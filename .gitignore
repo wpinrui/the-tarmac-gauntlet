@@ -1,2 +1,4 @@
 .agent/
 .claude/
+node_modules/
+out/
