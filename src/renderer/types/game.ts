@@ -33,7 +33,7 @@ export interface SaveMetadata {
 
 export type GamePhase =
   | "newGame"       // Character/team creation
-  | "prePrace"      // Between-race management screens
+  | "preRace"       // Between-race management screens
   | "race"          // Race in progress
   | "postRace";     // Race summary / newspaper
 
