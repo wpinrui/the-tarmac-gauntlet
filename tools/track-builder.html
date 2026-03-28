@@ -817,9 +817,12 @@ canvas.addEventListener("mousemove", (e) => {
       return;
     }
 
-    // Hover detection
+    // Hover detection (compare by value, not reference)
     const hit = hitTestControlPoints(pos.x, pos.y);
-    if (hit !== hoveredPoint) {
+    const same = hit && hoveredPoint
+      ? hit.curveSet === hoveredPoint.curveSet && hit.index === hoveredPoint.index && hit.which === hoveredPoint.which
+      : hit === hoveredPoint;
+    if (!same) {
       hoveredPoint = hit;
       canvas.style.cursor = hit ? "pointer" : "default";
       render();
@@ -1009,10 +1012,19 @@ document.addEventListener("keydown", (e) => {
     }
     saveState();
     const idx = hoveredPoint.index;
+    const closed = hoveredPoint.curveSet === "track" ? trackClosed : pitClosed;
     if (idx === 0) {
       curves.shift();
+      if (closed && curves.length > 0) {
+        // Reconnect: last segment's p3 must match new first segment's p0
+        curves[curves.length - 1].p3 = { ...curves[0].p0 };
+      }
     } else if (idx === curves.length - 1) {
       curves.pop();
+      if (closed && curves.length > 0) {
+        // Reconnect: last segment's p3 must match first segment's p0
+        curves[curves.length - 1].p3 = { ...curves[0].p0 };
+      }
     } else {
       // Join: make segment before connect to segment after
       curves[idx - 1].p3 = { ...curves[idx + 1].p0 };
