@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Track Builder — The 24h Tarmac Gauntlet</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- Toolbar --- */
+#toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #16213e;
+  border-bottom: 1px solid #0f3460;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+#toolbar button, #toolbar select {
+  padding: 6px 12px;
+  border: 1px solid #0f3460;
+  border-radius: 4px;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  cursor: pointer;
+  font-size: 13px;
+}
+#toolbar button:hover { background: #0f3460; }
+#toolbar button.active { background: #e94560; border-color: #e94560; color: #fff; }
+#toolbar button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.toolbar-sep {
+  width: 1px;
+  height: 24px;
+  background: #0f3460;
+}
+
+#toolbar label {
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+#toolbar input[type="range"] {
+  width: 80px;
+}
+
+#toolbar .info {
+  font-size: 12px;
+  color: #888;
+  margin-left: auto;
+}
+
+/* --- Canvas --- */
+#canvas-wrap {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+canvas {
+  display: block;
+  cursor: crosshair;
+}
+
+canvas.panning { cursor: grab; }
+canvas.panning:active { cursor: grabbing; }
+canvas.editing { cursor: default; }
+
+/* --- Status bar --- */
+#statusbar {
+  padding: 4px 12px;
+  background: #16213e;
+  border-top: 1px solid #0f3460;
+  font-size: 12px;
+  color: #888;
+  display: flex;
+  gap: 16px;
+}
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <button id="btn-draw-track" class="active" title="Draw the main track circuit">Draw Track</button>
+  <button id="btn-draw-pit" title="Draw the pit lane">Draw Pit Lane</button>
+  <button id="btn-edit" title="Edit control points">Edit</button>
+  <button id="btn-place-sf" title="Place start/finish line on track">Start/Finish</button>
+  <div class="toolbar-sep"></div>
+  <button id="btn-undo" title="Undo (Ctrl+Z)" disabled>Undo</button>
+  <button id="btn-redo" title="Redo (Ctrl+Y)" disabled>Redo</button>
+  <button id="btn-clear" title="Clear everything">Clear</button>
+  <div class="toolbar-sep"></div>
+  <label>Scale: <input type="range" id="scale-slider" min="5" max="100" value="20"> <span id="scale-value">20</span>m/sq</label>
+  <div class="toolbar-sep"></div>
+  <button id="btn-export" title="Export track as JSON">Export JSON</button>
+  <span class="info" id="toolbar-info"></span>
+</div>
+
+<div id="canvas-wrap">
+  <canvas id="canvas"></canvas>
+</div>
+
+<div id="statusbar">
+  <span id="status-mode">Mode: Draw Track</span>
+  <span id="status-mouse"></span>
+  <span id="status-measure"></span>
+</div>
+
+<script>
+// ============================================================
+// Track Builder — self-contained dev tool
+// ============================================================
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const wrap = document.getElementById("canvas-wrap");
+
+// --- State ---
+let mode = "draw-track"; // draw-track | draw-pit | edit | place-sf
+let viewX = 0, viewY = 0, viewZoom = 1;
+let gridMetres = 20; // metres per grid square
+
+// Track data
+let trackCurves = [];    // array of cubic bezier segments [{p0, cp1, cp2, p3}]
+let pitCurves = [];      // same format for pit lane
+let startFinish = null;  // {t, point} — parameter along track + world position
+let trackClosed = false;
+let pitClosed = false;
+
+// Drawing state
+let isDrawing = false;
+let drawPoints = [];     // raw freehand points during drawing
+let isPanning = false;
+let panStartX = 0, panStartY = 0;
+let panViewStartX = 0, panViewStartY = 0;
+
+// Edit state
+let dragPoint = null;    // {curveSet, index, which} — which control point is being dragged
+let hoveredPoint = null;
+
+// Undo/redo
+let undoStack = [];
+let redoStack = [];
+
+// --- Constants ---
+const GRID_SIZE = 40;       // pixels per grid square at zoom=1
+const POINT_RADIUS = 6;
+const SNAP_DIST = 15;       // pixels to snap to close loop
+const TRACK_COLOR = "#e94560";
+const TRACK_WIDTH = 4;
+const PIT_COLOR = "#f5a623";
+const PIT_WIDTH = 3;
+const CP_COLOR = "#4fc3f7";
+const CP_LINE_COLOR = "rgba(79,195,247,0.4)";
+const SF_COLOR = "#00e676";
+
+// ============================================================
+// Coordinate transforms
+// ============================================================
+function screenToWorld(sx, sy) {
+  return {
+    x: (sx - viewX) / viewZoom,
+    y: (sy - viewY) / viewZoom
+  };
+}
+
+function worldToScreen(wx, wy) {
+  return {
+    x: wx * viewZoom + viewX,
+    y: wy * viewZoom + viewY
+  };
+}
+
+// ============================================================
+// Canvas resize
+// ============================================================
+function resizeCanvas() {
+  canvas.width = wrap.clientWidth;
+  canvas.height = wrap.clientHeight;
+  render();
+}
+window.addEventListener("resize", resizeCanvas);
+
+// ============================================================
+// Grid rendering
+// ============================================================
+function drawGrid() {
+  const w = canvas.width, h = canvas.height;
+  const gridPx = GRID_SIZE * viewZoom;
+
+  // Don't draw grid if too small
+  if (gridPx < 4) return;
+
+  const startX = viewX % gridPx;
+  const startY = viewY % gridPx;
+
+  ctx.strokeStyle = "rgba(255,255,255,0.06)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let x = startX; x < w; x += gridPx) {
+    ctx.moveTo(Math.round(x) + 0.5, 0);
+    ctx.lineTo(Math.round(x) + 0.5, h);
+  }
+  for (let y = startY; y < h; y += gridPx) {
+    ctx.moveTo(0, Math.round(y) + 0.5);
+    ctx.lineTo(w, Math.round(y) + 0.5);
+  }
+  ctx.stroke();
+
+  // Major grid lines (every 5 squares)
+  const majorPx = gridPx * 5;
+  if (majorPx >= 20) {
+    const majorStartX = viewX % majorPx;
+    const majorStartY = viewY % majorPx;
+    ctx.strokeStyle = "rgba(255,255,255,0.12)";
+    ctx.beginPath();
+    for (let x = majorStartX; x < w; x += majorPx) {
+      ctx.moveTo(Math.round(x) + 0.5, 0);
+      ctx.lineTo(Math.round(x) + 0.5, h);
+    }
+    for (let y = majorStartY; y < h; y += majorPx) {
+      ctx.moveTo(0, Math.round(y) + 0.5);
+      ctx.lineTo(w, Math.round(y) + 0.5);
+    }
+    ctx.stroke();
+  }
+
+  // Origin crosshair
+  const origin = worldToScreen(0, 0);
+  ctx.strokeStyle = "rgba(255,255,255,0.2)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(origin.x + 0.5, 0);
+  ctx.lineTo(origin.x + 0.5, h);
+  ctx.moveTo(0, origin.y + 0.5);
+  ctx.lineTo(w, origin.y + 0.5);
+  ctx.stroke();
+}
+
+// ============================================================
+// Bezier curve fitting from freehand points
+// ============================================================
+
+function dist(a, b) {
+  const dx = a.x - b.x, dy = a.y - b.y;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function lerpPt(a, b, t) {
+  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+}
+
+// Ramer-Douglas-Peucker simplification
+function simplifyPoints(points, epsilon) {
+  if (points.length <= 2) return points;
+
+  let maxDist = 0, maxIdx = 0;
+  const first = points[0], last = points[points.length - 1];
+  const dx = last.x - first.x, dy = last.y - first.y;
+  const lenSq = dx * dx + dy * dy;
+
+  for (let i = 1; i < points.length - 1; i++) {
+    let d;
+    if (lenSq === 0) {
+      d = dist(points[i], first);
+    } else {
+      const t = Math.max(0, Math.min(1, ((points[i].x - first.x) * dx + (points[i].y - first.y) * dy) / lenSq));
+      const proj = { x: first.x + t * dx, y: first.y + t * dy };
+      d = dist(points[i], proj);
+    }
+    if (d > maxDist) { maxDist = d; maxIdx = i; }
+  }
+
+  if (maxDist > epsilon) {
+    const left = simplifyPoints(points.slice(0, maxIdx + 1), epsilon);
+    const right = simplifyPoints(points.slice(maxIdx), epsilon);
+    return left.slice(0, -1).concat(right);
+  }
+  return [first, last];
+}
+
+// Fit cubic Bezier through a sequence of points
+// Uses a simple heuristic: for each pair of adjacent simplified points,
+// create a cubic Bezier with control points at 1/3 and 2/3, adjusted by tangent
+function fitCubicBeziers(points) {
+  if (points.length < 2) return [];
+
+  const curves = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i];
+    const p3 = points[i + 1];
+
+    // Estimate tangents from neighbors
+    let tanIn, tanOut;
+    if (i > 0) {
+      tanIn = { x: p3.x - points[i - 1].x, y: p3.y - points[i - 1].y };
+    } else {
+      tanIn = { x: p3.x - p0.x, y: p3.y - p0.y };
+    }
+    if (i < points.length - 2) {
+      tanOut = { x: points[i + 2].x - p0.x, y: points[i + 2].y - p0.y };
+    } else {
+      tanOut = { x: p3.x - p0.x, y: p3.y - p0.y };
+    }
+
+    const segLen = dist(p0, p3);
+    const tanScale = segLen / 3;
+
+    const tanInLen = Math.sqrt(tanIn.x * tanIn.x + tanIn.y * tanIn.y) || 1;
+    const tanOutLen = Math.sqrt(tanOut.x * tanOut.x + tanOut.y * tanOut.y) || 1;
+
+    const cp1 = {
+      x: p0.x + (tanIn.x / tanInLen) * tanScale,
+      y: p0.y + (tanIn.y / tanInLen) * tanScale
+    };
+    const cp2 = {
+      x: p3.x - (tanOut.x / tanOutLen) * tanScale,
+      y: p3.y - (tanOut.y / tanOutLen) * tanScale
+    };
+
+    curves.push({ p0: { ...p0 }, cp1, cp2, p3: { ...p3 } });
+  }
+  return curves;
+}
+
+// Convert raw freehand points to Bezier curves
+function freehandToCurves(rawPoints, close) {
+  if (rawPoints.length < 2) return [];
+
+  // Simplify
+  const epsilon = 5 / viewZoom;
+  let simplified = simplifyPoints(rawPoints, epsilon);
+
+  // Ensure minimum points for good curves
+  if (simplified.length < 3 && rawPoints.length >= 3) {
+    simplified = [rawPoints[0], rawPoints[Math.floor(rawPoints.length / 2)], rawPoints[rawPoints.length - 1]];
+  }
+
+  if (close && simplified.length >= 3) {
+    // Force last point to match first
+    simplified[simplified.length - 1] = { ...simplified[0] };
+  }
+
+  return fitCubicBeziers(simplified);
+}
+
+// ============================================================
+// Bezier evaluation
+// ============================================================
+function evalBezier(c, t) {
+  const u = 1 - t;
+  return {
+    x: u*u*u*c.p0.x + 3*u*u*t*c.cp1.x + 3*u*t*t*c.cp2.x + t*t*t*c.p3.x,
+    y: u*u*u*c.p0.y + 3*u*u*t*c.cp1.y + 3*u*t*t*c.cp2.y + t*t*t*c.p3.y
+  };
+}
+
+function evalBezierTangent(c, t) {
+  const u = 1 - t;
+  return {
+    x: 3*u*u*(c.cp1.x-c.p0.x) + 6*u*t*(c.cp2.x-c.cp1.x) + 3*t*t*(c.p3.x-c.cp2.x),
+    y: 3*u*u*(c.cp1.y-c.p0.y) + 6*u*t*(c.cp2.y-c.cp1.y) + 3*t*t*(c.p3.y-c.cp2.y)
+  };
+}
+
+// Approximate arc length of a bezier curve
+function bezierLength(c, steps) {
+  steps = steps || 20;
+  let len = 0;
+  let prev = evalBezier(c, 0);
+  for (let i = 1; i <= steps; i++) {
+    const pt = evalBezier(c, i / steps);
+    len += dist(prev, pt);
+    prev = pt;
+  }
+  return len;
+}
+
+// Total track length in world units
+function totalLength(curves) {
+  let len = 0;
+  for (const c of curves) len += bezierLength(c);
+  return len;
+}
+
+// ============================================================
+// Rendering
+// ============================================================
+
+function drawBezierPath(curves, color, width) {
+  if (curves.length === 0) return;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width * viewZoom;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  const s0 = worldToScreen(curves[0].p0.x, curves[0].p0.y);
+  ctx.moveTo(s0.x, s0.y);
+  for (const c of curves) {
+    const s1 = worldToScreen(c.cp1.x, c.cp1.y);
+    const s2 = worldToScreen(c.cp2.x, c.cp2.y);
+    const s3 = worldToScreen(c.p3.x, c.p3.y);
+    ctx.bezierCurveTo(s1.x, s1.y, s2.x, s2.y, s3.x, s3.y);
+  }
+  ctx.stroke();
+}
+
+function drawControlPoints(curves, curveSet) {
+  if (mode !== "edit") return;
+  for (let i = 0; i < curves.length; i++) {
+    const c = curves[i];
+    // Control point lines
+    ctx.strokeStyle = CP_LINE_COLOR;
+    ctx.lineWidth = 1;
+
+    const sp0 = worldToScreen(c.p0.x, c.p0.y);
+    const scp1 = worldToScreen(c.cp1.x, c.cp1.y);
+    const scp2 = worldToScreen(c.cp2.x, c.cp2.y);
+    const sp3 = worldToScreen(c.p3.x, c.p3.y);
+
+    ctx.beginPath();
+    ctx.moveTo(sp0.x, sp0.y);
+    ctx.lineTo(scp1.x, scp1.y);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(sp3.x, sp3.y);
+    ctx.lineTo(scp2.x, scp2.y);
+    ctx.stroke();
+
+    // Anchor points (squares)
+    drawSquare(sp0.x, sp0.y, POINT_RADIUS, isHovered(curveSet, i, "p0") ? "#fff" : CP_COLOR);
+    if (i === curves.length - 1) {
+      drawSquare(sp3.x, sp3.y, POINT_RADIUS, isHovered(curveSet, i, "p3") ? "#fff" : CP_COLOR);
+    }
+    // Control points (circles)
+    drawCircle(scp1.x, scp1.y, POINT_RADIUS - 1, isHovered(curveSet, i, "cp1") ? "#fff" : CP_COLOR);
+    drawCircle(scp2.x, scp2.y, POINT_RADIUS - 1, isHovered(curveSet, i, "cp2") ? "#fff" : CP_COLOR);
+  }
+}
+
+function drawSquare(x, y, r, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(x - r, y - r, r * 2, r * 2);
+}
+
+function drawCircle(x, y, r, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function isHovered(curveSet, idx, which) {
+  return hoveredPoint && hoveredPoint.curveSet === curveSet && hoveredPoint.index === idx && hoveredPoint.which === which;
+}
+
+function drawStartFinish() {
+  if (!startFinish || trackCurves.length === 0) return;
+
+  const { segIdx, t } = startFinish;
+  if (segIdx >= trackCurves.length) return;
+  const c = trackCurves[segIdx];
+  const pt = evalBezier(c, t);
+  const tan = evalBezierTangent(c, t);
+  const tanLen = Math.sqrt(tan.x * tan.x + tan.y * tan.y) || 1;
+  const nx = -tan.y / tanLen;
+  const ny = tan.x / tanLen;
+
+  const lineLen = 15; // world units
+  const s1 = worldToScreen(pt.x + nx * lineLen, pt.y + ny * lineLen);
+  const s2 = worldToScreen(pt.x - nx * lineLen, pt.y - ny * lineLen);
+
+  ctx.strokeStyle = SF_COLOR;
+  ctx.lineWidth = 3;
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath();
+  ctx.moveTo(s1.x, s1.y);
+  ctx.lineTo(s2.x, s2.y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Label
+  const sp = worldToScreen(pt.x + nx * (lineLen + 5), pt.y + ny * (lineLen + 5));
+  ctx.fillStyle = SF_COLOR;
+  ctx.font = "11px sans-serif";
+  ctx.fillText("S/F", sp.x - 8, sp.y + 4);
+}
+
+function drawFreehandPreview() {
+  if (!isDrawing || drawPoints.length < 2) return;
+  const color = (mode === "draw-track") ? TRACK_COLOR : PIT_COLOR;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.globalAlpha = 0.5;
+  ctx.beginPath();
+  const s0 = worldToScreen(drawPoints[0].x, drawPoints[0].y);
+  ctx.moveTo(s0.x, s0.y);
+  for (let i = 1; i < drawPoints.length; i++) {
+    const s = worldToScreen(drawPoints[i].x, drawPoints[i].y);
+    ctx.lineTo(s.x, s.y);
+  }
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // Show snap indicator when close to start
+  if (drawPoints.length > 10) {
+    const first = worldToScreen(drawPoints[0].x, drawPoints[0].y);
+    const last = worldToScreen(drawPoints[drawPoints.length - 1].x, drawPoints[drawPoints.length - 1].y);
+    const d = dist(first, last);
+    if (d < SNAP_DIST * 2) {
+      ctx.strokeStyle = SF_COLOR;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(first.x, first.y, SNAP_DIST, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+}
+
+function drawMeasurements() {
+  // Show total track length
+  if (trackCurves.length > 0) {
+    const lenWorld = totalLength(trackCurves);
+    const lenMetres = lenWorld * (gridMetres / GRID_SIZE);
+    const text = `Track: ${lenMetres.toFixed(0)}m`;
+    ctx.fillStyle = TRACK_COLOR;
+    ctx.font = "12px sans-serif";
+    ctx.fillText(text, 10, canvas.height - 40);
+  }
+  if (pitCurves.length > 0) {
+    const lenWorld = totalLength(pitCurves);
+    const lenMetres = lenWorld * (gridMetres / GRID_SIZE);
+    const text = `Pit lane: ${lenMetres.toFixed(0)}m`;
+    ctx.fillStyle = PIT_COLOR;
+    ctx.font = "12px sans-serif";
+    ctx.fillText(text, 10, canvas.height - 24);
+  }
+}
+
+function render() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#1a1a2e";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  drawGrid();
+
+  // Pit lane (draw under track)
+  drawBezierPath(pitCurves, PIT_COLOR, PIT_WIDTH);
+  drawControlPoints(pitCurves, "pit");
+
+  // Main track
+  drawBezierPath(trackCurves, TRACK_COLOR, TRACK_WIDTH);
+  drawControlPoints(trackCurves, "track");
+
+  // Start/finish
+  drawStartFinish();
+
+  // Freehand preview
+  drawFreehandPreview();
+
+  // Measurements
+  drawMeasurements();
+}
+
+// ============================================================
+// Undo / Redo
+// ============================================================
+function saveState() {
+  undoStack.push({
+    trackCurves: JSON.parse(JSON.stringify(trackCurves)),
+    pitCurves: JSON.parse(JSON.stringify(pitCurves)),
+    startFinish: startFinish ? { ...startFinish } : null,
+    trackClosed,
+    pitClosed
+  });
+  redoStack = [];
+  updateUndoButtons();
+}
+
+function undo() {
+  if (undoStack.length === 0) return;
+  redoStack.push({
+    trackCurves: JSON.parse(JSON.stringify(trackCurves)),
+    pitCurves: JSON.parse(JSON.stringify(pitCurves)),
+    startFinish: startFinish ? { ...startFinish } : null,
+    trackClosed,
+    pitClosed
+  });
+  const state = undoStack.pop();
+  trackCurves = state.trackCurves;
+  pitCurves = state.pitCurves;
+  startFinish = state.startFinish;
+  trackClosed = state.trackClosed;
+  pitClosed = state.pitClosed;
+  updateUndoButtons();
+  render();
+}
+
+function redo() {
+  if (redoStack.length === 0) return;
+  undoStack.push({
+    trackCurves: JSON.parse(JSON.stringify(trackCurves)),
+    pitCurves: JSON.parse(JSON.stringify(pitCurves)),
+    startFinish: startFinish ? { ...startFinish } : null,
+    trackClosed,
+    pitClosed
+  });
+  const state = redoStack.pop();
+  trackCurves = state.trackCurves;
+  pitCurves = state.pitCurves;
+  startFinish = state.startFinish;
+  trackClosed = state.trackClosed;
+  pitClosed = state.pitClosed;
+  updateUndoButtons();
+  render();
+}
+
+function updateUndoButtons() {
+  document.getElementById("btn-undo").disabled = undoStack.length === 0;
+  document.getElementById("btn-redo").disabled = redoStack.length === 0;
+}
+
+// ============================================================
+// Hit testing (for edit mode)
+// ============================================================
+function hitTestControlPoints(sx, sy) {
+  const threshold = POINT_RADIUS + 4;
+
+  function check(curves, curveSet) {
+    for (let i = curves.length - 1; i >= 0; i--) {
+      const c = curves[i];
+      for (const which of ["cp2", "cp1", "p3", "p0"]) {
+        // Skip p3 for non-last curves (it's the same as next p0)
+        if (which === "p3" && i < curves.length - 1) continue;
+        const sp = worldToScreen(c[which].x, c[which].y);
+        if (Math.abs(sp.x - sx) < threshold && Math.abs(sp.y - sy) < threshold) {
+          return { curveSet, index: i, which };
+        }
+      }
+    }
+    return null;
+  }
+
+  return check(trackCurves, "track") || check(pitCurves, "pit");
+}
+
+// Find closest point on track curves to screen position
+function closestPointOnTrack(sx, sy) {
+  let bestDist = Infinity;
+  let bestSegIdx = 0;
+  let bestT = 0;
+
+  for (let i = 0; i < trackCurves.length; i++) {
+    const c = trackCurves[i];
+    const steps = 40;
+    for (let j = 0; j <= steps; j++) {
+      const t = j / steps;
+      const pt = evalBezier(c, t);
+      const sp = worldToScreen(pt.x, pt.y);
+      const d = dist({ x: sx, y: sy }, sp);
+      if (d < bestDist) {
+        bestDist = d;
+        bestSegIdx = i;
+        bestT = t;
+      }
+    }
+  }
+  return { segIdx: bestSegIdx, t: bestT, dist: bestDist };
+}
+
+// ============================================================
+// Mouse handlers
+// ============================================================
+function getMousePos(e) {
+  const rect = canvas.getBoundingClientRect();
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+
+canvas.addEventListener("mousedown", (e) => {
+  const pos = getMousePos(e);
+
+  // Middle mouse or space+click: pan
+  if (e.button === 1 || (e.button === 0 && e.altKey)) {
+    isPanning = true;
+    panStartX = pos.x;
+    panStartY = pos.y;
+    panViewStartX = viewX;
+    panViewStartY = viewY;
+    canvas.classList.add("panning");
+    return;
+  }
+
+  if (e.button !== 0) return;
+
+  if (mode === "draw-track" || mode === "draw-pit") {
+    const targetCurves = mode === "draw-track" ? trackCurves : pitCurves;
+    const isClosed = mode === "draw-track" ? trackClosed : pitClosed;
+    if (targetCurves.length > 0 && isClosed) {
+      updateInfo("Track already drawn. Use Edit mode or Clear.");
+      return;
+    }
+    if (targetCurves.length > 0) {
+      updateInfo("Path already drawn. Clear to redraw.");
+      return;
+    }
+    isDrawing = true;
+    drawPoints = [screenToWorld(pos.x, pos.y)];
+  } else if (mode === "edit") {
+    const hit = hitTestControlPoints(pos.x, pos.y);
+    if (hit) {
+      saveState();
+      dragPoint = hit;
+    }
+  } else if (mode === "place-sf") {
+    if (trackCurves.length === 0) {
+      updateInfo("Draw the track first.");
+      return;
+    }
+    const closest = closestPointOnTrack(pos.x, pos.y);
+    if (closest.dist < 30) {
+      saveState();
+      startFinish = { segIdx: closest.segIdx, t: closest.t };
+      render();
+      updateInfo("Start/finish line placed.");
+    }
+  }
+});
+
+canvas.addEventListener("mousemove", (e) => {
+  const pos = getMousePos(e);
+  const world = screenToWorld(pos.x, pos.y);
+  const worldMetres = {
+    x: (world.x / GRID_SIZE * gridMetres).toFixed(1),
+    y: (world.y / GRID_SIZE * gridMetres).toFixed(1)
+  };
+  document.getElementById("status-mouse").textContent = `Pos: ${worldMetres.x}, ${worldMetres.y} m`;
+
+  if (isPanning) {
+    viewX = panViewStartX + (pos.x - panStartX);
+    viewY = panViewStartY + (pos.y - panStartY);
+    render();
+    return;
+  }
+
+  if (isDrawing) {
+    const wp = screenToWorld(pos.x, pos.y);
+    // Only add if moved enough
+    const last = drawPoints[drawPoints.length - 1];
+    if (dist(last, wp) > 2 / viewZoom) {
+      drawPoints.push(wp);
+    }
+    render();
+
+    // Show distance while drawing
+    if (drawPoints.length > 1) {
+      let drawLen = 0;
+      for (let i = 1; i < drawPoints.length; i++) {
+        drawLen += dist(drawPoints[i-1], drawPoints[i]);
+      }
+      const lenMetres = drawLen * (gridMetres / GRID_SIZE);
+      document.getElementById("status-measure").textContent = `Drawing: ${lenMetres.toFixed(0)}m`;
+    }
+    return;
+  }
+
+  if (mode === "edit") {
+    if (dragPoint) {
+      const wp = screenToWorld(pos.x, pos.y);
+      const curves = dragPoint.curveSet === "track" ? trackCurves : pitCurves;
+      const c = curves[dragPoint.index];
+      const which = dragPoint.which;
+
+      // Move the point
+      c[which].x = wp.x;
+      c[which].y = wp.y;
+
+      // Keep adjacent curves connected
+      if (which === "p0" && dragPoint.index > 0) {
+        curves[dragPoint.index - 1].p3.x = wp.x;
+        curves[dragPoint.index - 1].p3.y = wp.y;
+      }
+      if (which === "p3" && dragPoint.index < curves.length - 1) {
+        curves[dragPoint.index + 1].p0.x = wp.x;
+        curves[dragPoint.index + 1].p0.y = wp.y;
+      }
+
+      // Keep closed loop connected
+      const closed = dragPoint.curveSet === "track" ? trackClosed : pitClosed;
+      if (closed && curves.length > 0) {
+        if (which === "p0" && dragPoint.index === 0) {
+          curves[curves.length - 1].p3.x = wp.x;
+          curves[curves.length - 1].p3.y = wp.y;
+        }
+        if (which === "p3" && dragPoint.index === curves.length - 1) {
+          curves[0].p0.x = wp.x;
+          curves[0].p0.y = wp.y;
+        }
+      }
+
+      render();
+      return;
+    }
+
+    // Hover detection
+    const hit = hitTestControlPoints(pos.x, pos.y);
+    if (hit !== hoveredPoint) {
+      hoveredPoint = hit;
+      canvas.style.cursor = hit ? "pointer" : "default";
+      render();
+    }
+  }
+});
+
+canvas.addEventListener("mouseup", (e) => {
+  if (isPanning) {
+    isPanning = false;
+    canvas.classList.remove("panning");
+    return;
+  }
+
+  if (isDrawing && drawPoints.length > 5) {
+    saveState();
+    const first = worldToScreen(drawPoints[0].x, drawPoints[0].y);
+    const last = worldToScreen(drawPoints[drawPoints.length - 1].x, drawPoints[drawPoints.length - 1].y);
+    const shouldClose = dist(first, last) < SNAP_DIST;
+
+    const curves = freehandToCurves(drawPoints, shouldClose);
+
+    if (mode === "draw-track") {
+      trackCurves = curves;
+      trackClosed = shouldClose;
+      updateInfo(shouldClose ? "Track closed! Loop complete." : "Track drawn (open path).");
+    } else {
+      pitCurves = curves;
+      pitClosed = shouldClose;
+      updateInfo("Pit lane drawn.");
+    }
+    render();
+  }
+
+  isDrawing = false;
+  drawPoints = [];
+  dragPoint = null;
+  document.getElementById("status-measure").textContent = "";
+});
+
+// Zoom
+canvas.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  const pos = getMousePos(e);
+  const worldBefore = screenToWorld(pos.x, pos.y);
+
+  const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+  viewZoom = Math.max(0.1, Math.min(10, viewZoom * zoomFactor));
+
+  const worldAfter = screenToWorld(pos.x, pos.y);
+  viewX += (worldAfter.x - worldBefore.x) * viewZoom;
+  viewY += (worldAfter.y - worldBefore.y) * viewZoom;
+
+  render();
+}, { passive: false });
+
+// ============================================================
+// Toolbar handlers
+// ============================================================
+function setMode(m) {
+  mode = m;
+  document.getElementById("btn-draw-track").classList.toggle("active", m === "draw-track");
+  document.getElementById("btn-draw-pit").classList.toggle("active", m === "draw-pit");
+  document.getElementById("btn-edit").classList.toggle("active", m === "edit");
+  document.getElementById("btn-place-sf").classList.toggle("active", m === "place-sf");
+
+  canvas.classList.toggle("editing", m === "edit");
+  canvas.style.cursor = m === "edit" ? "default" : "crosshair";
+
+  const modeNames = { "draw-track": "Draw Track", "draw-pit": "Draw Pit Lane", "edit": "Edit", "place-sf": "Place Start/Finish" };
+  document.getElementById("status-mode").textContent = "Mode: " + modeNames[m];
+
+  hoveredPoint = null;
+  render();
+}
+
+document.getElementById("btn-draw-track").addEventListener("click", () => setMode("draw-track"));
+document.getElementById("btn-draw-pit").addEventListener("click", () => setMode("draw-pit"));
+document.getElementById("btn-edit").addEventListener("click", () => setMode("edit"));
+document.getElementById("btn-place-sf").addEventListener("click", () => setMode("place-sf"));
+
+document.getElementById("btn-undo").addEventListener("click", undo);
+document.getElementById("btn-redo").addEventListener("click", redo);
+
+document.getElementById("btn-clear").addEventListener("click", () => {
+  if (trackCurves.length === 0 && pitCurves.length === 0 && !startFinish) return;
+  saveState();
+  trackCurves = [];
+  pitCurves = [];
+  startFinish = null;
+  trackClosed = false;
+  pitClosed = false;
+  render();
+  updateInfo("Cleared.");
+});
+
+// Scale slider
+const scaleSlider = document.getElementById("scale-slider");
+const scaleValue = document.getElementById("scale-value");
+scaleSlider.addEventListener("input", () => {
+  gridMetres = parseInt(scaleSlider.value);
+  scaleValue.textContent = gridMetres;
+  render();
+});
+
+// ============================================================
+// Export
+// ============================================================
+document.getElementById("btn-export").addEventListener("click", () => {
+  if (trackCurves.length === 0) {
+    updateInfo("Nothing to export — draw a track first.");
+    return;
+  }
+
+  const scale = gridMetres / GRID_SIZE; // metres per world unit
+
+  function convertCurves(curves) {
+    return curves.map(c => ({
+      p0: { x: +(c.p0.x * scale).toFixed(2), y: +(c.p0.y * scale).toFixed(2) },
+      cp1: { x: +(c.cp1.x * scale).toFixed(2), y: +(c.cp1.y * scale).toFixed(2) },
+      cp2: { x: +(c.cp2.x * scale).toFixed(2), y: +(c.cp2.y * scale).toFixed(2) },
+      p3: { x: +(c.p3.x * scale).toFixed(2), y: +(c.p3.y * scale).toFixed(2) }
+    }));
+  }
+
+  const data = {
+    version: 1,
+    scale: { metresPerGridSquare: gridMetres },
+    track: {
+      curves: convertCurves(trackCurves),
+      closed: trackClosed,
+      lengthMetres: +(totalLength(trackCurves) * scale).toFixed(1)
+    }
+  };
+
+  if (pitCurves.length > 0) {
+    data.pitLane = {
+      curves: convertCurves(pitCurves),
+      closed: pitClosed,
+      lengthMetres: +(totalLength(pitCurves) * scale).toFixed(1)
+    };
+  }
+
+  if (startFinish && startFinish.segIdx < trackCurves.length) {
+    const c = trackCurves[startFinish.segIdx];
+    const pt = evalBezier(c, startFinish.t);
+    data.startFinish = {
+      segmentIndex: startFinish.segIdx,
+      t: +startFinish.t.toFixed(4),
+      position: { x: +(pt.x * scale).toFixed(2), y: +(pt.y * scale).toFixed(2) }
+    };
+  }
+
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "track.json";
+  a.click();
+  URL.revokeObjectURL(url);
+  updateInfo("Track exported!");
+});
+
+// ============================================================
+// Keyboard shortcuts
+// ============================================================
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey && e.key === "z") { e.preventDefault(); undo(); }
+  if (e.ctrlKey && e.key === "y") { e.preventDefault(); redo(); }
+  if (e.key === "1") setMode("draw-track");
+  if (e.key === "2") setMode("draw-pit");
+  if (e.key === "3") setMode("edit");
+  if (e.key === "4") setMode("place-sf");
+  if (e.key === "Escape") {
+    if (isDrawing) {
+      isDrawing = false;
+      drawPoints = [];
+      render();
+    }
+  }
+  if (e.key === "Delete" && mode === "edit" && hoveredPoint) {
+    const curves = hoveredPoint.curveSet === "track" ? trackCurves : pitCurves;
+    if (curves.length <= 1) {
+      updateInfo("Can't delete the last segment.");
+      return;
+    }
+    saveState();
+    const idx = hoveredPoint.index;
+    if (idx === 0) {
+      curves.shift();
+    } else if (idx === curves.length - 1) {
+      curves.pop();
+    } else {
+      // Join: make segment before connect to segment after
+      curves[idx - 1].p3 = { ...curves[idx + 1].p0 };
+      curves[idx - 1].cp2 = lerpPt(curves[idx - 1].p0, curves[idx - 1].p3, 0.67);
+      curves.splice(idx, 1);
+    }
+    hoveredPoint = null;
+    render();
+    updateInfo("Segment deleted.");
+  }
+});
+
+// ============================================================
+// Info helper
+// ============================================================
+function updateInfo(text) {
+  document.getElementById("toolbar-info").textContent = text;
+  setTimeout(() => {
+    document.getElementById("toolbar-info").textContent = "";
+  }, 4000);
+}
+
+// ============================================================
+// Init
+// ============================================================
+function init() {
+  resizeCanvas();
+  // Center view
+  viewX = canvas.width / 2;
+  viewY = canvas.height / 2;
+  render();
+  updateInfo("Draw a track by clicking and dragging. Bring the end near the start to close the loop.");
+}
+
+init();
+</script>
+</body>
+</html>
