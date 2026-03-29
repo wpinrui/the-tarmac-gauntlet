@@ -65,8 +65,7 @@ const AI_TIER_SPECS: AiTierSpec[] = [
   { modelIds: ["d-12", "d-13", "d-14", "d-15"],                   count: 20, budgetMin: 10_000,  budgetMax: 25_000,   crewSize: 4 },
   { modelIds: ["c-16", "c-17", "c-18", "c-19", "c-20"],           count: 15, budgetMin: 25_000,  budgetMax: 60_000,   crewSize: 6 },
   { modelIds: ["b-21", "b-22", "b-23", "b-24", "b-25"],           count: 12, budgetMin: 60_000,  budgetMax: 150_000,  crewSize: 8 },
-  { modelIds: ["a-26", "a-27", "a-28", "a-29", "a-30"],           count: 8,  budgetMin: 150_000, budgetMax: 400_000,  crewSize: 12 },
-  { modelIds: ["f1-31"],                                           count: 4,  budgetMin: 400_000, budgetMax: 1_000_000, crewSize: 16 },
+  { modelIds: ["a-26", "a-27", "a-28", "a-29", "a-30"],           count: 12, budgetMin: 150_000, budgetMax: 400_000,  crewSize: 12 },
 ];
 
 // ---------------------------------------------------------------------------
