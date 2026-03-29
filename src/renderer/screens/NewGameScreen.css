@@ -2,6 +2,14 @@
 
 /* ---------- reset & backdrop ---------- */
 
+.new-game-root *,
+.new-game-root *::before,
+.new-game-root *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
 .new-game-root {
   position: fixed;
   inset: 0;
