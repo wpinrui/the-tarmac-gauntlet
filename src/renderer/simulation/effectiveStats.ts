@@ -18,7 +18,7 @@ const MIN_COMBINED_MULTIPLIER = 0.1;
  * pitStopTime is inverted (lower = better), so the combined multiplier is applied as a
  * divisor instead — lower condition and greater age both increase the pit stop duration.
  *
- * Upgrade pack → stat mapping (GDD §4):
+ * Upgrade pack → stat mapping (GDD §3):
  *   Power Pack    : power, fuelEfficiency
  *   Handling Pack : handling, tyreDurability
  *   Comfort Pack  : comfort
