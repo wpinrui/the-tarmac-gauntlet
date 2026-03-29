@@ -117,16 +117,15 @@ export interface PitStopResult {
  *   accumulated in earlier stints. This keeps the system simple and predictable.
  *   See Implementer → PM handoff 2026-03-29 if a "carry-over fatigue" model is preferred.
  *
- * @param ctx           Current car, driver, and team state.
- * @param config        What to do during the stop (from PitStopConfig).
- * @param issueIdsToFix Template IDs of issues the player wants to fix this stop.
- *                      Each fix is skipped silently if parts are insufficient.
+ * @param ctx    Current car, driver, and team state.
+ * @param config What to do during the stop. `config.issueIdsToFix` lists the template IDs
+ *               of issues to attempt to repair; each is skipped silently if parts are insufficient.
  */
 export function executePitStop(
   ctx: PitStopContext,
   config: PitStopConfig,
-  issueIdsToFix: string[] = [],
 ): PitStopResult {
+  const issueIdsToFix = config.issueIdsToFix ?? [];
   let taskSeconds = 0;
   let tyreSetsRemaining = ctx.tyreSetsAvailable;
   let sparePartsRemaining = ctx.sparePartsAvailable;

@@ -243,34 +243,34 @@ describe("executePitStop — issue fixes", () => {
 
   it("fixed issues are removed from activeIssues", () => {
     const ctx = makeCtx({ activeIssues: issues, issueTemplates: templates, sparePartsAvailable: 10 });
-    const { activeIssues } = executePitStop(ctx, emptyConfig, ["loose-wheel"]);
+    const { activeIssues } = executePitStop(ctx, { ...emptyConfig, issueIdsToFix: ["loose-wheel"] });
     expect(activeIssues.find((i) => i.templateId === "loose-wheel")).toBeUndefined();
     expect(activeIssues.find((i) => i.templateId === "brake-fade")).toBeDefined();
   });
 
   it("fixing an issue consumes spare parts", () => {
     const ctx = makeCtx({ activeIssues: issues, issueTemplates: templates, sparePartsAvailable: 10 });
-    const { sparePartsRemaining } = executePitStop(ctx, emptyConfig, ["loose-wheel"]);
+    const { sparePartsRemaining } = executePitStop(ctx, { ...emptyConfig, issueIdsToFix: ["loose-wheel"] });
     expect(sparePartsRemaining).toBe(8); // cost = 2
   });
 
   it("fixing an issue adds its fixDuration to the stop", () => {
     const ctx = makeCtx({ activeIssues: issues, issueTemplates: templates, sparePartsAvailable: 10 });
-    const withFix = executePitStop(ctx, emptyConfig, ["loose-wheel"]).duration;
-    const withoutFix = executePitStop(ctx, emptyConfig, []).duration;
+    const withFix = executePitStop(ctx, { ...emptyConfig, issueIdsToFix: ["loose-wheel"] }).duration;
+    const withoutFix = executePitStop(ctx, emptyConfig).duration;
     expect(withFix).toBeGreaterThan(withoutFix);
   });
 
   it("issue is skipped if spare parts are insufficient", () => {
     const ctx = makeCtx({ activeIssues: issues, issueTemplates: templates, sparePartsAvailable: 1 });
-    const { activeIssues, sparePartsRemaining } = executePitStop(ctx, emptyConfig, ["loose-wheel"]);
+    const { activeIssues, sparePartsRemaining } = executePitStop(ctx, { ...emptyConfig, issueIdsToFix: ["loose-wheel"] });
     expect(activeIssues.find((i) => i.templateId === "loose-wheel")).toBeDefined(); // not fixed
     expect(sparePartsRemaining).toBe(1); // no parts consumed
   });
 
   it("unfixed issues remain active", () => {
     const ctx = makeCtx({ activeIssues: issues, issueTemplates: templates, sparePartsAvailable: 10 });
-    const { activeIssues } = executePitStop(ctx, emptyConfig, []); // fix nothing
+    const { activeIssues } = executePitStop(ctx, emptyConfig); // fix nothing (no issueIdsToFix)
     expect(activeIssues).toHaveLength(2);
   });
 });
@@ -305,9 +305,9 @@ describe("executePitStop — combined stop", () => {
       activeIssues: [{ templateId: "loose-wheel", lapOccurred: 2 }],
       issueTemplates: templates,
     });
-    const config = { fuelToAdd: 60, changeTyres: true, nextDriverId: "driver-B" };
+    const config = { fuelToAdd: 60, changeTyres: true, nextDriverId: "driver-B", issueIdsToFix: ["loose-wheel"] };
 
-    const result = executePitStop(ctx, config, ["loose-wheel"]);
+    const result = executePitStop(ctx, config);
 
     expect(result.fuelLevel).toBe(80);          // 20 + 60
     expect(result.tyreWear).toBe(0);             // fresh tyres
