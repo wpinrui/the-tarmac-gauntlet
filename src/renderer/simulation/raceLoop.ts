@@ -1,6 +1,7 @@
 import type {
   CarInstance,
   CarModel,
+  CarStats,
   ActiveIssue,
   InstructionMode,
   IssueTemplate,
@@ -106,8 +107,10 @@ export interface RaceOptions {
   totalLaps?: number;
   /** Injectable random source for deterministic testing. */
   random?: () => number;
-  /** Issue template catalogue. Defaults to [] (no issues). */
+  /** Mechanical issue template catalogue. Defaults to [] (no issues). */
   issueTemplates?: IssueTemplate[];
+  /** Crash issue template catalogue. Defaults to [] (no crash issues). */
+  crashTemplates?: IssueTemplate[];
 }
 
 /** Final result for one car. */
@@ -181,6 +184,30 @@ function makeSnapshot(
 }
 
 /**
+ * Applies percentage-based stat debuffs from all active issues to effective stats.
+ * Each debuff is a fractional reduction, e.g. { power: 0.10 } = -10% power.
+ * Multiple debuffs on the same stat stack multiplicatively.
+ */
+function applyIssueDebuffs(
+  stats: CarStats,
+  activeIssues: ActiveIssue[],
+  allTemplates: IssueTemplate[],
+): CarStats {
+  if (activeIssues.length === 0) return stats;
+
+  const result = { ...stats };
+  for (const issue of activeIssues) {
+    const template = allTemplates.find((t) => t.id === issue.templateId);
+    if (!template) continue;
+    for (const [stat, debuff] of Object.entries(template.statDebuffs)) {
+      const key = stat as keyof CarStats;
+      result[key] = result[key] * (1 - (debuff as number));
+    }
+  }
+  return result;
+}
+
+/**
  * Default pit strategy for AI cars (GDD §8: "simple threshold strategy").
  * Pits when tyres are heavily worn or fuel is low.
  * Always refuels to capacity and changes tyres if sets are available.
@@ -247,6 +274,9 @@ export function simulateRace(
   const totalLaps = options.totalLaps ?? DEFAULT_TOTAL_LAPS;
   const random = options.random ?? Math.random;
   const issueTemplates = options.issueTemplates ?? [];
+  const crashTemplates = options.crashTemplates ?? [];
+  /** All templates combined — needed for pit stop issue fix lookups. */
+  const allTemplates = [...issueTemplates, ...crashTemplates];
 
   // Initialize working state for every car
   const states: CarWorkingState[] = cars.map((entry) => ({
@@ -292,9 +322,12 @@ export function simulateRace(
       )!;
       const currentFatigue = state.driverFatigue[state.currentDriverId] ?? 0;
 
-      // 3. Lap time (base — issue penalties added below)
-      const baseLapTime = calculateLapTime(
-        effectiveStats,
+      // 3. Apply active issue stat debuffs to effective stats
+      const debuffedStats = applyIssueDebuffs(effectiveStats, state.activeIssues, allTemplates);
+
+      // 4. Lap time using debuffed stats
+      const lapTime = calculateLapTime(
+        debuffedStats,
         currentDriver.stats,
         currentFatigue,
         state.instructionMode,
@@ -303,28 +336,22 @@ export function simulateRace(
         random,
       );
 
-      // Add per-lap penalties from active issues
-      const issuePenalty = state.activeIssues.reduce((sum, issue) => {
-        const template = issueTemplates.find((t) => t.id === issue.templateId);
-        return sum + (template?.lapTimeCost ?? 0);
-      }, 0);
-      const lapTime = baseLapTime + issuePenalty;
-
       // Track fastest lap (total on-track time including issue penalties)
       if (fastestLap === null || lapTime < fastestLap.time) {
         fastestLap = { carId: entry.carId, lap, time: lapTime };
       }
 
-      // 4. Roll for issues and failures
+      // 5. Roll for issues and failures
       const riskResult = rollLapRisks({
         currentLap: lap,
         condition: state.condition,
         carAge: entry.instance.age,
-        reliability: effectiveStats.reliability,
+        reliability: debuffedStats.reliability,
         driverSafety: currentDriver.stats.safety,
         instructionMode: state.instructionMode,
         activeIssues: state.activeIssues,
         issueTemplates,
+        crashTemplates,
         random,
       });
 
@@ -423,7 +450,7 @@ export function simulateRace(
             currentDriverId: state.currentDriverId,
             driverFatigue: state.driverFatigue,
             activeIssues: state.activeIssues,
-            issueTemplates,
+            issueTemplates: allTemplates,
             crewSize: entry.crewSize,
             engineerSkill: entry.engineerSkill,
           },

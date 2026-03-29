@@ -170,7 +170,7 @@ export function executePitStop(
     if (sparePartsRemaining < template.sparePartsCost) continue; // insufficient parts
 
     sparePartsRemaining -= template.sparePartsCost;
-    taskSeconds += template.fixDuration;
+    taskSeconds += template.workUnits;
     newActiveIssues = [
       ...newActiveIssues.slice(0, issueIndex),
       ...newActiveIssues.slice(issueIndex + 1),
