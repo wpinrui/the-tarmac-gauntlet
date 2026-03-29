@@ -27,20 +27,26 @@ export const AI_TEAM_ROSTER: AiTeamEntry[] = [
   // -----------------------------------------------------------------------
   // CLASS D — 20 teams
   // -----------------------------------------------------------------------
-  { name: "Rubasu Tecnica",              descriptor: "Rubasu's rally-bred factory effort", carClass: "D" },
-  // TODO: 19 teams TBD
+  { name: "Rubasu Technica",              descriptor: "Rubasu's rally-bred factory effort", carClass: "D" },
+  { name: "Amazing Wild Services",        descriptor: "tech-money privateer, data-obsessed", carClass: "D" },
+  { name: "Petrol Mush Racing",           descriptor: "fuel sponsor backing a scrappy sports car team", carClass: "D" },
+  // TODO: 17 teams TBD
 
   // -----------------------------------------------------------------------
   // CLASS C — 15 teams
   // -----------------------------------------------------------------------
   { name: "Team Hando Racing",           descriptor: "Hando's official touring/GT squad", carClass: "C" },
   { name: "Ichisan Racing",              descriptor: "Ichisan's factory GT programme", carClass: "C" },
-  { name: "Greystone AMG",              descriptor: "Maecides-supported independent squad", carClass: "C" },
+  { name: "Greystone Maecides OMG",      descriptor: "Maecides-supported independent squad", carClass: "C" },
   { name: "Vosper Fuud Racing",          descriptor: "Fuud-backed privateer with works engines", carClass: "C" },
   { name: "KNS Tonata",                  descriptor: "Tonata's Southeast Asian satellite programme", carClass: "C" },
   { name: "Premier Racing",              descriptor: "feeder-series talent factory gone GT", carClass: "C" },
   { name: "CRAFT Grand Prix",            descriptor: "elite junior formula team stepping up", carClass: "C" },
-  // TODO: 8 teams TBD
+  { name: "Carol Oil Autosport",         descriptor: "lubricant-sponsored touring car operation", carClass: "C" },
+  { name: "Agile 1 Motorsport",          descriptor: "technical sponsor turned team owner", carClass: "C" },
+  { name: "Complete Energy Racing",      descriptor: "fuel company's professional GT outfit", carClass: "C" },
+  { name: "DHM Logistics Racing",        descriptor: "corporate-backed mid-tier squad", carClass: "C" },
+  // TODO: 4 teams TBD
 
   // -----------------------------------------------------------------------
   // CLASS B — 12 teams
@@ -53,7 +59,9 @@ export const AI_TEAM_ROSTER: AiTeamEntry[] = [
   { name: "Stonebridge Rocher",          descriptor: "British-run Rocher customer racing outfit", carClass: "B" },
   { name: "Sip Vanessa Racing",          descriptor: "veteran-run multi-series operation", carClass: "B" },
   { name: "BG Corsa",                    descriptor: "Italian GT privateer powerhouse", carClass: "B" },
-  // TODO: 4 teams TBD
+  { name: "Alien Power Motorsport",      descriptor: "energy drink-sponsored privateer with deep pockets", carClass: "B" },
+  { name: "Seashell Racing",             descriptor: "fuel giant's long-running works partnership", carClass: "B" },
+  // TODO: 2 teams TBD
 
   // -----------------------------------------------------------------------
   // CLASS A — 12 teams
@@ -66,5 +74,7 @@ export const AI_TEAM_ROSTER: AiTeamEntry[] = [
   { name: "Panski Autosport",            descriptor: "multi-discipline racing dynasty", carClass: "A" },
   { name: "Avetti Motorsport",           descriptor: "expanding privateer empire", carClass: "A" },
   { name: "Revolution Racing",           descriptor: "Swiss-bankrolled endurance privateer", carClass: "A" },
-  // TODO: 4 teams TBD
+  { name: "Blue Cow Racing",             descriptor: "energy drink empire's factory racing arm", carClass: "A" },
+  { name: "Golf Endurance",              descriptor: "heritage oil brand's flagship endurance entry", carClass: "A" },
+  // TODO: 2 teams TBD
 ];
