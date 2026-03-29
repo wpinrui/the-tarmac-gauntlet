@@ -21,9 +21,10 @@ export interface ActiveIssue {
 // --- Pit Stop Configuration ---
 
 export interface PitStopConfig {
-  fuelToAdd: number;          // Litres to add (0 = no refuel)
-  changeTyres: boolean;       // Whether to change tyres (consumes 1 tyre set)
-  nextDriverId: string | null; // Driver to swap to (null = keep current)
+  fuelToAdd: number;              // Litres to add (0 = no refuel)
+  changeTyres: boolean;           // Whether to change tyres (consumes 1 tyre set)
+  nextDriverId: string | null;    // Driver to swap to (null = keep current)
+  issueIdsToFix?: string[];       // Template IDs of issues to fix this stop (omit or [] = fix nothing)
 }
 
 // --- Per-Car Race State ---
