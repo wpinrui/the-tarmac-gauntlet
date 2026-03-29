@@ -350,15 +350,13 @@ describe("AI pit strategy", () => {
     });
     // No pitDecider → AI strategy
 
-    let tyreWearAfterPit: number | null = null;
-    // We can observe tyre wear by checking that total time is higher (pit occurred)
+    // We can observe the pit occurred by checking that total time is higher (pit stop duration added)
     const noPitEntry = makeEntry({ carId: "no-pit", startingTyreWear: 0 });
     const aiResult = simulateRace([entry], { totalLaps: 3, random: neverFire });
     const noPitResult = simulateRace([noPitEntry], { totalLaps: 3, random: neverFire });
 
     // AI car pitted (tyre reset) → more time
     expect(aiResult.results[0].totalTime).toBeGreaterThan(noPitResult.results[0].totalTime);
-    void tyreWearAfterPit;
   });
 
   it("AI car pits when fuel drops below threshold fraction of capacity", () => {
