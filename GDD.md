@@ -155,7 +155,7 @@ A failure stops the car permanently. The team still receives prize money based o
 **Left side:**
 
 - **Track map** (top) — Overhead view of the circuit. All 100 cars are represented as solid coloured discs moving in real time. Disc speed varies by track geometry: faster on straights, slower through corners.
-- **Standings list** (below) — Scrollable list of all 100 cars showing position, team, laps, and gap. Scroll position is player-relative: the list keeps the player's car at whatever position the player last scrolled to. The list only auto-adjusts if the player's car would move off the visible area.
+- **Standings list** (below) — Scrollable list of all 100 cars showing overall position, class, class position, team, laps, and gap. Scroll position is player-relative: the list keeps the player's car at whatever position the player last scrolled to. The list only auto-adjusts if the player's car would move off the visible area.
 
 **Right side (all panels visible simultaneously):**
 
@@ -171,10 +171,12 @@ A failure stops the car permanently. The team still receives prize money based o
 
 ### Overview
 
-- **~20 distinct car models** on a continuous performance spectrum
-- No class divisions — all 100 cars race for overall position
-- Price range: **$750** (junkyard shitboxes) to **$3,000,000** (hypercars)
+- **31 car models** across **7 performance classes** (F, E, D, C, B, A, F1)
+- All 100 cars race for **overall position** — classes are not separate races
+- Classes give players **intermediate goals**: finishing top of your class is a milestone even if overall position is mid-pack
+- New car dealer prices range from **$6,500** (Class F) to **$15,000,000** (F1). Second-hand market prices can be much lower — a heavily aged Class F car can cost $750 or less.
 - The player can own **multiple cars** but enters **one car per race**
+- The player is expected to **win with a Class A car**. The F1 car is an achievement/trophy unlock — outrageously fast but fragile, expensive, and impractical. Reaching it is aspirational, not required.
 
 ### Car Stats
 
@@ -193,21 +195,25 @@ Every car has eight stats. Each stat has a **base value** (available at purchase
 
 Power and Handling determine the base lap time. Fuel Efficiency, Tyre Durability, Comfort, and Reliability modify degradation and risk rates during the race. Pit Stop Time and Fuel Capacity affect pit strategy.
 
-### Car Pricing
+### Classes & Pricing
 
-| Tier | Price Range |
-|------|-------------|
-| Junkyard shitboxes | $750 – $1,500 |
-| Old daily drivers / cheap sedans | $2,000 – $5,000 |
-| Used sports cars | $8,000 – $20,000 |
-| Dedicated track cars | $30,000 – $75,000 |
-| GT race cars | $150,000 – $350,000 |
-| Supercars | $500,000 – $1,000,000 |
-| Hypercars | $1,500,000 – $3,000,000 |
+All prices below are **new car dealer (MSRP)** prices. Second-hand prices are derived from the sale price formula and can be significantly lower.
+
+| Class | Cars | New Dealer Price Range | Character |
+|-------|------|----------------------|-----------|
+| **F** | 6 | $6,500 – $16,000 | Slow, efficient, reliable. Junkyard shitboxes when aged. |
+| **E** | 5 | $16,500 – $25,000 | Everyday cars. Slightly faster, still forgiving. |
+| **D** | 4 | $26,000 – $35,000 | Sports cars. Faster but less efficient, less comfortable. |
+| **C** | 5 | $39,000 – $115,000 | Performance cars and GTs. Wide price range, diverse trade-offs. |
+| **B** | 5 | $240,000 – $500,000 | Supercars. Very fast, expensive to run, low reliability and comfort. |
+| **A** | 5 | $845,000 – $3,000,000 | Le Mans prototypes. Near-maximum performance. The class you win with. |
+| **F1** | 1 | $15,000,000 | Trophy car. Fastest in the game but catastrophically fragile, thirsty, and uncomfortable. |
+
+The full car roster with base stats and upgrade potentials is defined in `car_roster.md`.
 
 ### Upgrade Packs
 
-Each car has **three** all-or-nothing upgrade packs. Purchasing a pack immediately raises the affected stats from base to potential.
+Upgrade packs are all-or-nothing purchases. Each pack immediately raises the affected stats from base to potential.
 
 | Pack | Primary Effect | Secondary Effect |
 |------|---------------|-----------------|
@@ -215,7 +221,21 @@ Each car has **three** all-or-nothing upgrade packs. Purchasing a pack immediate
 | **Handling Pack** | Handling → potential | Tyre Durability → potential |
 | **Comfort Pack** | Comfort → potential | — |
 
-Upgrade packs are a cheaper path to more performance than buying a new car, but each car has a ceiling. Once all three packs are installed, the only way to gain more performance is to buy a higher-tier car.
+**Not every car has all three packs.** Pack availability varies by class:
+
+| Class | Power Pack | Handling Pack | Comfort Pack |
+|-------|-----------|--------------|-------------|
+| F | Yes | Yes | Yes |
+| E | Yes | Yes | Yes |
+| D | Yes | Yes | Yes |
+| C | Yes | Yes | Yes |
+| B | Yes | Yes | Some cars only |
+| A | — | — | Yes |
+| F1 | — | — | — |
+
+Class A cars are already near-maximum performance — the only upgrade path is Comfort. The F1 car has no upgrades at all; it is what it is.
+
+Upgrade packs are a cheaper path to more performance than buying a new car, but each car has a ceiling. Once all available packs are installed, the only way forward is to buy a higher-class car.
 
 ### Car Age
 
@@ -238,14 +258,14 @@ Condition is a **percentage scale** representing the car's current mechanical he
 
 **Between races:**
 - **Repair** restores condition fully, accounting for the car's current age — it undoes race-related wear but cannot reverse permanent age-based stat decline
-- Repair consumes **spare parts** (see §7: Spare Parts). The cost in parts scales with the condition deficit and the car's tier — cheap cars require fewer parts, expensive cars require more
+- Repair consumes **spare parts** (see §7: Spare Parts). The cost in parts scales with the condition deficit and the car's class — lower-class cars require fewer parts, higher-class cars require more
 - The spare parts cost for repair is reduced by the player's **Business skill**
 - Repair is optional — the player can skip it to save parts, accepting worse performance and higher risk. If the player has no spare parts, they cannot repair
 
 ### Car Market
 
 **New car dealer:**
-- All ~20 car models always available at list price
+- All 31 car models always available at list price (MSRP)
 - Purchased cars: age 0, full condition, no upgrade packs
 
 **Second-hand dealer:**
@@ -394,7 +414,7 @@ The initial 15-point allocation defines the early career path:
 
 ### Plot Armour
 
-If the player has no car and cannot afford any on the market (new or used), they receive a **free starter shitbox** — the cheapest junkyard car, age 0, no upgrades.
+If the player has no car and cannot afford any on the market (new or used), they receive a **free starter shitbox** — a heavily aged Class F car, no upgrades.
 
 This applies in **any year**, not just year 1. It is the economy's permanent safety net: the player can never be locked out of racing.
 
@@ -419,7 +439,7 @@ The player begins year 1 with **$1,000** in cash. Plot armour provides the start
 
 **Tyre sets** are purchased before the race. Each pit stop tyre change consumes one set.
 
-- **Cost per set scales with car tier** — cheap tyres for junkyard cars, expensive tyres for hypercars (same scaling pattern as spare parts)
+- **Cost per set scales with car class** — cheap tyres for Class F cars, expensive tyres for Class A and F1 (same scaling pattern as spare parts)
 - Purchased between races with money. **Business skill** reduces the cost.
 - If the player runs out of tyre sets during a race, they **cannot change tyres** — the car continues on worn rubber, with lap times degrading progressively
 - If the player cannot afford any tyre sets before the race, they start and race on their initial set for the entire 48 laps with no changes
@@ -458,7 +478,7 @@ Fuel has a **per-litre monetary cost**.
 
 ### Progression Pacing
 
-- **~15 years** from junkyard shitbox to competitive hypercar
+- **~15 years** from junkyard shitbox (aged Class F) to competitive Class A
 - Full playthrough: ~15 races × 24 minutes = **~6 hours** of race time, plus between-race management
 - Economy balance must ensure steady upward progression without trivialising any performance tier
 
@@ -528,7 +548,8 @@ The player can also **sell cars** from the garage.
 
 Displayed after each race. Should be **comprehensive and interesting enough** that the player wants to review it:
 
-- Detailed position results for all 100 cars
+- Detailed position results for all 100 cars (overall and class position)
+- **Class podiums** — top 3 in each class
 - Key race moments (lead changes, failures, notable overtakes)
 - Player team statistics
 - **Driver instruction mode summary** (e.g., "Push: 10 laps / Normal: 25 laps / Conserve: 13 laps")
@@ -538,7 +559,8 @@ Displayed after each race. Should be **comprehensive and interesting enough** th
 A post-race newspaper with a classic **broadsheet layout** (white background, serif fonts, black dividing lines).
 
 **Content:**
-- **Winner headlines** — always featured
+- **Grand winner headline** — always featured
+- **Class podium results** — top 3 in each class reported alongside the overall winner
 - **Template-driven feature stories** — an algorithm scans race data to find the best-fitting team for each template:
   - Most Unlucky
   - Most Surprising
@@ -653,9 +675,10 @@ The following are explicitly **out of scope for v1** but the design accommodates
 | Total laps per race | 48 |
 | Typical pit stops per race | 8–12 |
 | Cars in field | 100 (99 AI + 1 player) |
-| Car models | ~20 |
+| Car models | 31 |
+| Car classes | 7 (F, E, D, C, B, A, F1) |
 | Car stats | 8 (Power, Handling, Fuel Efficiency, Tyre Durability, Comfort, Reliability, Pit Stop Time, Fuel Capacity) |
-| Upgrade packs per car | 3 (Power, Handling, Comfort) |
+| Upgrade packs per car | Up to 3 (Power, Handling, Comfort) — varies by class |
 | Driver pool size | 310 |
 | Drivers per AI team | 3 |
 | Drivers per player team | 1–4 (including player character) |
@@ -675,8 +698,9 @@ The following are explicitly **out of scope for v1** but the design accommodates
 | Contract discount (2yr) | 10% |
 | Contract discount (3yr) | 20% |
 | Contract buyout cost | Remaining salary × 1.5 |
-| Cheapest car | ~$750 |
-| Most expensive car | ~$3,000,000 |
+| Cheapest car (new) | $6,500 (Class F) |
+| Cheapest car (second-hand) | ~$750 (aged Class F) |
+| Most expensive car | $15,000,000 (F1) |
 | Last place prize money | ~$500 |
 | Winner prize money | ~$400,000–$500,000 |
 | Driver instruction modes | 3 (Push, Normal, Conserve) |
