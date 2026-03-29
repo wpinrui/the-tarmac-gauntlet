@@ -8,8 +8,7 @@ import type {
   InstalledUpgrades,
   UsedCarListing,
 } from "../types";
-import { calculateDriverStats, totalDriverStats } from "./driverLifecycle";
-import { calculateEffectiveStats } from "./effectiveStats";
+import { calculateDriverStats, totalDriverStats, calculateAnnualSalary } from "./driverLifecycle";
 
 // ---------------------------------------------------------------------------
 // Tunable constants
@@ -160,7 +159,7 @@ function enumerateOptions(
   if (driverCount < AI_TARGET_DRIVER_COUNT) {
     for (const agent of agents) {
       const agentScore = driverScore(agent);
-      const annualSalary = Math.round(500 + (agentScore / 500) * 149_500); // simple salary estimate
+      const annualSalary = calculateAnnualSalary(calculateDriverStats(agent));
       options.push({
         kind: "hireDriver",
         value: EMPTY_SLOT_BONUS + agentScore,
