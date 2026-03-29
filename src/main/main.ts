@@ -5,11 +5,15 @@ function createWindow(): void {
   const win = new BrowserWindow({
     width: 1280,
     height: 720,
+    show: false,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
     },
   });
+
+  win.setFullScreen(true);
+  win.show();
 
   if (process.env.ELECTRON_RENDERER_URL) {
     win.loadURL(process.env.ELECTRON_RENDERER_URL);
