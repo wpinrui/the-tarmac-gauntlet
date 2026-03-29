@@ -49,6 +49,14 @@ describe("buildPrizeSchedule", () => {
       expect(Number.isInteger(entry.amount)).toBe(true);
     }
   });
+
+  it("single-car field returns one entry with MAX_PRIZE (no division by zero)", () => {
+    const schedule = buildPrizeSchedule(1);
+    expect(schedule).toHaveLength(1);
+    expect(schedule[0].position).toBe(1);
+    expect(Number.isFinite(schedule[0].amount)).toBe(true);
+    expect(schedule[0].amount).toBeGreaterThan(0);
+  });
 });
 
 // ---------------------------------------------------------------------------

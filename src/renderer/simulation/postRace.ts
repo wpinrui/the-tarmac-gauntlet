@@ -64,6 +64,9 @@ export interface PastRaceResult {
  * @param numCars  Total number of cars in the race (typically 100).
  */
 export function buildPrizeSchedule(numCars: number): PrizeScheduleEntry[] {
+  if (numCars === 1) {
+    return [{ position: 1, amount: MAX_PRIZE }];
+  }
   const schedule: PrizeScheduleEntry[] = [];
   for (let pos = 1; pos <= numCars; pos++) {
     const fraction = (numCars - pos) / (numCars - 1);
