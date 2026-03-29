@@ -37,8 +37,12 @@ const MAX_FATIGUE_STAT_REDUCTION = 0.5;
 /** Condition lost per lap (0–100 scale) at age 0, skill 0, Normal mode. */
 const BASE_CONDITION_DECAY_PER_LAP = 1.0;
 /** Fractional increase in condition decay rate per year of car age. */
-const AGE_CONDITION_RATE = 0.05; // age 20 → 2× base decay
-/** Maximum fractional reduction in decay from Engineer skill (0–20). */
+const AGE_CONDITION_RATE = 0.05;
+/** Cap on the age multiplier — prevents unbounded decay on very old cars (mirrors effectiveStats.ts). */
+const MAX_AGE_FACTOR = 2.0; // reached at age 20, unchanged beyond
+/** Maximum of the Engineer skill stat (matches PlayerSkills.engineer in team.ts). */
+const MAX_ENGINEER_SKILL = 20;
+/** Maximum fractional reduction in decay from Engineer skill. */
 const MAX_ENGINEER_REDUCTION = 0.4; // skill 20 → 40% slower condition decay
 
 // ---------------------------------------------------------------------------
@@ -129,8 +133,8 @@ export function updateCarCondition(
   engineerSkill: number,
   mode: InstructionMode,
 ): number {
-  const ageFactor = 1 + carAge * AGE_CONDITION_RATE;
-  const engineerFactor = 1 - (engineerSkill / 20) * MAX_ENGINEER_REDUCTION;
+  const ageFactor = Math.min(MAX_AGE_FACTOR, 1 + carAge * AGE_CONDITION_RATE);
+  const engineerFactor = 1 - (engineerSkill / MAX_ENGINEER_SKILL) * MAX_ENGINEER_REDUCTION;
   const decayPerLap =
     BASE_CONDITION_DECAY_PER_LAP * ageFactor * engineerFactor * MODE_DEGRADATION_SCALE[mode];
   return Math.max(0, current - decayPerLap);

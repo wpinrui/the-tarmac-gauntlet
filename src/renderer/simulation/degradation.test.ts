@@ -179,4 +179,11 @@ describe("updateCarCondition", () => {
     expect(result).toBeGreaterThanOrEqual(0);
     expect(result).toBeLessThanOrEqual(100);
   });
+
+  it("age factor is capped: age 30 and age 20 produce identical decay", () => {
+    // MAX_AGE_FACTOR is reached at age 20 — any older car should degrade at the same rate.
+    const at20 = updateCarCondition(100, 20, 0, "normal");
+    const at30 = updateCarCondition(100, 30, 0, "normal");
+    expect(at20).toBeCloseTo(at30, 10);
+  });
 });
