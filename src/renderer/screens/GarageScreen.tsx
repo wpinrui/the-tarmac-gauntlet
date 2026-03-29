@@ -5,6 +5,7 @@ import { calculateDriverStats, totalDriverStats } from "../simulation/driverLife
 import type { PlayerTeam, CarInstance, CarModel, Driver } from "../types";
 import garageBackdropUrl from "../assets/garage-backdrop.jpg";
 import carBackdropUrl from "../assets/car-backdrop.jpg";
+import { SKILL_TOOLTIPS } from "../shared/skillData";
 import "./GarageScreen.css";
 
 const PersonIcon = () => (
@@ -26,11 +27,6 @@ function StatBar({ label, value, max = 100 }: { label: string; value: number; ma
   );
 }
 
-const SKILL_TIPS: Record<string, string> = {
-  driver: "Your personal driving ability. All five driver stats (Pace, Consistency, Stamina, Safety, Smoothness) equal this skill level \u00d7 5.",
-  engineer: "Pit stop expertise and car care. Reduces pit stop duration and slows car condition loss during races.",
-  business: "Financial acumen. Discounts on all purchases, salaries, and repairs. Improves car sale prices.",
-};
 
 const PRE_SEASON_NEWS = [
   { time: "Pre-season \u00b7 Today", headline: "100 Teams Line Up for Inaugural 24h Tarmac Gauntlet", snippet: "From factory hypercars to junkyard shitboxes \u2014 the full field is confirmed for the first-ever running." },
@@ -237,7 +233,7 @@ export function GarageScreen() {
                 <div className="skill-item" key={key}>
                   <div className="skill-label-group">
                     <span className="skill-label">{key.charAt(0).toUpperCase() + key.slice(1)}</span>
-                    <span className="info-dot">i<span className="tip">{SKILL_TIPS[key]}</span></span>
+                    <span className="info-dot">i<span className="tip">{SKILL_TOOLTIPS[key]}</span></span>
                   </div>
                   <span className="skill-val">{player.skills[key]} <span className="skill-max">/ 20</span></span>
                 </div>

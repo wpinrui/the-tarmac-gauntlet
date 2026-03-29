@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, type ReactNode } from "react";
+import { SKILL_TOOLTIPS } from "../shared/skillData";
 import "./NewGameScreen.css";
 import backdropUrl from "../assets/track-backdrop.jpg";
 
@@ -108,21 +109,9 @@ const LOGOS: { id: string; svg: ReactNode }[] = [
 // ---------------------------------------------------------------------------
 
 const SKILL_DEFS = [
-  {
-    key: "driver" as const,
-    label: "Driver",
-    tip: "Your personal driving ability. All five driver stats (Pace, Consistency, Stamina, Safety, Smoothness) equal this skill level \u00d7 5.",
-  },
-  {
-    key: "engineer" as const,
-    label: "Engineer",
-    tip: "Pit stop expertise and car care. Reduces pit stop duration and slows car condition loss during races.",
-  },
-  {
-    key: "business" as const,
-    label: "Business",
-    tip: "Financial acumen. Discounts on all purchases, salaries, and repairs. Improves car sale prices.",
-  },
+  { key: "driver" as const, label: "Driver" },
+  { key: "engineer" as const, label: "Engineer" },
+  { key: "business" as const, label: "Business" },
 ];
 
 const MAX_SKILL = 20;
@@ -315,7 +304,7 @@ export function NewGameScreen({ onStart }: NewGameScreenProps) {
                   <div className="skill-info">
                     <span className="skill-name">{skill.label}</span>
                     <span className="info-dot">
-                      i<span className="tip">{skill.tip}</span>
+                      i<span className="tip">{SKILL_TOOLTIPS[skill.key]}</span>
                     </span>
                   </div>
                   <div className="skill-controls">
