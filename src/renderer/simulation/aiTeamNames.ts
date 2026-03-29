@@ -17,12 +17,50 @@ export const AI_TEAM_ROSTER: AiTeamEntry[] = [
   // -----------------------------------------------------------------------
   // CLASS F — 20 teams
   // -----------------------------------------------------------------------
-  // TODO: 20 teams TBD
+  { name: "Backfire Racing",              descriptor: "three mates and a trailer", carClass: "F" },
+  { name: "Shed Speed Co.",               descriptor: "built in an actual garden shed", carClass: "F" },
+  { name: "Clutch & Pray",                descriptor: "optimistic underdogs", carClass: "F" },
+  { name: "Spare Parts FC",               descriptor: "the car is mostly replacement bits", carClass: "F" },
+  { name: "Gravel Trap Racing",           descriptor: "frequent visitors to the run-off area", carClass: "F" },
+  { name: "Duct Tape Dynamics",           descriptor: "structural integrity is a suggestion", carClass: "F" },
+  { name: "Flatbed Legends",              descriptor: "arrive on a flatbed, leave on a flatbed", carClass: "F" },
+  { name: "No Insurance Motorsport",      descriptor: "living dangerously in every sense", carClass: "F" },
+  { name: "Oily Rag Racing",              descriptor: "one rag, two spanners, zero budget", carClass: "F" },
+  { name: "Horizon Motorsport",           descriptor: "eyes on the distance, not the standings", carClass: "F" },
+  { name: "Ironbark Racing",              descriptor: "Australian hardwood — won't snap", carClass: "F" },
+  { name: "Mapleton Autosport",           descriptor: "small-town team with real ambition", carClass: "F" },
+  { name: "Vega Racing",                  descriptor: "named after the brightest star they could see", carClass: "F" },
+  { name: "First Gear Motorsport",        descriptor: "everyone starts somewhere", carClass: "F" },
+  { name: "Saltire Racing",               descriptor: "Scottish pride on a shoestring", carClass: "F" },
+  { name: "Croft & Davis",                descriptor: "two founders, one rusted car", carClass: "F" },
+  { name: "Long Road Racing",             descriptor: "long way to go, willing to drive it", carClass: "F" },
+  { name: "Pemberton Motorsport",         descriptor: "family name on the door, heart on the sleeve", carClass: "F" },
+  { name: "Basecamp Autosport",           descriptor: "starting from the bottom, climbing up", carClass: "F" },
+  { name: "Cornerstone Racing",           descriptor: "building something from nothing", carClass: "F" },
 
   // -----------------------------------------------------------------------
   // CLASS E — 20 teams
   // -----------------------------------------------------------------------
-  // TODO: 20 teams TBD
+  { name: "Dockyard Racing",              descriptor: "harbour-town mechanics turned racers", carClass: "E" },
+  { name: "Whitfield & Sons",             descriptor: "father-and-sons operation since forever", carClass: "E" },
+  { name: "Copper Lane Autosport",        descriptor: "named after the street they wrench on", carClass: "E" },
+  { name: "North Star Racing",            descriptor: "Scandinavian expats chasing points", carClass: "E" },
+  { name: "Terrace Motorsport",           descriptor: "working-class fan-funded team", carClass: "E" },
+  { name: "Gasworks Racing",              descriptor: "smells like petrol, runs like clockwork", carClass: "E" },
+  { name: "Southgate Motorsport",         descriptor: "suburban team, real commitment", carClass: "E" },
+  { name: "Barnstormer Racing",           descriptor: "rural team, loud cars, no apologies", carClass: "E" },
+  { name: "Overtime Racing",              descriptor: "day jobs fund the weekend habit", carClass: "E" },
+  { name: "Kessler Racing",               descriptor: "German-founded privateer with discipline", carClass: "E" },
+  { name: "Harrow Motorsport",            descriptor: "west London outfit, punching up", carClass: "E" },
+  { name: "Caldwell Racing",              descriptor: "veteran driver turned team owner", carClass: "E" },
+  { name: "Half Tank Racing",             descriptor: "never quite enough fuel budget", carClass: "E" },
+  { name: "Blackthorn Racing",            descriptor: "thorny, stubborn, hard to pass", carClass: "E" },
+  { name: "Montoya Motorsport",           descriptor: "Colombian-founded, passionate about racing", carClass: "E" },
+  { name: "Pit Lane Dreamers",            descriptor: "small team with big ambitions", carClass: "E" },
+  { name: "Three Pedals Racing",          descriptor: "manual gearbox purists", carClass: "E" },
+  { name: "Overpass Racing",              descriptor: "headquartered under a motorway bridge", carClass: "E" },
+  { name: "Sato Brothers Racing",         descriptor: "Japanese siblings building from scratch", carClass: "E" },
+  { name: "Yellow Flag Motorsport",       descriptor: "cautious but surprisingly consistent", carClass: "E" },
 
   // -----------------------------------------------------------------------
   // CLASS D — 20 teams
@@ -38,7 +76,15 @@ export const AI_TEAM_ROSTER: AiTeamEntry[] = [
   { name: "Carol Oil Autosport",          descriptor: "lubricant-sponsored touring car operation", carClass: "D" },
   { name: "Compost Racing",               descriptor: "scrappy but legitimate single-seater graduates", carClass: "D" },
   { name: "ML Motorsport",                descriptor: "Dutch-run team with an eye on the podium", carClass: "D" },
-  // TODO: 9 teams TBD
+  { name: "Thornton Motorsport",          descriptor: "British family-run sports car team", carClass: "D" },
+  { name: "Brackley Engineering",         descriptor: "ex-factory engineers gone independent", carClass: "D" },
+  { name: "Nakamura Racing",              descriptor: "Japanese privateer with touge roots", carClass: "D" },
+  { name: "Red Anvil Autosport",          descriptor: "heavy-handed but fast", carClass: "D" },
+  { name: "Costa Brava Racing",           descriptor: "Spanish sun-belt outfit", carClass: "D" },
+  { name: "Steelworks Motorsport",        descriptor: "industrial town pride project", carClass: "D" },
+  { name: "Müller Sport",                 descriptor: "German precision on a modest budget", carClass: "D" },
+  { name: "Park Ferme Racing",            descriptor: "obsessive about procedure and prep", carClass: "D" },
+  { name: "Ravenhill Autosport",          descriptor: "Northern Irish grit, southern ambition", carClass: "D" },
 
   // -----------------------------------------------------------------------
   // CLASS C — 15 teams
