@@ -20,7 +20,7 @@ export const AI_TEAM_ROSTER: AiTeamEntry[] = [
   { name: "Backfire Racing",              descriptor: "three mates and a trailer", carClass: "F" },
   { name: "Shed Speed Co.",               descriptor: "built in an actual garden shed", carClass: "F" },
   { name: "Clutch & Pray",                descriptor: "optimistic underdogs", carClass: "F" },
-  { name: "Spare Parts FC",               descriptor: "the car is mostly replacement bits", carClass: "F" },
+  { name: "Spare Parts Racing",            descriptor: "the car is mostly replacement bits", carClass: "F" },
   { name: "Gravel Trap Racing",           descriptor: "frequent visitors to the run-off area", carClass: "F" },
   { name: "Duct Tape Dynamics",           descriptor: "structural integrity is a suggestion", carClass: "F" },
   { name: "Flatbed Legends",              descriptor: "arrive on a flatbed, leave on a flatbed", carClass: "F" },
