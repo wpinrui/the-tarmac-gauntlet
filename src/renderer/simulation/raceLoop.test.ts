@@ -303,16 +303,17 @@ describe("standings", () => {
     const retiree = makeEntry({ carId: "retiree" });
 
     // Cars are processed in order [finisher, retiree] each lap.
-    // Each car uses exactly 2 random calls per lap with empty issueTemplates:
-    //   call 1: calculateLapTime variance, call 2: rollLapRisks failure roll.
-    // So lap 1 calls: n=1 (finisher lapTime), n=2 (finisher failure),
-    //                 n=3 (retiree lapTime),  n=4 (retiree failure) ← fire this one.
+    // Each car uses 3 random calls per lap with empty issueTemplates:
+    //   call 1: calculateLapTime variance, call 2: rollLapRisks failure roll,
+    //   call 3: rollLapRisks issue roll.
+    // So lap 1 calls: n=1 (finisher lapTime), n=2 (finisher failure), n=3 (finisher issue),
+    //                 n=4 (retiree lapTime),  n=5 (retiree failure) ← fire this one.
     let n = 0;
     const result = simulateRace([finisher, retiree], {
       totalLaps: 5,
       random: () => {
         n++;
-        return n === 4 ? 0 : 1; // fire only retiree's lap-1 failure roll
+        return n === 5 ? 0 : 1; // fire only retiree's lap-1 failure roll
       },
     });
 

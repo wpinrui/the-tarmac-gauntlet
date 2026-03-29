@@ -221,18 +221,22 @@ describe("executePitStop — issue fixes", () => {
     {
       id: "loose-wheel",
       description: "Loose wheel nut",
-      lapTimeCost: 3,
-      probabilityPerLap: 0.05,
+      severity: "minor",
+      category: "mechanical",
+      statDebuffs: { handling: 0.08 },
+      weight: 10,
       sparePartsCost: 2,
-      fixDuration: 10,
+      workUnits: 10,
     },
     {
       id: "brake-fade",
-      description: "Overheating brakes",
-      lapTimeCost: 5,
-      probabilityPerLap: 0.03,
+      description: "Brake fade",
+      severity: "medium",
+      category: "mechanical",
+      statDebuffs: { handling: 0.18 },
+      weight: 4,
       sparePartsCost: 4,
-      fixDuration: 15,
+      workUnits: 15,
     },
   ];
 
@@ -254,7 +258,7 @@ describe("executePitStop — issue fixes", () => {
     expect(sparePartsRemaining).toBe(8); // cost = 2
   });
 
-  it("fixing an issue adds its fixDuration to the stop", () => {
+  it("fixing an issue adds its workUnits to the stop", () => {
     const ctx = makeCtx({ activeIssues: issues, issueTemplates: templates, sparePartsAvailable: 10 });
     const withFix = executePitStop(ctx, { ...emptyConfig, issueIdsToFix: ["loose-wheel"] }).duration;
     const withoutFix = executePitStop(ctx, emptyConfig).duration;
@@ -293,7 +297,7 @@ describe("executePitStop — instruction mode", () => {
 describe("executePitStop — combined stop", () => {
   it("full stop (refuel + tyres + swap + issue fix) updates all resources correctly", () => {
     const templates: IssueTemplate[] = [
-      { id: "loose-wheel", description: "test", lapTimeCost: 2, probabilityPerLap: 0.05, sparePartsCost: 3, fixDuration: 8 },
+      { id: "loose-wheel", description: "test", severity: "minor", category: "mechanical", statDebuffs: { handling: 0.08 }, weight: 10, sparePartsCost: 3, workUnits: 8 },
     ];
     const ctx = makeCtx({
       currentFuel: 20,
