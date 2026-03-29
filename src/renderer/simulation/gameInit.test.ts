@@ -90,7 +90,7 @@ describe("initializeGame", () => {
     const game = initializeGame(options, stable);
     const player = game.teams.find((t) => t.kind === "player")!;
     expect(player.cars).toHaveLength(1);
-    expect(player.cars[0].modelId).toBe("junk-rustbucket");
+    expect(player.cars[0].modelId).toBe("f-01");
     expect(player.cars[0].age).toBe(0);
     expect(player.cars[0].condition).toBe(100);
   });

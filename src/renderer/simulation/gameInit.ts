@@ -59,13 +59,13 @@ interface AiTierSpec {
 }
 
 const AI_TIER_SPECS: AiTierSpec[] = [
-  { modelIds: ["junk-rustbucket", "junk-banger", "junk-heap"],     count: 20, budgetMin: 500,    budgetMax: 2_000,    crewSize: 0 },
-  { modelIds: ["daily-sedan", "daily-hatch", "daily-wagon"],       count: 20, budgetMin: 2_000,  budgetMax: 6_000,    crewSize: 2 },
-  { modelIds: ["sport-roadster", "sport-coupe", "sport-turbo"],    count: 20, budgetMin: 5_000,  budgetMax: 15_000,   crewSize: 4 },
-  { modelIds: ["track-clubsport", "track-proto", "track-enduro"],  count: 15, budgetMin: 15_000, budgetMax: 40_000,   crewSize: 6 },
-  { modelIds: ["gt-am", "gt-pro", "gt-evo"],                      count: 12, budgetMin: 40_000, budgetMax: 100_000,  crewSize: 8 },
-  { modelIds: ["super-veloce", "super-presto"],                    count: 8,  budgetMin: 80_000, budgetMax: 200_000,  crewSize: 12 },
-  { modelIds: ["hyper-apex", "hyper-zenith", "hyper-monarch"],     count: 4,  budgetMin: 200_000, budgetMax: 500_000, crewSize: 16 },
+  { modelIds: ["f-01", "f-02", "f-03", "f-04", "f-05", "f-06"],   count: 20, budgetMin: 500,     budgetMax: 4_000,    crewSize: 0 },
+  { modelIds: ["e-07", "e-08", "e-09", "e-10", "e-11"],           count: 20, budgetMin: 4_000,   budgetMax: 10_000,   crewSize: 2 },
+  { modelIds: ["d-12", "d-13", "d-14", "d-15"],                   count: 20, budgetMin: 10_000,  budgetMax: 25_000,   crewSize: 4 },
+  { modelIds: ["c-16", "c-17", "c-18", "c-19", "c-20"],           count: 15, budgetMin: 25_000,  budgetMax: 60_000,   crewSize: 6 },
+  { modelIds: ["b-21", "b-22", "b-23", "b-24", "b-25"],           count: 12, budgetMin: 60_000,  budgetMax: 150_000,  crewSize: 8 },
+  { modelIds: ["a-26", "a-27", "a-28", "a-29", "a-30"],           count: 8,  budgetMin: 150_000, budgetMax: 400_000,  crewSize: 12 },
+  { modelIds: ["f1-31"],                                           count: 4,  budgetMin: 400_000, budgetMax: 1_000_000, crewSize: 16 },
 ];
 
 // ---------------------------------------------------------------------------
@@ -222,7 +222,7 @@ function createPlayerTeam(
 ): PlayerTeam {
   const car: CarInstance = {
     id: nextCarId(),
-    modelId: "junk-rustbucket", // cheapest junkyard car (plot armour)
+    modelId: "f-01", // cheapest junkyard car (plot armour)
     age: 0,
     condition: 100,
     installedUpgrades: { power: false, handling: false, comfort: false },

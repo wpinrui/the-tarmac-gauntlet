@@ -21,6 +21,7 @@ const baseStats = {
 const testModel: CarModel = {
   id: "test-model",
   name: "Test Car",
+  carClass: "C",
   tier: "trackCar",
   price: 50_000,
   baseStats,
