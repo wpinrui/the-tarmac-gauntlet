@@ -206,7 +206,7 @@ export function GarageScreen() {
               <div className="driver-row">
                 <div className="driver-avatar you"><PersonIcon /></div>
                 <div className="driver-info">
-                  <div className="driver-name-text">You ({player.playerName})</div>
+                  <div className="driver-name-text">You</div>
                   <div className="driver-detail">No salary</div>
                 </div>
                 <div className="driver-overall"><span className="ovr-label">OVR</span>{playerCharOvr}</div>

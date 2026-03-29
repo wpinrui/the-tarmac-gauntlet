@@ -61,13 +61,13 @@
 .team-logo-icon svg { width: 18px; height: 18px; }
 .team-logo-icon path { fill: #00d4aa; }
 .team-name-label { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 16px; letter-spacing: 1.5px; text-transform: uppercase; color: #e8ecf4; white-space: nowrap; }
-.tab { padding: 18px 24px; font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 15px; letter-spacing: 2.5px; text-transform: uppercase; color: #5a7a98; cursor: pointer; position: relative; transition: color .2s; user-select: none; }
+.tab { padding: 18px 24px; font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 17px; letter-spacing: 2.5px; text-transform: uppercase; color: #7a96b0; cursor: pointer; position: relative; transition: color .2s; user-select: none; }
 .tab:hover { color: #a0b8d0; }
 .tab.active { color: #e8ecf4; }
 .tab.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: #00d4aa; }
 .tab-spacer { flex: 1; }
 .tab-budget { display: flex; align-items: center; gap: 8px; padding: 18px 0; user-select: none; }
-.tab-budget .budget-label { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: #5a7a98; }
+.tab-budget .budget-label { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: #7a96b0; }
 .tab-budget .budget-value { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 20px; color: #00d4aa; }
 
 /* ======== MAIN ======== */
@@ -81,17 +81,17 @@
 .stat-chip .chip-icon path, .stat-chip .chip-icon rect, .stat-chip .chip-icon circle { fill: #00d4aa; }
 .chip-body { display: flex; align-items: center; gap: 12px; flex: 1; }
 .chip-text { flex: 1; }
-.chip-text .chip-label { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 11px; letter-spacing: 1.8px; text-transform: uppercase; color: #6a8aa6; }
+.chip-text .chip-label { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 13px; letter-spacing: 1.8px; text-transform: uppercase; color: #8a9cb4; }
 .chip-text .chip-value { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 22px; color: #e8ecf4; line-height: 1.15; }
 .chip-text .chip-value .unit { font-weight: 400; font-size: 14px; color: #5a7a98; margin-left: 2px; }
-.btn-chip { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 11px; letter-spacing: 1.8px; text-transform: uppercase; padding: 6px 12px; border-radius: 4px; border: 1px solid #2a4262; background: transparent; color: #6a8aa6; cursor: pointer; transition: all .15s; white-space: nowrap; }
+.btn-chip { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 13px; letter-spacing: 1.8px; text-transform: uppercase; padding: 6px 12px; border-radius: 4px; border: 1px solid #2a4262; background: transparent; color: #8a9cb4; cursor: pointer; transition: all .15s; white-space: nowrap; }
 .btn-chip:hover { border-color: #00d4aa; color: #00d4aa; background: rgba(0,212,170,0.05); }
 
 /* ======== CARD GRID ======== */
 .card-grid { display: grid; grid-template-columns: 1fr 300px 1fr; grid-template-rows: auto 1fr; gap: 18px; flex: 1; }
 .card { background: rgba(12,18,32,0.78); backdrop-filter: blur(16px); border: 1px solid #2a4262; border-radius: 10px; padding: 22px 24px; display: flex; flex-direction: column; }
-.card-title { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 14px; letter-spacing: 2.5px; text-transform: uppercase; color: #6a8aa6; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
-.card-title .badge { font-size: 10px; letter-spacing: 1px; padding: 2px 8px; border-radius: 3px; background: rgba(0,212,170,0.1); color: #00d4aa; border: 1px solid rgba(0,212,170,0.2); }
+.card-title { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 15px; letter-spacing: 2.5px; text-transform: uppercase; color: #8a9cb4; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.card-title .badge { font-size: 12px; letter-spacing: 1px; padding: 2px 8px; border-radius: 3px; background: rgba(0,212,170,0.1); color: #00d4aa; border: 1px solid rgba(0,212,170,0.2); }
 
 /* Grid placement */
 .card.car-card    { grid-column: 1; grid-row: 1 / 3; }
@@ -102,7 +102,7 @@
 /* ---- Clickable card hover ---- */
 .card.clickable { cursor: pointer; transition: border-color .18s, box-shadow .18s; }
 .card.clickable:hover { border-color: #3a6a88; box-shadow: 0 0 16px rgba(0,212,170,0.06); }
-.card.clickable .card-title .nav-hint { font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 500; letter-spacing: 0.5px; text-transform: none; color: #3a5a78; margin-left: auto; transition: color .18s; }
+.card.clickable .card-title .nav-hint { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500; letter-spacing: 0.5px; text-transform: none; color: #6a8aa6; margin-left: auto; transition: color .18s; }
 .card.clickable:hover .card-title .nav-hint { color: #00d4aa; }
 
 /* ---- Car card ---- */
@@ -111,26 +111,26 @@
 .card.car-card > * { position: relative; z-index: 1; }
 
 .car-tabs { display: flex; gap: 6px; margin-bottom: 16px; }
-.car-tab { font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; padding: 6px 14px; border-radius: 4px; border: 1px solid #2a4262; background: transparent; color: #5a7a98; cursor: pointer; transition: all .15s; }
+.car-tab { font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 14px; letter-spacing: 1.5px; text-transform: uppercase; padding: 6px 14px; border-radius: 4px; border: 1px solid #2a4262; background: transparent; color: #7a96b0; cursor: pointer; transition: all .15s; }
 .car-tab:hover { border-color: #3a5a78; color: #a0b8d0; }
 .car-tab.active { border-color: #00d4aa; background: rgba(0,212,170,0.08); color: #00d4aa; }
-.car-entered-badge { font-size: 9px; letter-spacing: 1px; padding: 1px 6px; border-radius: 2px; background: rgba(0,212,170,0.15); color: #00d4aa; margin-left: 4px; vertical-align: middle; }
+.car-entered-badge { font-size: 11px; letter-spacing: 1px; padding: 1px 6px; border-radius: 2px; background: rgba(0,212,170,0.15); color: #00d4aa; margin-left: 4px; vertical-align: middle; }
 .car-name { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 24px; color: #e8ecf4; margin-bottom: 4px; }
-.car-meta { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 13px; color: #5a7a98; letter-spacing: 1px; margin-bottom: 18px; }
+.car-meta { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 15px; color: #7a96b0; letter-spacing: 1px; margin-bottom: 18px; }
 .stat-bars { display: flex; flex-direction: column; gap: 8px; flex: 1; }
 .stat-bar-row { display: flex; align-items: center; gap: 10px; }
-.stat-bar-label { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 12px; letter-spacing: 1.2px; text-transform: uppercase; color: #7a96b0; width: 110px; flex-shrink: 0; }
+.stat-bar-label { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 14px; letter-spacing: 1.2px; text-transform: uppercase; color: #8a9cb4; width: 110px; flex-shrink: 0; }
 .stat-bar-track { flex: 1; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; }
 .stat-bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #00d4aa, #00b894); transition: width .3s; }
 .stat-bar-fill.low { background: linear-gradient(90deg, #e17055, #d63031); }
-.stat-bar-val { font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 13px; color: #a0b8d0; width: 28px; text-align: right; flex-shrink: 0; }
+.stat-bar-val { font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 15px; color: #d0dce8; width: 28px; text-align: right; flex-shrink: 0; }
 .car-condition { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(42,66,98,0.4); }
 .condition-row { display: flex; align-items: center; justify-content: space-between; }
-.condition-label { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: #7a96b0; }
-.condition-pct { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 18px; color: #00d4aa; }
+.condition-label { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 15px; letter-spacing: 1.5px; text-transform: uppercase; color: #8a9cb4; }
+.condition-pct { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 22px; color: #00d4aa; }
 .condition-pct.warn { color: #e17055; }
 .car-actions { margin-top: 14px; display: flex; gap: 10px; }
-.btn-sm { font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; padding: 8px 16px; border-radius: 5px; border: 1px solid #2a4262; background: transparent; color: #8a9cb4; cursor: pointer; transition: all .15s; }
+.btn-sm { font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 15px; letter-spacing: 2px; text-transform: uppercase; padding: 10px 20px; border-radius: 5px; border: 1px solid #2a4262; background: transparent; color: #8a9cb4; cursor: pointer; transition: all .15s; }
 .btn-sm:hover { border-color: #3a5a78; color: #d0d8e4; }
 
 /* ---- Drivers card (compact) ---- */
@@ -144,10 +144,10 @@
 .driver-avatar.you { border-color: #00d4aa; background: rgba(0,212,170,0.1); }
 .driver-avatar.you path { fill: #00d4aa; }
 .driver-info { flex: 1; }
-.driver-name-text { font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 14px; color: #e0e6f0; }
-.driver-detail { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 11px; color: #5a7a98; letter-spacing: 0.8px; }
+.driver-name-text { font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 16px; color: #e0e6f0; }
+.driver-detail { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 13px; color: #7a96b0; letter-spacing: 0.8px; }
 .driver-overall { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 18px; color: #fff; flex-shrink: 0; text-align: right; }
-.driver-overall .ovr-label { font-weight: 400; font-size: 9px; letter-spacing: 1.2px; text-transform: uppercase; color: #4a6a88; display: block; }
+.driver-overall .ovr-label { font-weight: 400; font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: #6a8aa6; display: block; }
 .empty-slots-summary { padding: 8px 0; font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 12px; letter-spacing: 1px; color: #3a5a78; border-top: 1px solid rgba(42,66,98,0.3); text-align: center; }
 
 /* ---- Skills card (compact) ---- */
@@ -156,18 +156,18 @@
 .skill-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(42,66,98,0.3); }
 .skill-item:last-of-type { border-bottom: none; }
 .skill-label-group { display: flex; align-items: center; gap: 6px; }
-.skill-label { font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 14px; color: #c0d0e0; }
-.info-dot { width: 15px; height: 15px; border-radius: 50%; border: 1px solid #2a4262; display: inline-flex; align-items: center; justify-content: center; font-family: 'Inter', sans-serif; font-size: 9px; font-weight: 700; color: #4a6a88; cursor: help; position: relative; transition: border-color .15s, color .15s; }
+.skill-label { font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 16px; color: #c0d0e0; }
+.info-dot { width: 18px; height: 18px; border-radius: 50%; border: 1px solid #3a5a78; display: inline-flex; align-items: center; justify-content: center; font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 700; color: #5a7a98; cursor: help; position: relative; transition: border-color .15s, color .15s; }
 .info-dot:hover { border-color: #00d4aa; color: #00d4aa; }
 .tip { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); background: #10182a; border: 1px solid #243450; border-radius: 8px; padding: 12px 14px; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 400; color: #a0b4c8; line-height: 1.5; width: 260px; pointer-events: none; opacity: 0; transition: opacity .15s; z-index: 30; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
 .info-dot:hover .tip { opacity: 1; }
 .tip::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: #243450; }
-.skill-val { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 18px; color: #fff; }
-.skill-val .skill-max { font-weight: 400; font-size: 12px; color: #4a6a88; }
+.skill-val { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 22px; color: #fff; }
+.skill-val .skill-max { font-weight: 400; font-size: 14px; color: #5a7a98; }
 .skill-alloc-banner { margin-top: 8px; background: rgba(0,212,170,0.06); border: 1px solid rgba(0,212,170,0.2); border-radius: 6px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; }
-.alloc-text { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 12px; letter-spacing: 1px; color: #00d4aa; }
+.alloc-text { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 13px; letter-spacing: 1px; color: #00d4aa; }
 .alloc-text strong { font-weight: 600; font-size: 15px; }
-.btn-alloc { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; padding: 5px 12px; border-radius: 4px; border: none; background: #00d4aa; color: #060a14; cursor: pointer; transition: background .15s; }
+.btn-alloc { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; padding: 5px 12px; border-radius: 4px; border: none; background: #00d4aa; color: #060a14; cursor: pointer; transition: background .15s; }
 .btn-alloc:hover { background: #00e8bc; }
 
 /* ---- News feed card ---- */
@@ -175,10 +175,10 @@
 .news-item { padding: 12px 0; border-bottom: 1px solid rgba(42,66,98,0.3); cursor: pointer; transition: all .15s; }
 .news-item:last-child { border-bottom: none; }
 .news-item:hover { padding-left: 6px; }
-.news-time { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: #4a6a88; margin-bottom: 4px; }
-.news-headline { font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 15px; color: #d0d8e4; line-height: 1.3; transition: color .15s; }
+.news-time { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: #6a8aa6; margin-bottom: 4px; }
+.news-headline { font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 16px; color: #d0d8e4; line-height: 1.3; transition: color .15s; }
 .news-item:hover .news-headline { color: #00d4aa; }
-.news-snippet { font-family: 'Inter', sans-serif; font-weight: 400; font-size: 12px; color: #5a7a98; line-height: 1.45; margin-top: 4px; }
+.news-snippet { font-family: 'Inter', sans-serif; font-weight: 400; font-size: 13px; color: #7a96b0; line-height: 1.45; margin-top: 4px; }
 
 /* ======== NAV CARDS ======== */
 .nav-cards { display: flex; gap: 14px; }
@@ -187,7 +187,7 @@
 .nav-card-icon { width: 44px; height: 44px; border-radius: 8px; background: rgba(0,212,170,0.06); border: 1px solid rgba(0,212,170,0.15); display: flex; align-items: center; justify-content: center; }
 .nav-card-icon svg { width: 20px; height: 20px; }
 .nav-card-icon path, .nav-card-icon rect, .nav-card-icon circle, .nav-card-icon line { stroke: #00d4aa; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.nav-card-label { font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 13px; letter-spacing: 1.8px; text-transform: uppercase; color: #8a9cb4; transition: color .18s; }
+.nav-card-label { font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 16px; letter-spacing: 1.8px; text-transform: uppercase; color: #a0b8d0; transition: color .18s; }
 .nav-card:hover .nav-card-label { color: #d0dce8; }
 
 /* ======== RACE ROW ======== */
