@@ -13,6 +13,7 @@ import type {
 } from "../types";
 import { calculateDriverStats, calculateMarketValue, calculateAnnualSalary } from "./driverLifecycle";
 import { CAR_MODELS } from "./carModels";
+import { AI_TEAM_ROSTER } from "./aiTeamNames";
 import { getNewCarListings, generateUsedInventory } from "./carMarket";
 
 // ---------------------------------------------------------------------------
@@ -158,6 +159,7 @@ function nextCarId(): string {
 
 function createAiTeam(
   index: number,
+  teamName: string,
   spec: AiTierSpec,
   drivers: Driver[],
   driverOffset: number,
@@ -196,7 +198,7 @@ function createAiTeam(
   const team: AITeam = {
     kind: "ai",
     id: teamId,
-    name: `Team ${index + 1}`,
+    name: teamName,
     budget,
     prestige: 0,
     crewSize: spec.crewSize,
@@ -299,6 +301,7 @@ export function initializeGame(
     for (let i = 0; i < spec.count; i++) {
       const { team, contracts } = createAiTeam(
         teamIndex,
+        AI_TEAM_ROSTER[teamIndex].name,
         spec,
         drivers,
         driverOffset,
