@@ -15,6 +15,7 @@ function makeModel(id: string, price: number, power = 50, handling = 50): CarMod
   return {
     id,
     name: `Car ${id}`,
+    carClass: "B",
     tier: "gtRaceCar",
     price,
     baseStats: {

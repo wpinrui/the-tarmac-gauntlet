@@ -20,8 +20,11 @@ export interface UpgradePackDefinition {
   cost: number;
 }
 
-// --- Car Pricing Tiers ---
+// --- Car Classes ---
 
+export type CarClass = "F" | "E" | "D" | "C" | "B" | "A" | "F1";
+
+/** @deprecated Use CarClass instead. Kept for economy config compatibility. */
 export type CarTier =
   | "junkyard"
   | "dailyDriver"
@@ -36,11 +39,12 @@ export type CarTier =
 export interface CarModel {
   id: string;
   name: string;
+  carClass: CarClass;
   tier: CarTier;
   price: number;
   baseStats: CarStats;
   potentialStats: CarStats;
-  upgradePacks: [UpgradePackDefinition, UpgradePackDefinition, UpgradePackDefinition];
+  upgradePacks: UpgradePackDefinition[];
 }
 
 // --- Car Instance (owned by a team) ---

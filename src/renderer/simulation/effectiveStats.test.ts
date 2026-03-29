@@ -6,6 +6,7 @@ import type { CarInstance, CarModel } from "../types";
 const model: CarModel = {
   id: "test-model",
   name: "Test Car",
+  carClass: "C",
   tier: "trackCar",
   price: 10000,
   baseStats: {

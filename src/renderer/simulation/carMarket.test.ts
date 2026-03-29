@@ -18,6 +18,7 @@ function makeModel(id: string, price: number): CarModel {
   return {
     id,
     name: `Car ${id}`,
+    carClass: "B",
     tier: "gtRaceCar",
     price,
     baseStats: {
