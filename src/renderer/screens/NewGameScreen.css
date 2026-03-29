@@ -33,7 +33,7 @@
       rgba(8,13,24,0.55) 60%,
       rgba(8,13,24,0.85) 100%),
     radial-gradient(ellipse at center, rgba(8,13,24,0.3) 0%, rgba(8,13,24,0.75) 100%),
-    url('/track-backdrop.jpg') center / cover no-repeat;
+    var(--backdrop-url) center / cover no-repeat;
   pointer-events: none;
 }
 

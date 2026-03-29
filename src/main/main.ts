@@ -12,7 +12,7 @@ function createWindow(): void {
     },
   });
 
-  win.maximize();
+  win.setFullScreen(true);
   win.show();
 
   if (process.env.ELECTRON_RENDERER_URL) {

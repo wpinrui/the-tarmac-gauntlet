@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, type ReactNode } from "react";
 import "./NewGameScreen.css";
+import backdropUrl from "../assets/track-backdrop.jpg";
 
 // ---------------------------------------------------------------------------
 // Logo SVGs (matching mockup exactly)
@@ -212,7 +213,10 @@ export function NewGameScreen({ onStart }: NewGameScreenProps) {
   };
 
   return (
-    <div className="new-game-root">
+    <div
+      className="new-game-root"
+      style={{ "--backdrop-url": `url(${backdropUrl})` } as React.CSSProperties}
+    >
       <div className="screen">
         {/* Title */}
         <div className="title-area">
