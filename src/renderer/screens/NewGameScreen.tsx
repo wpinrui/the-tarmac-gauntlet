@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, type ReactNode } from "react";
 import { SKILL_TOOLTIPS } from "../shared/skillData";
-import "./NewGameScreen.css";
+import "./NewGameScreen.scss";
 import backdropUrl from "../assets/track-backdrop.jpg";
 
 // ---------------------------------------------------------------------------

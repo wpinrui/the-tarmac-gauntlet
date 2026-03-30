@@ -169,3 +169,64 @@ export function generateUsedInventory(
     return generateUsedListing(model, random);
   });
 }
+
+/** Probability that the F1 car appears in the used market (when eligible). */
+export const F1_USED_PROBABILITY = 0.20;
+
+/**
+ * Generates a used car inventory with exactly 1 car per class.
+ *
+ * For classes F–A: picks a random model from that class and generates a used listing.
+ * For F1: only included with F1_USED_PROBABILITY (20%) chance, and only if
+ * `includeF1` is true (caller checks win condition and affordability).
+ */
+export function generateUsedInventoryByClass(
+  models: CarModel[],
+  includeF1: boolean,
+  random: () => number,
+): UsedCarListing[] {
+  if (models.length === 0) return [];
+
+  const classes = ["F", "E", "D", "C", "B", "A"] as const;
+  const listings: UsedCarListing[] = [];
+
+  // Guaranteed shitbox: Neutrino Sago (f-01), max age, minimum condition, no upgrades.
+  // Always available, always purchasable (plot armour lives here).
+  const shitboxModel = models.find((m) => m.id === "f-01");
+  if (shitboxModel) {
+    const shitbox: CarInstance = {
+      id: "",
+      modelId: shitboxModel.id,
+      age: 15 + Math.floor(random() * 11), // 15–25 years old
+      condition: USED_CONDITION_MIN,
+      installedUpgrades: { power: false, handling: false, comfort: false },
+    };
+    const price = calculateCarMarketValue(shitbox, shitboxModel);
+    listings.push({
+      id: `used-shitbox-${Math.floor(random() * 1_000_000_000)}`,
+      modelId: shitboxModel.id,
+      age: shitbox.age,
+      condition: USED_CONDITION_MIN,
+      installedUpgrades: { power: false, handling: false, comfort: false },
+      price,
+    });
+  }
+
+  for (const cls of classes) {
+    // Exclude f-01 (Neutrino Sago) from randomisation — it's the designated shitbox above
+    const classModels = models.filter((m) => m.carClass === cls && m.id !== "f-01");
+    if (classModels.length === 0) continue;
+    const model = classModels[Math.floor(random() * classModels.length)];
+    listings.push(generateUsedListing(model, random));
+  }
+
+  // F1: 20% chance, only if eligible
+  if (includeF1 && random() < F1_USED_PROBABILITY) {
+    const f1Models = models.filter((m) => m.carClass === "F1");
+    if (f1Models.length > 0) {
+      listings.push(generateUsedListing(f1Models[0], random));
+    }
+  }
+
+  return listings;
+}

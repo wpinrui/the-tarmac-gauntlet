@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Class Badge Reference</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #080d18;
+            color: #d0d8e4;
+            font-family: 'Oswald', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            padding: 40px;
+        }
+
+        .class-badge {
+            font-weight: 600;
+            font-size: 14px;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            padding: 4px 14px;
+            border-radius: 8px;
+            border: 2px solid;
+            background: transparent;
+            display: inline-block;
+        }
+
+        .class-badge.f { color: #a0785a; border-color: #a0785a; }
+        .class-badge.e { color: #5ab8d8; border-color: #5ab8d8; }
+        .class-badge.d { color: #d060a0; border-color: #d060a0; }
+        .class-badge.c { color: #e0943a; border-color: #e0943a; }
+        .class-badge.b { color: #d04040; border-color: #d04040; }
+        .class-badge.a { color: #50c878; border-color: #50c878; }
+        .class-badge.f1 {
+            color: transparent;
+            border: 2px solid #888;
+            background:
+                repeating-conic-gradient(#222 0% 25%, #ddd 0% 50%) 50% / 8px 8px;
+            padding: 5px 14px;
+        }
+    </style>
+</head>
+<body>
+    <span class="class-badge f">Class F</span>
+    <span class="class-badge e">Class E</span>
+    <span class="class-badge d">Class D</span>
+    <span class="class-badge c">Class C</span>
+    <span class="class-badge b">Class B</span>
+    <span class="class-badge a">Class A</span>
+    <span class="class-badge f1">Class X</span>
+</body>
+</html>

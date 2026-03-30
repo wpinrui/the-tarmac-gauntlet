@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The 24h Tarmac Gauntlet — New Car Dealer</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #1e3450; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #2a4a68; }
+
+        html, body {
+            height: 100%;
+            background: #080d18;
+            color: #d0d8e4;
+            font-family: 'Inter', 'Segoe UI', -apple-system, sans-serif;
+            overflow: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                linear-gradient(180deg,
+                    rgba(8, 13, 24, 0.75) 0%,
+                    rgba(8, 13, 24, 0.45) 30%,
+                    rgba(8, 13, 24, 0.45) 70%,
+                    rgba(8, 13, 24, 0.75) 100%),
+                url('newdealer-backdrop.jpg') center / cover no-repeat;
+            pointer-events: none;
+        }
+
+        .app {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* ======== TAB BAR ======== */
+        .tab-bar {
+            display: flex;
+            align-items: stretch;
+            background: rgba(8, 12, 22, 0.85);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid #2a4262;
+            padding: 0 28px;
+            flex-shrink: 0;
+            position: relative; z-index: 10;
+        }
+
+        .team-identity {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 24px 10px 0;
+            margin-right: 8px;
+            border-right: 1px solid #1e3450;
+        }
+
+        .team-logo {
+            width: 32px; height: 32px;
+            border-radius: 6px;
+            background: rgba(0, 212, 170, 0.1);
+            border: 1px solid rgba(0, 212, 170, 0.25);
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .team-logo svg { width: 18px; height: 18px; }
+        .team-logo path { fill: #00d4aa; }
+
+        .team-name {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 600;
+            font-size: 16px;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: #e8ecf4;
+        }
+
+        .tab {
+            padding: 18px 24px;
+            font-family: 'Oswald', sans-serif;
+            font-weight: 500;
+            font-size: 17px;
+            letter-spacing: 2.5px;
+            text-transform: uppercase;
+            color: #7a96b0;
+            cursor: pointer;
+            position: relative;
+            transition: color .2s;
+        }
+
+        .tab:hover { color: #a0b8d0; }
+        .tab.active { color: #e8ecf4; }
+
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px; left: 0; right: 0;
+            height: 2px;
+            background: #00d4aa;
+        }
+
+        .tab-spacer { flex: 1; }
+
+        .tab-resource { display: flex; align-items: center; gap: 7px; padding: 14px 12px; border-radius: 6px; cursor: pointer; transition: background .15s; position: relative; }
+        .tab-resource:hover { background: rgba(255,255,255,0.04); }
+        .tab-resource .res-icon { font-size: 18px; color: #7a96b0; transition: color .15s; flex-shrink: 0; position: relative; top: 2px; }
+        .tab-resource:hover .res-icon { color: #a0b8d0; }
+        .tab-resource .res-value { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 20px; color: #e8ecf4; }
+        .tab-resource.money .res-value { color: #00d4aa; }
+        .tab-resource .res-tooltip {
+            display: none; position: absolute; top: 100%; right: 0; margin-top: 8px;
+            background: rgba(8,12,22,0.95); border: 1px solid #2a4262;
+            padding: 12px 16px; border-radius: 8px; width: 240px; z-index: 10;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+        }
+        .tab-resource:hover .res-tooltip { display: block; }
+        .res-tooltip-title {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 14px;
+            letter-spacing: 1.5px; text-transform: uppercase; color: #e8ecf4; margin-bottom: 4px;
+        }
+        .res-tooltip-desc {
+            font-family: 'Inter', sans-serif; font-weight: 400; font-size: 13px;
+            color: #8a9cb4; line-height: 1.4;
+        }
+
+        /* ======== BREADCRUMB ======== */
+        .breadcrumb {
+            padding: 14px 28px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .breadcrumb a {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 400;
+            font-size: 16px;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: #7a96b0;
+            text-decoration: none;
+            transition: color .15s;
+        }
+
+        .breadcrumb a:hover { color: #00d4aa; }
+
+        .breadcrumb .sep {
+            font-size: 16px;
+            color: #5a7a98;
+        }
+
+        .breadcrumb .current {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 600;
+            font-size: 16px;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: #d0dce8;
+        }
+
+        /* ======== SPLIT VIEW ======== */
+        .split {
+            flex: 1;
+            display: flex;
+            gap: 0;
+            overflow: hidden;
+            margin: 0 28px 28px;
+            border-radius: 10px;
+            border: 1px solid #2a4262;
+            background: rgba(12, 18, 32, 0.78);
+            backdrop-filter: blur(10px);
+        }
+
+        /* ---- Left: Car list ---- */
+        .car-list {
+            width: 680px;
+            flex-shrink: 0;
+            border-right: 1px solid #2a4262;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .list-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(42, 66, 98, 0.4);
+            flex-shrink: 0;
+        }
+
+        .list-title {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 600;
+            font-size: 17px;
+            letter-spacing: 2.5px;
+            text-transform: uppercase;
+            color: #8a9cb4;
+            margin-bottom: 10px;
+        }
+
+        .class-filter {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+
+        .class-btn {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 500;
+            font-size: 14px;
+            letter-spacing: 1px;
+            padding: 5px 12px;
+            border-radius: 4px;
+            border: 1px solid #2a4262;
+            background: transparent;
+            color: #8a9cb4;
+            cursor: pointer;
+            transition: all .15s;
+        }
+
+        .class-btn:hover { border-color: #3a5a78; color: #a0b8d0; }
+        .class-btn.active { border-color: #00d4aa; color: #00d4aa; background: rgba(0, 212, 170, 0.08); }
+
+        .list-scroll {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .car-list-group {
+            padding: 8px 0 0;
+        }
+
+        .group-label {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 600;
+            font-size: 13px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #6a8aa6;
+            padding: 6px 20px;
+        }
+
+        .car-list-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: background .12s;
+            border-left: 3px solid transparent;
+        }
+
+        .car-list-item:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .car-list-item.selected {
+            background: rgba(0, 212, 170, 0.04);
+            border-left-color: #00d4aa;
+        }
+
+        .car-item-info { flex: 1; }
+
+        .car-item-name {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 500;
+            font-size: 18px;
+            color: #d0dce8;
+        }
+
+        .car-list-item.selected .car-item-name { color: #fff; }
+
+        .class-badge {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 600;
+            font-size: 12px;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            padding: 2px 10px;
+            border-radius: 8px;
+            border: 1.5px solid;
+            background: transparent;
+            display: inline-block;
+            margin-top: 4px;
+        }
+
+        .class-badge.f { color: #a0785a; border-color: #a0785a; }
+        .class-badge.e { color: #5ab8d8; border-color: #5ab8d8; }
+        .class-badge.d { color: #d060a0; border-color: #d060a0; }
+        .class-badge.c { color: #e0943a; border-color: #e0943a; }
+        .class-badge.b { color: #d04040; border-color: #d04040; }
+        .class-badge.a { color: #50c878; border-color: #50c878; }
+        .class-badge.f1 {
+            color: transparent;
+            border-color: #888;
+            background:
+                repeating-conic-gradient(#222 0% 25%, #ddd 0% 50%) 50% / 8px 8px;
+            -webkit-background-clip: padding-box;
+            padding: 3px 10px;
+        }
+
+        .car-item-price {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 600;
+            font-size: 18px;
+            color: #fff;
+        }
+
+        /* ---- Right: Detail panel ---- */
+        .detail-panel {
+            flex: 1;
+            overflow-y: auto;
+            padding: 28px 32px;
+        }
+
+
+        .detail-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+
+        .detail-name {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 700;
+            font-size: 28px;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+
+        .detail-meta {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 400;
+            font-size: 15px;
+            color: #7a96b0;
+            letter-spacing: 1px;
+        }
+
+        .detail-price-block {
+            text-align: right;
+        }
+
+        .detail-price-label {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 400;
+            font-size: 14px;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: #8a9cb4;
+        }
+
+        .detail-price {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 700;
+            font-size: 28px;
+            color: #00d4aa;
+        }
+
+
+        /* Stat comparison grid */
+        .stats-section {
+            margin-bottom: 24px;
+        }
+
+        .stats-section-title {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 600;
+            font-size: 15px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #8a9cb4;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(42, 66, 98, 0.4);
+        }
+
+        .stat-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 0;
+        }
+
+        .stat-name {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 400;
+            font-size: 15px;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            color: #a0b8d0;
+            width: 140px;
+            flex-shrink: 0;
+        }
+
+        .stat-bar-track {
+            flex: 1;
+            max-width: 400px;
+            height: 6px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .stat-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            background: linear-gradient(90deg, #00d4aa, #00b894);
+            transition: width .3s;
+        }
+
+
+        .stat-value {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 600;
+            font-size: 17px;
+            color: #e8ecf4;
+            width: 30px;
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        .stat-delta {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 600;
+            font-size: 15px;
+            width: 50px;
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        .stat-delta.up { color: #00d4aa; }
+        .stat-delta.down { color: #e17055; }
+        .stat-delta.neutral { color: #5a7a98; }
+
+        /* Pit stop estimate */
+        .pit-estimate {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 0;
+            border-top: 1px solid rgba(42, 66, 98, 0.4);
+            border-bottom: 1px solid rgba(42, 66, 98, 0.4);
+            margin-bottom: 24px;
+        }
+
+        .pit-label {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 500;
+            font-size: 16px;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            color: #a0b8d0;
+        }
+
+        .pit-value {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 600;
+            font-size: 20px;
+            color: #e8ecf4;
+        }
+
+        .pit-value .pit-unit {
+            font-weight: 400;
+            font-size: 16px;
+            color: #7a96b0;
+        }
+
+        .pit-note {
+            font-family: 'Inter', sans-serif;
+            font-weight: 400;
+            font-size: 14px;
+            color: #7a96b0;
+        }
+
+        /* Upgrade packs */
+        .upgrades-section {
+            margin-bottom: 24px;
+        }
+
+        .upgrade-pack {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: rgba(6, 10, 20, 0.4);
+            border: 1px solid #2a4262;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .upgrade-info { flex: 1; }
+
+        .upgrade-name {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 600;
+            font-size: 17px;
+            color: #d0dce8;
+        }
+
+        .upgrade-desc {
+            font-family: 'Inter', sans-serif;
+            font-weight: 400;
+            font-size: 14px;
+            color: #8a9cb4;
+            margin-top: 2px;
+        }
+
+        .upgrade-stats {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 500;
+            font-size: 15px;
+            color: #00d4aa;
+            margin-top: 4px;
+        }
+
+        .upgrade-price {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 600;
+            font-size: 18px;
+            color: #a0b8d0;
+            flex-shrink: 0;
+            margin-left: 16px;
+        }
+
+        /* Buy button */
+        .buy-row {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 16px;
+            margin-top: 8px;
+        }
+
+        .btn-buy {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 700;
+            font-size: 16px;
+            letter-spacing: 2.5px;
+            text-transform: uppercase;
+            padding: 14px 36px;
+            border-radius: 8px;
+            border: none;
+            background: #00d4aa;
+            color: #060a14;
+            cursor: pointer;
+            transition: all .2s;
+        }
+
+        .btn-buy:hover { background: #00e8bc; box-shadow: 0 0 20px rgba(0,212,170,0.15); }
+
+        .btn-buy:disabled {
+            background: #1a2a40;
+            color: #4a6478;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+
+<div class="app">
+
+    <!-- Tab bar -->
+    <div class="tab-bar">
+        <div class="team-identity">
+            <div class="team-logo">
+                <svg viewBox="0 0 48 48"><path d="M24 4L40 12v14c0 12-16 18-16 18S8 38 8 26V12z"/></svg>
+            </div>
+            <span class="team-name">Backfire Racing</span>
+        </div>
+        <div class="tab active">Garage</div>
+        <div class="tab">Finances</div>
+        <div class="tab">Race History</div>
+        <div class="tab">Standings</div>
+        <div class="tab">Scouting Report</div>
+        <div class="tab-spacer"></div>
+        <div class="tab-resource">
+            <i class="fa-solid fa-wrench res-icon"></i>
+            <span class="res-value">12</span>
+            <div class="res-tooltip">
+                <div class="res-tooltip-title">Spare Parts</div>
+                <div class="res-tooltip-desc">Fix mechanical issues during races and repair car condition between races. Unspent parts carry over each year.</div>
+            </div>
+        </div>
+        <div class="tab-resource money">
+            <i class="fa-solid fa-sack-dollar res-icon"></i>
+            <span class="res-value">$1,000</span>
+            <div class="res-tooltip">
+                <div class="res-tooltip-title">Money</div>
+                <div class="res-tooltip-desc">Your team's funds. Buy cars, upgrades, spare parts, tyres, and hire drivers and crew.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Breadcrumb -->
+    <div class="breadcrumb">
+        <a href="#">← Garage</a>
+        <span class="sep">/</span>
+        <span class="current">New Car Dealer</span>
+    </div>
+
+    <!-- Split view -->
+    <div class="split">
+
+        <!-- Left: car list -->
+        <div class="car-list">
+            <div class="list-header">
+                <div class="list-title">Cars</div>
+                <div class="class-filter">
+                    <button class="class-btn active">All</button>
+                    <button class="class-btn">Class F</button>
+                    <button class="class-btn">Class E</button>
+                    <button class="class-btn">Class D</button>
+                    <button class="class-btn">Class C</button>
+                    <button class="class-btn">Class B</button>
+                    <button class="class-btn">Class A</button>
+                </div>
+            </div>
+
+            <div class="list-scroll">
+                <!-- Class F -->
+                <div class="car-list-group">
+                    <div class="car-list-item selected">
+                        <div class="car-item-info">
+                            <div class="car-item-name">Rusty Rattler 750</div>
+                            <span class="class-badge f">Class F</span>
+                        </div>
+                        <div class="car-item-price">$750</div>
+                    </div>
+                    <div class="car-list-item">
+                        <div class="car-item-info">
+                            <div class="car-item-name">Banger Box 900</div>
+                            <span class="class-badge f">Class F</span>
+                        </div>
+                        <div class="car-item-price">$900</div>
+                    </div>
+                    <div class="car-list-item">
+                        <div class="car-item-info">
+                            <div class="car-item-name">Dumpster Dart 1200</div>
+                            <span class="class-badge f">Class F</span>
+                        </div>
+                        <div class="car-item-price">$1,200</div>
+                    </div>
+                    <div class="car-list-item">
+                        <div class="car-item-info">
+                            <div class="car-item-name">Salvage Special 1500</div>
+                            <span class="class-badge f">Class F</span>
+                        </div>
+                        <div class="car-item-price">$1,500</div>
+                    </div>
+                </div>
+
+                <!-- Class E -->
+                <div class="car-list-group">
+                    <div class="car-list-item">
+                        <div class="car-item-info">
+                            <div class="car-item-name">Commuter GS 2000</div>
+                            <span class="class-badge e">Class E</span>
+                        </div>
+                        <div class="car-item-price">$2,000</div>
+                    </div>
+                    <div class="car-list-item">
+                        <div class="car-item-info">
+                            <div class="car-item-name">Sedan SE 3500</div>
+                            <span class="class-badge e">Class E</span>
+                        </div>
+                        <div class="car-item-price">$3,500</div>
+                    </div>
+                    <div class="car-list-item">
+                        <div class="car-item-info">
+                            <div class="car-item-name">Wagon LX 5000</div>
+                            <span class="class-badge e">Class E</span>
+                        </div>
+                        <div class="car-item-price">$5,000</div>
+                    </div>
+                </div>
+
+                <!-- Class D -->
+                <div class="car-list-group">
+                    <div class="car-list-item">
+                        <div class="car-item-info">
+                            <div class="car-item-name">Roadster RS 8K</div>
+                            <span class="class-badge d">Class D</span>
+                        </div>
+                        <div class="car-item-price">$8,000</div>
+                    </div>
+                    <div class="car-list-item">
+                        <div class="car-item-info">
+                            <div class="car-item-name">Coupé GT 15K</div>
+                            <span class="class-badge d">Class D</span>
+                        </div>
+                        <div class="car-item-price">$15,000</div>
+                    </div>
+                </div>
+
+                <!-- Class C -->
+                <div class="car-list-group">
+                    <div class="car-list-item">
+                        <div class="car-item-info">
+                            <div class="car-item-name">Track Hawk 30K</div>
+                            <span class="class-badge c">Class C</span>
+                        </div>
+                        <div class="car-item-price">$30,000</div>
+                    </div>
+                </div>
+
+                <!-- Higher classes abbreviated -->
+                <div class="car-list-group">
+                    <div class="car-list-item">
+                        <div class="car-item-info">
+                            <div class="car-item-name">GT Viper 150K</div>
+                            <span class="class-badge b">Class B</span>
+                        </div>
+                        <div class="car-item-price">$150,000</div>
+                    </div>
+                </div>
+
+                <div class="car-list-group">
+                    <div class="car-list-item">
+                        <div class="car-item-info">
+                            <div class="car-item-name">Apex Stallion 500K</div>
+                            <span class="class-badge a">Class A</span>
+                        </div>
+                        <div class="car-item-price">$500,000</div>
+                    </div>
+                </div>
+
+
+            </div>
+        </div>
+
+        <!-- Right: detail panel -->
+        <div class="detail-panel">
+            <div class="detail-header">
+                <div>
+                    <div class="detail-name">Rusty Rattler 750</div>
+                    <div class="detail-meta"><span class="class-badge f">Class F</span> · New · Age 0</div>
+                </div>
+                <div class="detail-price-block">
+                    <div class="detail-price-label">MSRP</div>
+                    <div class="detail-price">$750</div>
+                </div>
+            </div>
+
+            <!-- Stats with delta comparison -->
+            <div class="stats-section">
+                <div class="stats-section-title">Performance Stats <span style="font-weight:400; color:#4a6a88;">vs your Rusty Rattler 750</span></div>
+
+                <div class="stat-row">
+                    <span class="stat-name">Power</span>
+                    <div class="stat-bar-track"><div class="stat-bar-fill" style="width:8%"></div></div>
+                    <span class="stat-value">8</span>
+                    <span class="stat-delta neutral">—</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-name">Handling</span>
+                    <div class="stat-bar-track"><div class="stat-bar-fill" style="width:10%"></div></div>
+                    <span class="stat-value">10</span>
+                    <span class="stat-delta neutral">—</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-name">Fuel Efficiency</span>
+                    <div class="stat-bar-track"><div class="stat-bar-fill" style="width:15%"></div></div>
+                    <span class="stat-value">15</span>
+                    <span class="stat-delta neutral">—</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-name">Tyre Durability</span>
+                    <div class="stat-bar-track"><div class="stat-bar-fill" style="width:12%"></div></div>
+                    <span class="stat-value">12</span>
+                    <span class="stat-delta neutral">—</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-name">Comfort</span>
+                    <div class="stat-bar-track"><div class="stat-bar-fill" style="width:5%"></div></div>
+                    <span class="stat-value">5</span>
+                    <span class="stat-delta neutral">—</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-name">Reliability</span>
+                    <div class="stat-bar-track"><div class="stat-bar-fill" style="width:8%"></div></div>
+                    <span class="stat-value">8</span>
+                    <span class="stat-delta neutral">—</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-name">Fuel Capacity</span>
+                    <div class="stat-bar-track"><div class="stat-bar-fill" style="width:20%"></div></div>
+                    <span class="stat-value">20</span>
+                    <span class="stat-delta neutral">—</span>
+                </div>
+            </div>
+
+            <!-- Pit stop estimate -->
+            <div class="pit-estimate">
+                <div>
+                    <div class="pit-label">Est. Pit Stop Time</div>
+                    <div class="pit-note">Based on crew (0) + engineer skill (5)</div>
+                </div>
+                <div class="pit-value">~52 <span class="pit-unit">sec</span></div>
+            </div>
+
+            <!-- Upgrade packs available -->
+            <div class="upgrades-section">
+                <div class="stats-section-title">Upgrade Packs Available</div>
+
+                <div class="upgrade-pack">
+                    <div class="upgrade-info">
+                        <div class="upgrade-name">Power Pack</div>
+                        <div class="upgrade-desc">Unlocks Power and Fuel Efficiency potential</div>
+                        <div class="upgrade-stats">Power 8 → 14 · Fuel Efficiency 15 → 20</div>
+                    </div>
+                    <div class="upgrade-price">$400</div>
+                </div>
+
+                <div class="upgrade-pack">
+                    <div class="upgrade-info">
+                        <div class="upgrade-name">Handling Pack</div>
+                        <div class="upgrade-desc">Unlocks Handling and Tyre Durability potential</div>
+                        <div class="upgrade-stats">Handling 10 → 16 · Tyre Durability 12 → 18</div>
+                    </div>
+                    <div class="upgrade-price">$350</div>
+                </div>
+
+                <div class="upgrade-pack">
+                    <div class="upgrade-info">
+                        <div class="upgrade-name">Comfort Pack</div>
+                        <div class="upgrade-desc">Unlocks Comfort potential</div>
+                        <div class="upgrade-stats">Comfort 5 → 12</div>
+                    </div>
+                    <div class="upgrade-price">$250</div>
+                </div>
+            </div>
+
+            <!-- Buy -->
+            <div class="buy-row">
+                <button class="btn-buy">Buy — $750</button>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+</body>
+</html>

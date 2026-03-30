@@ -2,10 +2,14 @@ import { useCallback } from "react";
 import { useGameStore } from "./state/store";
 import { NewGameScreen } from "./screens/NewGameScreen";
 import { GarageScreen } from "./screens/GarageScreen";
+import { NewCarDealerScreen } from "./screens/NewCarDealerScreen";
+import { SecondHandDealerScreen } from "./screens/SecondHandDealerScreen";
+import { CarWorkshopScreen } from "./screens/CarWorkshopScreen";
 import { initializeGame } from "./simulation/gameInit";
 
 export function App() {
   const game = useGameStore((s) => s.game);
+  const screen = useGameStore((s) => s.screen);
   const setGame = useGameStore((s) => s.setGame);
 
   const handleNewGame = useCallback(
@@ -25,5 +29,15 @@ export function App() {
     return <NewGameScreen onStart={handleNewGame} />;
   }
 
-  return <GarageScreen />;
+  switch (screen) {
+    case "newCarDealer":
+      return <NewCarDealerScreen />;
+    case "secondHandDealer":
+      return <SecondHandDealerScreen />;
+    case "carWorkshop":
+      return <CarWorkshopScreen />;
+    case "garage":
+    default:
+      return <GarageScreen />;
+  }
 }

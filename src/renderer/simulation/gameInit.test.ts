@@ -86,13 +86,11 @@ describe("initializeGame", () => {
     expect(player.budget).toBe(1_000);
   });
 
-  it("player team has 1 car (plot armour junkyard)", () => {
+  it("player team starts with no cars", () => {
     const game = initializeGame(options, stable);
     const player = game.teams.find((t) => t.kind === "player")!;
-    expect(player.cars).toHaveLength(1);
-    expect(player.cars[0].modelId).toBe("f-01");
-    expect(player.cars[0].age).toBe(0);
-    expect(player.cars[0].condition).toBe(100);
+    expect(player.cars).toHaveLength(0);
+    expect(player.enteredCarId).toBeNull();
   });
 
   it("player team has 0 crew, no contracts, no spare parts, no tyre sets", () => {

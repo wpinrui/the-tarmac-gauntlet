@@ -7,7 +7,7 @@ import type {
   UsedCarListing,
 } from "../types";
 import { advanceDriverYear, type RookieSpec } from "./driverLifecycle";
-import { generateUsedInventory } from "./carMarket";
+import { generateUsedInventoryByClass } from "./carMarket";
 import { runAiSpending } from "./aiSpending";
 
 // ---------------------------------------------------------------------------
@@ -25,8 +25,8 @@ export interface YearAdvanceInput {
   carModels: CarModel[];
   /** Exactly 15 specs for newly generated rookie drivers. */
   rookieSpecs: RookieSpec[];
-  /** Number of used car listings to generate (default: 20). */
-  usedInventoryCount?: number;
+  /** Whether the player has won the event before (enables F1 in used market). */
+  playerHasWon?: boolean;
   /** Generates unique IDs for newly purchased car instances. Must produce distinct values. */
   newCarId: () => string;
 }
@@ -69,7 +69,7 @@ export function advanceYear(
   random: () => number,
 ): YearAdvanceResult {
   const { drivers, contracts, teams, carModels, rookieSpecs, newCarId } = input;
-  const usedInventoryCount = input.usedInventoryCount ?? 20;
+  const playerHasWon = input.playerHasWon ?? false;
 
   // 1. Advance driver pool
   const driverResult = advanceDriverYear(drivers, rookieSpecs, random);
@@ -86,7 +86,7 @@ export function advanceYear(
   }));
 
   // 4. Generate new used car inventory
-  const usedListings = generateUsedInventory(carModels, usedInventoryCount, random);
+  const usedListings = generateUsedInventoryByClass(carModels, playerHasWon, random);
 
   // 5. Run AI spending for each AI team
   let activeContracts = updatedContracts;
