@@ -412,7 +412,7 @@ $class-colors: (
   }
 
   &.f1 {
-    color: #ddd;
+    color: transparent;
     border-color: #888;
     background: repeating-conic-gradient(#222 0% 25%, #ddd 0% 50%) 50% / 8px 8px;
     -webkit-background-clip: padding-box;
