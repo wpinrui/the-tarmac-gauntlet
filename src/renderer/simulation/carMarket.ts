@@ -197,7 +197,7 @@ export function generateUsedInventoryByClass(
     const shitbox: CarInstance = {
       id: "",
       modelId: shitboxModel.id,
-      age: MAX_USED_AGE,
+      age: 15 + Math.floor(random() * 11), // 15–25 years old
       condition: USED_CONDITION_MIN,
       installedUpgrades: { power: false, handling: false, comfort: false },
     };
@@ -205,7 +205,7 @@ export function generateUsedInventoryByClass(
     listings.push({
       id: `used-shitbox-${Math.floor(random() * 1_000_000_000)}`,
       modelId: shitboxModel.id,
-      age: MAX_USED_AGE,
+      age: shitbox.age,
       condition: USED_CONDITION_MIN,
       installedUpgrades: { power: false, handling: false, comfort: false },
       price,

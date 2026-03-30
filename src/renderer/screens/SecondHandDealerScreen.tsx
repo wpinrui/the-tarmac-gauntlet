@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useGameStore } from "../state/store";
 import { TopBar } from "./TopBar";
+import { calculateEffectiveStats } from "../simulation/effectiveStats";
 import type { CarInstance, PlayerTeam, UsedCarListing } from "../types";
 import backdropUrl from "../assets/secondhand-backdrop.jpg";
 import "./DealerShared.scss";
@@ -42,6 +43,12 @@ export function SecondHandDealerScreen() {
 
   const selected = selectedId ? listings.find((l) => l.id === selectedId) ?? null : null;
   const selectedModel = selected ? models.find((m) => m.id === selected.modelId) : null;
+  const selectedEffective = selected && selectedModel
+    ? calculateEffectiveStats(
+        { id: "", modelId: selected.modelId, age: selected.age, condition: selected.condition, installedUpgrades: selected.installedUpgrades },
+        selectedModel,
+      )
+    : null;
 
   const isShitbox = (listing: UsedCarListing) => listing.id.startsWith("used-shitbox-");
 
@@ -112,7 +119,7 @@ export function SecondHandDealerScreen() {
 
           {/* Right: detail panel */}
           <div className="detail-panel">
-            {selected && selectedModel ? (
+            {selected && selectedModel && selectedEffective ? (
               <>
                 <div className="detail-header">
                   <div>
@@ -148,7 +155,7 @@ export function SecondHandDealerScreen() {
                 <div className="stats-section">
                   <div className="stats-section-title">Performance</div>
                   {(["power", "handling", "fuelEfficiency", "tyreDurability", "comfort", "reliability", "fuelCapacity"] as const).map((stat) => {
-                    const val = selectedModel.baseStats[stat];
+                    const val = selectedEffective[stat];
                     return (
                       <div className="stat-row" key={stat}>
                         <span className="stat-name">{stat.replace(/([A-Z])/g, " $1")}</span>
