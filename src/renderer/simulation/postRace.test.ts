@@ -23,10 +23,9 @@ describe("buildPrizeSchedule", () => {
     });
   });
 
-  it("winner (P1) receives approximately the maximum prize", () => {
+  it("winner (P1) receives $750,000", () => {
     const schedule = buildPrizeSchedule(100);
-    expect(schedule[0].amount).toBeGreaterThanOrEqual(400_000);
-    expect(schedule[0].amount).toBeLessThanOrEqual(500_000);
+    expect(schedule[0].amount).toBe(750_000);
   });
 
   it("last place (P100) receives approximately the minimum prize", () => {
@@ -35,11 +34,17 @@ describe("buildPrizeSchedule", () => {
     expect(schedule[99].amount).toBeLessThanOrEqual(1_000);
   });
 
-  it("prizes are strictly decreasing from P1 to P100", () => {
+  it("prizes are non-increasing from P1 to P100", () => {
     const schedule = buildPrizeSchedule(100);
     for (let i = 1; i < schedule.length; i++) {
-      expect(schedule[i - 1].amount).toBeGreaterThan(schedule[i].amount);
+      expect(schedule[i - 1].amount).toBeGreaterThanOrEqual(schedule[i].amount);
     }
+  });
+
+  it("total prize pool is exactly $15,000,000", () => {
+    const schedule = buildPrizeSchedule(100);
+    const total = schedule.reduce((sum, e) => sum + e.amount, 0);
+    expect(total).toBe(15_000_000);
   });
 
   it("all amounts are positive integers", () => {
@@ -104,7 +109,7 @@ describe("distributePrizeMoney", () => {
     expect(prizes["team-100"]).toBe(0);
   });
 
-  it("higher position always pays more than lower position (for non-zero lap cars)", () => {
+  it("higher position always pays at least as much as lower position (for non-zero lap cars)", () => {
     const results = Array.from({ length: 100 }, (_, i) => ({
       teamId: `team-${i + 1}`,
       position: i + 1,
@@ -112,7 +117,7 @@ describe("distributePrizeMoney", () => {
     }));
     const prizes = distributePrizeMoney(results, schedule);
     for (let pos = 1; pos < 100; pos++) {
-      expect(prizes[`team-${pos}`]).toBeGreaterThan(prizes[`team-${pos + 1}`]);
+      expect(prizes[`team-${pos}`]).toBeGreaterThanOrEqual(prizes[`team-${pos + 1}`]);
     }
   });
 

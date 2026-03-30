@@ -5,9 +5,9 @@ import type { CarModel, CarInstance, InstalledUpgrades, NewCarListing, UsedCarLi
 // ---------------------------------------------------------------------------
 
 /** Fraction of original value lost per year of age. */
-const AGE_DEPRECIATION_PER_YEAR = 0.08;
+const AGE_DEPRECIATION_PER_YEAR = 0.03;
 /** Minimum age factor — a car never drops below this due to age alone. */
-const MIN_AGE_FACTOR = 0.10;
+const MIN_AGE_FACTOR = 0.50;
 /** Minimum condition factor — even a 0%-condition car retains this fraction of aged value. */
 const CONDITION_FLOOR = 0.50;
 /** Fraction of each installed upgrade pack's cost recovered in the used listing price. */
@@ -174,7 +174,7 @@ export function generateUsedInventory(
 export const F1_USED_PROBABILITY = 0.20;
 
 /**
- * Generates a used car inventory with exactly 1 car per class.
+ * Generates a used car inventory with 2 cars per class.
  *
  * For classes F–A: picks a random model from that class and generates a used listing.
  * For F1: only included with F1_USED_PROBABILITY (20%) chance, and only if
@@ -216,8 +216,10 @@ export function generateUsedInventoryByClass(
     // Exclude f-01 (Neutrino Sago) from randomisation — it's the designated shitbox above
     const classModels = models.filter((m) => m.carClass === cls && m.id !== "f-01");
     if (classModels.length === 0) continue;
-    const model = classModels[Math.floor(random() * classModels.length)];
-    listings.push(generateUsedListing(model, random));
+    for (let i = 0; i < 2; i++) {
+      const model = classModels[Math.floor(random() * classModels.length)];
+      listings.push(generateUsedListing(model, random));
+    }
   }
 
   // F1: 20% chance, only if eligible
