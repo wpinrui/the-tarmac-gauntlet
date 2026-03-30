@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useGameStore } from "../state/store";
 import { calculateEffectiveStats } from "../simulation/effectiveStats";
+import { calculateSalePrice } from "../simulation/carMarket";
 import { TopBar } from "./TopBar";
 import type { CarInstance, CarModel, PlayerTeam, UpgradePackType } from "../types";
 import backdropUrl from "../assets/workshop-backdrop.jpg";
@@ -35,6 +36,10 @@ export function CarWorkshopScreen() {
   const selectedModel = selectedCar ? models.find((m) => m.id === selectedCar.modelId) : null;
   const effectiveStats = selectedCar && selectedModel ? calculateEffectiveStats(selectedCar, selectedModel) : null;
 
+  const displaySalePrice = selectedCar && selectedModel
+    ? Math.round(calculateSalePrice(selectedCar, selectedModel, player.skills.business) * 0.5)
+    : 0;
+
   const conditionDeficit = selectedCar ? 100 - selectedCar.condition : 0;
   const maxRepairParts = Math.min(player.spareParts, Math.ceil(conditionDeficit / CONDITION_PER_PART));
   const repairGain = Math.min(conditionDeficit, repairParts * CONDITION_PER_PART);
@@ -53,8 +58,9 @@ export function CarWorkshopScreen() {
 
   const handleSell = () => {
     if (!selectedCar || !selectedModel) return;
-    // Simple sale price: 50% of model price (placeholder)
-    const salePrice = Math.round(selectedModel.price * 0.5);
+    // 50% of the calculated sale price (which factors age, condition, upgrades, Business skill)
+    const fullSalePrice = calculateSalePrice(selectedCar, selectedModel, player.skills.business);
+    const salePrice = Math.round(fullSalePrice * 0.5);
     sellCar(selectedCar.id, salePrice);
     setSelectedCarId(null);
   };
@@ -217,7 +223,7 @@ export function CarWorkshopScreen() {
                 {/* Sell */}
                 <div className="buy-row">
                   <button className="btn-buy" style={{ background: "transparent", border: "1px solid #2a4262", color: "#8a9cb4" }} onClick={handleSell}>
-                    Sell Car
+                    Sell — ${displaySalePrice.toLocaleString()}
                   </button>
                 </div>
               </>
