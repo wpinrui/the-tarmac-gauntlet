@@ -1,0 +1,726 @@
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+
+// ---------------------------------------------------------------------------
+// Variables
+// ---------------------------------------------------------------------------
+$bg: #080d18;
+$teal: #00d4aa;
+$teal-hover: #00e8bc;
+$border: #2a4262;
+$text-primary: #e8ecf4;
+$text-secondary: #a0b8d0;
+$text-muted: #7a96b0;
+$text-dim: #5a7a98;
+$text-faint: #8a9cb4;
+$panel-bg: rgba(12, 18, 32, 0.78);
+$input-bg: rgba(6, 10, 20, 0.4);
+$disabled-bg: #1a2a40;
+$disabled-color: #4a6478;
+
+// Class badge colors
+$class-colors: (
+  f: #a0785a,
+  e: #5ab8d8,
+  d: #d060a0,
+  c: #e0943a,
+  b: #d04040,
+  a: #50c878,
+);
+
+// ---------------------------------------------------------------------------
+// Root
+// ---------------------------------------------------------------------------
+.dealer-root {
+  position: fixed;
+  inset: 0;
+  background: $bg;
+  color: #d0d8e4;
+  font-family: 'Inter', 'Segoe UI', -apple-system, sans-serif;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  // Scrollbar
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #1e3450; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #2a4a68; }
+
+  // Backdrop
+  &::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      linear-gradient(180deg,
+        rgba(8,13,24,0.75) 0%,
+        rgba(8,13,24,0.45) 30%,
+        rgba(8,13,24,0.45) 70%,
+        rgba(8,13,24,0.75) 100%),
+      var(--dealer-backdrop) center / cover no-repeat;
+    pointer-events: none;
+  }
+}
+
+.dealer-app {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+// ---------------------------------------------------------------------------
+// Breadcrumb
+// ---------------------------------------------------------------------------
+.breadcrumb {
+  padding: 14px 28px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+
+  a {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 400;
+    font-size: 16px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: $text-muted;
+    text-decoration: none;
+    cursor: pointer;
+    transition: color .15s;
+
+    &:hover { color: $teal; }
+  }
+
+  .sep {
+    font-size: 16px;
+    color: $text-dim;
+  }
+
+  .current {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 600;
+    font-size: 16px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #d0dce8;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Split view
+// ---------------------------------------------------------------------------
+.split {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  margin: 0 28px 28px;
+  border-radius: 10px;
+  border: 1px solid $border;
+  background: $panel-bg;
+  backdrop-filter: blur(10px);
+}
+
+// Left: car list
+.car-list {
+  width: 680px;
+  flex-shrink: 0;
+  border-right: 1px solid $border;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.list-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(42,66,98,0.4);
+  flex-shrink: 0;
+}
+
+.list-title {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 17px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: $text-faint;
+  margin-bottom: 10px;
+}
+
+.list-subtitle {
+  font-family: 'Inter', sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: $text-muted;
+}
+
+// Class filter buttons
+.class-filter {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.class-btn {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 500;
+  font-size: 14px;
+  letter-spacing: 1px;
+  padding: 5px 12px;
+  border-radius: 4px;
+  border: 1px solid $border;
+  background: transparent;
+  color: $text-faint;
+  cursor: pointer;
+  transition: all .15s;
+
+  &:hover { border-color: #3a5a78; color: $text-secondary; }
+  &.active { border-color: $teal; color: $teal; background: rgba(0,212,170,0.08); }
+}
+
+.list-scroll {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.car-list-group {
+  padding: 8px 0 0;
+}
+
+.group-label {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #6a8aa6;
+  padding: 6px 20px;
+}
+
+// Car list items
+.car-list-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 20px;
+  cursor: pointer;
+  transition: background .12s;
+  border-left: 3px solid transparent;
+  border-bottom: 1px solid rgba(42,66,98,0.2);
+
+  &:hover { background: rgba(255,255,255,0.02); }
+
+  &.selected {
+    background: rgba(0,212,170,0.04);
+    border-left-color: $teal;
+
+    .car-item-name { color: #fff; }
+  }
+}
+
+.car-item-info { flex: 1; }
+
+.car-item-name {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 500;
+  font-size: 18px;
+  color: #d0dce8;
+}
+
+.car-item-details {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: $text-muted;
+  letter-spacing: 0.8px;
+  margin-top: 2px;
+}
+
+.car-item-price {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 18px;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+// ---------------------------------------------------------------------------
+// Class badges
+// ---------------------------------------------------------------------------
+.class-badge {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 2px 10px;
+  border-radius: 8px;
+  border: 1.5px solid;
+  background: transparent;
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 4px;
+
+  @each $cls, $color in $class-colors {
+    &.#{$cls} { color: $color; border-color: $color; }
+  }
+
+  &.f1 {
+    color: #ddd;
+    border-color: #888;
+    background: repeating-conic-gradient(#222 0% 25%, #ddd 0% 50%) 50% / 8px 8px;
+    -webkit-background-clip: padding-box;
+    padding: 3px 10px;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Detail panel (right side)
+// ---------------------------------------------------------------------------
+.detail-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px 32px;
+}
+
+.detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.detail-name {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 700;
+  font-size: 28px;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.detail-meta {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 400;
+  font-size: 15px;
+  color: $text-muted;
+  letter-spacing: 1px;
+}
+
+.detail-price-block { text-align: right; }
+
+.detail-price-label {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: $text-faint;
+}
+
+.detail-price {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 700;
+  font-size: 28px;
+  color: $teal;
+}
+
+.detail-msrp {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 400;
+  font-size: 15px;
+  color: $text-dim;
+  text-decoration: line-through;
+}
+
+// ---------------------------------------------------------------------------
+// Info chips (second-hand)
+// ---------------------------------------------------------------------------
+.info-chips {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+
+  .info-chip {
+    background: $input-bg;
+    border: 1px solid $border;
+    border-radius: 6px;
+    padding: 10px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .info-chip-label {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 400;
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: $text-faint;
+  }
+
+  .info-chip-value {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 600;
+    font-size: 20px;
+    color: $text-primary;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Stats section
+// ---------------------------------------------------------------------------
+.stats-section {
+  margin-bottom: 24px;
+}
+
+.stats-section-title {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: $text-faint;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(42,66,98,0.4);
+}
+
+.stat-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.stat-name {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 400;
+  font-size: 15px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: $text-secondary;
+  width: 140px;
+  flex-shrink: 0;
+}
+
+.stat-bar-track {
+  flex: 1;
+  max-width: 400px;
+  height: 6px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.stat-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, $teal, #00b894);
+  transition: width .3s;
+}
+
+.stat-bar-potential {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-radius: 3px;
+  background: rgba(0,212,170,0.2);
+  border-right: 2px solid $teal;
+}
+
+.stat-value {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 17px;
+  color: $text-primary;
+  width: 30px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.stat-delta {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  width: 50px;
+  text-align: right;
+  flex-shrink: 0;
+
+  &.up { color: $teal; }
+  &.down { color: #e17055; }
+  &.neutral { color: $text-dim; }
+}
+
+.stat-potential {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: $teal;
+  width: 50px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+// ---------------------------------------------------------------------------
+// Pit stop estimate
+// ---------------------------------------------------------------------------
+.pit-estimate {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-top: 1px solid rgba(42,66,98,0.4);
+  border-bottom: 1px solid rgba(42,66,98,0.4);
+  margin-bottom: 24px;
+
+  .pit-label {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 500;
+    font-size: 16px;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: $text-secondary;
+  }
+
+  .pit-value {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 600;
+    font-size: 20px;
+    color: $text-primary;
+
+    .pit-unit {
+      font-weight: 400;
+      font-size: 16px;
+      color: $text-muted;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Upgrade packs
+// ---------------------------------------------------------------------------
+.upgrades-section {
+  margin-bottom: 24px;
+}
+
+.upgrade-pack {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: $input-bg;
+  border: 1px solid $border;
+  border-radius: 8px;
+  margin-bottom: 8px;
+
+  &.installed {
+    background: rgba(0,212,170,0.04);
+    border-color: rgba(0,212,170,0.2);
+    .upgrade-name { color: $teal; }
+  }
+}
+
+.upgrade-info { flex: 1; }
+
+.upgrade-name {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 17px;
+  color: #d0dce8;
+}
+
+.upgrade-desc {
+  font-family: 'Inter', sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: $text-faint;
+  margin-top: 2px;
+}
+
+.upgrade-stats {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 500;
+  font-size: 15px;
+  color: $teal;
+  margin-top: 4px;
+}
+
+.upgrade-price {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 18px;
+  color: $text-secondary;
+  flex-shrink: 0;
+  margin-left: 16px;
+}
+
+.upgrade-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  margin-left: 16px;
+}
+
+.installed-tag {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 500;
+  font-size: 14px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: $teal;
+}
+
+// ---------------------------------------------------------------------------
+// Buttons
+// ---------------------------------------------------------------------------
+.buy-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.btn-buy, .btn-enter, .btn-repair, .btn-install {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  border-radius: 8px;
+  border: none;
+  background: $teal;
+  color: #060a14;
+  cursor: pointer;
+  transition: all .2s;
+
+  &:hover { background: $teal-hover; box-shadow: 0 0 20px rgba(0,212,170,0.15); }
+  &:disabled { background: $disabled-bg; color: $disabled-color; cursor: not-allowed; box-shadow: none; }
+}
+
+.btn-buy { font-size: 16px; padding: 14px 36px; }
+.btn-enter { font-size: 15px; padding: 10px 24px; font-weight: 600; letter-spacing: 2px; border-radius: 6px; }
+.btn-repair { font-size: 14px; padding: 10px 24px; font-weight: 600; letter-spacing: 2px; border-radius: 6px; }
+.btn-install { font-size: 14px; padding: 8px 18px; font-weight: 600; letter-spacing: 2px; border-radius: 6px; }
+
+.btn-entered {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 10px 24px;
+  border-radius: 6px;
+  border: 1px solid rgba(0,212,170,0.3);
+  background: rgba(0,212,170,0.06);
+  color: $teal;
+  cursor: default;
+}
+
+// ---------------------------------------------------------------------------
+// Workshop: condition & repair stepper
+// ---------------------------------------------------------------------------
+.condition-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 0;
+  border-top: 1px solid rgba(42,66,98,0.4);
+  border-bottom: 1px solid rgba(42,66,98,0.4);
+  margin-bottom: 24px;
+}
+
+.condition-label {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 500;
+  font-size: 16px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: $text-secondary;
+}
+
+.condition-value {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 700;
+  font-size: 28px;
+  color: $teal;
+}
+
+.repair-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.repair-stepper {
+  display: flex;
+  align-items: center;
+}
+
+.stepper-btn {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 18px;
+  width: 32px;
+  height: 32px;
+  border: 1px solid $border;
+  background: $input-bg;
+  color: $text-secondary;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .15s;
+
+  &:first-child { border-radius: 6px 0 0 6px; }
+  &:last-child { border-radius: 0 6px 6px 0; }
+  &:hover { background: rgba(0,212,170,0.08); border-color: #3a5a78; color: $text-primary; }
+  &:disabled { opacity: 0.3; cursor: not-allowed; }
+}
+
+.stepper-value {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 18px;
+  color: $text-primary;
+  min-width: 40px;
+  text-align: center;
+  border-top: 1px solid $border;
+  border-bottom: 1px solid $border;
+  height: 32px;
+  line-height: 32px;
+  background: rgba(6,10,20,0.2);
+}
+
+.repair-result {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 400;
+  font-size: 15px;
+  color: $text-faint;
+  strong { font-weight: 600; color: $teal; }
+}
+
+// Workshop entered badge
+.entered-badge {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 500;
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 4px;
+  background: rgba(0,212,170,0.1);
+  color: $teal;
+  border: 1px solid rgba(0,212,170,0.2);
+  flex-shrink: 0;
+}

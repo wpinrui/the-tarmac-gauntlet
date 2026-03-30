@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useGameStore } from "../state/store";
+import { useGameStore, type Screen } from "../state/store";
 import { calculateEffectiveStats } from "../simulation/effectiveStats";
 import { calculateDriverStats, totalDriverStats } from "../simulation/driverLifecycle";
 import type { PlayerTeam, CarInstance, CarModel, Driver } from "../types";
@@ -38,6 +38,7 @@ const PRE_SEASON_NEWS = [
 
 export function GarageScreen() {
   const game = useGameStore((s) => s.game);
+  const setScreen = useGameStore((s) => s.setScreen);
   const [selectedCarIdx, setSelectedCarIdx] = useState(0);
 
   if (!game) return null;
@@ -149,7 +150,7 @@ export function GarageScreen() {
           {/* Card grid */}
           <div className="card-grid">
             {/* COL 1: CAR */}
-            <div className="card car-card clickable">
+            <div className="card car-card clickable" onClick={() => setScreen("carWorkshop")}>
               <div className="card-title">
                 Cars <span className="badge">{cars.length} Owned</span>
                 <span className="nav-hint">Car Workshop &rsaquo;</span>
@@ -255,23 +256,23 @@ export function GarageScreen() {
 
           {/* Sub-screen nav */}
           <div className="nav-cards">
-            <div className="nav-card">
+            <div className="nav-card" onClick={() => setScreen("newCarDealer")}>
               <div className="nav-card-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="13" rx="2" /><line x1="12" y1="16" x2="12" y2="21" /><line x1="8" y1="21" x2="16" y2="21" /></svg></div>
               <span className="nav-card-label">New Car Dealer</span>
             </div>
-            <div className="nav-card">
+            <div className="nav-card" onClick={() => setScreen("secondHandDealer")}>
               <div className="nav-card-icon"><svg viewBox="0 0 24 24"><path d="M9 11l3-3 3 3M12 8v8" /><rect x="3" y="3" width="18" height="18" rx="2" /></svg></div>
               <span className="nav-card-label">Second-Hand Dealer</span>
             </div>
-            <div className="nav-card">
+            <div className="nav-card" onClick={() => setScreen("carWorkshop")}>
               <div className="nav-card-icon"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg></div>
               <span className="nav-card-label">Car Workshop</span>
             </div>
-            <div className="nav-card">
+            <div className="nav-card" onClick={() => setScreen("driverMarket")}>
               <div className="nav-card-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg></div>
               <span className="nav-card-label">Driver Market</span>
             </div>
-            <div className="nav-card">
+            <div className="nav-card" onClick={() => setScreen("crewHiring")}>
               <div className="nav-card-icon"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" y1="8" x2="19" y2="14" /><line x1="22" y1="11" x2="16" y2="11" /></svg></div>
               <span className="nav-card-label">Crew Hiring</span>
             </div>

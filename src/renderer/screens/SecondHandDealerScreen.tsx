@@ -1,0 +1,182 @@
+import { useState } from "react";
+import { useGameStore } from "../state/store";
+import type { CarInstance, PlayerTeam, UsedCarListing } from "../types";
+import backdropUrl from "../assets/secondhand-backdrop.jpg";
+import "./DealerShared.scss";
+
+let carIdCounter = Date.now() + 100_000;
+function nextCarId(): string {
+  return `car-${++carIdCounter}`;
+}
+
+export function SecondHandDealerScreen() {
+  const game = useGameStore((s) => s.game);
+  const setScreen = useGameStore((s) => s.setScreen);
+  const buyCar = useGameStore((s) => s.buyCar);
+
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  if (!game) return null;
+  const player = game.teams.find((t) => t.kind === "player") as PlayerTeam;
+  const listings = game.carMarket.usedListings;
+  const models = game.carModels;
+
+  const selected = selectedId ? listings.find((l) => l.id === selectedId) ?? null : null;
+  const selectedModel = selected ? models.find((m) => m.id === selected.modelId) : null;
+
+  const handleBuy = () => {
+    if (!selected || !selectedModel) return;
+    if (player.budget < selected.price) return;
+    const newCar: CarInstance = {
+      id: nextCarId(),
+      modelId: selected.modelId,
+      age: selected.age,
+      condition: selected.condition,
+      installedUpgrades: selected.installedUpgrades,
+    };
+    buyCar(newCar, selected.price);
+    setScreen("garage");
+  };
+
+  const upgradeCount = (u: UsedCarListing["installedUpgrades"]) =>
+    [u.power, u.handling, u.comfort].filter(Boolean).length;
+
+  return (
+    <div className="dealer-root" style={{ "--dealer-backdrop": `url(${backdropUrl})` } as React.CSSProperties}>
+      <div className="dealer-app">
+        <div className="breadcrumb">
+          <a onClick={() => setScreen("garage")}>&larr; Garage</a>
+          <span className="sep">/</span>
+          <span className="current">Second-Hand Dealer</span>
+        </div>
+
+        <div className="split">
+          {/* Left: inventory list */}
+          <div className="car-list">
+            <div className="list-header">
+              <div className="list-title">Used Inventory</div>
+              <div className="list-subtitle">Rotating stock — changes every year. Bargains may appear.</div>
+            </div>
+            <div className="list-scroll">
+              {listings.map((l) => {
+                const model = models.find((m) => m.id === l.modelId);
+                return (
+                  <div
+                    key={l.id}
+                    className={`car-list-item ${selectedId === l.id ? "selected" : ""}`}
+                    onClick={() => setSelectedId(l.id)}
+                  >
+                    <div className="car-item-info">
+                      <div className="car-item-name">
+                        {model && <span className={`class-badge ${model.carClass.toLowerCase()}`}>{model.carClass}</span>}
+                        {model?.name ?? l.modelId}
+                      </div>
+                      <div className="car-item-details">
+                        Age {l.age} &middot; {l.condition}% &middot; {upgradeCount(l.installedUpgrades)} upgrades
+                      </div>
+                    </div>
+                    <div className="car-item-price">${l.price.toLocaleString()}</div>
+                  </div>
+                );
+              })}
+              {listings.length === 0 && (
+                <div style={{ padding: 40, textAlign: "center", color: "#5a7a98", fontFamily: "'Oswald', sans-serif" }}>
+                  No used cars available this year
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right: detail panel */}
+          <div className="detail-panel">
+            {selected && selectedModel ? (
+              <>
+                <div className="detail-header">
+                  <div>
+                    <div className="detail-name">
+                      <span className={`class-badge ${selectedModel.carClass.toLowerCase()}`}>{selectedModel.carClass}</span>
+                      {selectedModel.name}
+                    </div>
+                    <div className="detail-meta">Used &middot; Age {selected.age}</div>
+                  </div>
+                  <div className="detail-price-block">
+                    <div className="detail-price">${selected.price.toLocaleString()}</div>
+                    <div className="detail-msrp">MSRP ${selectedModel.price.toLocaleString()}</div>
+                  </div>
+                </div>
+
+                {/* Info chips */}
+                <div className="info-chips">
+                  <div className="info-chip">
+                    <span className="info-chip-label">Age</span>
+                    <span className="info-chip-value">{selected.age} yr</span>
+                  </div>
+                  <div className="info-chip">
+                    <span className="info-chip-label">Condition</span>
+                    <span className="info-chip-value">{selected.condition}%</span>
+                  </div>
+                  <div className="info-chip">
+                    <span className="info-chip-label">Upgrades</span>
+                    <span className="info-chip-value">{upgradeCount(selected.installedUpgrades)} / {selectedModel.upgradePacks.length}</span>
+                  </div>
+                </div>
+
+                {/* Stats */}
+                <div className="stats-section">
+                  <div className="stats-section-title">Performance</div>
+                  {(["power", "handling", "fuelEfficiency", "tyreDurability", "comfort", "reliability", "fuelCapacity"] as const).map((stat) => {
+                    const val = selectedModel.baseStats[stat];
+                    return (
+                      <div className="stat-row" key={stat}>
+                        <span className="stat-name">{stat.replace(/([A-Z])/g, " $1")}</span>
+                        <div className="stat-bar-track">
+                          <div className="stat-bar-fill" style={{ width: `${val}%` }} />
+                        </div>
+                        <span className="stat-value">{Math.round(val)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Upgrade state */}
+                {selectedModel.upgradePacks.length > 0 && (
+                  <div className="upgrades-section">
+                    <div className="stats-section-title">Upgrades</div>
+                    {selectedModel.upgradePacks.map((pack) => {
+                      const isInstalled = selected.installedUpgrades[pack.type];
+                      return (
+                        <div key={pack.type} className={`upgrade-pack ${isInstalled ? "installed" : ""}`}>
+                          <div className="upgrade-info">
+                            <div className="upgrade-name">{pack.type.charAt(0).toUpperCase() + pack.type.slice(1)} Pack</div>
+                          </div>
+                          <span className={isInstalled ? "installed-tag" : ""} style={isInstalled ? {} : { color: "#5a7a98", fontFamily: "'Oswald', sans-serif", fontSize: 14, letterSpacing: 1.5, textTransform: "uppercase" as const }}>
+                            {isInstalled ? "Installed" : "Available after purchase"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Buy */}
+                <div className="buy-row">
+                  <button
+                    className="btn-buy"
+                    disabled={player.budget < selected.price}
+                    onClick={handleBuy}
+                  >
+                    Buy — ${selected.price.toLocaleString()}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#5a7a98", fontFamily: "'Oswald', sans-serif", fontSize: 18, letterSpacing: 2 }}>
+                SELECT A CAR TO VIEW DETAILS
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
