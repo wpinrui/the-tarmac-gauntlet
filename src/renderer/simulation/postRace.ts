@@ -4,17 +4,20 @@ import type { PrizeScheduleEntry } from "../types";
 // Tunable constants — balance values, adjust freely without touching logic
 // ---------------------------------------------------------------------------
 
-// --- Prize money ---
-/** Prize awarded to the last-place finisher (minimum non-zero payout). */
-const MIN_PRIZE = 500;
-/** Prize awarded to the race winner. GDD §7: ~$400,000–$500,000. */
-const MAX_PRIZE = 450_000;
-/**
- * Exponent for the prize curve.
- * > 1 concentrates reward at the top — top positions pull away sharply.
- * Exponent 2 (quadratic): P10 ≈ $372k, P50 ≈ $115k, P99 ≈ $546.
- */
-const PRIZE_CURVE_EXPONENT = 2;
+// --- Prize money (hardcoded table, total = $15,000,000) ---
+/** Prize amounts indexed by position (0 = P1, 99 = P100). */
+export const PRIZE_TABLE: readonly number[] = [
+  750000,700000,675000,650000,620000,595000,570000,545000,520000,500000,
+  480000,460000,440000,420000,400000,380000,365000,345000,330000,315000,
+  300000,285000,270000,260000,245000,230000,220000,210000,195000,180000,
+  175000,165000,155000,145000,135000,130000,120000,115000,105000,100000,
+  95000,90000,83000,77000,71000,66000,62000,59000,54000,50000,
+  46000,42000,39000,35000,32000,30000,27000,25000,22000,19500,
+  19000,17000,16000,14000,13000,11000,10000,9000,8000,7000,
+  6500,5500,5000,4000,3500,3000,3000,2500,2000,2000,
+  1500,1500,1000,1000,1000,800,750,650,600,600,
+  550,550,500,500,500,500,500,500,500,500,
+];
 
 // --- Prestige ---
 /**
@@ -47,32 +50,15 @@ export interface PastRaceResult {
 // ---------------------------------------------------------------------------
 
 /**
- * Builds a prize schedule for a race with `numCars` cars (GDD §7).
+ * Returns the prize schedule from the hardcoded PRIZE_TABLE.
+ * The table has exactly 100 entries totalling $15,000,000.
  *
- * The schedule is a continuous curve — top positions earn dramatically more
- * than midfield, reflecting real endurance racing prize structures.
- *
- * Formula:
- *   amount(pos) = MIN_PRIZE + (MAX_PRIZE − MIN_PRIZE) × ((numCars − pos) / (numCars − 1))^EXPONENT
- *
- * Cars with 0 laps completed are excluded from payout entirely by `distributePrizeMoney`;
- * the schedule itself covers all 1..numCars positions.
- *
- * The returned array is the authoritative source shown to the player during
- * race preparation (GDD §7: "The complete prize money schedule is always visible").
- *
- * @param numCars  Total number of cars in the race (typically 100).
+ * @param numCars  Total number of cars in the race (typically 100). Entries beyond the table length get $0.
  */
 export function buildPrizeSchedule(numCars: number): PrizeScheduleEntry[] {
-  if (numCars === 1) {
-    return [{ position: 1, amount: MAX_PRIZE }];
-  }
   const schedule: PrizeScheduleEntry[] = [];
   for (let pos = 1; pos <= numCars; pos++) {
-    const fraction = (numCars - pos) / (numCars - 1);
-    const amount = Math.round(
-      MIN_PRIZE + (MAX_PRIZE - MIN_PRIZE) * Math.pow(fraction, PRIZE_CURVE_EXPONENT),
-    );
+    const amount = pos <= PRIZE_TABLE.length ? PRIZE_TABLE[pos - 1] : 0;
     schedule.push({ position: pos, amount });
   }
   return schedule;
