@@ -72,6 +72,7 @@ function makeDriver(id: string, totalStatSum: number): Driver {
   return {
     id,
     name: `Driver ${id}`,
+    nationality: "gb",
     age: 30, // peak age → stats ≈ perStat
     curveParams: {
       peakAge: 30,

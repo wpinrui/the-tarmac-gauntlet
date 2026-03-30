@@ -81,6 +81,7 @@ const ANNUAL_RETIREMENTS = 15;
 export interface RookieSpec {
   id: string;
   name: string;
+  nationality: string;
 }
 
 /** Result returned by `advanceDriverYear`. */
@@ -259,6 +260,7 @@ export function generateRookie(spec: RookieSpec, random: () => number): Driver {
   const stub: Driver = {
     id: spec.id,
     name: spec.name,
+    nationality: spec.nationality,
     age: ROOKIE_AGE,
     curveParams,
     marketValue: 0,

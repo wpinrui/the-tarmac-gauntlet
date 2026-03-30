@@ -1,0 +1,139 @@
+.roster-list {
+  width: 400px;
+  flex-shrink: 0;
+  border-right: 1px solid #2a4262;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.roster-item {
+  display: flex;
+  align-items: center;
+  padding: 14px 20px;
+  cursor: pointer;
+  transition: background .12s;
+  border-left: 3px solid transparent;
+  border-bottom: 1px solid rgba(42,66,98,0.2);
+
+  &:hover { background: rgba(255,255,255,0.02); }
+
+  &.selected {
+    background: rgba(0,212,170,0.04);
+    border-left-color: #00d4aa;
+    .roster-item-name { color: #fff; }
+  }
+
+  &.empty {
+    border: none;
+    border-bottom: 1px solid rgba(42,66,98,0.2);
+    .roster-item-info {
+      border: 1.5px dashed #1e3450;
+      border-radius: 8px;
+      padding: 12px;
+      width: 100%;
+      text-align: center;
+    }
+    .roster-item-meta { color: #3a5a78; }
+    &:hover .roster-item-meta { color: #00d4aa; }
+  }
+}
+
+.roster-item-info { flex: 1; }
+
+.roster-item-name {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 500;
+  font-size: 16px;
+  color: #d0dce8;
+}
+
+.roster-item-meta {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 400;
+  font-size: 13px;
+  color: #7a96b0;
+  letter-spacing: 0.8px;
+  margin-top: 2px;
+}
+
+.roster-item-overall {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 700;
+  font-size: 20px;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.you-badge {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 500;
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(0,212,170,0.1);
+  color: #00d4aa;
+  border: 1px solid rgba(0,212,170,0.2);
+  vertical-align: middle;
+}
+
+.contract-info-section {
+  margin-top: 24px;
+  padding: 20px;
+  background: rgba(6,10,20,0.4);
+  border: 1px solid #2a4262;
+  border-radius: 8px;
+}
+
+.contract-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.contract-label {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #8a9cb4;
+}
+
+.contract-text {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 500;
+  font-size: 16px;
+  color: #e8ecf4;
+}
+
+.player-note {
+  font-family: 'Inter', sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #7a96b0;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+.btn-release {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 10px 24px;
+  border-radius: 6px;
+  border: 1px solid rgba(208,64,64,0.4);
+  background: rgba(208,64,64,0.1);
+  color: #d04040;
+  cursor: pointer;
+  transition: all .15s;
+
+  &:hover {
+    background: rgba(208,64,64,0.2);
+    border-color: #d04040;
+  }
+}

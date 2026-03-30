@@ -4,6 +4,8 @@ import type {
   GamePhase,
   CarInstance,
   CarModel,
+  Contract,
+  ContractLength,
   PlayerTeam,
   InstalledUpgrades,
   UpgradePackType,
@@ -19,6 +21,7 @@ export type Screen =
   | "secondHandDealer"
   | "carWorkshop"
   | "driverMarket"
+  | "teamRoster"
   | "crewHiring";
 
 // ---------------------------------------------------------------------------
@@ -43,6 +46,14 @@ interface GameStore {
   enterCar: (carId: string) => void;
   installUpgrade: (carId: string, packType: UpgradePackType, cost: number) => void;
   repairCar: (carId: string, partsUsed: number, conditionGain: number) => void;
+
+  // Driver actions
+  hireDriver: (driverId: string, length: ContractLength, annualSalary: number) => void;
+  releaseDriver: (driverId: string) => void;
+  buyoutDriver: (driverId: string, buyoutCost: number) => void;
+
+  // Crew
+  setCrewSize: (size: number, annualCost: number) => void;
 
   // Consumables
   buySpares: (quantity: number, totalCost: number) => void;
@@ -161,6 +172,76 @@ export const useGameStore = create<GameStore>()((set) => ({
         ...p,
         budget: p.budget - totalCost,
         tyreSets: p.tyreSets + quantity,
+      })),
+    ),
+
+  // --- Driver actions ---
+
+  hireDriver: (driverId, length, annualSalary) =>
+    set((state) => {
+      if (!state.game) return state;
+      const contract: Contract = {
+        driverId,
+        teamId: "player",
+        length,
+        remainingYears: length,
+        annualSalary,
+      };
+      const result = updatePlayer(state, (p) => ({
+        ...p,
+        budget: p.budget - annualSalary,
+        contracts: [...p.contracts, contract],
+      }));
+      // Also add to global contracts
+      if (result.game) {
+        result.game = { ...result.game, contracts: [...result.game.contracts, contract] };
+      }
+      return result;
+    }),
+
+  releaseDriver: (driverId) =>
+    set((state) => {
+      if (!state.game) return state;
+      const result = updatePlayer(state, (p) => ({
+        ...p,
+        contracts: p.contracts.filter((c) => c.driverId !== driverId),
+      }));
+      if (result.game) {
+        result.game = {
+          ...result.game,
+          contracts: result.game.contracts.filter(
+            (c) => !(c.driverId === driverId && c.teamId === "player"),
+          ),
+        };
+      }
+      return result;
+    }),
+
+  buyoutDriver: (driverId, buyoutCost) =>
+    set((state) => {
+      if (!state.game) return state;
+      // Remove the driver's existing contract with their current team
+      const updatedContracts = state.game.contracts.filter(
+        (c) => c.driverId !== driverId,
+      );
+      const result = updatePlayer(state, (p) => ({
+        ...p,
+        budget: p.budget - buyoutCost,
+      }));
+      if (result.game) {
+        result.game = { ...result.game, contracts: updatedContracts };
+      }
+      return result;
+    }),
+
+  // --- Crew ---
+
+  setCrewSize: (size, annualCost) =>
+    set((state) =>
+      updatePlayer(state, (p) => ({
+        ...p,
+        crewSize: size,
+        budget: p.budget - annualCost,
       })),
     ),
 }));

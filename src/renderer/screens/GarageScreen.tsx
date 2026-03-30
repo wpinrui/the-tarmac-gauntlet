@@ -126,7 +126,7 @@ export function GarageScreen() {
                   <div className="chip-label">Crew Size</div>
                   <div className="chip-value">{player.crewSize} <span className="unit">/ 16</span></div>
                 </div>
-                <button className="btn-chip">Hire</button>
+                <button className="btn-chip" onClick={() => setScreen("crewHiring")}>Hire</button>
               </div>
             </div>
             <div className="stat-chip">
@@ -136,7 +136,7 @@ export function GarageScreen() {
                   <div className="chip-label">Drivers</div>
                   <div className="chip-value">{1 + hiredDrivers.length} <span className="unit">/ 4</span></div>
                 </div>
-                <button className="btn-chip">Recruit</button>
+                <button className="btn-chip" onClick={() => setScreen("driverMarket")}>Recruit</button>
               </div>
             </div>
           </div>
@@ -191,7 +191,7 @@ export function GarageScreen() {
             </div>
 
             {/* COL 2 TOP: DRIVERS (compact) */}
-            <div className="card drivers-card clickable">
+            <div className="card drivers-card clickable" onClick={() => setScreen("teamRoster")}>
               <div className="card-title">Drivers <span className="nav-hint">Team Roster &rsaquo;</span></div>
               <div className="driver-row">
                 <div className="driver-avatar you"><PersonIcon /></div>
@@ -209,7 +209,7 @@ export function GarageScreen() {
                     <div className="driver-avatar"><PersonIcon /></div>
                     <div className="driver-info">
                       <div className="driver-name-text">{d.name}</div>
-                      <div className="driver-detail">Age {d.age} &middot; {d.contractYears}yr &middot; ${d.salary.toLocaleString()}/yr</div>
+                      <div className="driver-detail">Age {d.age} &middot; {d.contractYears}yr &middot; ${d.salary.toLocaleString()}/race</div>
                     </div>
                     <div className="driver-overall"><span className="ovr-label">OVR</span>{ovr}</div>
                   </div>

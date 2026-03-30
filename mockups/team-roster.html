@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The 24h Tarmac Gauntlet — Team Roster</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/flag-icons/7.2.1/css/flag-icons.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #1e3450; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #2a4a68; }
+
+        html, body {
+            height: 100%;
+            background: #080d18;
+            color: #d0d8e4;
+            font-family: 'Inter', 'Segoe UI', -apple-system, sans-serif;
+            overflow: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                linear-gradient(180deg,
+                    rgba(8, 13, 24, 0.75) 0%,
+                    rgba(8, 13, 24, 0.45) 30%,
+                    rgba(8, 13, 24, 0.45) 70%,
+                    rgba(8, 13, 24, 0.75) 100%),
+                url('roster-backdrop.jpg') center / cover no-repeat;
+            pointer-events: none;
+        }
+
+        .app {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* ======== TAB BAR ======== */
+        .tab-bar {
+            display: flex; align-items: stretch;
+            background: rgba(8, 12, 22, 0.85);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid #2a4262;
+            padding: 0 28px; flex-shrink: 0;
+            position: relative; z-index: 10;
+        }
+        .team-identity { display: flex; align-items: center; gap: 12px; padding: 10px 24px 10px 0; margin-right: 8px; border-right: 1px solid #1e3450; }
+        .team-logo { width: 32px; height: 32px; border-radius: 6px; background: rgba(0,212,170,0.1); border: 1px solid rgba(0,212,170,0.25); display: flex; align-items: center; justify-content: center; }
+        .team-logo svg { width: 18px; height: 18px; }
+        .team-logo path { fill: #00d4aa; }
+        .team-name { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 16px; letter-spacing: 1.5px; text-transform: uppercase; color: #e8ecf4; }
+        .tab { padding: 18px 24px; font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 17px; letter-spacing: 2.5px; text-transform: uppercase; color: #7a96b0; cursor: pointer; position: relative; transition: color .2s; }
+        .tab:hover { color: #a0b8d0; }
+        .tab.active { color: #e8ecf4; }
+        .tab.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: #00d4aa; }
+        .tab-spacer { flex: 1; }
+        .tab-resource { display: flex; align-items: center; gap: 7px; padding: 14px 12px; border-radius: 6px; cursor: pointer; transition: background .15s; position: relative; }
+        .tab-resource:hover { background: rgba(255,255,255,0.04); }
+        .tab-resource .res-icon { font-size: 18px; color: #7a96b0; transition: color .15s; flex-shrink: 0; position: relative; top: 2px; }
+        .tab-resource:hover .res-icon { color: #a0b8d0; }
+        .tab-resource .res-value { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 20px; color: #e8ecf4; }
+        .tab-resource.money .res-value { color: #00d4aa; }
+        .tab-resource .res-tooltip {
+            display: none; position: absolute; top: 100%; right: 0; margin-top: 8px;
+            background: rgba(8,12,22,0.95); border: 1px solid #2a4262;
+            padding: 12px 16px; border-radius: 8px; width: 240px; z-index: 10;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+        }
+        .tab-resource:hover .res-tooltip { display: block; }
+        .res-tooltip-title {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 14px;
+            letter-spacing: 1.5px; text-transform: uppercase; color: #e8ecf4; margin-bottom: 4px;
+        }
+        .res-tooltip-desc {
+            font-family: 'Inter', sans-serif; font-weight: 400; font-size: 13px;
+            color: #8a9cb4; line-height: 1.4;
+        }
+
+        /* ======== BREADCRUMB ======== */
+        .breadcrumb { padding: 14px 28px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        .breadcrumb a { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 16px; letter-spacing: 1.5px; text-transform: uppercase; color: #7a96b0; text-decoration: none; transition: color .15s; }
+        .breadcrumb a:hover { color: #00d4aa; }
+        .breadcrumb .sep { font-size: 16px; color: #5a7a98; }
+        .breadcrumb .current { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 16px; letter-spacing: 1.5px; text-transform: uppercase; color: #d0dce8; }
+        .roster-count {
+            margin-left: auto;
+            font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 14px;
+            letter-spacing: 1.5px; text-transform: uppercase; color: #7a96b0;
+        }
+        .roster-count strong { font-weight: 600; color: #e8ecf4; }
+
+        /* ======== SPLIT VIEW ======== */
+        .split {
+            flex: 1; display: flex; overflow: hidden;
+            margin: 0 28px 28px; border-radius: 10px;
+            border: 1px solid #2a4262;
+            background: rgba(12, 18, 32, 0.78);
+            backdrop-filter: blur(10px);
+        }
+
+        /* ---- Left: Roster list ---- */
+        .roster-list {
+            width: 400px; flex-shrink: 0;
+            border-right: 1px solid #2a4262;
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+        .list-header { padding: 16px 20px; border-bottom: 1px solid rgba(42,66,98,0.4); flex-shrink: 0; }
+        .list-title { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 17px; letter-spacing: 2.5px; text-transform: uppercase; color: #8a9cb4; }
+
+        .list-scroll { flex: 1; overflow-y: auto; }
+
+        .roster-item {
+            display: flex; align-items: center; padding: 16px 20px;
+            cursor: pointer; transition: background .12s;
+            border-left: 3px solid transparent;
+            border-bottom: 1px solid rgba(42,66,98,0.2);
+            gap: 12px;
+        }
+        .roster-item:hover { background: rgba(255,255,255,0.02); }
+        .roster-item.selected { background: rgba(0,212,170,0.04); border-left-color: #00d4aa; }
+
+        .roster-item-info { flex: 1; }
+        .roster-item-name { font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 18px; color: #d0dce8; }
+        .roster-item.selected .roster-item-name { color: #fff; }
+        .roster-item-meta { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 14px; color: #7a96b0; letter-spacing: 0.8px; margin-top: 2px; }
+
+        .roster-item-flag { margin-right: 4px; border-radius: 2px; position: relative; top: 1px; }
+
+        .roster-item-overall {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 20px;
+            color: #e8ecf4; width: 40px; text-align: center; flex-shrink: 0;
+        }
+
+        .you-badge {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 11px;
+            letter-spacing: 1.5px; text-transform: uppercase;
+            padding: 2px 8px; border-radius: 4px;
+            background: rgba(0,212,170,0.1); color: #00d4aa;
+            border: 1px solid rgba(0,212,170,0.2);
+            flex-shrink: 0;
+        }
+
+        /* Empty slot */
+        .roster-item.empty {
+            border: 1px dashed rgba(42,66,98,0.4);
+            border-left: 3px solid transparent;
+            background: transparent; cursor: default;
+        }
+        .roster-item.empty .roster-item-name { color: #3a5a78; }
+        .roster-item.empty .roster-item-meta { color: #2a4262; }
+
+        /* ---- Right: Detail panel ---- */
+        .detail-panel { flex: 1; overflow-y: auto; padding: 28px 32px; }
+
+        .detail-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; }
+        .detail-name { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 28px; color: #fff; margin-bottom: 4px; }
+        .detail-meta { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 15px; color: #7a96b0; letter-spacing: 1px; }
+
+        /* Info chips */
+        .info-chips { display: flex; gap: 12px; margin-bottom: 24px; }
+        .info-chip {
+            background: rgba(6,10,20,0.4); border: 1px solid #2a4262;
+            border-radius: 6px; padding: 10px 16px;
+            display: flex; flex-direction: column; align-items: center; gap: 2px;
+        }
+        .info-chip-label { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: #8a9cb4; }
+        .info-chip-value { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 20px; color: #e8ecf4; }
+        .info-chip-note { font-family: 'Inter', sans-serif; font-weight: 400; font-size: 12px; color: #5a7a98; }
+
+        /* Stats + History two-column */
+        .stats-history { display: flex; gap: 24px; margin-bottom: 24px; }
+        .stats-history .stats-section { flex: 1; margin-bottom: 0; }
+        .stats-history .history-section { flex: 1; }
+
+        /* Stats */
+        .stats-section { margin-bottom: 24px; }
+        .stats-section-title {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 15px;
+            letter-spacing: 2px; text-transform: uppercase; color: #8a9cb4;
+            margin-bottom: 12px; padding-bottom: 8px;
+            border-bottom: 1px solid rgba(42,66,98,0.4);
+        }
+        .stat-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+        .stat-name { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 15px; letter-spacing: 1.2px; text-transform: uppercase; color: #a0b8d0; width: 140px; flex-shrink: 0; }
+        .stat-bar-track { flex: 1; max-width: 400px; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; }
+        .stat-bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #00d4aa, #00b894); }
+        .stat-value { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 17px; color: #e8ecf4; width: 30px; text-align: right; flex-shrink: 0; }
+
+        /* History table */
+        .history-table { width: 100%; border-collapse: collapse; }
+        .history-table th {
+            font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 13px;
+            letter-spacing: 1.2px; text-transform: uppercase; color: #5a7a98;
+            text-align: left; padding: 6px 8px;
+            border-bottom: 1px solid rgba(42,66,98,0.4);
+        }
+        .history-table td {
+            font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 14px;
+            color: #a0b8d0; padding: 7px 8px;
+            border-bottom: 1px solid rgba(42,66,98,0.15);
+        }
+        .history-table td.result { font-weight: 600; color: #e8ecf4; }
+        .history-table td.result.gold { color: #d4a840; }
+        .history-table td.result.silver { color: #b0b8c4; }
+        .history-table td.result.bronze { color: #c47a3a; }
+        .history-table td.result.retired { color: #e17055; }
+        .list-scroll-history { max-height: 260px; overflow-y: auto; }
+
+        /* Contract section */
+        .contract-info-section {
+            padding: 18px; border-radius: 8px;
+            border: 1px solid #2a4262; background: rgba(6,10,20,0.4);
+            margin-bottom: 24px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .contract-details { }
+        .contract-label { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 15px; letter-spacing: 1.5px; text-transform: uppercase; color: #8a9cb4; margin-bottom: 4px; }
+        .contract-text { font-family: 'Inter', sans-serif; font-weight: 400; font-size: 15px; color: #e8ecf4; line-height: 1.6; }
+        .contract-text .muted { color: #7a96b0; }
+
+        .player-note {
+            font-family: 'Inter', sans-serif; font-weight: 400; font-size: 14px;
+            color: #5a7a98; font-style: italic;
+        }
+
+        /* Action buttons */
+        .action-row { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
+        .btn-release {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 15px;
+            letter-spacing: 2px; text-transform: uppercase;
+            padding: 10px 24px; border-radius: 6px;
+            border: 1px solid rgba(225,112,85,0.3); background: rgba(225,112,85,0.06);
+            color: #e17055; cursor: pointer; transition: all .2s;
+        }
+        .btn-release:hover { background: rgba(225,112,85,0.12); border-color: rgba(225,112,85,0.5); }
+    </style>
+</head>
+<body>
+
+<div class="app">
+    <!-- Tab bar -->
+    <div class="tab-bar">
+        <div class="team-identity">
+            <div class="team-logo"><svg viewBox="0 0 48 48"><path d="M24 4L40 12v14c0 12-16 18-16 18S8 38 8 26V12z"/></svg></div>
+            <span class="team-name">Backfire Racing</span>
+        </div>
+        <div class="tab active">Garage</div>
+        <div class="tab">Finances</div>
+        <div class="tab">Race History</div>
+        <div class="tab">Standings</div>
+        <div class="tab">Scouting Report</div>
+        <div class="tab-spacer"></div>
+        <div class="tab-resource">
+            <i class="fa-solid fa-wrench res-icon"></i>
+            <span class="res-value">12</span>
+            <div class="res-tooltip">
+                <div class="res-tooltip-title">Spare Parts</div>
+                <div class="res-tooltip-desc">Fix mechanical issues during races and repair car condition between races. Unspent parts carry over each year.</div>
+            </div>
+        </div>
+        <div class="tab-resource money">
+            <i class="fa-solid fa-sack-dollar res-icon"></i>
+            <span class="res-value">$1,000</span>
+            <div class="res-tooltip">
+                <div class="res-tooltip-title">Money</div>
+                <div class="res-tooltip-desc">Your team's funds. Buy cars, upgrades, spare parts, tyres, and hire drivers and crew.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Breadcrumb -->
+    <div class="breadcrumb">
+        <a href="#">← Garage</a>
+        <span class="sep">/</span>
+        <span class="current">Team Roster</span>
+        <div class="roster-count">Drivers: <strong>2 / 4</strong></div>
+    </div>
+
+    <!-- Split view -->
+    <div class="split">
+
+        <!-- Left: Roster -->
+        <div class="roster-list">
+            <div class="list-header">
+                <div class="list-title">Your Drivers</div>
+            </div>
+            <div class="list-scroll">
+                <!-- Player character — always first -->
+                <div class="roster-item selected">
+                    <div class="roster-item-info">
+                        <div class="roster-item-name"><span class="fi fi-sg roster-item-flag"></span> Ivan Chen</div>
+                        <div class="roster-item-meta">Age 25 · Team Owner · <span style="color:#00d4aa;">You</span></div>
+                    </div>
+                    <div class="roster-item-overall">25</div>
+                </div>
+
+                <!-- Hired driver -->
+                <div class="roster-item">
+                    <div class="roster-item-info">
+                        <div class="roster-item-name"><span class="fi fi-br roster-item-flag"></span> Marco Ribeiro</div>
+                        <div class="roster-item-meta">Age 22 · 2yr contract · $1,620/yr</div>
+                    </div>
+                    <div class="roster-item-overall">47</div>
+                </div>
+
+                <!-- Empty slot -->
+                <div class="roster-item empty">
+                    <div class="roster-item-info">
+                        <div class="roster-item-name">Empty Slot</div>
+                        <div class="roster-item-meta">Hire from the Driver Market</div>
+                    </div>
+                </div>
+
+                <!-- Empty slot -->
+                <div class="roster-item empty">
+                    <div class="roster-item-info">
+                        <div class="roster-item-name">Empty Slot</div>
+                        <div class="roster-item-meta">Hire from the Driver Market</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Detail panel — Player character selected -->
+        <div class="detail-panel">
+            <div class="detail-header">
+                <div>
+                    <div class="detail-name"><span class="fi fi-sg" style="margin-right:8px; border-radius:3px; position:relative; top:1px;"></span>Ivan Chen</div>
+                    <div class="detail-meta">Age 25 · Singaporean · Team Owner</div>
+                </div>
+                <span class="you-badge" style="font-size:14px; padding:6px 14px;">You</span>
+            </div>
+
+            <!-- Info chips -->
+            <div class="info-chips">
+                <div class="info-chip">
+                    <div class="info-chip-label">Age</div>
+                    <div class="info-chip-value">25</div>
+                </div>
+                <div class="info-chip">
+                    <div class="info-chip-label">Overall</div>
+                    <div class="info-chip-value">25</div>
+                </div>
+            </div>
+
+            <!-- Stats + History -->
+            <div class="stats-history">
+                <div class="stats-section">
+                    <div class="stats-section-title">Driver Stats</div>
+                    <div class="stat-row">
+                        <span class="stat-name">Pace</span>
+                        <div class="stat-bar-track"><div class="stat-bar-fill" style="width:25%"></div></div>
+                        <span class="stat-value">25</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-name">Consistency</span>
+                        <div class="stat-bar-track"><div class="stat-bar-fill" style="width:25%"></div></div>
+                        <span class="stat-value">25</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-name">Stamina</span>
+                        <div class="stat-bar-track"><div class="stat-bar-fill" style="width:25%"></div></div>
+                        <span class="stat-value">25</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-name">Safety</span>
+                        <div class="stat-bar-track"><div class="stat-bar-fill" style="width:25%"></div></div>
+                        <span class="stat-value">25</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-name">Smoothness</span>
+                        <div class="stat-bar-track"><div class="stat-bar-fill" style="width:25%"></div></div>
+                        <span class="stat-value">25</span>
+                    </div>
+                </div>
+                <div class="history-section">
+                    <div class="stats-section-title">Race History</div>
+                    <div class="list-scroll-history">
+                    <table class="history-table">
+                        <thead>
+                            <tr><th>Year</th><th>Team</th><th>Car</th><th>Result</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>3</td><td>Backfire Racing</td><td>Banger Box 900</td><td class="result">58th</td></tr>
+                            <tr><td>2</td><td>Backfire Racing</td><td>Rusty Rattler 750</td><td class="result">71st</td></tr>
+                            <tr><td>1</td><td>Backfire Racing</td><td>Rusty Rattler 750</td><td class="result">84th</td></tr>
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contract info — player character -->
+            <div class="contract-info-section">
+                <div class="contract-details">
+                    <div class="contract-label">Contract</div>
+                    <div class="player-note">No contract — you are the team owner and driver. Stats scale with your Driver skill allocation.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

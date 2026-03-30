@@ -48,6 +48,7 @@ function makeDriver(id: string, totalStats: number): Driver {
   return {
     id,
     name: `Driver ${id}`,
+    nationality: "gb",
     age: 30,
     curveParams: {
       peakAge: 30,
@@ -83,7 +84,7 @@ function makePlayerTeam(id: string): PlayerTeam {
 
 /** Returns 15 driver specs for rookie generation. */
 function rookieSpecs() {
-  return Array.from({ length: 15 }, (_, i) => ({ id: `rookie-${i}`, name: `Rookie ${i}` }));
+  return Array.from({ length: 15 }, (_, i) => ({ id: `rookie-${i}`, name: `Rookie ${i}`, nationality: "gb" }));
 }
 
 /** Deterministic random: always returns 0.5. */
@@ -263,7 +264,7 @@ describe("yearAdvance — full 100-team state", () => {
       return makeAiTeam(`ai-${i}`, 50_000 + i * 1_000, car);
     });
     const teams: Team[] = [playerTeam, ...aiTeams];
-    const specs = Array.from({ length: 15 }, (_, i) => ({ id: `r${i}`, name: `R${i}` }));
+    const specs = Array.from({ length: 15 }, (_, i) => ({ id: `r${i}`, name: `R${i}`, nationality: "gb" }));
 
     expect(() => {
       advanceYear(
