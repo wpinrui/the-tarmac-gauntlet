@@ -3,6 +3,7 @@ import { useGameStore } from "../state/store";
 import { TopBar } from "./TopBar";
 import { calculateDriverStats, totalDriverStats, calculateAnnualSalary, calculateContractSalary, calculateBuyoutCost } from "../simulation/driverLifecycle";
 import { DISPLAY_STATS } from "../shared/dealerData";
+import { DRIVER_STAT_KEYS, DRIVER_STAT_LABELS } from "../shared/driverData";
 import type { PlayerTeam, Driver, Contract, ContractLength } from "../types";
 import backdropUrl from "../assets/driver-market-backdrop.jpg";
 import "./DealerShared.scss";
@@ -11,10 +12,6 @@ import "./DriverMarket.scss";
 type FilterMode = "all" | "free" | "contracted";
 type SortKey = "overall" | "age" | "salary" | "pace" | "safety";
 
-const DRIVER_STAT_KEYS = ["pace", "consistency", "stamina", "safety", "smoothness"] as const;
-const DRIVER_STAT_LABELS: Record<string, string> = {
-  pace: "Pace", consistency: "Consistency", stamina: "Stamina", safety: "Safety", smoothness: "Smoothness",
-};
 
 export function DriverMarketScreen() {
   const game = useGameStore((s) => s.game);

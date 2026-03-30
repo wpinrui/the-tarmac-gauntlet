@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useGameStore } from "../state/store";
 import { TopBar } from "./TopBar";
 import { calculateEffectiveStats } from "../simulation/effectiveStats";
+import { estimateFullServicePitDuration } from "../simulation/pitStop";
 import type { PlayerTeam } from "../types";
 import backdropUrl from "../assets/crew-backdrop.jpg";
 import "./DealerShared.scss";
@@ -10,21 +11,6 @@ import "./CrewHiring.scss";
 const CREW_COST_PER_MEMBER = 2_000;
 const MAX_CREW = 16;
 
-// Pit stop constants (from pitStop.ts)
-const REFUEL_BASE_SECONDS = 2.0;
-const REFUEL_SECONDS_PER_LITRE = 0.05;
-const TYRE_CHANGE_SECONDS = 8.0;
-const DRIVER_SWAP_SECONDS = 5.0;
-const SOLO_CREW_MULTIPLIER = 2.5;
-const MAX_ENGINEER_SKILL = 20;
-const MAX_ENGINEER_PIT_REDUCTION = 0.25;
-
-function estimatePitTime(pitStopTimeStat: number, fuelCapacity: number, crewSize: number, engineerSkill: number): number {
-  const taskSeconds = REFUEL_BASE_SECONDS + REFUEL_SECONDS_PER_LITRE * fuelCapacity + TYRE_CHANGE_SECONDS + DRIVER_SWAP_SECONDS;
-  const crewMultiplier = 1 + (1 - crewSize / MAX_CREW) * (SOLO_CREW_MULTIPLIER - 1);
-  const engineerMultiplier = 1 - (engineerSkill / MAX_ENGINEER_SKILL) * MAX_ENGINEER_PIT_REDUCTION;
-  return (pitStopTimeStat + taskSeconds) * crewMultiplier * engineerMultiplier;
-}
 
 export function CrewHiringScreen() {
   const game = useGameStore((s) => s.game);
@@ -44,10 +30,10 @@ export function CrewHiringScreen() {
 
   const pitStopTime = effectiveStats?.pitStopTime ?? 0;
   const fuelCapacity = effectiveStats?.fuelCapacity ?? 0;
-  const currentPitTime = estimatePitTime(pitStopTime, fuelCapacity, player.crewSize, player.skills.engineer);
-  const newPitTime = estimatePitTime(pitStopTime, fuelCapacity, newSize, player.skills.engineer);
+  const currentPitTime = estimateFullServicePitDuration(pitStopTime, fuelCapacity, player.crewSize, player.skills.engineer);
+  const newPitTime = estimateFullServicePitDuration(pitStopTime, fuelCapacity, newSize, player.skills.engineer);
   // Max bar reference: solo (0 crew, 0 skill) pit time
-  const maxPitTime = estimatePitTime(pitStopTime, fuelCapacity, 0, 0);
+  const maxPitTime = estimateFullServicePitDuration(pitStopTime, fuelCapacity, 0, 0);
 
   const handleConfirm = () => {
     if (costDelta > player.budget) return;

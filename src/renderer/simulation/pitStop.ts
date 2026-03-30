@@ -91,6 +91,26 @@ export interface PitStopResult {
 }
 
 // ---------------------------------------------------------------------------
+// Estimate: full-service pit stop duration (for UI previews)
+// ---------------------------------------------------------------------------
+
+/**
+ * Estimates the duration of a full-service pit stop (refuel + tyre change + driver swap).
+ * Used by the crew hiring screen to show a reference comparison.
+ */
+export function estimateFullServicePitDuration(
+  pitStopTimeStat: number,
+  fuelCapacity: number,
+  crewSize: number,
+  engineerSkill: number,
+): number {
+  const taskSeconds = REFUEL_BASE_SECONDS + REFUEL_SECONDS_PER_LITRE * fuelCapacity + TYRE_CHANGE_SECONDS + DRIVER_SWAP_SECONDS;
+  const crewMultiplier = 1 + (1 - crewSize / MAX_CREW_SIZE) * (SOLO_CREW_MULTIPLIER - 1);
+  const engineerMultiplier = 1 - (engineerSkill / MAX_ENGINEER_SKILL) * MAX_ENGINEER_PIT_REDUCTION;
+  return (pitStopTimeStat + taskSeconds) * crewMultiplier * engineerMultiplier;
+}
+
+// ---------------------------------------------------------------------------
 // Main function
 // ---------------------------------------------------------------------------
 

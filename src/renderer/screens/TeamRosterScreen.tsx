@@ -2,15 +2,12 @@ import { useState } from "react";
 import { useGameStore } from "../state/store";
 import { TopBar } from "./TopBar";
 import { calculateDriverStats, totalDriverStats } from "../simulation/driverLifecycle";
+import { DRIVER_STAT_KEYS, DRIVER_STAT_LABELS } from "../shared/driverData";
 import type { PlayerTeam, Driver, Contract } from "../types";
 import backdropUrl from "../assets/roster-backdrop.jpg";
 import "./DealerShared.scss";
 import "./TeamRoster.scss";
 
-const DRIVER_STAT_KEYS = ["pace", "consistency", "stamina", "safety", "smoothness"] as const;
-const DRIVER_STAT_LABELS: Record<string, string> = {
-  pace: "Pace", consistency: "Consistency", stamina: "Stamina", safety: "Safety", smoothness: "Smoothness",
-};
 
 export function TeamRosterScreen() {
   const game = useGameStore((s) => s.game);
