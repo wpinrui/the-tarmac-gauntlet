@@ -26,6 +26,7 @@ const CAR_BACKDROPS: Partial<Record<CarClass, string>> = {
   // F1: carBackdropF1,
 };
 import { ClassBadge } from "../shared/ClassBadge";
+import { DISPLAY_STATS } from "../shared/dealerData";
 import { SKILL_TOOLTIPS } from "../shared/skillData";
 import "./DealerShared.scss";
 import "./GarageScreen.scss";
@@ -170,13 +171,9 @@ export function GarageScreen() {
                         {" "}&middot; Age {selectedCar.age} &middot; {upgradeText}
                       </div>
                       <div className="stat-bars">
-                        <StatBar label="Power" value={effectiveStats.power} />
-                        <StatBar label="Handling" value={effectiveStats.handling} />
-                        <StatBar label="Fuel Efficiency" value={effectiveStats.fuelEfficiency} />
-                        <StatBar label="Tyre Durability" value={effectiveStats.tyreDurability} />
-                        <StatBar label="Comfort" value={effectiveStats.comfort} />
-                        <StatBar label="Reliability" value={effectiveStats.reliability} />
-                        <StatBar label="Fuel Capacity" value={effectiveStats.fuelCapacity} />
+                        {DISPLAY_STATS.map(({ key, label }) => (
+                          <StatBar key={key} label={label} value={effectiveStats[key]} />
+                        ))}
                       </div>
                       <div className="car-condition">
                         <div className="condition-row">
