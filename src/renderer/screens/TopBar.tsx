@@ -19,7 +19,7 @@ export function TopBar() {
         <span className="team-name">{player.name}</span>
       </div>
       <div className={`tab ${screen === "garage" ? "active" : ""}`} onClick={() => setScreen("garage")}>Garage</div>
-      <div className="tab">Finances</div>
+      <div className={`tab ${screen === "finances" ? "active" : ""}`} onClick={() => setScreen("finances")}>Finances</div>
       <div className="tab">Race History</div>
       <div className="tab">Standings</div>
       <div className="tab">Scouting Report</div>

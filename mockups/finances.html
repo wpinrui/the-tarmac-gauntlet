@@ -168,12 +168,13 @@
             color: #3a5a78; font-style: italic;
         }
 
+
         /* ======== TRANSACTION LOG ======== */
         .txn-panel { flex: 1; display: flex; flex-direction: column; }
         .txn-panel .panel-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; padding: 0; }
 
         .txn-filters {
-            display: flex; gap: 4px; padding: 12px 20px; flex-wrap: wrap;
+            display: flex; align-items: center; gap: 4px; padding: 12px 20px; flex-wrap: wrap;
             border-bottom: 1px solid rgba(42,66,98,0.2);
         }
         .txn-filter-btn {
@@ -184,6 +185,19 @@
         }
         .txn-filter-btn:hover { border-color: #3a5a78; color: #a0b8d0; }
         .txn-filter-btn.active { border-color: #00d4aa; color: #00d4aa; background: rgba(0,212,170,0.08); }
+        .txn-year-select {
+            font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 14px;
+            letter-spacing: 1px; color: #a0b8d0;
+            background: rgba(6,10,20,0.4); border: 1px solid #2a4262;
+            padding: 5px 12px; border-radius: 4px;
+            cursor: pointer; transition: all .15s;
+            -webkit-appearance: none; appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237a96b0'/%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right 10px center;
+            padding-right: 28px;
+        }
+        .txn-year-select:hover { border-color: #3a5a78; color: #e8ecf4; }
+        .txn-year-select option { background: #0c1220; color: #a0b8d0; }
 
         .txn-scroll { flex: 1; overflow-y: auto; }
 
@@ -195,42 +209,9 @@
             font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 14px;
             color: #5a7a98; width: 36px; flex-shrink: 0;
         }
-        .txn-cat {
-            font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 11px;
-            letter-spacing: 1.2px; text-transform: uppercase;
-            padding: 2px 8px; border-radius: 4px;
-            border: 1px solid; flex-shrink: 0; min-width: 90px; text-align: center;
-        }
-        .txn-cat.car-purchase { color: #d060a0; border-color: rgba(208,96,160,0.3); }
-        .txn-cat.car-sale { color: #00d4aa; border-color: rgba(0,212,170,0.3); }
-        .txn-cat.upgrade { color: #5ab8d8; border-color: rgba(90,184,216,0.3); }
-        .txn-cat.spare-parts { color: #a0b8d0; border-color: rgba(160,184,208,0.3); }
-        .txn-cat.tyres { color: #a0b8d0; border-color: rgba(160,184,208,0.3); }
-        .txn-cat.driver-salary { color: #e0943a; border-color: rgba(224,148,58,0.3); }
-        .txn-cat.crew-cost { color: #e0943a; border-color: rgba(224,148,58,0.3); }
-        .txn-cat.prize-money { color: #00d4aa; border-color: rgba(0,212,170,0.3); }
-        .txn-cat.fuel-cost { color: #a0785a; border-color: rgba(160,120,90,0.3); }
-        .txn-cat.driver-buyout { color: #e17055; border-color: rgba(225,112,85,0.3); }
 
-        /* Style A: Icon only */
-        .txn-icon { font-size: 16px; width: 90px; text-align: center; flex-shrink: 0; }
-
-        /* Style B: Dot + text */
-        .txn-dot-cat {
-            font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 13px;
-            letter-spacing: 0.8px; text-transform: uppercase; color: #7a96b0;
-            display: flex; align-items: center; gap: 6px;
-            min-width: 90px; flex-shrink: 0;
-        }
-        .txn-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-
-        /* Style C: Filled pill */
-        .txn-pill {
-            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 11px;
-            letter-spacing: 1.2px; text-transform: uppercase;
-            padding: 3px 10px; border-radius: 10px;
-            min-width: 90px; text-align: center; flex-shrink: 0;
-        }
+        .txn-icon { font-size: 16px; width: 24px; text-align: center; flex-shrink: 0; font-style: normal; }
+        .txn-icon svg { width: 16px; height: 16px; vertical-align: middle; }
 
         .txn-desc {
             font-family: 'Inter', sans-serif; font-weight: 400; font-size: 14px;
@@ -312,7 +293,7 @@
         </div>
         <div class="tab-resource money">
             <i class="fa-solid fa-sack-dollar res-icon"></i>
-            <span class="res-value">$2,830</span>
+            <span class="res-value">$187,420</span>
             <div class="res-tooltip">
                 <div class="res-tooltip-title">Money</div>
                 <div class="res-tooltip-desc">Your team's funds. Buy cars, upgrades, spare parts, tyres, and hire drivers and crew.</div>
@@ -334,56 +315,58 @@
                 <div class="panel-body">
                     <div class="balance-row">
                         <span class="balance-label">Current Balance</span>
-                        <span class="balance-amount">$2,830</span>
+                        <span class="balance-amount">$187,420</span>
                     </div>
 
+                    <!-- Most recent 3 years -->
                     <div class="year-summary">
                         <div class="year-card">
-                            <div class="year-card-year">Year 1</div>
+                            <div class="year-card-year">Year 10</div>
                             <div class="year-line">
                                 <span class="year-line-label">Income</span>
-                                <span class="year-line-value income">+$2,500</span>
+                                <span class="year-line-value income">+$150,000</span>
                             </div>
                             <div class="year-line">
                                 <span class="year-line-label">Expenses</span>
-                                <span class="year-line-value expense">−$1,420</span>
+                                <span class="year-line-value expense">−$98,500</span>
                             </div>
                             <div class="year-line net">
                                 <span class="year-line-label">Net</span>
-                                <span class="year-line-value net-pos">+$1,080</span>
+                                <span class="year-line-value net-pos">+$51,500</span>
                             </div>
                         </div>
                         <div class="year-card">
-                            <div class="year-card-year">Year 2</div>
+                            <div class="year-card-year">Year 11</div>
                             <div class="year-line">
                                 <span class="year-line-label">Income</span>
-                                <span class="year-line-value income">+$5,000</span>
+                                <span class="year-line-value income">+$200,000</span>
                             </div>
                             <div class="year-line">
                                 <span class="year-line-label">Expenses</span>
-                                <span class="year-line-value expense">−$3,750</span>
+                                <span class="year-line-value expense">−$142,300</span>
                             </div>
                             <div class="year-line net">
                                 <span class="year-line-label">Net</span>
-                                <span class="year-line-value net-pos">+$1,250</span>
+                                <span class="year-line-value net-pos">+$57,700</span>
                             </div>
                         </div>
                         <div class="year-card current">
-                            <div class="year-card-year">Year 3 (Current)</div>
+                            <div class="year-card-year">Year 12 (Current)</div>
                             <div class="year-line">
                                 <span class="year-line-label">Income</span>
                                 <span class="year-line-value empty-income">After next race</span>
                             </div>
                             <div class="year-line">
                                 <span class="year-line-label">Expenses</span>
-                                <span class="year-line-value expense">−$500</span>
+                                <span class="year-line-value expense">−$86,200</span>
                             </div>
                             <div class="year-line net">
                                 <span class="year-line-label">Net</span>
-                                <span class="year-line-value net-neg">−$500</span>
+                                <span class="year-line-value net-neg">−$86,200</span>
                             </div>
                         </div>
                     </div>
+
                 </div>
             </div>
 
@@ -395,102 +378,113 @@
                 <div class="panel-body">
                     <div class="txn-filters">
                         <button class="txn-filter-btn active">All</button>
-                        <button class="txn-filter-btn">Year 1</button>
-                        <button class="txn-filter-btn">Year 2</button>
-                        <button class="txn-filter-btn">Year 3</button>
-                        <span style="width:1px; background:#2a4262; margin:0 4px;"></span>
                         <button class="txn-filter-btn">Cars</button>
                         <button class="txn-filter-btn">Upgrades</button>
                         <button class="txn-filter-btn">Consumables</button>
                         <button class="txn-filter-btn">Staff</button>
                         <button class="txn-filter-btn">Race</button>
+                        <span style="flex:1;"></span>
+                        <select class="txn-year-select">
+                            <option>All Years</option>
+                            <option>Year 12</option>
+                            <option>Year 11</option>
+                            <option>Year 10</option>
+                            <option>Year 9</option>
+                            <option>Year 8</option>
+                            <option>Year 7</option>
+                            <option>Year 6</option>
+                            <option>Year 5</option>
+                            <option>Year 4</option>
+                            <option>Year 3</option>
+                            <option>Year 2</option>
+                            <option>Year 1</option>
+                        </select>
                     </div>
                     <div class="txn-scroll">
-                        <!-- Style A: Icon only -->
+                        <!-- Year 3 -->
                         <div class="txn-row">
                             <span class="txn-year">Y3</span>
                             <i class="fa-solid fa-wrench txn-icon" style="color:#a0b8d0;"></i>
                             <span class="txn-desc">Bought 5 spare parts</span>
                             <span class="txn-amount negative">−$500</span>
                         </div>
-                        <!-- Style B: Dot + text -->
+                        <!-- Year 2 -->
                         <div class="txn-row">
                             <span class="txn-year">Y2</span>
-                            <span class="txn-dot-cat"><span class="txn-dot" style="background:#00d4aa;"></span> Prize Money</span>
+                            <i class="fa-solid fa-trophy txn-icon" style="color:#00d4aa;"></i>
                             <span class="txn-desc">Race 2 — finished 68th</span>
                             <span class="txn-amount positive">+$5,500</span>
                         </div>
-                        <!-- Style C: Filled pill -->
                         <div class="txn-row">
                             <span class="txn-year">Y2</span>
-                            <span class="txn-pill" style="background:rgba(160,120,90,0.2); color:#a0785a;">Fuel Cost</span>
+                            <i class="fa-solid fa-gas-pump txn-icon" style="color:#a0785a;"></i>
                             <span class="txn-desc">Race 2 fuel consumption</span>
                             <span class="txn-amount negative">−$250</span>
                         </div>
                         <div class="txn-row">
                             <span class="txn-year">Y2</span>
-                            <span class="txn-cat upgrade">Upgrade</span>
+                            <i class="fa-solid fa-arrow-up txn-icon" style="color:#5ab8d8;"></i>
                             <span class="txn-desc">Power Pack — Rusty Rattler 750</span>
                             <span class="txn-amount negative">−$400</span>
                         </div>
                         <div class="txn-row">
                             <span class="txn-year">Y2</span>
-                            <span class="txn-cat spare-parts">Spare Parts</span>
+                            <i class="fa-solid fa-wrench txn-icon" style="color:#a0b8d0;"></i>
                             <span class="txn-desc">Bought 8 spare parts</span>
                             <span class="txn-amount negative">−$800</span>
                         </div>
                         <div class="txn-row">
                             <span class="txn-year">Y2</span>
-                            <span class="txn-cat tyres">Tyres</span>
+                            <span class="txn-icon"><svg viewBox="0 0 512 512" fill="#a0b8d0"><path d="M256 21A235 235 0 0 0 21 256a235 235 0 0 0 235 235 235 235 0 0 0 235-235A235 235 0 0 0 256 21zm0 82c84.393 0 153 68.607 153 153s-68.607 153-153 153-153-68.607-153-153 68.607-153 153-153zm0 18c-20.417 0-39.757 4.52-57.09 12.602C210.457 166.482 230.218 208 256 208c25.823 0 44.926-41.65 56.752-74.555C295.505 125.462 276.284 121 256 121zm98.752 42.88c-27.714 21.143-61.142 52.79-53.17 77.327 7.981 24.564 53.508 29.858 88.459 30.936.628-5.294.959-10.678.959-16.143 0-35.642-13.755-68.012-36.248-92.12zm-197.729.243C134.663 188.204 121 220.477 121 256c0 5.55.34 11.018.988 16.39 34.833-.825 80.381-6.793 88.344-31.3 7.974-24.542-25.68-55.553-53.309-76.967zm70.188 43.643a9 9 0 0 0-5.035 1.714 9 9 0 0 0-1.99 12.57 9 9 0 0 0 12.57 1.993 9 9 0 0 0 1.992-12.572 9 9 0 0 0-7.537-3.705zm57.578 0a9 9 0 0 0-.637.004 9 9 0 0 0-6.9 3.7 9 9 0 0 0 1.992 12.573 9 9 0 0 0 12.57-1.992 9 9 0 0 0-1.99-12.57 9 9 0 0 0-5.035-1.715zM256 224a32 32 0 0 0-32 32 32 32 0 0 0 32 32 32 32 0 0 0 32-32 32 32 0 0 0-32-32zm-46.297 38.037a9 9 0 0 0-2.652.44 9 9 0 0 0-5.78 11.341 9 9 0 0 0 11.34 5.778 9 9 0 0 0 5.78-11.34 9 9 0 0 0-8.688-6.219zm92.856.008a9 9 0 0 0-8.95 6.21 9 9 0 0 0 5.78 11.34 9 9 0 0 0 11.34-5.777 9 9 0 0 0-5.78-11.341 9 9 0 0 0-2.39-.432zm-92.143 27.713c-21.59.104-50.24 16.832-72.424 31.928 19.029 34.168 52.46 59.164 92.143 66.837 9.99-33.39 18.42-78.618-2.446-93.777-4.854-3.527-10.737-5.02-17.273-4.988zm91.016.02c-6.58 0-12.492 1.516-17.346 5.042-20.895 15.181-11.863 60.106-2.088 93.678 39.687-7.715 73.108-32.76 92.1-66.973-22.006-15.224-50.935-31.747-72.666-31.748zM256 295.58a9 9 0 0 0-9 9 9 9 0 0 0 9 9 9 9 0 0 0 9-9 9 9 0 0 0-9-9z"/></svg></span>
                             <span class="txn-desc">Bought 3 tyre sets</span>
                             <span class="txn-amount negative">−$300</span>
                         </div>
                         <div class="txn-row">
                             <span class="txn-year">Y2</span>
-                            <span class="txn-cat driver-salary">Driver Salary</span>
+                            <i class="fa-solid fa-user txn-icon" style="color:#e0943a;"></i>
                             <span class="txn-desc">Marco Ribeiro — annual salary</span>
                             <span class="txn-amount negative">−$1,620</span>
                         </div>
                         <div class="txn-row">
                             <span class="txn-year">Y2</span>
-                            <span class="txn-cat crew-cost">Crew Cost</span>
+                            <i class="fa-solid fa-users txn-icon" style="color:#e0943a;"></i>
                             <span class="txn-desc">Pit crew (4 members) — annual</span>
                             <span class="txn-amount negative">−$8,000</span>
                         </div>
                         <!-- Year 1 -->
                         <div class="txn-row">
                             <span class="txn-year">Y1</span>
-                            <span class="txn-cat prize-money">Prize Money</span>
+                            <i class="fa-solid fa-trophy txn-icon" style="color:#00d4aa;"></i>
                             <span class="txn-desc">Race 1 — finished 84th</span>
                             <span class="txn-amount positive">+$2,500</span>
                         </div>
                         <div class="txn-row">
                             <span class="txn-year">Y1</span>
-                            <span class="txn-cat fuel-cost">Fuel Cost</span>
+                            <i class="fa-solid fa-gas-pump txn-icon" style="color:#a0785a;"></i>
                             <span class="txn-desc">Race 1 fuel consumption</span>
                             <span class="txn-amount negative">−$180</span>
                         </div>
                         <div class="txn-row">
                             <span class="txn-year">Y1</span>
-                            <span class="txn-cat car-purchase">Car Purchase</span>
+                            <i class="fa-solid fa-car txn-icon" style="color:#d060a0;"></i>
                             <span class="txn-desc">Bought Rusty Rattler 750 (used)</span>
                             <span class="txn-amount negative">−$320</span>
                         </div>
                         <div class="txn-row">
                             <span class="txn-year">Y1</span>
-                            <span class="txn-cat spare-parts">Spare Parts</span>
+                            <i class="fa-solid fa-wrench txn-icon" style="color:#a0b8d0;"></i>
                             <span class="txn-desc">Bought 4 spare parts</span>
                             <span class="txn-amount negative">−$400</span>
                         </div>
                         <div class="txn-row">
                             <span class="txn-year">Y1</span>
-                            <span class="txn-cat tyres">Tyres</span>
+                            <span class="txn-icon"><svg viewBox="0 0 512 512" fill="#a0b8d0"><path d="M256 21A235 235 0 0 0 21 256a235 235 0 0 0 235 235 235 235 0 0 0 235-235A235 235 0 0 0 256 21zm0 82c84.393 0 153 68.607 153 153s-68.607 153-153 153-153-68.607-153-153 68.607-153 153-153zm0 18c-20.417 0-39.757 4.52-57.09 12.602C210.457 166.482 230.218 208 256 208c25.823 0 44.926-41.65 56.752-74.555C295.505 125.462 276.284 121 256 121zm98.752 42.88c-27.714 21.143-61.142 52.79-53.17 77.327 7.981 24.564 53.508 29.858 88.459 30.936.628-5.294.959-10.678.959-16.143 0-35.642-13.755-68.012-36.248-92.12zm-197.729.243C134.663 188.204 121 220.477 121 256c0 5.55.34 11.018.988 16.39 34.833-.825 80.381-6.793 88.344-31.3 7.974-24.542-25.68-55.553-53.309-76.967zm70.188 43.643a9 9 0 0 0-5.035 1.714 9 9 0 0 0-1.99 12.57 9 9 0 0 0 12.57 1.993 9 9 0 0 0 1.992-12.572 9 9 0 0 0-7.537-3.705zm57.578 0a9 9 0 0 0-.637.004 9 9 0 0 0-6.9 3.7 9 9 0 0 0 1.992 12.573 9 9 0 0 0 12.57-1.992 9 9 0 0 0-1.99-12.57 9 9 0 0 0-5.035-1.715zM256 224a32 32 0 0 0-32 32 32 32 0 0 0 32 32 32 32 0 0 0 32-32 32 32 0 0 0-32-32zm-46.297 38.037a9 9 0 0 0-2.652.44 9 9 0 0 0-5.78 11.341 9 9 0 0 0 11.34 5.778 9 9 0 0 0 5.78-11.34 9 9 0 0 0-8.688-6.219zm92.856.008a9 9 0 0 0-8.95 6.21 9 9 0 0 0 5.78 11.34 9 9 0 0 0 11.34-5.777 9 9 0 0 0-5.78-11.341 9 9 0 0 0-2.39-.432zm-92.143 27.713c-21.59.104-50.24 16.832-72.424 31.928 19.029 34.168 52.46 59.164 92.143 66.837 9.99-33.39 18.42-78.618-2.446-93.777-4.854-3.527-10.737-5.02-17.273-4.988zm91.016.02c-6.58 0-12.492 1.516-17.346 5.042-20.895 15.181-11.863 60.106-2.088 93.678 39.687-7.715 73.108-32.76 92.1-66.973-22.006-15.224-50.935-31.747-72.666-31.748zM256 295.58a9 9 0 0 0-9 9 9 9 0 0 0 9 9 9 9 0 0 0 9-9 9 9 0 0 0-9-9z"/></svg></span>
                             <span class="txn-desc">Bought 2 tyre sets</span>
                             <span class="txn-amount negative">−$200</span>
                         </div>
                         <div class="txn-row">
                             <span class="txn-year">Y1</span>
-                            <span class="txn-cat car-sale">Car Sale</span>
+                            <i class="fa-solid fa-car txn-icon" style="color:#00d4aa;"></i>
                             <span class="txn-desc">Sold Banger Box 900</span>
                             <span class="txn-amount positive">+$520</span>
                         </div>

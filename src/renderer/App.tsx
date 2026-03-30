@@ -8,6 +8,7 @@ import { CarWorkshopScreen } from "./screens/CarWorkshopScreen";
 import { DriverMarketScreen } from "./screens/DriverMarketScreen";
 import { TeamRosterScreen } from "./screens/TeamRosterScreen";
 import { CrewHiringScreen } from "./screens/CrewHiringScreen";
+import { FinancesScreen } from "./screens/FinancesScreen";
 import { initializeGame } from "./simulation/gameInit";
 
 export function App() {
@@ -45,6 +46,8 @@ export function App() {
       return <TeamRosterScreen />;
     case "crewHiring":
       return <CrewHiringScreen />;
+    case "finances":
+      return <FinancesScreen />;
     case "garage":
     default:
       return <GarageScreen />;
