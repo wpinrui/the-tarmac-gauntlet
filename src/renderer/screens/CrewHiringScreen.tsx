@@ -74,27 +74,29 @@ export function CrewHiringScreen() {
               </div>
             </div>
 
-            <div className="pit-preview">
-              <div className="pit-preview-title">Est. Pit Stop Time</div>
-              <div className="pit-note" style={{ marginBottom: 14, marginTop: -8 }}>Full refuel, tyre change, and driver swap</div>
-              <div className="pit-bar-container">
-                <span className="pit-bar-label">Current ({player.crewSize})</span>
-                <div className="pit-bar-track">
-                  <div className="pit-bar-fill previous" style={{ width: `${(currentPitTime / maxPitTime) * 100}%` }} />
+            {enteredModel && (
+              <div className="pit-preview">
+                <div className="pit-preview-title">Est. Pit Stop Time</div>
+                <div className="pit-note" style={{ marginBottom: 14, marginTop: -8 }}>Full refuel, tyre change, and driver swap</div>
+                <div className="pit-bar-container">
+                  <span className="pit-bar-label">Current ({player.crewSize})</span>
+                  <div className="pit-bar-track">
+                    <div className="pit-bar-fill previous" style={{ width: `${(currentPitTime / maxPitTime) * 100}%` }} />
+                  </div>
+                  <span className="pit-bar-time">~{Math.round(currentPitTime)} <span className="unit">sec</span></span>
                 </div>
-                <span className="pit-bar-time">~{Math.round(currentPitTime)} <span className="unit">sec</span></span>
-              </div>
-              <div className="pit-bar-container">
-                <span className="pit-bar-label">New ({newSize})</span>
-                <div className="pit-bar-track">
-                  <div className="pit-bar-fill current" style={{ width: `${(newPitTime / maxPitTime) * 100}%` }} />
+                <div className="pit-bar-container">
+                  <span className="pit-bar-label">New ({newSize})</span>
+                  <div className="pit-bar-track">
+                    <div className="pit-bar-fill current" style={{ width: `${(newPitTime / maxPitTime) * 100}%` }} />
+                  </div>
+                  <span className="pit-bar-time">~{Math.round(newPitTime)} <span className="unit">sec</span></span>
                 </div>
-                <span className="pit-bar-time">~{Math.round(newPitTime)} <span className="unit">sec</span></span>
+                <div className="pit-note">
+                  Based on Engineer skill ({player.skills.engineer}) and {enteredModel.name}
+                </div>
               </div>
-              <div className="pit-note">
-                Based on Engineer skill ({player.skills.engineer}){enteredModel ? ` and ${enteredModel.name}` : ""}
-              </div>
-            </div>
+            )}
 
             <div className="crew-action">
               <button className="btn-confirm" disabled={costDelta > player.budget || newSize === player.crewSize} onClick={handleConfirm}>
