@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The 24h Tarmac Gauntlet — Crew Hiring</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #1e3450; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #2a4a68; }
+
+        html, body {
+            height: 100%;
+            background: #080d18;
+            color: #d0d8e4;
+            font-family: 'Inter', 'Segoe UI', -apple-system, sans-serif;
+            overflow: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                linear-gradient(180deg,
+                    rgba(8, 13, 24, 0.75) 0%,
+                    rgba(8, 13, 24, 0.45) 30%,
+                    rgba(8, 13, 24, 0.45) 70%,
+                    rgba(8, 13, 24, 0.75) 100%),
+                url('crew-backdrop.jpg') center / cover no-repeat;
+            pointer-events: none;
+        }
+
+        .app {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* ======== TAB BAR ======== */
+        .tab-bar {
+            display: flex; align-items: stretch;
+            background: rgba(8, 12, 22, 0.85);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid #2a4262;
+            padding: 0 28px; flex-shrink: 0;
+            position: relative; z-index: 10;
+        }
+        .team-identity { display: flex; align-items: center; gap: 12px; padding: 10px 24px 10px 0; margin-right: 8px; border-right: 1px solid #1e3450; }
+        .team-logo { width: 32px; height: 32px; border-radius: 6px; background: rgba(0,212,170,0.1); border: 1px solid rgba(0,212,170,0.25); display: flex; align-items: center; justify-content: center; }
+        .team-logo svg { width: 18px; height: 18px; }
+        .team-logo path { fill: #00d4aa; }
+        .team-name { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 16px; letter-spacing: 1.5px; text-transform: uppercase; color: #e8ecf4; }
+        .tab { padding: 18px 24px; font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 17px; letter-spacing: 2.5px; text-transform: uppercase; color: #7a96b0; cursor: pointer; position: relative; transition: color .2s; }
+        .tab:hover { color: #a0b8d0; }
+        .tab.active { color: #e8ecf4; }
+        .tab.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: #00d4aa; }
+        .tab-spacer { flex: 1; }
+        .tab-resource { display: flex; align-items: center; gap: 7px; padding: 14px 12px; border-radius: 6px; cursor: pointer; transition: background .15s; position: relative; }
+        .tab-resource:hover { background: rgba(255,255,255,0.04); }
+        .tab-resource .res-icon { font-size: 18px; color: #7a96b0; transition: color .15s; flex-shrink: 0; position: relative; top: 2px; }
+        .tab-resource:hover .res-icon { color: #a0b8d0; }
+        .tab-resource .res-value { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 20px; color: #e8ecf4; }
+        .tab-resource.money .res-value { color: #00d4aa; }
+        .tab-resource .res-tooltip {
+            display: none; position: absolute; top: 100%; right: 0; margin-top: 8px;
+            background: rgba(8,12,22,0.95); border: 1px solid #2a4262;
+            padding: 12px 16px; border-radius: 8px; width: 240px; z-index: 10;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+        }
+        .tab-resource:hover .res-tooltip { display: block; }
+        .res-tooltip-title {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 14px;
+            letter-spacing: 1.5px; text-transform: uppercase; color: #e8ecf4; margin-bottom: 4px;
+        }
+        .res-tooltip-desc {
+            font-family: 'Inter', sans-serif; font-weight: 400; font-size: 13px;
+            color: #8a9cb4; line-height: 1.4;
+        }
+
+        /* ======== BREADCRUMB ======== */
+        .breadcrumb { padding: 14px 28px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        .breadcrumb a { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 16px; letter-spacing: 1.5px; text-transform: uppercase; color: #7a96b0; text-decoration: none; transition: color .15s; }
+        .breadcrumb a:hover { color: #00d4aa; }
+        .breadcrumb .sep { font-size: 16px; color: #5a7a98; }
+        .breadcrumb .current { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 16px; letter-spacing: 1.5px; text-transform: uppercase; color: #d0dce8; }
+
+        /* ======== MAIN CONTENT ======== */
+        .main-content {
+            flex: 1; display: flex; align-items: center; justify-content: center;
+            margin: 0 28px 28px;
+        }
+
+        .crew-card {
+            width: 560px;
+            border-radius: 10px;
+            border: 1px solid #2a4262;
+            background: rgba(12, 18, 32, 0.78);
+            backdrop-filter: blur(10px);
+            padding: 40px;
+        }
+
+        .crew-title {
+            font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 28px;
+            color: #fff; text-align: center; margin-bottom: 8px;
+        }
+        .crew-subtitle {
+            font-family: 'Inter', sans-serif; font-weight: 400; font-size: 15px;
+            color: #7a96b0; text-align: center; margin-bottom: 36px; line-height: 1.5;
+        }
+
+        /* Stepper */
+        .crew-stepper {
+            display: flex; align-items: center; justify-content: center;
+            gap: 0; margin-bottom: 32px;
+        }
+        .stepper-btn {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 24px;
+            width: 48px; height: 48px; border: 1px solid #2a4262;
+            background: rgba(6,10,20,0.4); color: #a0b8d0; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; transition: all .15s;
+        }
+        .stepper-btn:first-child { border-radius: 8px 0 0 8px; }
+        .stepper-btn:last-child { border-radius: 0 8px 8px 0; }
+        .stepper-btn:hover { background: rgba(0,212,170,0.08); border-color: #3a5a78; color: #e8ecf4; }
+        .stepper-value {
+            font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 36px;
+            color: #fff; min-width: 80px; text-align: center;
+            border-top: 1px solid #2a4262; border-bottom: 1px solid #2a4262;
+            height: 48px; line-height: 48px; background: rgba(6,10,20,0.2);
+        }
+
+        /* Cost breakdown */
+        .crew-costs {
+            display: flex; justify-content: center; gap: 32px;
+            margin-bottom: 32px;
+        }
+        .cost-item { text-align: center; }
+        .cost-label {
+            font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 13px;
+            letter-spacing: 1.5px; text-transform: uppercase; color: #5a7a98;
+            margin-bottom: 4px;
+        }
+        .cost-value {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 22px;
+            color: #e8ecf4;
+        }
+        .cost-value.money { color: #00d4aa; }
+
+        /* Pit stop preview */
+        .pit-preview {
+            border-top: 1px solid rgba(42,66,98,0.4);
+            padding-top: 24px; margin-bottom: 32px;
+        }
+        .pit-preview-title {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 15px;
+            letter-spacing: 2px; text-transform: uppercase; color: #8a9cb4;
+            margin-bottom: 16px; text-align: center;
+        }
+
+        .pit-bar-container {
+            display: flex; align-items: center; gap: 12px;
+            margin-bottom: 8px;
+        }
+        .pit-bar-label {
+            font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 14px;
+            letter-spacing: 1px; text-transform: uppercase; color: #7a96b0;
+            width: 120px; text-align: right; flex-shrink: 0;
+        }
+        .pit-bar-track {
+            flex: 1; height: 10px; background: rgba(255,255,255,0.05);
+            border-radius: 5px; overflow: hidden; position: relative;
+        }
+        .pit-bar-fill {
+            height: 100%; border-radius: 5px;
+            background: linear-gradient(90deg, #00d4aa, #00b894);
+            transition: width .3s;
+        }
+        .pit-bar-fill.current { background: linear-gradient(90deg, #00d4aa, #00b894); }
+        .pit-bar-fill.previous { background: linear-gradient(90deg, #3a5a78, #2a4a68); }
+        .pit-bar-time {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 16px;
+            color: #e8ecf4; width: 60px; flex-shrink: 0;
+        }
+        .pit-bar-time .unit { font-weight: 400; font-size: 13px; color: #7a96b0; }
+
+        .pit-note {
+            font-family: 'Inter', sans-serif; font-weight: 400; font-size: 13px;
+            color: #5a7a98; text-align: center; margin-top: 8px;
+        }
+
+        /* Confirm */
+        .crew-action { display: flex; justify-content: center; }
+        .btn-confirm {
+            font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 16px;
+            letter-spacing: 2.5px; text-transform: uppercase;
+            padding: 14px 48px; border-radius: 8px; border: none;
+            background: #00d4aa; color: #060a14; cursor: pointer; transition: all .2s;
+        }
+        .btn-confirm:hover { background: #00e8bc; box-shadow: 0 0 20px rgba(0,212,170,0.15); }
+    </style>
+</head>
+<body>
+
+<div class="app">
+    <!-- Tab bar -->
+    <div class="tab-bar">
+        <div class="team-identity">
+            <div class="team-logo"><svg viewBox="0 0 48 48"><path d="M24 4L40 12v14c0 12-16 18-16 18S8 38 8 26V12z"/></svg></div>
+            <span class="team-name">Backfire Racing</span>
+        </div>
+        <div class="tab active">Garage</div>
+        <div class="tab">Finances</div>
+        <div class="tab">Race History</div>
+        <div class="tab">Standings</div>
+        <div class="tab">Scouting Report</div>
+        <div class="tab-spacer"></div>
+        <div class="tab-resource">
+            <i class="fa-solid fa-wrench res-icon"></i>
+            <span class="res-value">12</span>
+            <div class="res-tooltip">
+                <div class="res-tooltip-title">Spare Parts</div>
+                <div class="res-tooltip-desc">Fix mechanical issues during races and repair car condition between races. Unspent parts carry over each year.</div>
+            </div>
+        </div>
+        <div class="tab-resource money">
+            <i class="fa-solid fa-sack-dollar res-icon"></i>
+            <span class="res-value">$1,000</span>
+            <div class="res-tooltip">
+                <div class="res-tooltip-title">Money</div>
+                <div class="res-tooltip-desc">Your team's funds. Buy cars, upgrades, spare parts, tyres, and hire drivers and crew.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Breadcrumb -->
+    <div class="breadcrumb">
+        <a href="#">← Garage</a>
+        <span class="sep">/</span>
+        <span class="current">Crew Hiring</span>
+    </div>
+
+    <!-- Centered crew card -->
+    <div class="main-content">
+        <div class="crew-card">
+            <div class="crew-title">Pit Crew</div>
+            <div class="crew-subtitle">More crew members mean faster pit stops. Set your headcount for the upcoming year.</div>
+
+            <!-- Stepper -->
+            <div class="crew-stepper">
+                <button class="stepper-btn">−</button>
+                <div class="stepper-value">4</div>
+                <button class="stepper-btn">+</button>
+            </div>
+
+            <!-- Cost breakdown -->
+            <div class="crew-costs">
+                <div class="cost-item">
+                    <div class="cost-label">Per Member</div>
+                    <div class="cost-value">$2,000</div>
+                </div>
+                <div class="cost-item">
+                    <div class="cost-label">Annual Cost</div>
+                    <div class="cost-value money">$8,000</div>
+                </div>
+                <div class="cost-item">
+                    <div class="cost-label">Current Crew</div>
+                    <div class="cost-value">0</div>
+                </div>
+            </div>
+
+            <!-- Pit stop time preview -->
+            <div class="pit-preview">
+                <div class="pit-preview-title">Est. Pit Stop Time</div>
+                <div class="pit-note" style="margin-bottom:14px; margin-top:-8px;">Full refuel, tyre change, and driver swap</div>
+                <div class="pit-bar-container">
+                    <span class="pit-bar-label">Current (0)</span>
+                    <div class="pit-bar-track"><div class="pit-bar-fill previous" style="width:85%"></div></div>
+                    <span class="pit-bar-time">~52 <span class="unit">sec</span></span>
+                </div>
+                <div class="pit-bar-container">
+                    <span class="pit-bar-label">New (4)</span>
+                    <div class="pit-bar-track"><div class="pit-bar-fill current" style="width:55%"></div></div>
+                    <span class="pit-bar-time">~34 <span class="unit">sec</span></span>
+                </div>
+                <div class="pit-note">Based on Engineer skill (5) and Rusty Rattler 750</div>
+            </div>
+
+            <!-- Confirm -->
+            <div class="crew-action">
+                <button class="btn-confirm">Confirm — $8,000/yr</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

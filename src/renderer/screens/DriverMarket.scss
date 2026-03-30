@@ -1,0 +1,140 @@
+.breadcrumb-counter {
+  margin-left: auto;
+  font-family: 'Oswald', sans-serif;
+  font-weight: 500;
+  font-size: 15px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #5a7a98;
+}
+
+.filter-row, .sort-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.sort-row {
+  align-items: center;
+}
+
+.sort-label {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 400;
+  font-size: 13px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #5a7a98;
+  margin-right: 4px;
+}
+
+.driver-item-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+  gap: 2px;
+}
+
+.driver-item-overall {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 700;
+  font-size: 20px;
+  color: #fff;
+}
+
+.driver-item-salary {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #7a96b0;
+}
+
+.contracted-badge {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(208,64,64,0.1);
+  color: #d04040;
+  border: 1px solid rgba(208,64,64,0.3);
+}
+
+// Contract cards
+.contract-section {
+  margin-top: 24px;
+}
+
+.contract-options {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.contract-card {
+  flex: 1;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #2a4262;
+  background: rgba(6,10,20,0.4);
+  cursor: pointer;
+  transition: all .15s;
+  text-align: center;
+
+  &:hover { border-color: #3a5a78; }
+
+  &.selected {
+    border-color: #00d4aa;
+    background: rgba(0,212,170,0.06);
+  }
+}
+
+.contract-length {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 18px;
+  color: #e8ecf4;
+  margin-bottom: 8px;
+}
+
+.contract-salary {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 500;
+  font-size: 16px;
+  color: #00d4aa;
+}
+
+.contract-total {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 400;
+  font-size: 13px;
+  color: #7a96b0;
+  margin-top: 4px;
+}
+
+.contract-discount {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 500;
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: #00d4aa;
+  margin-top: 6px;
+}
+
+// Buyout section
+.buyout-section {
+  margin-top: 24px;
+}
+
+.buyout-details {
+  font-family: 'Inter', sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #7a96b0;
+  margin-bottom: 12px;
+  strong { color: #e8ecf4; }
+}

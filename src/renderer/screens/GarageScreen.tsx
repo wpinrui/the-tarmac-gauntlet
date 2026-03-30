@@ -191,7 +191,7 @@ export function GarageScreen() {
             </div>
 
             {/* COL 2 TOP: DRIVERS (compact) */}
-            <div className="card drivers-card clickable">
+            <div className="card drivers-card clickable" onClick={() => setScreen("teamRoster")}>
               <div className="card-title">Drivers <span className="nav-hint">Team Roster &rsaquo;</span></div>
               <div className="driver-row">
                 <div className="driver-avatar you"><PersonIcon /></div>
