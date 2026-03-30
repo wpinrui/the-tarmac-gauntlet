@@ -7,7 +7,7 @@ import type {
   UsedCarListing,
 } from "../types";
 import { advanceDriverYear, type RookieSpec } from "./driverLifecycle";
-import { generateUsedInventory, generateUsedInventoryByClass } from "./carMarket";
+import { generateUsedInventoryByClass } from "./carMarket";
 import { runAiSpending } from "./aiSpending";
 
 // ---------------------------------------------------------------------------
