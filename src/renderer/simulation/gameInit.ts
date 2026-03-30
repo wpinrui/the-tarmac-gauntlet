@@ -221,14 +221,9 @@ function createPlayerTeam(
   logo: string | null,
   skills: { driver: number; engineer: number; business: number },
 ): PlayerTeam {
-  const car: CarInstance = {
-    id: nextCarId(),
-    modelId: "f-01", // cheapest junkyard car (plot armour)
-    age: 0,
-    condition: 100,
-    installedUpgrades: { power: false, handling: false, comfort: false },
-  };
-
+  // Player starts with no car — their first action is visiting the dealers.
+  // Plot armour lives at the dealer level: if the player has no car and can't
+  // afford the cheapest one, it becomes purchasable anyway.
   return {
     kind: "player",
     id: "player",
@@ -236,9 +231,9 @@ function createPlayerTeam(
     budget: PLAYER_STARTING_BUDGET,
     prestige: 0,
     crewSize: 0,
-    cars: [car],
+    cars: [],
     contracts: [],
-    enteredCarId: car.id,
+    enteredCarId: null,
     playerName,
     logo,
     skills,
