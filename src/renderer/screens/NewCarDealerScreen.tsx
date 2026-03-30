@@ -44,7 +44,7 @@ export function NewCarDealerScreen() {
       condition: 100,
       installedUpgrades: { power: false, handling: false, comfort: false },
     };
-    buyCar(newCar, selected.price);
+    buyCar(newCar, selected.price, selected.name);
     setScreen("garage");
   };
 

@@ -7,6 +7,27 @@ export interface PrizeScheduleEntry {
   amount: number;      // Prize money in dollars
 }
 
+// --- Transactions ---
+
+export type TransactionCategory =
+  | "carPurchase"
+  | "carSale"
+  | "upgrade"
+  | "spareParts"
+  | "tyres"
+  | "driverSalary"
+  | "driverBuyout"
+  | "crewCost"
+  | "prizeMoney"
+  | "fuelCost";
+
+export interface TransactionRecord {
+  year: number;
+  category: TransactionCategory;
+  amount: number;       // positive = income, negative = expense
+  description: string;
+}
+
 // --- Car Markets ---
 
 export interface NewCarListing {
@@ -45,7 +66,6 @@ export interface FuelConfig {
 // --- Economy Config (all configurable rates) ---
 
 export interface EconomyConfig {
-  prizeSchedule: PrizeScheduleEntry[];
   tierCosts: TierCosts[];
   fuelConfig: FuelConfig;
   crewCostPerMember: number;     // $2,000 per GDD

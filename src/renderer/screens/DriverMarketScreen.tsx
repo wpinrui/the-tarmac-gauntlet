@@ -80,13 +80,13 @@ export function DriverMarketScreen() {
     if (!selected || !selectedContract || !selected.isFree) return;
     if (playerDriverCount >= 4) return;
     if (player.budget < selectedContract.annual) return;
-    hireDriver(selected.driver.id, selectedLength, selectedContract.annual);
+    hireDriver(selected.driver.id, selected.driver.name, selectedLength, selectedContract.annual);
   };
 
   const handleBuyout = () => {
     if (!selected || !selected.contract) return;
     if (player.budget < buyoutCost) return;
-    buyoutDriver(selected.driver.id, buyoutCost);
+    buyoutDriver(selected.driver.id, selected.driver.name, buyoutCost);
   };
 
   return (

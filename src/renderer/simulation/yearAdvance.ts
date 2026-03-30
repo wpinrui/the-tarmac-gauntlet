@@ -4,6 +4,8 @@ import type {
   Driver,
   Team,
   AITeam,
+  PlayerTeam,
+  TransactionRecord,
   UsedCarListing,
 } from "../types";
 import { advanceDriverYear, type RookieSpec } from "./driverLifecycle";
@@ -27,6 +29,8 @@ export interface YearAdvanceInput {
   rookieSpecs: RookieSpec[];
   /** Whether the player has won the event before (enables F1 in used market). */
   playerHasWon?: boolean;
+  /** Current game year (for transaction logging). */
+  currentYear?: number;
   /** Generates unique IDs for newly purchased car instances. Must produce distinct values. */
   newCarId: () => string;
 }
@@ -70,6 +74,7 @@ export function advanceYear(
 ): YearAdvanceResult {
   const { drivers, contracts, teams, carModels, rookieSpecs, newCarId } = input;
   const playerHasWon = input.playerHasWon ?? false;
+  const currentYear = input.currentYear ?? 1;
 
   // 1. Advance driver pool
   const driverResult = advanceDriverYear(drivers, rookieSpecs, random);
@@ -79,8 +84,38 @@ export function advanceYear(
     .map((c) => ({ ...c, remainingYears: c.remainingYears - 1 }))
     .filter((c) => c.remainingYears > 0);
 
-  // 3. Age all car instances by 1 year
-  const agedTeams: Team[] = teams.map((team) => ({
+  // 3. Annual deductions: driver salaries + crew costs for ALL teams
+  const CREW_COST_PER_MEMBER = 2_000;
+  const deductedTeams: Team[] = teams.map((team) => {
+    // Sum salaries for this team's active contracts
+    const teamContracts = updatedContracts.filter((c) => c.teamId === team.id);
+    const totalSalary = teamContracts.reduce((sum, c) => sum + c.annualSalary, 0);
+    const crewCost = team.crewSize * CREW_COST_PER_MEMBER;
+    const totalDeduction = totalSalary + crewCost;
+
+    const updatedBudget = team.budget - totalDeduction;
+
+    if (team.kind === "player") {
+      // Log transactions for the player
+      const newTxs: TransactionRecord[] = [];
+      if (totalSalary > 0) {
+        newTxs.push({ year: currentYear, category: "driverSalary", amount: -totalSalary, description: `Annual driver salaries (${teamContracts.length} contracts)` });
+      }
+      if (crewCost > 0) {
+        newTxs.push({ year: currentYear, category: "crewCost", amount: -crewCost, description: `Crew wages (${team.crewSize} members)` });
+      }
+      return {
+        ...team,
+        budget: updatedBudget,
+        transactions: [...(team as PlayerTeam).transactions, ...newTxs],
+      } as PlayerTeam;
+    }
+
+    return { ...team, budget: updatedBudget };
+  });
+
+  // 4. Age all car instances by 1 year
+  const agedTeams: Team[] = deductedTeams.map((team) => ({
     ...team,
     cars: team.cars.map((car) => ({ ...car, age: car.age + 1 })),
   }));

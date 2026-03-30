@@ -37,7 +37,7 @@ export function CrewHiringScreen() {
 
   const handleConfirm = () => {
     if (costDelta > player.budget) return;
-    setCrewSize(newSize, Math.max(0, costDelta));
+    setCrewSize(newSize);
     setScreen("garage");
   };
 

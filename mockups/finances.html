@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The 24h Tarmac Gauntlet — Finances</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #1e3450; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #2a4a68; }
+
+        html, body {
+            height: 100%;
+            background: #080d18;
+            color: #d0d8e4;
+            font-family: 'Inter', 'Segoe UI', -apple-system, sans-serif;
+            overflow: hidden;
+        }
+
+        .app {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* ======== TAB BAR ======== */
+        .tab-bar {
+            display: flex; align-items: stretch;
+            background: rgba(8, 12, 22, 0.85);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid #2a4262;
+            padding: 0 28px; flex-shrink: 0;
+            position: relative; z-index: 10;
+        }
+        .team-identity { display: flex; align-items: center; gap: 12px; padding: 10px 24px 10px 0; margin-right: 8px; border-right: 1px solid #1e3450; }
+        .team-logo { width: 32px; height: 32px; border-radius: 6px; background: rgba(0,212,170,0.1); border: 1px solid rgba(0,212,170,0.25); display: flex; align-items: center; justify-content: center; }
+        .team-logo svg { width: 18px; height: 18px; }
+        .team-logo path { fill: #00d4aa; }
+        .team-name { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 16px; letter-spacing: 1.5px; text-transform: uppercase; color: #e8ecf4; }
+        .tab { padding: 18px 24px; font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 17px; letter-spacing: 2.5px; text-transform: uppercase; color: #7a96b0; cursor: pointer; position: relative; transition: color .2s; }
+        .tab:hover { color: #a0b8d0; }
+        .tab.active { color: #e8ecf4; }
+        .tab.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: #00d4aa; }
+        .tab-spacer { flex: 1; }
+        .tab-resource { display: flex; align-items: center; gap: 7px; padding: 14px 12px; border-radius: 6px; cursor: pointer; transition: background .15s; position: relative; }
+        .tab-resource:hover { background: rgba(255,255,255,0.04); }
+        .tab-resource .res-icon { font-size: 18px; color: #7a96b0; transition: color .15s; flex-shrink: 0; position: relative; top: 2px; }
+        .tab-resource:hover .res-icon { color: #a0b8d0; }
+        .tab-resource .res-value { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 20px; color: #e8ecf4; }
+        .tab-resource.money .res-value { color: #00d4aa; }
+        .tab-resource .res-tooltip {
+            display: none; position: absolute; top: 100%; right: 0; margin-top: 8px;
+            background: rgba(8,12,22,0.95); border: 1px solid #2a4262;
+            padding: 12px 16px; border-radius: 8px; width: 240px; z-index: 10;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+        }
+        .tab-resource:hover .res-tooltip { display: block; }
+        .res-tooltip-title {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 14px;
+            letter-spacing: 1.5px; text-transform: uppercase; color: #e8ecf4; margin-bottom: 4px;
+        }
+        .res-tooltip-desc {
+            font-family: 'Inter', sans-serif; font-weight: 400; font-size: 13px;
+            color: #8a9cb4; line-height: 1.4;
+        }
+
+        /* ======== MAIN CONTENT ======== */
+        .main {
+            flex: 1;
+            padding: 24px 28px 28px;
+            display: flex;
+            gap: 18px;
+            overflow: hidden;
+        }
+
+        /* ---- Left column: Overview + Transaction log ---- */
+        .left-col {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            overflow: hidden;
+        }
+
+        /* ---- Right column: Prize schedule ---- */
+        .right-col {
+            width: 340px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ======== PANELS ======== */
+        .panel {
+            border-radius: 10px;
+            border: 1px solid #2a4262;
+            background: rgba(12, 18, 32, 0.78);
+            backdrop-filter: blur(10px);
+            overflow: hidden;
+        }
+        .panel-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(42,66,98,0.4);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .panel-title {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 17px;
+            letter-spacing: 2.5px; text-transform: uppercase; color: #8a9cb4;
+        }
+        .panel-body { padding: 20px; }
+
+        /* ======== BUDGET OVERVIEW ======== */
+        .balance-row {
+            display: flex; align-items: baseline; gap: 12px;
+            margin-bottom: 24px;
+        }
+        .balance-label {
+            font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 14px;
+            letter-spacing: 1.5px; text-transform: uppercase; color: #7a96b0;
+        }
+        .balance-amount {
+            font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 36px;
+            color: #00d4aa;
+        }
+
+        .year-summary { display: flex; gap: 12px; }
+        .year-card {
+            flex: 1; padding: 14px 16px;
+            border-radius: 8px; border: 1px solid #2a4262;
+            background: rgba(6,10,20,0.4);
+        }
+        .year-card.current { border-color: rgba(0,212,170,0.3); background: rgba(0,212,170,0.04); }
+        .year-card-year {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 14px;
+            letter-spacing: 1.5px; text-transform: uppercase; color: #7a96b0;
+            margin-bottom: 10px;
+        }
+        .year-card.current .year-card-year { color: #00d4aa; }
+        .year-line {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 3px 0;
+        }
+        .year-line-label {
+            font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 13px;
+            letter-spacing: 1px; text-transform: uppercase; color: #5a7a98;
+        }
+        .year-line-value {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 15px;
+            color: #e8ecf4;
+        }
+        .year-line-value.income { color: #00d4aa; }
+        .year-line-value.expense { color: #e17055; }
+        .year-line-value.net-pos { color: #00d4aa; }
+        .year-line-value.net-neg { color: #e17055; }
+        .year-line.net { border-top: 1px solid rgba(42,66,98,0.4); margin-top: 4px; padding-top: 6px; }
+
+        .empty-income {
+            font-family: 'Inter', sans-serif; font-weight: 400; font-size: 13px;
+            color: #3a5a78; font-style: italic;
+        }
+
+        /* ======== TRANSACTION LOG ======== */
+        .txn-panel { flex: 1; display: flex; flex-direction: column; }
+        .txn-panel .panel-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; padding: 0; }
+
+        .txn-filters {
+            display: flex; gap: 4px; padding: 12px 20px; flex-wrap: wrap;
+            border-bottom: 1px solid rgba(42,66,98,0.2);
+        }
+        .txn-filter-btn {
+            font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 13px;
+            letter-spacing: 0.8px; padding: 4px 10px; border-radius: 4px;
+            border: 1px solid #2a4262; background: transparent; color: #7a96b0;
+            cursor: pointer; transition: all .15s;
+        }
+        .txn-filter-btn:hover { border-color: #3a5a78; color: #a0b8d0; }
+        .txn-filter-btn.active { border-color: #00d4aa; color: #00d4aa; background: rgba(0,212,170,0.08); }
+
+        .txn-scroll { flex: 1; overflow-y: auto; }
+
+        .txn-row {
+            display: flex; align-items: center; padding: 10px 20px; gap: 12px;
+            border-bottom: 1px solid rgba(42,66,98,0.15);
+        }
+        .txn-year {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 14px;
+            color: #5a7a98; width: 36px; flex-shrink: 0;
+        }
+        .txn-cat {
+            font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 11px;
+            letter-spacing: 1.2px; text-transform: uppercase;
+            padding: 2px 8px; border-radius: 4px;
+            border: 1px solid; flex-shrink: 0; min-width: 90px; text-align: center;
+        }
+        .txn-cat.car-purchase { color: #d060a0; border-color: rgba(208,96,160,0.3); }
+        .txn-cat.car-sale { color: #00d4aa; border-color: rgba(0,212,170,0.3); }
+        .txn-cat.upgrade { color: #5ab8d8; border-color: rgba(90,184,216,0.3); }
+        .txn-cat.spare-parts { color: #a0b8d0; border-color: rgba(160,184,208,0.3); }
+        .txn-cat.tyres { color: #a0b8d0; border-color: rgba(160,184,208,0.3); }
+        .txn-cat.driver-salary { color: #e0943a; border-color: rgba(224,148,58,0.3); }
+        .txn-cat.crew-cost { color: #e0943a; border-color: rgba(224,148,58,0.3); }
+        .txn-cat.prize-money { color: #00d4aa; border-color: rgba(0,212,170,0.3); }
+        .txn-cat.fuel-cost { color: #a0785a; border-color: rgba(160,120,90,0.3); }
+        .txn-cat.driver-buyout { color: #e17055; border-color: rgba(225,112,85,0.3); }
+
+        /* Style A: Icon only */
+        .txn-icon { font-size: 16px; width: 90px; text-align: center; flex-shrink: 0; }
+
+        /* Style B: Dot + text */
+        .txn-dot-cat {
+            font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 13px;
+            letter-spacing: 0.8px; text-transform: uppercase; color: #7a96b0;
+            display: flex; align-items: center; gap: 6px;
+            min-width: 90px; flex-shrink: 0;
+        }
+        .txn-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+        /* Style C: Filled pill */
+        .txn-pill {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 11px;
+            letter-spacing: 1.2px; text-transform: uppercase;
+            padding: 3px 10px; border-radius: 10px;
+            min-width: 90px; text-align: center; flex-shrink: 0;
+        }
+
+        .txn-desc {
+            font-family: 'Inter', sans-serif; font-weight: 400; font-size: 14px;
+            color: #a0b8d0; flex: 1;
+        }
+        .txn-amount {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 16px;
+            width: 100px; text-align: right; flex-shrink: 0;
+        }
+        .txn-amount.positive { color: #00d4aa; }
+        .txn-amount.negative { color: #e8ecf4; }
+
+        /* ======== PRIZE SCHEDULE ======== */
+        .prize-panel { flex: 1; display: flex; flex-direction: column; }
+        .prize-panel .panel-body { flex: 1; overflow: hidden; padding: 0; display: flex; flex-direction: column; }
+        .prize-scroll { flex: 1; overflow-y: auto; }
+
+        .prize-table { width: 100%; border-collapse: collapse; }
+        .prize-table th {
+            font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 13px;
+            letter-spacing: 1.2px; text-transform: uppercase; color: #5a7a98;
+            text-align: left; padding: 8px 16px;
+            border-bottom: 1px solid rgba(42,66,98,0.4);
+            position: sticky; top: 0; background: rgba(12,18,32,0.95); z-index: 1;
+        }
+        .prize-table th:last-child { text-align: right; }
+        .prize-table td {
+            font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 14px;
+            color: #a0b8d0; padding: 6px 16px;
+            border-bottom: 1px solid rgba(42,66,98,0.1);
+        }
+        .prize-table td:last-child {
+            text-align: right; font-weight: 600; color: #e8ecf4;
+        }
+        .prize-table tr.gold td { color: #d4a840; }
+        .prize-table tr.gold td:last-child { color: #d4a840; }
+        .prize-table tr.silver td { color: #b0b8c4; }
+        .prize-table tr.silver td:last-child { color: #b0b8c4; }
+        .prize-table tr.bronze td { color: #c47a3a; }
+        .prize-table tr.bronze td:last-child { color: #c47a3a; }
+
+        .prize-total {
+            padding: 12px 16px;
+            border-top: 1px solid rgba(42,66,98,0.4);
+            display: flex; justify-content: space-between;
+        }
+        .prize-total-label {
+            font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 13px;
+            letter-spacing: 1.5px; text-transform: uppercase; color: #5a7a98;
+        }
+        .prize-total-value {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 15px;
+            color: #00d4aa;
+        }
+    </style>
+</head>
+<body>
+
+<div class="app">
+    <!-- Tab bar -->
+    <div class="tab-bar">
+        <div class="team-identity">
+            <div class="team-logo"><svg viewBox="0 0 48 48"><path d="M24 4L40 12v14c0 12-16 18-16 18S8 38 8 26V12z"/></svg></div>
+            <span class="team-name">Backfire Racing</span>
+        </div>
+        <div class="tab">Garage</div>
+        <div class="tab active">Finances</div>
+        <div class="tab">Race History</div>
+        <div class="tab">Standings</div>
+        <div class="tab">Scouting Report</div>
+        <div class="tab-spacer"></div>
+        <div class="tab-resource">
+            <i class="fa-solid fa-wrench res-icon"></i>
+            <span class="res-value">12</span>
+            <div class="res-tooltip">
+                <div class="res-tooltip-title">Spare Parts</div>
+                <div class="res-tooltip-desc">Fix mechanical issues during races and repair car condition between races. Unspent parts carry over each year.</div>
+            </div>
+        </div>
+        <div class="tab-resource money">
+            <i class="fa-solid fa-sack-dollar res-icon"></i>
+            <span class="res-value">$2,830</span>
+            <div class="res-tooltip">
+                <div class="res-tooltip-title">Money</div>
+                <div class="res-tooltip-desc">Your team's funds. Buy cars, upgrades, spare parts, tyres, and hire drivers and crew.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main content -->
+    <div class="main">
+
+        <!-- Left column -->
+        <div class="left-col">
+
+            <!-- Budget overview -->
+            <div class="panel">
+                <div class="panel-header">
+                    <span class="panel-title">Budget Overview</span>
+                </div>
+                <div class="panel-body">
+                    <div class="balance-row">
+                        <span class="balance-label">Current Balance</span>
+                        <span class="balance-amount">$2,830</span>
+                    </div>
+
+                    <div class="year-summary">
+                        <div class="year-card">
+                            <div class="year-card-year">Year 1</div>
+                            <div class="year-line">
+                                <span class="year-line-label">Income</span>
+                                <span class="year-line-value income">+$2,500</span>
+                            </div>
+                            <div class="year-line">
+                                <span class="year-line-label">Expenses</span>
+                                <span class="year-line-value expense">−$1,420</span>
+                            </div>
+                            <div class="year-line net">
+                                <span class="year-line-label">Net</span>
+                                <span class="year-line-value net-pos">+$1,080</span>
+                            </div>
+                        </div>
+                        <div class="year-card">
+                            <div class="year-card-year">Year 2</div>
+                            <div class="year-line">
+                                <span class="year-line-label">Income</span>
+                                <span class="year-line-value income">+$5,000</span>
+                            </div>
+                            <div class="year-line">
+                                <span class="year-line-label">Expenses</span>
+                                <span class="year-line-value expense">−$3,750</span>
+                            </div>
+                            <div class="year-line net">
+                                <span class="year-line-label">Net</span>
+                                <span class="year-line-value net-pos">+$1,250</span>
+                            </div>
+                        </div>
+                        <div class="year-card current">
+                            <div class="year-card-year">Year 3 (Current)</div>
+                            <div class="year-line">
+                                <span class="year-line-label">Income</span>
+                                <span class="year-line-value empty-income">After next race</span>
+                            </div>
+                            <div class="year-line">
+                                <span class="year-line-label">Expenses</span>
+                                <span class="year-line-value expense">−$500</span>
+                            </div>
+                            <div class="year-line net">
+                                <span class="year-line-label">Net</span>
+                                <span class="year-line-value net-neg">−$500</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transaction log -->
+            <div class="panel txn-panel">
+                <div class="panel-header">
+                    <span class="panel-title">Transaction History</span>
+                </div>
+                <div class="panel-body">
+                    <div class="txn-filters">
+                        <button class="txn-filter-btn active">All</button>
+                        <button class="txn-filter-btn">Year 1</button>
+                        <button class="txn-filter-btn">Year 2</button>
+                        <button class="txn-filter-btn">Year 3</button>
+                        <span style="width:1px; background:#2a4262; margin:0 4px;"></span>
+                        <button class="txn-filter-btn">Cars</button>
+                        <button class="txn-filter-btn">Upgrades</button>
+                        <button class="txn-filter-btn">Consumables</button>
+                        <button class="txn-filter-btn">Staff</button>
+                        <button class="txn-filter-btn">Race</button>
+                    </div>
+                    <div class="txn-scroll">
+                        <!-- Style A: Icon only -->
+                        <div class="txn-row">
+                            <span class="txn-year">Y3</span>
+                            <i class="fa-solid fa-wrench txn-icon" style="color:#a0b8d0;"></i>
+                            <span class="txn-desc">Bought 5 spare parts</span>
+                            <span class="txn-amount negative">−$500</span>
+                        </div>
+                        <!-- Style B: Dot + text -->
+                        <div class="txn-row">
+                            <span class="txn-year">Y2</span>
+                            <span class="txn-dot-cat"><span class="txn-dot" style="background:#00d4aa;"></span> Prize Money</span>
+                            <span class="txn-desc">Race 2 — finished 68th</span>
+                            <span class="txn-amount positive">+$5,500</span>
+                        </div>
+                        <!-- Style C: Filled pill -->
+                        <div class="txn-row">
+                            <span class="txn-year">Y2</span>
+                            <span class="txn-pill" style="background:rgba(160,120,90,0.2); color:#a0785a;">Fuel Cost</span>
+                            <span class="txn-desc">Race 2 fuel consumption</span>
+                            <span class="txn-amount negative">−$250</span>
+                        </div>
+                        <div class="txn-row">
+                            <span class="txn-year">Y2</span>
+                            <span class="txn-cat upgrade">Upgrade</span>
+                            <span class="txn-desc">Power Pack — Rusty Rattler 750</span>
+                            <span class="txn-amount negative">−$400</span>
+                        </div>
+                        <div class="txn-row">
+                            <span class="txn-year">Y2</span>
+                            <span class="txn-cat spare-parts">Spare Parts</span>
+                            <span class="txn-desc">Bought 8 spare parts</span>
+                            <span class="txn-amount negative">−$800</span>
+                        </div>
+                        <div class="txn-row">
+                            <span class="txn-year">Y2</span>
+                            <span class="txn-cat tyres">Tyres</span>
+                            <span class="txn-desc">Bought 3 tyre sets</span>
+                            <span class="txn-amount negative">−$300</span>
+                        </div>
+                        <div class="txn-row">
+                            <span class="txn-year">Y2</span>
+                            <span class="txn-cat driver-salary">Driver Salary</span>
+                            <span class="txn-desc">Marco Ribeiro — annual salary</span>
+                            <span class="txn-amount negative">−$1,620</span>
+                        </div>
+                        <div class="txn-row">
+                            <span class="txn-year">Y2</span>
+                            <span class="txn-cat crew-cost">Crew Cost</span>
+                            <span class="txn-desc">Pit crew (4 members) — annual</span>
+                            <span class="txn-amount negative">−$8,000</span>
+                        </div>
+                        <!-- Year 1 -->
+                        <div class="txn-row">
+                            <span class="txn-year">Y1</span>
+                            <span class="txn-cat prize-money">Prize Money</span>
+                            <span class="txn-desc">Race 1 — finished 84th</span>
+                            <span class="txn-amount positive">+$2,500</span>
+                        </div>
+                        <div class="txn-row">
+                            <span class="txn-year">Y1</span>
+                            <span class="txn-cat fuel-cost">Fuel Cost</span>
+                            <span class="txn-desc">Race 1 fuel consumption</span>
+                            <span class="txn-amount negative">−$180</span>
+                        </div>
+                        <div class="txn-row">
+                            <span class="txn-year">Y1</span>
+                            <span class="txn-cat car-purchase">Car Purchase</span>
+                            <span class="txn-desc">Bought Rusty Rattler 750 (used)</span>
+                            <span class="txn-amount negative">−$320</span>
+                        </div>
+                        <div class="txn-row">
+                            <span class="txn-year">Y1</span>
+                            <span class="txn-cat spare-parts">Spare Parts</span>
+                            <span class="txn-desc">Bought 4 spare parts</span>
+                            <span class="txn-amount negative">−$400</span>
+                        </div>
+                        <div class="txn-row">
+                            <span class="txn-year">Y1</span>
+                            <span class="txn-cat tyres">Tyres</span>
+                            <span class="txn-desc">Bought 2 tyre sets</span>
+                            <span class="txn-amount negative">−$200</span>
+                        </div>
+                        <div class="txn-row">
+                            <span class="txn-year">Y1</span>
+                            <span class="txn-cat car-sale">Car Sale</span>
+                            <span class="txn-desc">Sold Banger Box 900</span>
+                            <span class="txn-amount positive">+$520</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right column: Prize schedule -->
+        <div class="right-col">
+            <div class="panel prize-panel">
+                <div class="panel-header">
+                    <span class="panel-title">Prize Schedule</span>
+                </div>
+                <div class="panel-body">
+                    <div class="prize-scroll">
+                        <table class="prize-table">
+                            <thead>
+                                <tr><th>Position</th><th>Prize</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr class="gold"><td>1st</td><td>$750,000</td></tr>
+                                <tr class="silver"><td>2nd</td><td>$700,000</td></tr>
+                                <tr class="bronze"><td>3rd</td><td>$675,000</td></tr>
+                                <tr><td>4th</td><td>$650,000</td></tr>
+                                <tr><td>5th</td><td>$625,000</td></tr>
+                                <tr><td>6th</td><td>$600,000</td></tr>
+                                <tr><td>7th</td><td>$575,000</td></tr>
+                                <tr><td>8th</td><td>$550,000</td></tr>
+                                <tr><td>9th</td><td>$525,000</td></tr>
+                                <tr><td>10th</td><td>$500,000</td></tr>
+                                <tr><td>15th</td><td>$375,000</td></tr>
+                                <tr><td>20th</td><td>$275,000</td></tr>
+                                <tr><td>25th</td><td>$200,000</td></tr>
+                                <tr><td>30th</td><td>$150,000</td></tr>
+                                <tr><td>35th</td><td>$110,000</td></tr>
+                                <tr><td>40th</td><td>$80,000</td></tr>
+                                <tr><td>45th</td><td>$60,000</td></tr>
+                                <tr><td>50th</td><td>$50,000</td></tr>
+                                <tr><td>55th</td><td>$35,000</td></tr>
+                                <tr><td>60th</td><td>$25,000</td></tr>
+                                <tr><td>65th</td><td>$15,000</td></tr>
+                                <tr><td>70th</td><td>$10,000</td></tr>
+                                <tr><td>75th</td><td>$5,000</td></tr>
+                                <tr><td>80th</td><td>$3,000</td></tr>
+                                <tr><td>85th</td><td>$2,000</td></tr>
+                                <tr><td>90th</td><td>$1,500</td></tr>
+                                <tr><td>95th</td><td>$1,000</td></tr>
+                                <tr><td>100th</td><td>$500</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="prize-total">
+                        <span class="prize-total-label">Total Fund</span>
+                        <span class="prize-total-value">$15,000,000</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>
