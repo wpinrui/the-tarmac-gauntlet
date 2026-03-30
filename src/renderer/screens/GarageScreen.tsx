@@ -4,7 +4,26 @@ import { calculateEffectiveStats } from "../simulation/effectiveStats";
 import { calculateDriverStats, totalDriverStats } from "../simulation/driverLifecycle";
 import type { PlayerTeam, CarInstance, CarModel, Driver } from "../types";
 import garageBackdropUrl from "../assets/garage-backdrop.jpg";
-import carBackdropUrl from "../assets/car-backdrop.jpg";
+import carBackdropF from "../assets/car-backdrop-f.jpg";
+// Placeholder imports for other classes — add the actual images when available:
+// import carBackdropE from "../assets/car-backdrop-e.jpg";
+// import carBackdropD from "../assets/car-backdrop-d.jpg";
+// import carBackdropC from "../assets/car-backdrop-c.jpg";
+// import carBackdropB from "../assets/car-backdrop-b.jpg";
+// import carBackdropA from "../assets/car-backdrop-a.jpg";
+// import carBackdropF1 from "../assets/car-backdrop-f1.jpg";
+
+import type { CarClass } from "../types";
+
+const CAR_BACKDROPS: Partial<Record<CarClass, string>> = {
+  F: carBackdropF,
+  // E: carBackdropE,
+  // D: carBackdropD,
+  // C: carBackdropC,
+  // B: carBackdropB,
+  // A: carBackdropA,
+  // F1: carBackdropF1,
+};
 import { SKILL_TOOLTIPS } from "../shared/skillData";
 import "./GarageScreen.scss";
 
@@ -78,7 +97,10 @@ export function GarageScreen() {
   return (
     <div
       className="garage-root"
-      style={{ "--garage-backdrop": `url(${garageBackdropUrl})`, "--car-backdrop": `url(${carBackdropUrl})` } as React.CSSProperties}
+      style={{
+        "--garage-backdrop": `url(${garageBackdropUrl})`,
+        "--car-backdrop": carModel ? `url(${CAR_BACKDROPS[carModel.carClass] ?? ""})` : "none",
+      } as React.CSSProperties}
     >
       <div className="garage-app">
         {/* TAB BAR */}
