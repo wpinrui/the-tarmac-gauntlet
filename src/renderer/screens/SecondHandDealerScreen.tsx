@@ -57,12 +57,13 @@ export function SecondHandDealerScreen() {
   const enteredEffective = enteredCar && enteredModel ? calculateEffectiveStats(enteredCar, enteredModel) : null;
 
   const isShitbox = (listing: UsedCarListing) => listing.id.startsWith("used-shitbox-");
+  const canBeg = (listing: UsedCarListing) => isShitbox(listing) && player.cars.length === 0;
 
   const handleBuy = () => {
     if (!selected || !selectedModel) return;
-    const shitbox = isShitbox(selected);
-    if (!shitbox && player.budget < selected.price) return;
-    const cost = shitbox ? Math.min(player.budget, selected.price) : selected.price;
+    const beg = canBeg(selected);
+    if (!beg && player.budget < selected.price) return;
+    const cost = beg ? Math.min(player.budget, selected.price) : selected.price;
     const newCar: CarInstance = {
       id: nextCarId(),
       modelId: selected.modelId,
@@ -224,10 +225,10 @@ export function SecondHandDealerScreen() {
                 <div className="buy-row">
                   <button
                     className="btn-buy"
-                    disabled={!isShitbox(selected) && player.budget < selected.price}
+                    disabled={!canBeg(selected) && player.budget < selected.price}
                     onClick={handleBuy}
                   >
-                    {isShitbox(selected) && player.budget < selected.price
+                    {canBeg(selected) && player.budget < selected.price
                       ? `Beg — $${player.budget.toLocaleString()}`
                       : `Buy — $${selected.price.toLocaleString()}`}
                   </button>
