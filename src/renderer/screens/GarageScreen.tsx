@@ -209,7 +209,7 @@ export function GarageScreen() {
                     <div className="driver-avatar"><PersonIcon /></div>
                     <div className="driver-info">
                       <div className="driver-name-text">{d.name}</div>
-                      <div className="driver-detail">Age {d.age} &middot; {d.contractYears}yr &middot; ${d.salary.toLocaleString()}/yr</div>
+                      <div className="driver-detail">Age {d.age} &middot; {d.contractYears}yr &middot; ${d.salary.toLocaleString()}/race</div>
                     </div>
                     <div className="driver-overall"><span className="ovr-label">OVR</span>{ovr}</div>
                   </div>

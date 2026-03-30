@@ -140,7 +140,7 @@ export function DriverMarketScreen() {
                   <div className="driver-item-right">
                     <div className="driver-item-overall">{ovr}</div>
                     {isFree ? (
-                      <div className="driver-item-salary">${salary.toLocaleString()}/yr</div>
+                      <div className="driver-item-salary">${salary.toLocaleString()}/race</div>
                     ) : (
                       <span className="contracted-badge">Contracted</span>
                     )}
@@ -193,7 +193,7 @@ export function DriverMarketScreen() {
                           onClick={() => setSelectedLength(cp.length)}
                         >
                           <div className="contract-length">{cp.length} Year{cp.length > 1 ? "s" : ""}</div>
-                          <div className="contract-salary">${cp.annual.toLocaleString()}/yr</div>
+                          <div className="contract-salary">${cp.annual.toLocaleString()}/race</div>
                           <div className="contract-total">Total: ${cp.total.toLocaleString()}</div>
                           {cp.discount > 0 && <div className="contract-discount">{cp.discount}% off</div>}
                         </div>
@@ -201,7 +201,7 @@ export function DriverMarketScreen() {
                     </div>
                     <div className="buy-row">
                       <button className="btn-buy" disabled={!selectedContract || player.budget < selectedContract.annual} onClick={handleHire}>
-                        Hire — ${selectedContract?.annual.toLocaleString()}/yr
+                        Hire — ${selectedContract?.annual.toLocaleString()}/race
                       </button>
                     </div>
                   </div>

@@ -163,7 +163,7 @@ export function TeamRosterScreen() {
                   <div className="contract-details">
                     <div><span className="contract-label">Contract:</span> <span className="contract-text">{selectedHired.contract.length} year{selectedHired.contract.length > 1 ? "s" : ""}</span></div>
                     <div><span className="contract-label">Remaining:</span> <span className="contract-text">{selectedHired.contract.remainingYears} year{selectedHired.contract.remainingYears > 1 ? "s" : ""}</span></div>
-                    <div><span className="contract-label">Salary:</span> <span className="contract-text">${selectedHired.contract.annualSalary.toLocaleString()}/yr</span></div>
+                    <div><span className="contract-label">Salary:</span> <span className="contract-text">${selectedHired.contract.annualSalary.toLocaleString()}/race</span></div>
                   </div>
                   <div className="buy-row" style={{ marginTop: 16 }}>
                     <button className="btn-release" onClick={handleRelease}>Release Driver</button>

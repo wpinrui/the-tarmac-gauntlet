@@ -98,7 +98,7 @@ export function CrewHiringScreen() {
 
             <div className="crew-action">
               <button className="btn-confirm" disabled={costDelta > player.budget || newSize === player.crewSize} onClick={handleConfirm}>
-                {costDelta > 0 ? `Confirm — $${costDelta.toLocaleString()}/yr` : newSize === player.crewSize ? "No Change" : "Confirm — Free"}
+                {costDelta > 0 ? `Confirm — $${costDelta.toLocaleString()}/race` : newSize === player.crewSize ? "No Change" : "Confirm — Free"}
               </button>
             </div>
           </div>
