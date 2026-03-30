@@ -34,6 +34,7 @@ function makeDriver(
   return {
     id,
     name: `Driver ${id}`,
+    nationality: "gb",
     age,
     curveParams: { peakAge, peakStats: peak, phaseOffsets: zero },
     marketValue: 0,
@@ -89,6 +90,7 @@ describe("calculateDriverStats", () => {
     const noOffset: Driver = {
       id: "a",
       name: "A",
+      nationality: "gb",
       age: 30,
       curveParams: {
         peakAge: 30,
@@ -117,7 +119,7 @@ describe("calculateDriverStats", () => {
   it("two same-age drivers with different phase offsets have different stats", () => {
     const base = { pace: 80, consistency: 80, stamina: 80, safety: 80, smoothness: 80 };
     const driverA: Driver = {
-      id: "a", name: "A", age: 28,
+      id: "a", name: "A", nationality: "gb", age: 28,
       curveParams: {
         peakAge: 30, peakStats: base,
         phaseOffsets: { pace: -1, consistency: 2, stamina: 0, safety: -2, smoothness: 1 },
@@ -125,7 +127,7 @@ describe("calculateDriverStats", () => {
       marketValue: 0,
     };
     const driverB: Driver = {
-      id: "b", name: "B", age: 28,
+      id: "b", name: "B", nationality: "gb", age: 28,
       curveParams: {
         peakAge: 30, peakStats: base,
         phaseOffsets: { pace: 2, consistency: -1, stamina: 1, safety: 1, smoothness: -2 },
@@ -277,12 +279,12 @@ describe("isDriverFreeAgent", () => {
 
 describe("generateRookie", () => {
   it("rookie is always age 18", () => {
-    const r = generateRookie({ id: "r1", name: "Rex" }, neverFire);
+    const r = generateRookie({ id: "r1", name: "Rex", nationality: "gb" }, neverFire);
     expect(r.age).toBe(18);
   });
 
   it("rookie has low stats (well below peak potential)", () => {
-    const r = generateRookie({ id: "r1", name: "Rex" }, () => 0.5);
+    const r = generateRookie({ id: "r1", name: "Rex", nationality: "gb" }, () => 0.5);
     const stats = calculateDriverStats(r);
     // At age 18 the stat should be substantially below peak
     const total = totalDriverStats(stats);
@@ -297,19 +299,19 @@ describe("generateRookie", () => {
   });
 
   it("rookie ID and name are set from spec", () => {
-    const r = generateRookie({ id: "rookie-99", name: "Sam Speed" }, neverFire);
+    const r = generateRookie({ id: "rookie-99", name: "Sam Speed", nationality: "us" }, neverFire);
     expect(r.id).toBe("rookie-99");
     expect(r.name).toBe("Sam Speed");
   });
 
   it("rookie market value is positive", () => {
-    const r = generateRookie({ id: "r1", name: "Rex" }, () => 0.5);
+    const r = generateRookie({ id: "r1", name: "Rex", nationality: "gb" }, () => 0.5);
     expect(r.marketValue).toBeGreaterThan(0);
   });
 
   it("different random values produce different rookies", () => {
-    const r1 = generateRookie({ id: "r1", name: "A" }, () => 0.1);
-    const r2 = generateRookie({ id: "r2", name: "B" }, () => 0.9);
+    const r1 = generateRookie({ id: "r1", name: "A", nationality: "gb" }, () => 0.1);
+    const r2 = generateRookie({ id: "r2", name: "B", nationality: "jp" }, () => 0.9);
     const stats1 = calculateDriverStats(r1);
     const stats2 = calculateDriverStats(r2);
     expect(totalDriverStats(stats1)).not.toBe(totalDriverStats(stats2));
@@ -323,7 +325,7 @@ describe("generateRookie", () => {
 describe("advanceDriverYear", () => {
   it("all drivers age by exactly 1 year", () => {
     const drivers = [makeDriver("d1", 25), makeDriver("d2", 30), makeDriver("d3", 40)];
-    const rookieSpecs = Array.from({ length: 15 }, (_, i) => ({ id: `r${i}`, name: `R${i}` }));
+    const rookieSpecs = Array.from({ length: 15 }, (_, i) => ({ id: `r${i}`, name: `R${i}`, nationality: "gb" }));
     const result = advanceDriverYear(drivers, rookieSpecs, () => 0.5);
     const survivors = result.drivers.filter((d) => !result.rookies.includes(d));
     for (const d of survivors) {
@@ -341,7 +343,7 @@ describe("advanceDriverYear", () => {
       makeDriver(`strong-${i}`, 30, 90), // total stats ≈ 90×5 = 450 each
     );
     const drivers = [...weak, ...strong];
-    const rookieSpecs = Array.from({ length: 15 }, (_, i) => ({ id: `r${i}`, name: `R${i}` }));
+    const rookieSpecs = Array.from({ length: 15 }, (_, i) => ({ id: `r${i}`, name: `R${i}`, nationality: "gb" }));
 
     const result = advanceDriverYear(drivers, rookieSpecs, () => 0.5);
 
@@ -358,21 +360,21 @@ describe("advanceDriverYear", () => {
 
   it("adds exactly 15 new rookies", () => {
     const drivers = Array.from({ length: 20 }, (_, i) => makeDriver(`d${i}`, 30));
-    const rookieSpecs = Array.from({ length: 15 }, (_, i) => ({ id: `r${i}`, name: `R${i}` }));
+    const rookieSpecs = Array.from({ length: 15 }, (_, i) => ({ id: `r${i}`, name: `R${i}`, nationality: "gb" }));
     const result = advanceDriverYear(drivers, rookieSpecs, () => 0.5);
     expect(result.rookies).toHaveLength(15);
   });
 
   it("new pool size = original size (15 removed + 15 added)", () => {
     const drivers = Array.from({ length: 310 }, (_, i) => makeDriver(`d${i}`, 30));
-    const rookieSpecs = Array.from({ length: 15 }, (_, i) => ({ id: `r${i}`, name: `R${i}` }));
+    const rookieSpecs = Array.from({ length: 15 }, (_, i) => ({ id: `r${i}`, name: `R${i}`, nationality: "gb" }));
     const result = advanceDriverYear(drivers, rookieSpecs, () => 0.5);
     expect(result.drivers).toHaveLength(310);
   });
 
   it("rookies are always age 18", () => {
     const drivers = Array.from({ length: 20 }, (_, i) => makeDriver(`d${i}`, 30));
-    const rookieSpecs = Array.from({ length: 15 }, (_, i) => ({ id: `r${i}`, name: `R${i}` }));
+    const rookieSpecs = Array.from({ length: 15 }, (_, i) => ({ id: `r${i}`, name: `R${i}`, nationality: "gb" }));
     const result = advanceDriverYear(drivers, rookieSpecs, () => 0.5);
     for (const r of result.rookies) {
       expect(r.age).toBe(18);
@@ -396,7 +398,7 @@ describe("advanceDriverYear", () => {
 
     // Need 15 low-stat fillers so d1 and d2 (high stats) survive retirement
     const fillers = Array.from({ length: 15 }, (_, i) => makeDriver(`filler${i}`, 50, 10));
-    const rookieSpecs = Array.from({ length: 15 }, (_, i) => ({ id: `r${i}`, name: `R${i}` }));
+    const rookieSpecs = Array.from({ length: 15 }, (_, i) => ({ id: `r${i}`, name: `R${i}`, nationality: "gb" }));
     const result = advanceDriverYear([withPeak, withOld, ...fillers], rookieSpecs, () => 0.5);
 
     const peakResult = result.drivers.find((d) => d.id === "d1")!;

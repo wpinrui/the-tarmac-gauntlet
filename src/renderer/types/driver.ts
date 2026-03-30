@@ -23,6 +23,7 @@ export interface DriverCurveParams {
 export interface Driver {
   id: string;
   name: string;
+  nationality: string; // ISO 3166-1 alpha-2 country code (e.g. "br", "jp", "gb")
   age: number;
   curveParams: DriverCurveParams;
   marketValue: number;

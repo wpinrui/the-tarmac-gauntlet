@@ -132,7 +132,7 @@ export function DriverMarketScreen() {
                   onClick={() => setSelectedId(d.id)}
                 >
                   <div className="car-item-info">
-                    <div className="car-item-name">{d.name}</div>
+                    <div className="car-item-name"><span className={`fi fi-${d.nationality} driver-item-flag`} /> {d.name}</div>
                     <div className="car-item-details">
                       Age {d.age} &middot; {isFree ? "Free Agent" : `${contractTeam}`}
                     </div>
@@ -156,7 +156,7 @@ export function DriverMarketScreen() {
               <>
                 <div className="detail-header">
                   <div>
-                    <div className="detail-name">{selected.driver.name}</div>
+                    <div className="detail-name"><span className={`fi fi-${selected.driver.nationality} driver-item-flag`} /> {selected.driver.name}</div>
                     <div className="detail-meta">
                       Age {selected.driver.age} &middot; {selected.isFree ? "Free Agent" : `Contracted to ${selected.contractTeam}`}
                     </div>

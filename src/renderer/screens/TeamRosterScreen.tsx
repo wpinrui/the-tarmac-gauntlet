@@ -82,7 +82,7 @@ export function TeamRosterScreen() {
                     onClick={() => setSelectedId(d.id)}
                   >
                     <div className="roster-item-info">
-                      <div className="roster-item-name">{d.name}</div>
+                      <div className="roster-item-name"><span className={`fi fi-${d.nationality} driver-item-flag`} /> {d.name}</div>
                       <div className="roster-item-meta">Age {d.age} &middot; {c.remainingYears}yr contract</div>
                     </div>
                     <div className="roster-item-overall">{ovr}</div>
@@ -134,7 +134,7 @@ export function TeamRosterScreen() {
               <>
                 <div className="detail-header">
                   <div>
-                    <div className="detail-name">{selectedHired.driver.name}</div>
+                    <div className="detail-name"><span className={`fi fi-${selectedHired.driver.nationality} driver-item-flag`} /> {selectedHired.driver.name}</div>
                     <div className="detail-meta">Age {selectedHired.driver.age}</div>
                   </div>
                   <div className="detail-price-block">

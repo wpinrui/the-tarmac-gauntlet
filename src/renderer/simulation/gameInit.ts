@@ -90,6 +90,13 @@ const LAST_NAMES = [
   "Ortiz", "Park", "Rivera", "Silva", "Tanaka", "Uribe", "Volkov", "Walsh",
 ];
 
+const NATIONALITIES = [
+  "br", "jp", "mx", "gb", "se", "fr", "gh", "ru", "in", "de",
+  "es", "it", "kr", "nl", "au", "ca", "ar", "cl", "no", "fi",
+  "dk", "be", "at", "ch", "pt", "pl", "cz", "hu", "nz", "za",
+  "my", "sg", "th", "ph", "ie", "us", "cn", "tw", "co", "ve",
+];
+
 // ---------------------------------------------------------------------------
 // Driver generation helpers
 // ---------------------------------------------------------------------------
@@ -136,6 +143,7 @@ export function seedDriverPool(random: () => number): Driver[] {
     const driver: Driver = {
       id: `driver-${i}`,
       name: generateDriverName(i, random),
+      nationality: NATIONALITIES[Math.floor(random() * NATIONALITIES.length)],
       age,
       curveParams: { peakAge, peakStats, phaseOffsets },
       marketValue: 0,
