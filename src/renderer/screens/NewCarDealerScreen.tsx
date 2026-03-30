@@ -5,7 +5,7 @@ import type { CarModel, CarClass, CarInstance, PlayerTeam } from "../types";
 import backdropUrl from "../assets/newdealer-backdrop.jpg";
 import "./DealerShared.scss";
 
-const CLASS_ORDER: CarClass[] = ["F", "E", "D", "C", "B", "A", "F1"];
+const CLASS_ORDER: CarClass[] = ["F", "E", "D", "C", "B", "A"];
 
 const UPGRADE_DESCS: Record<string, string> = {
   power: "Unlocks power and fuel efficiency potential",
@@ -29,14 +29,14 @@ export function NewCarDealerScreen() {
   if (!game) return null;
   const player = game.teams.find((t) => t.kind === "player") as PlayerTeam;
 
-  const models = game.carModels;
+  const models = game.carModels.filter((m) => m.carClass !== "F1");
   const filtered = classFilter === "all" ? models : models.filter((m) => m.carClass === classFilter);
 
   // Group by class
   const grouped = useMemo(() => {
     const groups: { cls: CarClass; cars: CarModel[] }[] = [];
     for (const cls of CLASS_ORDER) {
-      const cars = filtered.filter((m) => m.carClass === cls);
+      const cars = filtered.filter((m) => m.carClass === cls).sort((a, b) => a.price - b.price);
       if (cars.length > 0) groups.push({ cls, cars });
     }
     return groups;
@@ -190,11 +190,6 @@ export function NewCarDealerScreen() {
 
                 {/* Buy */}
                 <div className="buy-row">
-                  {plotArmourActive && selected.id === cheapest.id && (
-                    <span style={{ color: "#e17055", fontFamily: "'Oswald', sans-serif", fontSize: 14, letterSpacing: 1 }}>
-                      PLOT ARMOUR — you need a car to race!
-                    </span>
-                  )}
                   <button
                     className="btn-buy"
                     disabled={!canAfford(selected.price)}
