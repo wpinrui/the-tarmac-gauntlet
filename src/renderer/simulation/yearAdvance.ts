@@ -10,6 +10,7 @@ import type {
 } from "../types";
 import { advanceDriverYear, type RookieSpec } from "./driverLifecycle";
 import { generateUsedInventoryByClass } from "./carMarket";
+import { CREW_COST_PER_MEMBER } from "../shared/dealerData";
 import { runAiSpending } from "./aiSpending";
 
 // ---------------------------------------------------------------------------
@@ -85,7 +86,6 @@ export function advanceYear(
     .filter((c) => c.remainingYears > 0);
 
   // 3. Annual deductions: driver salaries + crew costs for ALL teams
-  const CREW_COST_PER_MEMBER = 2_000;
   const deductedTeams: Team[] = teams.map((team) => {
     // Sum salaries for this team's active contracts
     const teamContracts = updatedContracts.filter((c) => c.teamId === team.id);

@@ -6,9 +6,9 @@ import { estimateFullServicePitDuration } from "../simulation/pitStop";
 import type { PlayerTeam } from "../types";
 import backdropUrl from "../assets/crew-backdrop.jpg";
 import "./DealerShared.scss";
+import { CREW_COST_PER_MEMBER } from "../shared/dealerData";
 import "./CrewHiring.scss";
 
-const CREW_COST_PER_MEMBER = 2_000;
 const MAX_CREW = 16;
 
 
