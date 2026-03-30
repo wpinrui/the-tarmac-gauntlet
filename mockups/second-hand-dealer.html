@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The 24h Tarmac Gauntlet — Second-Hand Dealer</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #1e3450; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #2a4a68; }
+
+        html, body {
+            height: 100%;
+            background: #080d18;
+            color: #d0d8e4;
+            font-family: 'Inter', 'Segoe UI', -apple-system, sans-serif;
+            overflow: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                linear-gradient(180deg,
+                    rgba(8, 13, 24, 0.75) 0%,
+                    rgba(8, 13, 24, 0.45) 30%,
+                    rgba(8, 13, 24, 0.45) 70%,
+                    rgba(8, 13, 24, 0.75) 100%),
+                url('secondhand-backdrop.jpg') center / cover no-repeat;
+            pointer-events: none;
+        }
+
+        .app {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* ======== TAB BAR ======== */
+        .tab-bar {
+            display: flex; align-items: stretch;
+            background: rgba(8, 12, 22, 0.85);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid #2a4262;
+            padding: 0 28px; flex-shrink: 0;
+            position: relative; z-index: 10;
+        }
+        .team-identity { display: flex; align-items: center; gap: 12px; padding: 10px 24px 10px 0; margin-right: 8px; border-right: 1px solid #1e3450; }
+        .team-logo { width: 32px; height: 32px; border-radius: 6px; background: rgba(0,212,170,0.1); border: 1px solid rgba(0,212,170,0.25); display: flex; align-items: center; justify-content: center; }
+        .team-logo svg { width: 18px; height: 18px; }
+        .team-logo path { fill: #00d4aa; }
+        .team-name { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 16px; letter-spacing: 1.5px; text-transform: uppercase; color: #e8ecf4; }
+        .tab { padding: 18px 24px; font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 17px; letter-spacing: 2.5px; text-transform: uppercase; color: #7a96b0; cursor: pointer; position: relative; transition: color .2s; }
+        .tab:hover { color: #a0b8d0; }
+        .tab.active { color: #e8ecf4; }
+        .tab.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: #00d4aa; }
+        .tab-spacer { flex: 1; }
+        .tab-resource { display: flex; align-items: center; gap: 7px; padding: 14px 12px; border-radius: 6px; cursor: pointer; transition: background .15s; position: relative; }
+        .tab-resource:hover { background: rgba(255,255,255,0.04); }
+        .tab-resource .res-icon { font-size: 18px; color: #7a96b0; transition: color .15s; flex-shrink: 0; position: relative; top: 2px; }
+        .tab-resource:hover .res-icon { color: #a0b8d0; }
+        .tab-resource .res-value { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 20px; color: #e8ecf4; }
+        .tab-resource.money .res-value { color: #00d4aa; }
+        .tab-resource .res-tooltip {
+            display: none; position: absolute; top: 100%; right: 0; margin-top: 8px;
+            background: rgba(8,12,22,0.95); border: 1px solid #2a4262;
+            padding: 12px 16px; border-radius: 8px; width: 240px; z-index: 10;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+        }
+        .tab-resource:hover .res-tooltip { display: block; }
+        .res-tooltip-title {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 14px;
+            letter-spacing: 1.5px; text-transform: uppercase; color: #e8ecf4; margin-bottom: 4px;
+        }
+        .res-tooltip-desc {
+            font-family: 'Inter', sans-serif; font-weight: 400; font-size: 13px;
+            color: #8a9cb4; line-height: 1.4;
+        }
+
+        /* ======== BREADCRUMB ======== */
+        .breadcrumb { padding: 14px 28px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        .breadcrumb a { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 16px; letter-spacing: 1.5px; text-transform: uppercase; color: #7a96b0; text-decoration: none; transition: color .15s; }
+        .breadcrumb a:hover { color: #00d4aa; }
+        .breadcrumb .sep { font-size: 16px; color: #5a7a98; }
+        .breadcrumb .current { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 16px; letter-spacing: 1.5px; text-transform: uppercase; color: #d0dce8; }
+
+        /* ======== SPLIT VIEW ======== */
+        .split {
+            flex: 1; display: flex; overflow: hidden;
+            margin: 0 28px 28px; border-radius: 10px;
+            border: 1px solid #2a4262;
+            background: rgba(12, 18, 32, 0.78);
+            backdrop-filter: blur(10px);
+        }
+
+        /* ---- Left: Car list ---- */
+        .car-list {
+            width: 680px; flex-shrink: 0;
+            border-right: 1px solid #2a4262;
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+        .list-header { padding: 16px 20px; border-bottom: 1px solid rgba(42,66,98,0.4); flex-shrink: 0; }
+        .list-title { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 17px; letter-spacing: 2.5px; text-transform: uppercase; color: #8a9cb4; margin-bottom: 6px; }
+        .list-subtitle { font-family: 'Inter', sans-serif; font-weight: 400; font-size: 14px; color: #7a96b0; }
+
+        .list-scroll { flex: 1; overflow-y: auto; }
+
+        .car-list-item {
+            display: flex; align-items: center; padding: 14px 20px;
+            cursor: pointer; transition: background .12s;
+            border-left: 3px solid transparent;
+            border-bottom: 1px solid rgba(42,66,98,0.2);
+        }
+        .car-list-item:hover { background: rgba(255,255,255,0.02); }
+        .car-list-item.selected { background: rgba(0,212,170,0.04); border-left-color: #00d4aa; }
+        .car-item-info { flex: 1; }
+        .car-item-name { font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 18px; color: #d0dce8; }
+        .car-list-item.selected .car-item-name { color: #fff; }
+        .car-item-details { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 14px; color: #7a96b0; letter-spacing: 0.8px; margin-top: 2px; }
+
+        .class-badge {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 12px;
+            letter-spacing: 1.5px; text-transform: uppercase;
+            padding: 2px 10px; border-radius: 8px; border: 1.5px solid;
+            background: transparent; display: inline-block; vertical-align: middle; margin-right: 4px;
+        }
+        .class-badge.f { color: #a0785a; border-color: #a0785a; }
+        .class-badge.e { color: #5ab8d8; border-color: #5ab8d8; }
+        .class-badge.d { color: #d060a0; border-color: #d060a0; }
+        .class-badge.c { color: #e0943a; border-color: #e0943a; }
+        .class-badge.b { color: #d04040; border-color: #d04040; }
+        .class-badge.a { color: #50c878; border-color: #50c878; }
+        .car-item-price { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 18px; color: #fff; flex-shrink: 0; }
+
+
+        /* ---- Right: Detail panel ---- */
+        .detail-panel { flex: 1; overflow-y: auto; padding: 28px 32px; }
+
+        .detail-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; }
+        .detail-name { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 28px; color: #fff; margin-bottom: 4px; }
+        .detail-meta { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 15px; color: #7a96b0; letter-spacing: 1px; }
+
+        .detail-price-block { text-align: right; }
+        .detail-price-label { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 14px; letter-spacing: 1.5px; text-transform: uppercase; color: #8a9cb4; }
+        .detail-price { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 28px; color: #00d4aa; }
+        .detail-msrp { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 15px; color: #5a7a98; text-decoration: line-through; }
+
+        /* Info chips row */
+        .info-chips { display: flex; gap: 12px; margin-bottom: 24px; }
+        .info-chip {
+            background: rgba(6,10,20,0.4); border: 1px solid #2a4262;
+            border-radius: 6px; padding: 10px 16px;
+            display: flex; flex-direction: column; align-items: center; gap: 2px;
+        }
+        .info-chip-label { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: #8a9cb4; }
+        .info-chip-value { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 20px; color: #e8ecf4; }
+
+        /* Stats */
+        .stats-section { margin-bottom: 24px; }
+        .stats-section-title {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 15px;
+            letter-spacing: 2px; text-transform: uppercase; color: #8a9cb4;
+            margin-bottom: 12px; padding-bottom: 8px;
+            border-bottom: 1px solid rgba(42,66,98,0.4);
+        }
+        .stat-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+        .stat-name { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 15px; letter-spacing: 1.2px; text-transform: uppercase; color: #a0b8d0; width: 140px; flex-shrink: 0; }
+        .stat-bar-track { flex: 1; max-width: 400px; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; }
+        .stat-bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #00d4aa, #00b894); }
+        .stat-value { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 17px; color: #e8ecf4; width: 30px; text-align: right; flex-shrink: 0; }
+        .stat-delta { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 15px; width: 50px; text-align: right; flex-shrink: 0; }
+        .stat-delta.up { color: #00d4aa; }
+        .stat-delta.down { color: #e17055; }
+        .stat-delta.neutral { color: #5a7a98; }
+
+        /* Pit stop estimate */
+        .pit-estimate {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 0;
+            border-top: 1px solid rgba(42,66,98,0.4);
+            border-bottom: 1px solid rgba(42,66,98,0.4);
+            margin-bottom: 24px;
+        }
+        .pit-label { font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 16px; letter-spacing: 1.2px; text-transform: uppercase; color: #a0b8d0; }
+        .pit-value { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 20px; color: #e8ecf4; }
+        .pit-value .pit-unit { font-weight: 400; font-size: 16px; color: #7a96b0; }
+        .pit-note { font-family: 'Inter', sans-serif; font-weight: 400; font-size: 14px; color: #7a96b0; }
+
+        /* Installed upgrades */
+        .upgrade-installed {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 16px; background: rgba(0,212,170,0.04);
+            border: 1px solid rgba(0,212,170,0.2); border-radius: 8px;
+            margin-bottom: 8px;
+        }
+        .upgrade-installed-name { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 15px; color: #00d4aa; }
+        .upgrade-installed-tag { font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: #00d4aa; background: rgba(0,212,170,0.1); padding: 2px 8px; border-radius: 3px; margin-left: auto; }
+
+        .upgrade-available {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 16px; background: rgba(6,10,20,0.4);
+            border: 1px solid #2a4262; border-radius: 8px;
+            margin-bottom: 8px;
+        }
+        .upgrade-available-name { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 15px; color: #8a9cb4; }
+        .upgrade-available-tag { font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: #5a7a98; }
+
+        /* Buy */
+        .buy-row { display: flex; align-items: center; justify-content: flex-end; gap: 16px; margin-top: 8px; }
+        .btn-buy {
+            font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 16px;
+            letter-spacing: 2.5px; text-transform: uppercase;
+            padding: 14px 36px; border-radius: 8px; border: none;
+            background: #00d4aa; color: #060a14; cursor: pointer; transition: all .2s;
+        }
+        .btn-buy:hover { background: #00e8bc; box-shadow: 0 0 20px rgba(0,212,170,0.15); }
+        .btn-buy:disabled { background: #1a2a40; color: #4a6478; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+<div class="app">
+    <!-- Tab bar -->
+    <div class="tab-bar">
+        <div class="team-identity">
+            <div class="team-logo"><svg viewBox="0 0 48 48"><path d="M24 4L40 12v14c0 12-16 18-16 18S8 38 8 26V12z"/></svg></div>
+            <span class="team-name">Backfire Racing</span>
+        </div>
+        <div class="tab active">Garage</div>
+        <div class="tab">Finances</div>
+        <div class="tab">Race History</div>
+        <div class="tab">Standings</div>
+        <div class="tab">Scouting Report</div>
+        <div class="tab-spacer"></div>
+        <div class="tab-resource">
+            <i class="fa-solid fa-wrench res-icon"></i>
+            <span class="res-value">12</span>
+            <div class="res-tooltip">
+                <div class="res-tooltip-title">Spare Parts</div>
+                <div class="res-tooltip-desc">Fix mechanical issues during races and repair car condition between races. Unspent parts carry over each year.</div>
+            </div>
+        </div>
+        <div class="tab-resource money">
+            <i class="fa-solid fa-sack-dollar res-icon"></i>
+            <span class="res-value">$1,000</span>
+            <div class="res-tooltip">
+                <div class="res-tooltip-title">Money</div>
+                <div class="res-tooltip-desc">Your team's funds. Buy cars, upgrades, spare parts, tyres, and hire drivers and crew.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Breadcrumb -->
+    <div class="breadcrumb">
+        <a href="#">← Garage</a>
+        <span class="sep">/</span>
+        <span class="current">Second-Hand Dealer</span>
+    </div>
+
+    <!-- Split view -->
+    <div class="split">
+
+        <!-- Left: rotating inventory -->
+        <div class="car-list">
+            <div class="list-header">
+                <div class="list-title">This Year's Stock</div>
+                <div class="list-subtitle">Inventory rotates each year. Bargains won't last.</div>
+            </div>
+            <div class="list-scroll">
+                <div class="car-list-item selected">
+                    <div class="car-item-info">
+                        <div class="car-item-name">Banger Box 900</div>
+                        <div class="car-item-details"><span class="class-badge f">Class F</span> Age 2 · 88% condition · Power Pack installed</div>
+                    </div>
+                    <div class="car-item-price">$620</div>
+                </div>
+                <div class="car-list-item">
+                    <div class="car-item-info">
+                        <div class="car-item-name">Salvage Special 1500</div>
+                        <div class="car-item-details"><span class="class-badge f">Class F</span> Age 5 · 61% condition · No upgrades</div>
+                    </div>
+                    <div class="car-item-price">$680</div>
+                </div>
+                <div class="car-list-item">
+                    <div class="car-item-info">
+                        <div class="car-item-name">Commuter GS 2000</div>
+                        <div class="car-item-details"><span class="class-badge e">Class E</span> Age 8 · 34% condition · Comfort Pack installed</div>
+                    </div>
+                    <div class="car-item-price">$550</div>
+                </div>
+                <div class="car-list-item">
+                    <div class="car-item-info">
+                        <div class="car-item-name">Sedan SE 3500</div>
+                        <div class="car-item-details"><span class="class-badge e">Class E</span> Age 3 · 92% condition · Full upgrades</div>
+                    </div>
+                    <div class="car-item-price">$2,400</div>
+                </div>
+                <div class="car-list-item">
+                    <div class="car-item-info">
+                        <div class="car-item-name">Roadster RS 8K</div>
+                        <div class="car-item-details"><span class="class-badge d">Class D</span> Age 6 · 55% condition · Handling Pack installed</div>
+                    </div>
+                    <div class="car-item-price">$3,200</div>
+                </div>
+                <div class="car-list-item">
+                    <div class="car-item-info">
+                        <div class="car-item-name">Rusty Rattler 750</div>
+                        <div class="car-item-details"><span class="class-badge f">Class F</span> Age 4 · 72% condition · No upgrades</div>
+                    </div>
+                    <div class="car-item-price">$320</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: detail panel -->
+        <div class="detail-panel">
+            <div class="detail-header">
+                <div>
+                    <div class="detail-name">Banger Box 900</div>
+                    <div class="detail-meta"><span class="class-badge f">Class F</span> · Second-Hand</div>
+                </div>
+                <div class="detail-price-block">
+                    <div class="detail-price-label">Asking Price</div>
+                    <div class="detail-price">$620</div>
+                    <div class="detail-msrp">MSRP $900</div>
+                </div>
+            </div>
+
+            <!-- Info chips: age, condition, upgrades -->
+            <div class="info-chips">
+                <div class="info-chip">
+                    <div class="info-chip-label">Age</div>
+                    <div class="info-chip-value">2 yrs</div>
+                </div>
+                <div class="info-chip">
+                    <div class="info-chip-label">Condition</div>
+                    <div class="info-chip-value">88%</div>
+                </div>
+                <div class="info-chip">
+                    <div class="info-chip-label">Upgrades</div>
+                    <div class="info-chip-value">1 / 3</div>
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats-section">
+                <div class="stats-section-title">Performance Stats <span style="font-weight:400; color:#5a7a98;">vs your Rusty Rattler 750</span></div>
+                <div class="stat-row">
+                    <span class="stat-name">Power</span>
+                    <div class="stat-bar-track"><div class="stat-bar-fill" style="width:16%"></div></div>
+                    <span class="stat-value">16</span>
+                    <span class="stat-delta up">+8</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-name">Handling</span>
+                    <div class="stat-bar-track"><div class="stat-bar-fill" style="width:12%"></div></div>
+                    <span class="stat-value">12</span>
+                    <span class="stat-delta up">+2</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-name">Fuel Efficiency</span>
+                    <div class="stat-bar-track"><div class="stat-bar-fill" style="width:22%"></div></div>
+                    <span class="stat-value">22</span>
+                    <span class="stat-delta up">+7</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-name">Tyre Durability</span>
+                    <div class="stat-bar-track"><div class="stat-bar-fill" style="width:14%"></div></div>
+                    <span class="stat-value">14</span>
+                    <span class="stat-delta up">+2</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-name">Comfort</span>
+                    <div class="stat-bar-track"><div class="stat-bar-fill" style="width:7%"></div></div>
+                    <span class="stat-value">7</span>
+                    <span class="stat-delta up">+2</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-name">Reliability</span>
+                    <div class="stat-bar-track"><div class="stat-bar-fill" style="width:11%"></div></div>
+                    <span class="stat-value">11</span>
+                    <span class="stat-delta up">+3</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-name">Fuel Capacity</span>
+                    <div class="stat-bar-track"><div class="stat-bar-fill" style="width:24%"></div></div>
+                    <span class="stat-value">24</span>
+                    <span class="stat-delta up">+4</span>
+                </div>
+            </div>
+
+            <!-- Pit stop estimate -->
+            <div class="pit-estimate">
+                <div>
+                    <div class="pit-label">Est. Pit Stop Time</div>
+                    <div class="pit-note">Based on crew (0) + engineer skill (5)</div>
+                </div>
+                <div class="pit-value">~48 <span class="pit-unit">sec</span></div>
+            </div>
+
+            <!-- Upgrade state -->
+            <div class="stats-section">
+                <div class="stats-section-title">Upgrades</div>
+                <div class="upgrade-installed">
+                    <span class="upgrade-installed-name">Power Pack</span>
+                    <span class="upgrade-installed-tag">Installed</span>
+                </div>
+                <div class="upgrade-available">
+                    <span class="upgrade-available-name">Handling Pack</span>
+                    <span class="upgrade-available-tag">Available after purchase</span>
+                </div>
+                <div class="upgrade-available">
+                    <span class="upgrade-available-name">Comfort Pack</span>
+                    <span class="upgrade-available-tag">Available after purchase</span>
+                </div>
+            </div>
+
+            <!-- Buy -->
+            <div class="buy-row">
+                <button class="btn-buy">Buy — $620</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>
