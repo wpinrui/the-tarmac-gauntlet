@@ -6,7 +6,7 @@ import type { PlayerTeam, CarInstance, CarModel, Driver } from "../types";
 import garageBackdropUrl from "../assets/garage-backdrop.jpg";
 import carBackdropUrl from "../assets/car-backdrop.jpg";
 import { SKILL_TOOLTIPS } from "../shared/skillData";
-import "./GarageScreen.css";
+import "./GarageScreen.scss";
 
 const PersonIcon = () => (
   <svg viewBox="0 0 24 24">
