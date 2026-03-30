@@ -104,7 +104,7 @@ export interface PitStopResult {
  *   - Refuel: base overhead + per-litre rate (only if fuelToAdd > 0)
  *   - Tyre change: flat cost (only if changeTyres and tyreSetsAvailable > 0)
  *   - Driver swap: flat cost (only if nextDriverId differs from current)
- *   - Issue fix: each fixed issue adds its template's fixDuration
+ *   - Issue fix: each fixed issue adds its template's workUnits
  *
  * Crew multiplier: `1 + (1 − crewSize / MAX_CREW_SIZE) × (SOLO_CREW_MULTIPLIER − 1)`
  *   → crew 16 = 1.0×, crew 0 = SOLO_CREW_MULTIPLIER (very slow).
