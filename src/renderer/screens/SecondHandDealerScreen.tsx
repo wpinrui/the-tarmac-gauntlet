@@ -217,7 +217,9 @@ export function SecondHandDealerScreen() {
                     disabled={!isShitbox(selected) && player.budget < selected.price}
                     onClick={handleBuy}
                   >
-                    Buy — ${selected.price.toLocaleString()}
+                    {isShitbox(selected) && player.budget < selected.price
+                      ? `Beg — $${player.budget.toLocaleString()}`
+                      : `Buy — $${selected.price.toLocaleString()}`}
                   </button>
                 </div>
               </>

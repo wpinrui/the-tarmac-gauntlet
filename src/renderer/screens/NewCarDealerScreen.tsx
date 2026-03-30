@@ -53,14 +53,8 @@ export function NewCarDealerScreen() {
 
   const selected = selectedId ? models.find((m) => m.id === selectedId) ?? null : null;
 
-  // Plot armour
-  const cheapest = models.reduce((a, b) => (a.price < b.price ? a : b));
-  const plotArmourActive = player.cars.length === 0 && player.budget < cheapest.price;
-  const canAfford = (price: number) => plotArmourActive || player.budget >= price;
-  const effectiveCost = (price: number) => plotArmourActive ? Math.min(player.budget, price) : price;
-
   const handleBuy = () => {
-    if (!selected) return;
+    if (!selected || player.budget < selected.price) return;
     const newCar: CarInstance = {
       id: nextCarId(),
       modelId: selected.id,
@@ -68,7 +62,7 @@ export function NewCarDealerScreen() {
       condition: 100,
       installedUpgrades: { power: false, handling: false, comfort: false },
     };
-    buyCar(newCar, effectiveCost(selected.price));
+    buyCar(newCar, selected.price);
     setScreen("garage");
   };
 
@@ -232,8 +226,8 @@ export function NewCarDealerScreen() {
 
                 {/* Buy */}
                 <div className="buy-row">
-                  <button className="btn-buy" disabled={!canAfford(selected.price)} onClick={handleBuy}>
-                    Buy — ${effectiveCost(selected.price).toLocaleString()}
+                  <button className="btn-buy" disabled={player.budget < selected.price} onClick={handleBuy}>
+                    Buy — ${selected.price.toLocaleString()}
                   </button>
                 </div>
               </>
