@@ -18,6 +18,9 @@ export const DISPLAY_STATS: { key: keyof CarStats; label: string }[] = [
   { key: "fuelCapacity", label: "Fuel Capacity" },
 ];
 
+/** Crew cost per member per race (GDD §5: $2,000). */
+export const CREW_COST_PER_MEMBER = 2_000;
+
 /** Sale price multiplier — player receives this fraction of the calculated sale value. */
 export const SALE_PRICE_MULTIPLIER = 0.5;
 

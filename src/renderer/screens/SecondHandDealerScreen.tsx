@@ -68,7 +68,7 @@ export function SecondHandDealerScreen() {
       condition: selected.condition,
       installedUpgrades: selected.installedUpgrades,
     };
-    buyCar(newCar, cost);
+    buyCar(newCar, cost, selectedModel!.name);
     setScreen("garage");
   };
 

@@ -49,7 +49,7 @@ export function CarWorkshopScreen() {
 
   const handleInstall = (packType: UpgradePackType, cost: number) => {
     if (!selectedCar || player.budget < cost) return;
-    installUpgrade(selectedCar.id, packType, cost);
+    installUpgrade(selectedCar.id, packType, cost, selectedModel!.name);
   };
 
   const handleSell = () => {
@@ -57,7 +57,7 @@ export function CarWorkshopScreen() {
     // Sale price is a fraction of the calculated value (which factors age, condition, upgrades, Business skill)
     const fullSalePrice = calculateSalePrice(selectedCar, selectedModel, player.skills.business);
     const salePrice = Math.round(fullSalePrice * SALE_PRICE_MULTIPLIER);
-    sellCar(selectedCar.id, salePrice);
+    sellCar(selectedCar.id, salePrice, selectedModel!.name);
     setSelectedCarId(null);
   };
 

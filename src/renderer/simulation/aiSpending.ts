@@ -9,6 +9,7 @@ import type {
   UsedCarListing,
 } from "../types";
 import { calculateDriverStats, totalDriverStats, calculateAnnualSalary } from "./driverLifecycle";
+import { CREW_COST_PER_MEMBER } from "../shared/dealerData";
 
 // ---------------------------------------------------------------------------
 // Tunable constants
@@ -16,8 +17,6 @@ import { calculateDriverStats, totalDriverStats, calculateAnnualSalary } from ".
 
 /** AI teams always aim to field exactly this many drivers. */
 const AI_TARGET_DRIVER_COUNT = 3;
-/** Crew cost per member per year (matches GDD §5). */
-const CREW_COST_PER_MEMBER = 2_000;
 /** Target crew size AI will work toward when budget permits. */
 const AI_TARGET_CREW_SIZE = 8;
 /** Number of spare parts AI buys per spending iteration. */

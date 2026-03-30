@@ -79,6 +79,7 @@ function makePlayerTeam(id: string): PlayerTeam {
     playerName: "Ivan", logo: null,
     skills: { driver: 5, engineer: 5, business: 5 },
     spareParts: 10, tyreSets: 5,
+    transactions: [],
   };
 }
 
@@ -245,8 +246,8 @@ describe("yearAdvance — AI spending", () => {
     );
 
     const resultPlayer = result.teams.find((t) => t.id === "player1")!;
-    // Budget should be unchanged (player spending not handled here)
-    expect(resultPlayer.budget).toBe(playerTeam.budget);
+    // Budget reduced by annual crew cost (2 members × $2,000 = $4,000)
+    expect(resultPlayer.budget).toBe(playerTeam.budget - playerTeam.crewSize * 2_000);
   });
 });
 

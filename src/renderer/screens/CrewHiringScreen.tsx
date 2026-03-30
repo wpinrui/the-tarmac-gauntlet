@@ -6,9 +6,9 @@ import { estimateFullServicePitDuration } from "../simulation/pitStop";
 import type { PlayerTeam } from "../types";
 import backdropUrl from "../assets/crew-backdrop.jpg";
 import "./DealerShared.scss";
+import { CREW_COST_PER_MEMBER } from "../shared/dealerData";
 import "./CrewHiring.scss";
 
-const CREW_COST_PER_MEMBER = 2_000;
 const MAX_CREW = 16;
 
 
@@ -37,7 +37,7 @@ export function CrewHiringScreen() {
 
   const handleConfirm = () => {
     if (costDelta > player.budget) return;
-    setCrewSize(newSize, Math.max(0, costDelta));
+    setCrewSize(newSize);
     setScreen("garage");
   };
 

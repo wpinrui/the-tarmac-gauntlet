@@ -247,6 +247,7 @@ function createPlayerTeam(
     skills,
     spareParts: 0,
     tyreSets: 0,
+    transactions: [],
   };
 }
 
@@ -345,7 +346,6 @@ export function initializeGame(
     contracts: allContracts,
     teams,
     economyConfig: {
-      prizeSchedule: [], // Built dynamically by buildPrizeSchedule
       tierCosts: [],     // Placeholder — will be defined during economy tuning
       fuelConfig: { costPerLitre: 2 },
       crewCostPerMember: 2_000,

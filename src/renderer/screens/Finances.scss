@@ -1,0 +1,178 @@
+// Finances screen — top-level tab, no backdrop
+
+.finances-root {
+  position: fixed;
+  inset: 0;
+  background: #080d18;
+  color: #d0d8e4;
+  font-family: 'Inter', 'Segoe UI', -apple-system, sans-serif;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #1e3450; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #2a4a68; }
+}
+
+.finances-app {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.finances-main {
+  flex: 1;
+  padding: 24px 28px 28px;
+  display: flex;
+  gap: 18px;
+  overflow: hidden;
+}
+
+// Columns
+.left-col { flex: 1; display: flex; flex-direction: column; gap: 18px; overflow: hidden; }
+.right-col { width: 340px; flex-shrink: 0; display: flex; flex-direction: column; overflow: hidden; }
+
+// Panels
+.panel {
+  border-radius: 10px;
+  border: 1px solid #2a4262;
+  background: rgba(12,18,32,0.78);
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+}
+.panel-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(42,66,98,0.4);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.panel-title {
+  font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 17px;
+  letter-spacing: 2.5px; text-transform: uppercase; color: #8a9cb4;
+}
+.panel-body { padding: 20px; }
+
+// Budget overview
+.balance-row { display: flex; align-items: baseline; gap: 12px; margin-bottom: 24px; }
+.balance-label { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 14px; letter-spacing: 1.5px; text-transform: uppercase; color: #7a96b0; }
+.balance-amount { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 36px; color: #00d4aa; }
+
+.year-summary { display: flex; gap: 12px; }
+.year-card {
+  flex: 1; padding: 14px 16px;
+  border-radius: 8px; border: 1px solid #2a4262;
+  background: rgba(6,10,20,0.4);
+  &.current { border-color: rgba(0,212,170,0.3); background: rgba(0,212,170,0.04); }
+}
+.year-card-year {
+  font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 14px;
+  letter-spacing: 1.5px; text-transform: uppercase; color: #7a96b0;
+  margin-bottom: 10px;
+  .year-card.current & { color: #00d4aa; }
+}
+.year-line {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 3px 0;
+  &.net { border-top: 1px solid rgba(42,66,98,0.4); margin-top: 4px; padding-top: 6px; }
+}
+.year-line-label { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: #5a7a98; }
+.year-line-value {
+  font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 15px; color: #e8ecf4;
+  &.income { color: #00d4aa; }
+  &.expense { color: #e17055; }
+  &.net-pos { color: #00d4aa; }
+  &.net-neg { color: #e17055; }
+}
+.empty-income { font-family: 'Inter', sans-serif; font-weight: 400; font-size: 13px; color: #3a5a78; font-style: italic; }
+
+// Transaction log
+.txn-panel { flex: 1; display: flex; flex-direction: column; }
+.txn-panel .panel-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; padding: 0; }
+
+.txn-filters {
+  display: flex; align-items: center; gap: 4px; padding: 12px 20px; flex-wrap: wrap;
+  border-bottom: 1px solid rgba(42,66,98,0.2);
+}
+.txn-filter-btn {
+  font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 13px;
+  letter-spacing: 0.8px; padding: 4px 10px; border-radius: 4px;
+  border: 1px solid #2a4262; background: transparent; color: #7a96b0;
+  cursor: pointer; transition: all .15s;
+  &:hover { border-color: #3a5a78; color: #a0b8d0; }
+  &.active { border-color: #00d4aa; color: #00d4aa; background: rgba(0,212,170,0.08); }
+}
+.txn-year-select {
+  font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 14px;
+  letter-spacing: 1px; color: #a0b8d0;
+  background: rgba(6,10,20,0.4); border: 1px solid #2a4262;
+  padding: 5px 28px 5px 12px; border-radius: 4px;
+  cursor: pointer; transition: all .15s;
+  -webkit-appearance: none; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237a96b0'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center;
+  &:hover { border-color: #3a5a78; color: #e8ecf4; }
+  option { background: #0c1220; color: #a0b8d0; }
+}
+
+.txn-scroll { flex: 1; overflow-y: auto; }
+
+.txn-row {
+  display: flex; align-items: center; padding: 10px 20px; gap: 12px;
+  border-bottom: 1px solid rgba(42,66,98,0.15);
+}
+.txn-year { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 14px; color: #5a7a98; width: 36px; flex-shrink: 0; }
+.txn-icon { font-size: 16px; width: 24px; text-align: center; flex-shrink: 0; font-style: normal; }
+.txn-icon svg { width: 16px; height: 16px; vertical-align: middle; }
+.txn-desc { font-family: 'Inter', sans-serif; font-weight: 400; font-size: 14px; color: #a0b8d0; flex: 1; }
+.txn-amount {
+  font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 16px;
+  width: 100px; text-align: right; flex-shrink: 0;
+  &.positive { color: #00d4aa; }
+  &.negative { color: #e8ecf4; }
+}
+
+// Prize schedule
+.prize-panel { flex: 1; display: flex; flex-direction: column; }
+.prize-panel .panel-body { flex: 1; overflow: hidden; padding: 0; display: flex; flex-direction: column; }
+.prize-scroll { flex: 1; overflow-y: auto; }
+
+.prize-table { width: 100%; border-collapse: collapse; }
+.prize-table th {
+  font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 13px;
+  letter-spacing: 1.2px; text-transform: uppercase; color: #5a7a98;
+  text-align: left; padding: 8px 16px;
+  border-bottom: 1px solid rgba(42,66,98,0.4);
+  position: sticky; top: 0; background: rgba(12,18,32,0.95); z-index: 1;
+  &:last-child { text-align: right; }
+}
+.prize-table td {
+  font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 14px;
+  color: #a0b8d0; padding: 6px 16px;
+  border-bottom: 1px solid rgba(42,66,98,0.1);
+  &:last-child { text-align: right; font-weight: 600; color: #e8ecf4; }
+}
+.prize-table tr.gold td { color: #d4a840; &:last-child { color: #d4a840; } }
+.prize-table tr.silver td { color: #b0b8c4; &:last-child { color: #b0b8c4; } }
+.prize-table tr.bronze td { color: #c47a3a; &:last-child { color: #c47a3a; } }
+
+.prize-total {
+  padding: 12px 16px;
+  border-top: 1px solid rgba(42,66,98,0.4);
+  display: flex; justify-content: space-between;
+}
+.prize-total-label { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: #5a7a98; }
+.prize-total-value { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 15px; color: #00d4aa; }
+
+.txn-empty {
+  padding: 40px 20px;
+  text-align: center;
+  font-family: 'Oswald', sans-serif;
+  font-size: 16px;
+  letter-spacing: 1.5px;
+  color: #3a5a78;
+}

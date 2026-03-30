@@ -1,5 +1,6 @@
 import type { CarInstance } from "./car";
 import type { Contract } from "./driver";
+import type { TransactionRecord } from "./economy";
 
 // --- Player Skills ---
 
@@ -31,6 +32,7 @@ export interface PlayerTeam extends BaseTeam {
   skills: PlayerSkills;
   spareParts: number;        // Consumable units carried over
   tyreSets: number;          // Tyre sets carried over
+  transactions: TransactionRecord[];
 }
 
 // --- AI Team ---
