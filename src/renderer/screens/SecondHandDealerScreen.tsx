@@ -153,9 +153,14 @@ export function SecondHandDealerScreen() {
 
                 {/* Stats */}
                 <div className="stats-section">
-                  <div className="stats-section-title">Performance</div>
+                  <div className="stats-section-title">
+                    Performance
+                    <span style={{ fontWeight: 400, color: "#4a6a88" }}> vs new</span>
+                  </div>
                   {(["power", "handling", "fuelEfficiency", "tyreDurability", "comfort", "reliability", "fuelCapacity"] as const).map((stat) => {
                     const val = selectedEffective[stat];
+                    const base = selectedModel.baseStats[stat];
+                    const delta = Math.round(val - base);
                     return (
                       <div className="stat-row" key={stat}>
                         <span className="stat-name">{stat.replace(/([A-Z])/g, " $1")}</span>
@@ -163,6 +168,9 @@ export function SecondHandDealerScreen() {
                           <div className="stat-bar-fill" style={{ width: `${val}%` }} />
                         </div>
                         <span className="stat-value">{Math.round(val)}</span>
+                        <span className={`stat-delta ${delta < 0 ? "down" : delta > 0 ? "up" : "neutral"}`}>
+                          {delta < 0 ? `${delta}` : delta > 0 ? `+${delta}` : "\u2014"}
+                        </span>
                       </div>
                     );
                   })}
