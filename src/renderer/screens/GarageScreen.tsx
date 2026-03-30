@@ -237,8 +237,8 @@ export function GarageScreen() {
             </div>
 
             {/* COL 3: NEWS */}
-            <div className="card news-card">
-              <div className="card-title">News</div>
+            <div className="card news-card clickable">
+              <div className="card-title">News <span className="nav-hint">News Room &rsaquo;</span></div>
             </div>
 
           </div>

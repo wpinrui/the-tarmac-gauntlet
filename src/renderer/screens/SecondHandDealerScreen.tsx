@@ -50,6 +50,11 @@ export function SecondHandDealerScreen() {
       )
     : null;
 
+  // Player's current entered car for comparison
+  const enteredCar = player.cars.find((c) => c.id === player.enteredCarId);
+  const enteredModel = enteredCar ? models.find((m) => m.id === enteredCar.modelId) : undefined;
+  const enteredEffective = enteredCar && enteredModel ? calculateEffectiveStats(enteredCar, enteredModel) : null;
+
   const isShitbox = (listing: UsedCarListing) => listing.id.startsWith("used-shitbox-");
 
   const handleBuy = () => {
@@ -155,12 +160,15 @@ export function SecondHandDealerScreen() {
                 <div className="stats-section">
                   <div className="stats-section-title">
                     Performance
-                    <span style={{ fontWeight: 400, color: "#4a6a88" }}> vs new</span>
+                    <span style={{ fontWeight: 400, color: "#4a6a88" }}>
+                      {" "}vs new{enteredModel ? ` · vs your ${enteredModel.name}` : ""}
+                    </span>
                   </div>
                   {(["power", "handling", "fuelEfficiency", "tyreDurability", "comfort", "reliability", "fuelCapacity"] as const).map((stat) => {
                     const val = selectedEffective[stat];
                     const base = selectedModel.baseStats[stat];
-                    const delta = Math.round(val - base);
+                    const vsNew = Math.round(val - base);
+                    const vsCurrent = enteredEffective ? Math.round(val - enteredEffective[stat]) : null;
                     return (
                       <div className="stat-row" key={stat}>
                         <span className="stat-name">{stat.replace(/([A-Z])/g, " $1")}</span>
@@ -168,9 +176,14 @@ export function SecondHandDealerScreen() {
                           <div className="stat-bar-fill" style={{ width: `${val}%` }} />
                         </div>
                         <span className="stat-value">{Math.round(val)}</span>
-                        <span className={`stat-delta ${delta < 0 ? "down" : delta > 0 ? "up" : "neutral"}`}>
-                          {delta < 0 ? `${delta}` : delta > 0 ? `+${delta}` : "\u2014"}
+                        <span className={`stat-delta ${vsNew < 0 ? "down" : vsNew > 0 ? "up" : "neutral"}`}>
+                          {vsNew < 0 ? `${vsNew}` : vsNew > 0 ? `+${vsNew}` : "\u2014"}
                         </span>
+                        {vsCurrent !== null && (
+                          <span className={`stat-delta ${vsCurrent > 0 ? "up" : vsCurrent < 0 ? "down" : "neutral"}`}>
+                            {vsCurrent > 0 ? `+${vsCurrent}` : vsCurrent < 0 ? `${vsCurrent}` : "\u2014"}
+                          </span>
+                        )}
                       </div>
                     );
                   })}
