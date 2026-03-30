@@ -49,13 +49,6 @@ function StatBar({ label, value, max = 100 }: { label: string; value: number; ma
 }
 
 
-const PRE_SEASON_NEWS = [
-  { time: "Pre-season \u00b7 Today", headline: "100 Teams Line Up for Inaugural 24h Tarmac Gauntlet", snippet: "From factory hypercars to junkyard shitboxes \u2014 the full field is confirmed for the first-ever running." },
-  { time: "Pre-season \u00b7 2 days ago", headline: "Prestige Rankings: Apex Motorsport Tops Early Grid Predictions", snippet: "With a $2.8M hypercar and three elite drivers, Apex enters as the clear favourite." },
-  { time: "Pre-season \u00b7 4 days ago", headline: "Rookie Watch: 15 New Faces Join the Driver Pool", snippet: "A fresh crop of 18-year-old talent enters the market. Cheap contracts, unproven pace." },
-  { time: "Pre-season \u00b7 1 week ago", headline: "", snippet: "" },
-  { time: "Pre-season \u00b7 2 weeks ago", headline: "Circuit Revealed: Organisers Unveil the Gauntlet Layout", snippet: "Long straights, tight hairpins, and a fearsome sweeping complex. 48 laps in 24 hours." },
-];
 
 export function GarageScreen() {
   const game = useGameStore((s) => s.game);
@@ -88,13 +81,6 @@ export function GarageScreen() {
 
   const playerCharOvr = player.skills.driver * 5;
   const emptySlots = Math.max(0, 3 - hiredDrivers.length);
-
-  // Personalise news item 4
-  const news = PRE_SEASON_NEWS.map((n, i) =>
-    i === 3
-      ? { ...n, headline: `${player.name} Registers for the Gauntlet`, snippet: `A one-car outfit with no crew and no co-drivers. The ${carModel?.name ?? "starter car"} has seen better days.` }
-      : n,
-  );
 
   return (
     <div
@@ -177,11 +163,11 @@ export function GarageScreen() {
                   </div>
                   {selectedCar && carModel && effectiveStats && (
                     <>
-                      <div className="car-name">
-                        <span className={`class-badge ${carModel.carClass.toLowerCase()}`}>{carModel.carClass}</span>
-                        {carModel.name}
+                      <div className="car-name">{carModel.name}</div>
+                      <div className="car-meta">
+                        <span className={`class-badge ${carModel.carClass.toLowerCase()}`}>Class {carModel.carClass}</span>
+                        {" "}&middot; Age {selectedCar.age} &middot; {upgradeText}
                       </div>
-                      <div className="car-meta">Age {selectedCar.age} &middot; {upgradeText}</div>
                       <div className="stat-bars">
                         <StatBar label="Power" value={effectiveStats.power} />
                         <StatBar label="Handling" value={effectiveStats.handling} />
@@ -250,17 +236,6 @@ export function GarageScreen() {
               ))}
             </div>
 
-            {/* COL 3: NEWS FEED */}
-            <div className="card news-card">
-              <div className="card-title">News</div>
-              {news.map((item, i) => (
-                <div className="news-item" key={i}>
-                  <div className="news-time">{item.time}</div>
-                  <div className="news-headline">{item.headline}</div>
-                  <div className="news-snippet">{item.snippet}</div>
-                </div>
-              ))}
-            </div>
           </div>
 
           {/* Sub-screen nav */}

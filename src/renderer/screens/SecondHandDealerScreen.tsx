@@ -116,11 +116,11 @@ export function SecondHandDealerScreen() {
               <>
                 <div className="detail-header">
                   <div>
-                    <div className="detail-name">
-                      <span className={`class-badge ${selectedModel.carClass.toLowerCase()}`}>{selectedModel.carClass}</span>
-                      {selectedModel.name}
+                    <div className="detail-name">{selectedModel.name}</div>
+                    <div className="detail-meta">
+                      <span className={`class-badge ${selectedModel.carClass.toLowerCase()}`}>Class {selectedModel.carClass}</span>
+                      {" "}&middot; Used &middot; Age {selected.age}
                     </div>
-                    <div className="detail-meta">Used &middot; Age {selected.age}</div>
                   </div>
                   <div className="detail-price-block">
                     <div className="detail-price">${selected.price.toLocaleString()}</div>

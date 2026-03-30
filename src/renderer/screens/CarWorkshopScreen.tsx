@@ -117,12 +117,10 @@ export function CarWorkshopScreen() {
               <>
                 <div className="detail-header">
                   <div>
-                    <div className="detail-name">
-                      <span className={`class-badge ${selectedModel.carClass.toLowerCase()}`}>{selectedModel.carClass}</span>
-                      {selectedModel.name}
-                    </div>
+                    <div className="detail-name">{selectedModel.name}</div>
                     <div className="detail-meta">
-                      Age {selectedCar.age} &middot;{" "}
+                      <span className={`class-badge ${selectedModel.carClass.toLowerCase()}`}>Class {selectedModel.carClass}</span>
+                      {" "}&middot; Age {selectedCar.age} &middot;{" "}
                       {[selectedCar.installedUpgrades.power && "Power", selectedCar.installedUpgrades.handling && "Handling", selectedCar.installedUpgrades.comfort && "Comfort"].filter(Boolean).join(", ") || "No upgrades"}
                     </div>
                   </div>
