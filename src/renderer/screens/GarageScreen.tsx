@@ -25,6 +25,7 @@ const CAR_BACKDROPS: Partial<Record<CarClass, string>> = {
   // A: carBackdropA,
   // F1: carBackdropF1,
 };
+import { ClassBadge } from "../shared/ClassBadge";
 import { SKILL_TOOLTIPS } from "../shared/skillData";
 import "./DealerShared.scss";
 import "./GarageScreen.scss";
@@ -165,7 +166,7 @@ export function GarageScreen() {
                     <>
                       <div className="car-name">{carModel.name}</div>
                       <div className="car-meta">
-                        <span className={`class-badge ${carModel.carClass.toLowerCase()}`}>Class {carModel.carClass}</span>
+                        <ClassBadge carClass={carModel.carClass} />
                         {" "}&middot; Age {selectedCar.age} &middot; {upgradeText}
                       </div>
                       <div className="stat-bars">

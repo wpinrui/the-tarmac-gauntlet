@@ -3,18 +3,14 @@ import { useGameStore } from "../state/store";
 import { calculateEffectiveStats } from "../simulation/effectiveStats";
 import { calculateSalePrice } from "../simulation/carMarket";
 import { TopBar } from "./TopBar";
+import { UPGRADE_DESCS, DISPLAY_STATS, SALE_PRICE_MULTIPLIER } from "../shared/dealerData";
+import { ClassBadge } from "../shared/ClassBadge";
 import type { CarInstance, CarModel, PlayerTeam, UpgradePackType } from "../types";
 import backdropUrl from "../assets/workshop-backdrop.jpg";
 import "./DealerShared.scss";
 
 /** Placeholder: 1 spare part restores this much condition. */
 const CONDITION_PER_PART = 5;
-
-const UPGRADE_DESCS: Record<string, string> = {
-  power: "Unlocks power and fuel efficiency potential",
-  handling: "Unlocks handling and tyre durability potential",
-  comfort: "Unlocks comfort potential",
-};
 
 export function CarWorkshopScreen() {
   const game = useGameStore((s) => s.game);
@@ -37,7 +33,7 @@ export function CarWorkshopScreen() {
   const effectiveStats = selectedCar && selectedModel ? calculateEffectiveStats(selectedCar, selectedModel) : null;
 
   const displaySalePrice = selectedCar && selectedModel
-    ? Math.round(calculateSalePrice(selectedCar, selectedModel, player.skills.business) * 0.5)
+    ? Math.round(calculateSalePrice(selectedCar, selectedModel, player.skills.business) * SALE_PRICE_MULTIPLIER)
     : 0;
 
   const conditionDeficit = selectedCar ? 100 - selectedCar.condition : 0;
@@ -58,9 +54,9 @@ export function CarWorkshopScreen() {
 
   const handleSell = () => {
     if (!selectedCar || !selectedModel) return;
-    // 50% of the calculated sale price (which factors age, condition, upgrades, Business skill)
+    // Sale price is a fraction of the calculated value (which factors age, condition, upgrades, Business skill)
     const fullSalePrice = calculateSalePrice(selectedCar, selectedModel, player.skills.business);
-    const salePrice = Math.round(fullSalePrice * 0.5);
+    const salePrice = Math.round(fullSalePrice * SALE_PRICE_MULTIPLIER);
     sellCar(selectedCar.id, salePrice);
     setSelectedCarId(null);
   };
@@ -101,7 +97,7 @@ export function CarWorkshopScreen() {
                     <div className="car-item-info">
                       <div className="car-item-name">{model?.name ?? car.modelId}</div>
                       <div className="car-item-details">
-                        {model && <span className={`class-badge ${model.carClass.toLowerCase()}`}>Class {model.carClass}</span>}{" "}
+                        {model && <ClassBadge carClass={model.carClass} />}{" "}
                         Age {car.age} &middot; {car.condition}% condition
                       </div>
                     </div>
@@ -125,7 +121,7 @@ export function CarWorkshopScreen() {
                   <div>
                     <div className="detail-name">{selectedModel.name}</div>
                     <div className="detail-meta">
-                      <span className={`class-badge ${selectedModel.carClass.toLowerCase()}`}>Class {selectedModel.carClass}</span>
+                      <ClassBadge carClass={selectedModel.carClass} />
                       {" "}&middot; Age {selectedCar.age} &middot;{" "}
                       {[selectedCar.installedUpgrades.power && "Power", selectedCar.installedUpgrades.handling && "Handling", selectedCar.installedUpgrades.comfort && "Comfort"].filter(Boolean).join(", ") || "No upgrades"}
                     </div>
@@ -167,13 +163,13 @@ export function CarWorkshopScreen() {
                 {/* Stats with potential */}
                 <div className="stats-section">
                   <div className="stats-section-title">Performance</div>
-                  {(["power", "handling", "fuelEfficiency", "tyreDurability", "comfort", "reliability", "fuelCapacity"] as const).map((stat) => {
-                    const current = effectiveStats[stat];
-                    const potential = selectedModel.potentialStats[stat];
-                    const hasPotential = potential > selectedModel.baseStats[stat];
+                  {DISPLAY_STATS.map(({ key, label }) => {
+                    const current = effectiveStats[key];
+                    const potential = selectedModel.potentialStats[key];
+                    const hasPotential = potential > selectedModel.baseStats[key];
                     return (
-                      <div className="stat-row" key={stat}>
-                        <span className="stat-name">{stat.replace(/([A-Z])/g, " $1")}</span>
+                      <div className="stat-row" key={key}>
+                        <span className="stat-name">{label}</span>
                         <div className="stat-bar-track">
                           <div className="stat-bar-fill" style={{ width: `${current}%` }} />
                           {hasPotential && (
@@ -228,7 +224,7 @@ export function CarWorkshopScreen() {
                 </div>
               </>
             ) : (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#5a7a98", fontFamily: "'Oswald', sans-serif", fontSize: 18, letterSpacing: 2 }}>
+              <div className="detail-empty">
                 {cars.length === 0 ? "NO CARS — VISIT A DEALER" : "SELECT A CAR"}
               </div>
             )}

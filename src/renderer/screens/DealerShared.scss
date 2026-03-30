@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
-
 // ---------------------------------------------------------------------------
 // Variables
 // ---------------------------------------------------------------------------
@@ -862,4 +860,19 @@ $class-colors: (
   color: $teal;
   border: 1px solid rgba(0,212,170,0.2);
   flex-shrink: 0;
+}
+
+// ---------------------------------------------------------------------------
+// Empty state placeholder
+// ---------------------------------------------------------------------------
+.detail-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #5a7a98;
+  font-family: 'Oswald', sans-serif;
+  font-size: 18px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
 }

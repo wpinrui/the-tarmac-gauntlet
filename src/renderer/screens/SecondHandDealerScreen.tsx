@@ -2,14 +2,11 @@ import { useState } from "react";
 import { useGameStore } from "../state/store";
 import { TopBar } from "./TopBar";
 import { calculateEffectiveStats } from "../simulation/effectiveStats";
+import { DISPLAY_STATS, SHITBOX_MODEL_ID, nextCarId } from "../shared/dealerData";
+import { ClassBadge } from "../shared/ClassBadge";
 import type { CarInstance, PlayerTeam, UsedCarListing } from "../types";
 import backdropUrl from "../assets/secondhand-backdrop.jpg";
 import "./DealerShared.scss";
-
-let carIdCounter = Date.now() + 100_000;
-function nextCarId(): string {
-  return `car-${++carIdCounter}`;
-}
 
 export function SecondHandDealerScreen() {
   const game = useGameStore((s) => s.game);
@@ -56,7 +53,7 @@ export function SecondHandDealerScreen() {
   const enteredModel = enteredCar ? models.find((m) => m.id === enteredCar.modelId) : undefined;
   const enteredEffective = enteredCar && enteredModel ? calculateEffectiveStats(enteredCar, enteredModel) : null;
 
-  const isShitbox = (listing: UsedCarListing) => listing.id.startsWith("used-shitbox-");
+  const isShitbox = (listing: UsedCarListing) => listing.modelId === SHITBOX_MODEL_ID;
   const canBeg = (listing: UsedCarListing) => isShitbox(listing) && player.cars.length === 0;
 
   const handleBuy = () => {
@@ -108,7 +105,7 @@ export function SecondHandDealerScreen() {
                     <div className="car-item-info">
                       <div className="car-item-name">{model?.name ?? l.modelId}</div>
                       <div className="car-item-details">
-                        {model && <span className={`class-badge ${model.carClass.toLowerCase()}`}>Class {model.carClass}</span>}{" "}
+                        {model && <ClassBadge carClass={model.carClass} />}{" "}
                         Age {l.age} &middot; {l.condition}% &middot; {upgradeCount(l.installedUpgrades)} upgrades
                       </div>
                     </div>
@@ -132,7 +129,7 @@ export function SecondHandDealerScreen() {
                   <div>
                     <div className="detail-name">{selectedModel.name}</div>
                     <div className="detail-meta">
-                      <span className={`class-badge ${selectedModel.carClass.toLowerCase()}`}>Class {selectedModel.carClass}</span>
+                      <ClassBadge carClass={selectedModel.carClass} />
                       {" "}&middot; Used &middot; Age {selected.age}
                     </div>
                   </div>
@@ -180,15 +177,15 @@ export function SecondHandDealerScreen() {
                       </>
                     )}
                   </div>
-                  {(["power", "handling", "fuelEfficiency", "tyreDurability", "comfort", "reliability", "fuelCapacity"] as const).map((stat) => {
-                    const val = selectedEffective[stat];
+                  {DISPLAY_STATS.map(({ key, label }) => {
+                    const val = selectedEffective[key];
                     const ref = compareMode === "new"
-                      ? selectedModel.baseStats[stat]
-                      : enteredEffective ? enteredEffective[stat] : val;
+                      ? selectedModel.baseStats[key]
+                      : enteredEffective ? enteredEffective[key] : val;
                     const delta = Math.round(val - ref);
                     return (
-                      <div className="stat-row" key={stat}>
-                        <span className="stat-name">{stat.replace(/([A-Z])/g, " $1")}</span>
+                      <div className="stat-row" key={key}>
+                        <span className="stat-name">{label}</span>
                         <div className="stat-bar-track">
                           <div className="stat-bar-fill" style={{ width: `${val}%` }} />
                         </div>
@@ -235,9 +232,7 @@ export function SecondHandDealerScreen() {
                 </div>
               </>
             ) : (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#5a7a98", fontFamily: "'Oswald', sans-serif", fontSize: 18, letterSpacing: 2 }}>
-                SELECT A CAR TO VIEW DETAILS
-              </div>
+              <div className="detail-empty">SELECT A CAR TO VIEW DETAILS</div>
             )}
           </div>
         </div>

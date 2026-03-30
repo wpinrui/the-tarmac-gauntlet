@@ -2,32 +2,13 @@ import { useState, useMemo } from "react";
 import { useGameStore } from "../state/store";
 import { calculateEffectiveStats } from "../simulation/effectiveStats";
 import { TopBar } from "./TopBar";
+import { UPGRADE_DESCS, DISPLAY_STATS, nextCarId } from "../shared/dealerData";
+import { ClassBadge } from "../shared/ClassBadge";
 import type { CarModel, CarClass, CarInstance, PlayerTeam } from "../types";
 import backdropUrl from "../assets/newdealer-backdrop.jpg";
 import "./DealerShared.scss";
 
 const CLASS_ORDER: CarClass[] = ["F", "E", "D", "C", "B", "A"];
-
-const UPGRADE_DESCS: Record<string, string> = {
-  power: "Unlocks power and fuel efficiency potential",
-  handling: "Unlocks handling and tyre durability potential",
-  comfort: "Unlocks comfort potential",
-};
-
-const STAT_LABELS: Record<string, string> = {
-  power: "Power",
-  handling: "Handling",
-  fuelEfficiency: "Fuel Efficiency",
-  tyreDurability: "Tyre Durability",
-  comfort: "Comfort",
-  reliability: "Reliability",
-  fuelCapacity: "Fuel Capacity",
-};
-
-let carIdCounter = Date.now();
-function nextCarId(): string {
-  return `car-${++carIdCounter}`;
-}
 
 export function NewCarDealerScreen() {
   const game = useGameStore((s) => s.game);
@@ -110,7 +91,7 @@ export function NewCarDealerScreen() {
                     >
                       <div className="car-item-info">
                         <div className="car-item-name">{m.name}</div>
-                        <span className={`class-badge ${m.carClass.toLowerCase()}`}>Class {m.carClass}</span>
+                        <ClassBadge carClass={m.carClass} />
                       </div>
                       <div className="car-item-price">${m.price.toLocaleString()}</div>
                     </div>
@@ -128,7 +109,7 @@ export function NewCarDealerScreen() {
                   <div>
                     <div className="detail-name">{selected.name}</div>
                     <div className="detail-meta">
-                      <span className={`class-badge ${selected.carClass.toLowerCase()}`}>Class {selected.carClass}</span>
+                      <ClassBadge carClass={selected.carClass} />
                       {" "}&middot; New &middot; Age 0
                     </div>
                   </div>
@@ -146,12 +127,12 @@ export function NewCarDealerScreen() {
                       <span style={{ fontWeight: 400, color: "#4a6a88" }}> vs your {enteredModel.name}</span>
                     )}
                   </div>
-                  {(["power", "handling", "fuelEfficiency", "tyreDurability", "comfort", "reliability", "fuelCapacity"] as const).map((stat) => {
-                    const val = selected.baseStats[stat];
-                    const delta = enteredStats ? Math.round(val - enteredStats[stat]) : null;
+                  {DISPLAY_STATS.map(({ key, label }) => {
+                    const val = selected.baseStats[key];
+                    const delta = enteredStats ? Math.round(val - enteredStats[key]) : null;
                     return (
-                      <div className="stat-row" key={stat}>
-                        <span className="stat-name">{STAT_LABELS[stat]}</span>
+                      <div className="stat-row" key={key}>
+                        <span className="stat-name">{label}</span>
                         <div className="stat-bar-track">
                           <div className="stat-bar-fill" style={{ width: `${val}%` }} />
                         </div>
@@ -203,9 +184,7 @@ export function NewCarDealerScreen() {
                 </div>
               </>
             ) : (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#5a7a98", fontFamily: "'Oswald', sans-serif", fontSize: 18, letterSpacing: 2 }}>
-                SELECT A CAR TO VIEW DETAILS
-              </div>
+              <div className="detail-empty">SELECT A CAR TO VIEW DETAILS</div>
             )}
           </div>
         </div>
