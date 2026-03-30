@@ -66,9 +66,9 @@
 .tab.active { color: #e8ecf4; }
 .tab.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: #00d4aa; }
 .tab-spacer { flex: 1; }
-.tab-budget { display: flex; align-items: center; gap: 8px; padding: 18px 0; user-select: none; }
-.tab-budget .budget-label { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: #7a96b0; }
-.tab-budget .budget-value { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 20px; color: #00d4aa; }
+.tab-money { display: flex; align-items: center; gap: 8px; padding: 18px 0; user-select: none; }
+.tab-money .money-label { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: #7a96b0; }
+.tab-money .money-value { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 20px; color: #00d4aa; }
 
 /* ======== MAIN ======== */
 .garage-main { flex: 1; padding: 24px 28px 28px; display: flex; flex-direction: column; gap: 18px; overflow-y: auto; }
@@ -197,3 +197,13 @@
 .btn-race { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 18px; letter-spacing: 3px; text-transform: uppercase; padding: 16px 44px; border-radius: 8px; border: none; background: #00d4aa; color: #060a14; cursor: pointer; transition: all .2s; }
 .btn-race:hover { background: #00e8bc; box-shadow: 0 0 24px rgba(0,212,170,0.2); }
 .btn-race:disabled { background: #1a2a40; color: #4a6478; cursor: not-allowed; box-shadow: none; }
+
+/* ======== CLASS BADGES ======== */
+.class-badge { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; padding: 2px 10px; border-radius: 8px; border: 1.5px solid; background: transparent; display: inline-block; vertical-align: middle; margin-right: 4px; }
+.class-badge.f { color: #a0785a; border-color: #a0785a; }
+.class-badge.e { color: #5ab8d8; border-color: #5ab8d8; }
+.class-badge.d { color: #d060a0; border-color: #d060a0; }
+.class-badge.c { color: #e0943a; border-color: #e0943a; }
+.class-badge.b { color: #d04040; border-color: #d04040; }
+.class-badge.a { color: #50c878; border-color: #50c878; }
+.class-badge.f1 { color: #ddd; border-color: #888; background: repeating-conic-gradient(#222 0% 25%, #ddd 0% 50%) 50% / 8px 8px; -webkit-background-clip: padding-box; padding: 3px 10px; }

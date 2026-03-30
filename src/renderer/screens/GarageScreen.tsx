@@ -95,9 +95,9 @@ export function GarageScreen() {
           <div className="tab">Standings</div>
           <div className="tab">Scouting Report</div>
           <div className="tab-spacer" />
-          <div className="tab-budget">
-            <span className="budget-label">Budget</span>
-            <span className="budget-value">${player.budget.toLocaleString()}</span>
+          <div className="tab-money">
+            <span className="money-label">Money</span>
+            <span className="money-value">${player.budget.toLocaleString()}</span>
           </div>
         </div>
 
@@ -171,7 +171,10 @@ export function GarageScreen() {
                   </div>
                   {selectedCar && carModel && effectiveStats && (
                     <>
-                      <div className="car-name">{carModel.name}</div>
+                      <div className="car-name">
+                        <span className={`class-badge ${carModel.carClass.toLowerCase()}`}>{carModel.carClass}</span>
+                        {carModel.name}
+                      </div>
                       <div className="car-meta">Age {selectedCar.age} &middot; {upgradeText}</div>
                       <div className="stat-bars">
                         <StatBar label="Power" value={effectiveStats.power} />
