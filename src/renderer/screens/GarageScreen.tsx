@@ -236,6 +236,11 @@ export function GarageScreen() {
               ))}
             </div>
 
+            {/* COL 3: NEWS */}
+            <div className="card news-card">
+              <div className="card-title">News</div>
+            </div>
+
           </div>
 
           {/* Sub-screen nav */}
