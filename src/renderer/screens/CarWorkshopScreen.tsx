@@ -66,6 +66,38 @@ export function CarWorkshopScreen() {
   return (
     <div className="dealer-root" style={{ "--dealer-backdrop": `url(${backdropUrl})` } as React.CSSProperties}>
       <div className="dealer-app">
+        {/* Tab bar */}
+        <div className="tab-bar">
+          <div className="team-identity">
+            <div className="team-logo">
+              <svg viewBox="0 0 48 48"><path d="M24 4L40 12v14c0 12-16 18-16 18S8 38 8 26V12z" /></svg>
+            </div>
+            <span className="team-name">{player.name}</span>
+          </div>
+          <div className="tab active" onClick={() => setScreen("garage")}>Garage</div>
+          <div className="tab">Finances</div>
+          <div className="tab">Race History</div>
+          <div className="tab">Standings</div>
+          <div className="tab">Scouting Report</div>
+          <div className="tab-spacer" />
+          <div className="tab-resource">
+            <i className="fa-solid fa-wrench res-icon" />
+            <span className="res-value">{player.spareParts}</span>
+            <div className="res-tooltip">
+              <div className="res-tooltip-title">Spare Parts</div>
+              <div className="res-tooltip-desc">Fix mechanical issues during races and repair car condition between races.</div>
+            </div>
+          </div>
+          <div className="tab-resource money">
+            <i className="fa-solid fa-sack-dollar res-icon" />
+            <span className="res-value">${player.budget.toLocaleString()}</span>
+            <div className="res-tooltip">
+              <div className="res-tooltip-title">Money</div>
+              <div className="res-tooltip-desc">Your team&apos;s funds. Buy cars, upgrades, spare parts, tyres, and hire drivers and crew.</div>
+            </div>
+          </div>
+        </div>
+
         <div className="breadcrumb">
           <a onClick={() => setScreen("garage")}>&larr; Garage</a>
           <span className="sep">/</span>
@@ -90,11 +122,9 @@ export function CarWorkshopScreen() {
                     onClick={() => { setSelectedCarId(car.id); setRepairParts(0); }}
                   >
                     <div className="car-item-info">
-                      <div className="car-item-name">
-                        {model && <span className={`class-badge ${model.carClass.toLowerCase()}`}>{model.carClass}</span>}
-                        {model?.name ?? car.modelId}
-                      </div>
+                      <div className="car-item-name">{model?.name ?? car.modelId}</div>
                       <div className="car-item-details">
+                        {model && <span className={`class-badge ${model.carClass.toLowerCase()}`}>Class {model.carClass}</span>}{" "}
                         Age {car.age} &middot; {car.condition}% condition
                       </div>
                     </div>

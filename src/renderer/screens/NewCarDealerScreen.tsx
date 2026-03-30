@@ -13,6 +13,16 @@ const UPGRADE_DESCS: Record<string, string> = {
   comfort: "Unlocks comfort potential",
 };
 
+const STAT_LABELS: Record<string, string> = {
+  power: "Power",
+  handling: "Handling",
+  fuelEfficiency: "Fuel Efficiency",
+  tyreDurability: "Tyre Durability",
+  comfort: "Comfort",
+  reliability: "Reliability",
+  fuelCapacity: "Fuel Capacity",
+};
+
 let carIdCounter = Date.now();
 function nextCarId(): string {
   return `car-${++carIdCounter}`;
@@ -32,7 +42,6 @@ export function NewCarDealerScreen() {
   const models = game.carModels.filter((m) => m.carClass !== "F1");
   const filtered = classFilter === "all" ? models : models.filter((m) => m.carClass === classFilter);
 
-  // Group by class
   const grouped = useMemo(() => {
     const groups: { cls: CarClass; cars: CarModel[] }[] = [];
     for (const cls of CLASS_ORDER) {
@@ -44,23 +53,14 @@ export function NewCarDealerScreen() {
 
   const selected = selectedId ? models.find((m) => m.id === selectedId) ?? null : null;
 
-  // Plot armour: if player has no car and can't afford the cheapest, cheapest is still purchasable
+  // Plot armour
   const cheapest = models.reduce((a, b) => (a.price < b.price ? a : b));
   const plotArmourActive = player.cars.length === 0 && player.budget < cheapest.price;
-
-  const canAfford = (price: number) => {
-    if (plotArmourActive) return true; // plot armour
-    return player.budget >= price;
-  };
-
-  const effectiveCost = (price: number) => {
-    if (plotArmourActive) return Math.min(player.budget, price);
-    return price;
-  };
+  const canAfford = (price: number) => plotArmourActive || player.budget >= price;
+  const effectiveCost = (price: number) => plotArmourActive ? Math.min(player.budget, price) : price;
 
   const handleBuy = () => {
     if (!selected) return;
-    const cost = effectiveCost(selected.price);
     const newCar: CarInstance = {
       id: nextCarId(),
       modelId: selected.id,
@@ -68,11 +68,11 @@ export function NewCarDealerScreen() {
       condition: 100,
       installedUpgrades: { power: false, handling: false, comfort: false },
     };
-    buyCar(newCar, cost);
+    buyCar(newCar, effectiveCost(selected.price));
     setScreen("garage");
   };
 
-  // Stat comparison with player's entered car
+  // Stat comparison
   const enteredCar = player.cars.find((c) => c.id === player.enteredCarId);
   const enteredModel = enteredCar ? models.find((m) => m.id === enteredCar.modelId) : undefined;
   const enteredStats = enteredCar && enteredModel ? calculateEffectiveStats(enteredCar, enteredModel) : null;
@@ -80,6 +80,38 @@ export function NewCarDealerScreen() {
   return (
     <div className="dealer-root" style={{ "--dealer-backdrop": `url(${backdropUrl})` } as React.CSSProperties}>
       <div className="dealer-app">
+        {/* Tab bar */}
+        <div className="tab-bar">
+          <div className="team-identity">
+            <div className="team-logo">
+              <svg viewBox="0 0 48 48"><path d="M24 4L40 12v14c0 12-16 18-16 18S8 38 8 26V12z" /></svg>
+            </div>
+            <span className="team-name">{player.name}</span>
+          </div>
+          <div className="tab active" onClick={() => setScreen("garage")}>Garage</div>
+          <div className="tab">Finances</div>
+          <div className="tab">Race History</div>
+          <div className="tab">Standings</div>
+          <div className="tab">Scouting Report</div>
+          <div className="tab-spacer" />
+          <div className="tab-resource">
+            <i className="fa-solid fa-wrench res-icon" />
+            <span className="res-value">{player.spareParts}</span>
+            <div className="res-tooltip">
+              <div className="res-tooltip-title">Spare Parts</div>
+              <div className="res-tooltip-desc">Fix mechanical issues during races and repair car condition between races. Unspent parts carry over each year.</div>
+            </div>
+          </div>
+          <div className="tab-resource money">
+            <i className="fa-solid fa-sack-dollar res-icon" />
+            <span className="res-value">${player.budget.toLocaleString()}</span>
+            <div className="res-tooltip">
+              <div className="res-tooltip-title">Money</div>
+              <div className="res-tooltip-desc">Your team&apos;s funds. Buy cars, upgrades, spare parts, tyres, and hire drivers and crew.</div>
+            </div>
+          </div>
+        </div>
+
         {/* Breadcrumb */}
         <div className="breadcrumb">
           <a onClick={() => setScreen("garage")}>&larr; Garage</a>
@@ -92,12 +124,12 @@ export function NewCarDealerScreen() {
           {/* Left: car list */}
           <div className="car-list">
             <div className="list-header">
-              <div className="list-title">New Cars</div>
+              <div className="list-title">Cars</div>
               <div className="class-filter">
                 <button className={`class-btn ${classFilter === "all" ? "active" : ""}`} onClick={() => setClassFilter("all")}>All</button>
                 {CLASS_ORDER.map((cls) => (
                   <button key={cls} className={`class-btn ${classFilter === cls ? "active" : ""}`} onClick={() => setClassFilter(cls)}>
-                    {cls === "F1" ? "F1" : `Class ${cls}`}
+                    Class {cls}
                   </button>
                 ))}
               </div>
@@ -105,7 +137,6 @@ export function NewCarDealerScreen() {
             <div className="list-scroll">
               {grouped.map(({ cls, cars }) => (
                 <div className="car-list-group" key={cls}>
-                  <div className="group-label">Class {cls}</div>
                   {cars.map((m) => (
                     <div
                       key={m.id}
@@ -113,10 +144,8 @@ export function NewCarDealerScreen() {
                       onClick={() => setSelectedId(m.id)}
                     >
                       <div className="car-item-info">
-                        <div className="car-item-name">
-                          <span className={`class-badge ${m.carClass.toLowerCase()}`}>{m.carClass}</span>
-                          {m.name}
-                        </div>
+                        <div className="car-item-name">{m.name}</div>
+                        <span className={`class-badge ${m.carClass.toLowerCase()}`}>Class {m.carClass}</span>
                       </div>
                       <div className="car-item-price">${m.price.toLocaleString()}</div>
                     </div>
@@ -132,11 +161,11 @@ export function NewCarDealerScreen() {
               <>
                 <div className="detail-header">
                   <div>
-                    <div className="detail-name">
-                      <span className={`class-badge ${selected.carClass.toLowerCase()}`}>{selected.carClass}</span>
-                      {selected.name}
+                    <div className="detail-name">{selected.name}</div>
+                    <div className="detail-meta">
+                      <span className={`class-badge ${selected.carClass.toLowerCase()}`}>Class {selected.carClass}</span>
+                      {" "}&middot; New &middot; Age 0
                     </div>
-                    <div className="detail-meta">New &middot; Age 0 &middot; 100% condition</div>
                   </div>
                   <div className="detail-price-block">
                     <div className="detail-price-label">MSRP</div>
@@ -144,27 +173,40 @@ export function NewCarDealerScreen() {
                   </div>
                 </div>
 
-                {/* Stats */}
+                {/* Stats with delta comparison */}
                 <div className="stats-section">
-                  <div className="stats-section-title">Performance</div>
+                  <div className="stats-section-title">
+                    Performance Stats
+                    {enteredModel && (
+                      <span style={{ fontWeight: 400, color: "#4a6a88" }}> vs your {enteredModel.name}</span>
+                    )}
+                  </div>
                   {(["power", "handling", "fuelEfficiency", "tyreDurability", "comfort", "reliability", "fuelCapacity"] as const).map((stat) => {
                     const val = selected.baseStats[stat];
-                    const delta = enteredStats ? val - enteredStats[stat] : null;
+                    const delta = enteredStats ? Math.round(val - enteredStats[stat]) : null;
                     return (
                       <div className="stat-row" key={stat}>
-                        <span className="stat-name">{stat.replace(/([A-Z])/g, " $1")}</span>
+                        <span className="stat-name">{STAT_LABELS[stat]}</span>
                         <div className="stat-bar-track">
                           <div className="stat-bar-fill" style={{ width: `${val}%` }} />
                         </div>
                         <span className="stat-value">{Math.round(val)}</span>
                         {delta !== null && (
                           <span className={`stat-delta ${delta > 0 ? "up" : delta < 0 ? "down" : "neutral"}`}>
-                            {delta > 0 ? `+${Math.round(delta)}` : delta < 0 ? `${Math.round(delta)}` : "—"}
+                            {delta > 0 ? `+${delta}` : delta < 0 ? `${delta}` : "\u2014"}
                           </span>
                         )}
                       </div>
                     );
                   })}
+                </div>
+
+                {/* Pit stop estimate */}
+                <div className="pit-estimate">
+                  <span className="pit-label">Pit Stop Time</span>
+                  <span className="pit-value">
+                    {selected.baseStats.pitStopTime}<span className="pit-unit">s base</span>
+                  </span>
                 </div>
 
                 {/* Upgrade packs */}
@@ -190,11 +232,7 @@ export function NewCarDealerScreen() {
 
                 {/* Buy */}
                 <div className="buy-row">
-                  <button
-                    className="btn-buy"
-                    disabled={!canAfford(selected.price)}
-                    onClick={handleBuy}
-                  >
+                  <button className="btn-buy" disabled={!canAfford(selected.price)} onClick={handleBuy}>
                     Buy — ${effectiveCost(selected.price).toLocaleString()}
                   </button>
                 </div>
