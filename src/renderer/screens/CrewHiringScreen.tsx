@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useGameStore } from "../state/store";
 import { TopBar } from "./TopBar";
+import { calculateEffectiveStats } from "../simulation/effectiveStats";
 import type { PlayerTeam } from "../types";
 import backdropUrl from "../assets/crew-backdrop.jpg";
 import "./DealerShared.scss";
@@ -8,6 +9,22 @@ import "./CrewHiring.scss";
 
 const CREW_COST_PER_MEMBER = 2_000;
 const MAX_CREW = 16;
+
+// Pit stop constants (from pitStop.ts)
+const REFUEL_BASE_SECONDS = 2.0;
+const REFUEL_SECONDS_PER_LITRE = 0.05;
+const TYRE_CHANGE_SECONDS = 8.0;
+const DRIVER_SWAP_SECONDS = 5.0;
+const SOLO_CREW_MULTIPLIER = 2.5;
+const MAX_ENGINEER_SKILL = 20;
+const MAX_ENGINEER_PIT_REDUCTION = 0.25;
+
+function estimatePitTime(pitStopTimeStat: number, fuelCapacity: number, crewSize: number, engineerSkill: number): number {
+  const taskSeconds = REFUEL_BASE_SECONDS + REFUEL_SECONDS_PER_LITRE * fuelCapacity + TYRE_CHANGE_SECONDS + DRIVER_SWAP_SECONDS;
+  const crewMultiplier = 1 + (1 - crewSize / MAX_CREW) * (SOLO_CREW_MULTIPLIER - 1);
+  const engineerMultiplier = 1 - (engineerSkill / MAX_ENGINEER_SKILL) * MAX_ENGINEER_PIT_REDUCTION;
+  return (pitStopTimeStat + taskSeconds) * crewMultiplier * engineerMultiplier;
+}
 
 export function CrewHiringScreen() {
   const game = useGameStore((s) => s.game);
@@ -21,16 +38,16 @@ export function CrewHiringScreen() {
   const annualCost = newSize * CREW_COST_PER_MEMBER;
   const costDelta = (newSize - player.crewSize) * CREW_COST_PER_MEMBER;
 
-  // Placeholder pit stop time estimates (proper calc will come from simulation)
-  const basePitTime = 60;
-  const crewReduction = (size: number) => size * 2;
-  const engineerReduction = player.skills.engineer * 0.5;
-  const currentPitTime = Math.max(10, basePitTime - crewReduction(player.crewSize) - engineerReduction);
-  const newPitTime = Math.max(10, basePitTime - crewReduction(newSize) - engineerReduction);
-  const maxPitTime = 65;
-
   const enteredCar = player.cars.find((c) => c.id === player.enteredCarId);
   const enteredModel = enteredCar ? game.carModels.find((m) => m.id === enteredCar.modelId) : undefined;
+  const effectiveStats = enteredCar && enteredModel ? calculateEffectiveStats(enteredCar, enteredModel) : null;
+
+  const pitStopTime = effectiveStats?.pitStopTime ?? 0;
+  const fuelCapacity = effectiveStats?.fuelCapacity ?? 0;
+  const currentPitTime = estimatePitTime(pitStopTime, fuelCapacity, player.crewSize, player.skills.engineer);
+  const newPitTime = estimatePitTime(pitStopTime, fuelCapacity, newSize, player.skills.engineer);
+  // Max bar reference: solo (0 crew, 0 skill) pit time
+  const maxPitTime = estimatePitTime(pitStopTime, fuelCapacity, 0, 0);
 
   const handleConfirm = () => {
     if (costDelta > player.budget) return;
@@ -77,20 +94,20 @@ export function CrewHiringScreen() {
             {enteredModel && (
               <div className="pit-preview">
                 <div className="pit-preview-title">Est. Pit Stop Time</div>
-                <div className="pit-note" style={{ marginBottom: 14, marginTop: -8 }}>Full refuel, tyre change, and driver swap</div>
+                <div className="pit-note" style={{ marginBottom: 14, marginTop: -8 }}>Full refuel, tyre change, and driver swap (game time)</div>
                 <div className="pit-bar-container">
                   <span className="pit-bar-label">Current ({player.crewSize})</span>
                   <div className="pit-bar-track">
                     <div className="pit-bar-fill previous" style={{ width: `${(currentPitTime / maxPitTime) * 100}%` }} />
                   </div>
-                  <span className="pit-bar-time">~{Math.round(currentPitTime)} <span className="unit">sec</span></span>
+                  <span className="pit-bar-time">{Math.floor(currentPitTime / 60)}:{String(Math.round(currentPitTime % 60)).padStart(2, "0")}</span>
                 </div>
                 <div className="pit-bar-container">
                   <span className="pit-bar-label">New ({newSize})</span>
                   <div className="pit-bar-track">
                     <div className="pit-bar-fill current" style={{ width: `${(newPitTime / maxPitTime) * 100}%` }} />
                   </div>
-                  <span className="pit-bar-time">~{Math.round(newPitTime)} <span className="unit">sec</span></span>
+                  <span className="pit-bar-time">{Math.floor(newPitTime / 60)}:{String(Math.round(newPitTime % 60)).padStart(2, "0")}</span>
                 </div>
                 <div className="pit-note">
                   Based on Engineer skill ({player.skills.engineer}) and {enteredModel.name}
