@@ -219,7 +219,7 @@ Crash issues (e.g., "front wing damage," "rear impact damage," "bent suspension 
 - **31 car models** across **7 performance classes** (F, E, D, C, B, A, F1)
 - All 100 cars race for **overall position** — classes are not separate races
 - Classes give players **intermediate goals**: finishing top of your class is a milestone even if overall position is mid-pack
-- New car dealer prices range from **$6,500** (Class F) to **$15,000,000** (F1). Second-hand market prices can be much lower — a heavily aged Class F car can cost $750 or less.
+- New car dealer prices range from **$4,500** (Class F) to **$3,000,000** (Class A). F1 is not sold new (see §3: F1 Class Rules). Second-hand prices can be much lower — a heavily aged Class F car can cost under $1,000.
 - The player can own **multiple cars** but enters **one car per race**
 - The player is expected to **win with a Class A car**. The F1 car is an achievement/trophy unlock — outrageously fast but fragile, expensive, and impractical. Reaching it is aspirational, not required.
 
@@ -246,13 +246,13 @@ All prices below are **new car dealer (MSRP)** prices. Second-hand prices are de
 
 | Class | Cars | New Dealer Price Range | Character |
 |-------|------|----------------------|-----------|
-| **F** | 6 | $6,500 – $16,000 | Slow, efficient, reliable. Junkyard shitboxes when aged. |
-| **E** | 5 | $16,500 – $25,000 | Everyday cars. Slightly faster, still forgiving. |
-| **D** | 4 | $26,000 – $35,000 | Sports cars. Faster but less efficient, less comfortable. |
-| **C** | 5 | $39,000 – $115,000 | Performance cars and GTs. Wide price range, diverse trade-offs. |
-| **B** | 5 | $240,000 – $500,000 | Supercars. Very fast, expensive to run, low reliability and comfort. |
-| **A** | 5 | $845,000 – $3,000,000 | Le Mans prototypes. Near-maximum performance. The class you win with. |
-| **F1** | 1 | $15,000,000 | Trophy car. Fastest in the game but catastrophically fragile, thirsty, and uncomfortable. |
+| **F** | 6 | $4,500 – $7,500 | Slow, efficient, reliable. Junkyard shitboxes when aged. |
+| **E** | 5 | $20,000 – $30,000 | Everyday cars. Slightly faster, still forgiving. |
+| **D** | 4 | $70,000 – $85,000 | Sports cars. Faster but less efficient, less comfortable. |
+| **C** | 5 | $190,000 – $280,000 | Performance cars and GTs. Diverse trade-offs. |
+| **B** | 5 | $750,000 – $950,000 | Supercars. Very fast, expensive to run, low reliability and comfort. |
+| **A** | 5 | $2,500,000 – $3,000,000 | Le Mans prototypes. Near-maximum performance. The class you win with. |
+| **F1** | 1 | $15,000,000 | Trophy car. Not sold new — only available used (see F1 Class Rules). |
 
 The full car roster with base stats and upgrade potentials is defined in `car_roster.md`.
 
@@ -282,6 +282,19 @@ Class A cars are already near-maximum performance — the only upgrade path is C
 
 Upgrade packs are a cheaper path to more performance than buying a new car, but each car has a ceiling. Once all available packs are installed, the only way forward is to buy a higher-class car.
 
+### F1 Class Rules
+
+The F1 class has unique handling that differs from every other class. This section is the canonical reference.
+
+- **Not sold new.** F1 cars never appear in the new car dealer.
+- **Rare second-hand appearance.** An F1 car may appear in the second-hand dealer only if **all three conditions** are met:
+  1. The player has **won The 24h Tarmac Gauntlet** at least once (finished P1 in any past race)
+  2. The player's current budget is **≥ $15,000,000** (the F1 MSRP — a wealth gate, even though the used listing price is lower)
+  3. A **20% random roll** succeeds during that year's inventory generation
+- **No AI teams run F1 cars.** The F1 class exists exclusively for the player.
+- **Zero upgrade packs.** The F1 car cannot be improved — it is what it is.
+- **Trophy, not target.** The player is expected to win the race with a Class A car. The F1 car is an achievement unlock for players who have already won and want to experience the ultimate machine — outrageously fast but catastrophically fragile, thirsty, and uncomfortable.
+
 ### Car Age
 
 Every car has an **age** in years. A new car starts at age 0. Age increments by 1 each year and **cannot be reversed**.
@@ -309,19 +322,28 @@ Condition is a **percentage scale** representing the car's current mechanical he
 
 ### Car Market
 
+**Depreciation & pricing:**
+- Used car market value depreciates at **3% per year** of age, with a **price floor of 50% of MSRP** — a car never depreciates below half its new price due to age alone
+- Condition further reduces value: a car at 30% condition is worth significantly less than one at 90%
+- Installed upgrade packs add value (50% of the pack's cost)
+
 **New car dealer:**
-- All 31 car models always available at list price (MSRP)
+- All **30 car models** (Classes F through A) always available at list price (MSRP)
+- F1 is **never sold new** (see §3: F1 Class Rules)
 - Purchased cars: age 0, full condition, no upgrade packs
 
 **Second-hand dealer:**
-- Rotating inventory that changes each year — randomly selected from the full car model pool with randomised age and upgrade state
-- Cheaper than new but carry age-related drawbacks
-- Bargains may appear, creating opportunistic buying decisions
+- Rotating inventory that changes each year:
+  - **1 guaranteed shitbox** — the Neutrino Sago (cheapest Class F car), aged 15–25 years, 30% condition, no upgrades. Always available. This is the economy's entry point.
+  - **2 cars per class** (F through A) — randomly selected models with randomised age (1–10 years), condition (30–90%), and upgrades (33% chance per pack)
+  - **F1 conditional** — an F1 car may appear if the player meets eligibility criteria (see §3: F1 Class Rules)
+- Total inventory: **13–14 listings per year**
+- The Neutrino Sago only appears as the guaranteed shitbox — it is excluded from random Class F generation
 
 **Selling:**
 - The player can sell any car from the garage between races
 - Sale price is influenced by: car model, age, condition, installed upgrades, and the player's Business skill
-- If the player sells all their cars and cannot afford a replacement, plot armour applies (see §7: Plot Armour)
+- If the player sells all their cars and cannot afford a replacement, the beg mechanic applies (see §7: Beg Mechanic)
 
 ---
 
@@ -451,23 +473,29 @@ The initial 15-point allocation defines the early career path:
 
 ### Prize Money
 
-- Distributed to **all cars that complete at least 1 lap**. Cars that complete 0 laps receive nothing.
-- Last place: **~$500**
-- Winner: **~$400,000–$500,000**
-- The complete prize money schedule is **always visible** during race preparation
+Prize money is distributed from a **hardcoded static table** — not a formula. The table has 100 entries, one per finishing position.
+
+- **Total fund: $15,000,000** across all 100 positions
+- **P1: $750,000** · P2: $700,000 · P3: $675,000 · ... · P10: $500,000
+- Mid-pack drops steadily: P50: $50,000 · P75: $5,000
+- **P100: $500**
+- Cars that complete **0 laps receive nothing**. All others are paid by position.
+- The complete prize money schedule is **always visible** to the player in the Finances tab
 - Prize money is the **sole source of income**
 
-### Plot Armour
+### Beg Mechanic
 
-If the player has no car and cannot afford any on the market (new or used), they receive a **free starter shitbox** — a heavily aged Class F car, no upgrades.
+If the player has **no cars** and cannot afford the cheapest listing on the second-hand market, the **guaranteed shitbox** (Neutrino Sago) becomes purchasable for **whatever the player currently has** — even $0. The player pays their entire remaining budget and receives the shitbox.
 
 This applies in **any year**, not just year 1. It is the economy's permanent safety net: the player can never be locked out of racing.
 
-Plot armour covers the **car only**. It does not provide spare parts, tyre sets, fuel money, or any other resources. A player relying on plot armour races with whatever they can afford — potentially zero spare parts, zero tyre sets (no tyre changes all race), and no ability to fix anything.
+The beg mechanic works **silently** — no special UI messaging. The shitbox listing simply becomes affordable. The button reads "Beg" instead of "Buy."
+
+The beg mechanic provides the **car only**. It does not provide spare parts, tyre sets, fuel money, or any other resources. A player who begged races with whatever remains — potentially zero spare parts, zero tyre sets (no tyre changes all race), and no ability to fix anything.
 
 ### Starting Budget
 
-The player begins year 1 with **$1,000** in cash. Plot armour provides the starter car; the $1,000 covers initial spare parts, tyre sets, and fuel.
+The player begins year 1 with **$1,000** in cash and **no car**. Their first action is to visit the second-hand dealer and buy the guaranteed shitbox (a heavily aged Neutrino Sago, typically costing under $1,000). The remaining budget covers initial spare parts, tyre sets, and fuel — barely.
 
 ### Spare Parts
 
@@ -515,10 +543,10 @@ Fuel has a **per-litre monetary cost**.
 
 ### Year 1 Experience
 
-- The player starts with **$1,000** and a free junkyard car (via plot armour)
+- The player starts with **$1,000** and **no car** — they buy the guaranteed shitbox from the second-hand dealer
 - Driving solo (player character only), no hired drivers, no crew
 - The player does their own pit stops (slow, since crew size is 0)
-- The $1,000 must cover spare parts, tyre sets, and fuel — budget is tight
+- After buying the shitbox, remaining budget covers spare parts, tyre sets, and fuel — barely
 - Prize money from a back-of-grid finish is enough to do one small thing: a minor upgrade, a cheap co-driver, some spare parts, or start saving toward a better car
 
 ### Progression Pacing
@@ -537,6 +565,7 @@ Fuel has a **per-litre monetary cost**.
 - All teams are **permanent and persistent** — no teams enter or leave during a career
 - Each AI team has hand-crafted initial conditions: starting budget, car, and driver lineup
 - AI teams field **3 drivers** each
+- **No AI team runs an F1 car** — F1 exists exclusively for the player
 
 ### Simulation
 
@@ -585,6 +614,7 @@ Accessed from the garage dashboard:
 | **Second-Hand Dealer** | Browse rotating used car inventory |
 | **Car Workshop** | Apply upgrade packs and repair car condition |
 | **Driver Market** | Browse available drivers, hire, and manage contracts |
+| **Team Roster** | View current drivers' stats, contracts, and salary details |
 | **Crew Hiring** | Set crew headcount for the upcoming year |
 
 The player can also **sell cars** from the garage.
@@ -743,11 +773,16 @@ The following are explicitly **out of scope for v1** but the design accommodates
 | Contract discount (2yr) | 10% |
 | Contract discount (3yr) | 20% |
 | Contract buyout cost | Remaining salary × 1.5 |
-| Cheapest car (new) | $6,500 (Class F) |
-| Cheapest car (second-hand) | ~$750 (aged Class F) |
-| Most expensive car | $15,000,000 (F1) |
-| Last place prize money | ~$500 |
-| Winner prize money | ~$400,000–$500,000 |
+| Cheapest car (new) | $4,500 (Class F) |
+| Cheapest car (second-hand) | ~$675–$1,050 (guaranteed shitbox) |
+| Most expensive car (new) | $3,000,000 (Class A) |
+| F1 car price | $15,000,000 (MSRP; used market only) |
+| Depreciation rate | 3% per year |
+| Price floor (age) | 50% of MSRP |
+| Used inventory per year | 1 shitbox + 2 per class (F–A) + F1 conditional = 13–14 |
+| Prize money total fund | $15,000,000 |
+| P1 prize money | $750,000 |
+| P100 prize money | $500 |
 | Driver instruction modes | 3 (Push, Normal, Conserve) |
 | Mode change timing | Takes effect next lap |
 | Mode reset | Resets to Normal on every pit stop |
