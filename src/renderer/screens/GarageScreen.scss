@@ -54,21 +54,7 @@
   min-height: 100vh;
 }
 
-/* ======== TAB BAR ======== */
-.tab-bar { display: flex; align-items: stretch; background: rgba(8,12,22,0.85); backdrop-filter: blur(16px); border-bottom: 1px solid #2a4262; padding: 0 28px; flex-shrink: 0; }
-.team-identity { display: flex; align-items: center; gap: 12px; padding: 10px 24px 10px 0; margin-right: 8px; border-right: 1px solid #1e3450; }
-.team-logo-icon { width: 32px; height: 32px; border-radius: 6px; background: rgba(0,212,170,0.1); border: 1px solid rgba(0,212,170,0.25); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.team-logo-icon svg { width: 18px; height: 18px; }
-.team-logo-icon path { fill: #00d4aa; }
-.team-name-label { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 16px; letter-spacing: 1.5px; text-transform: uppercase; color: #e8ecf4; white-space: nowrap; }
-.tab { padding: 18px 24px; font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 17px; letter-spacing: 2.5px; text-transform: uppercase; color: #7a96b0; cursor: pointer; position: relative; transition: color .2s; user-select: none; }
-.tab:hover { color: #a0b8d0; }
-.tab.active { color: #e8ecf4; }
-.tab.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: #00d4aa; }
-.tab-spacer { flex: 1; }
-.tab-money { display: flex; align-items: center; gap: 8px; padding: 18px 0; user-select: none; }
-.tab-money .money-label { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: #7a96b0; }
-.tab-money .money-value { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 20px; color: #00d4aa; }
+/* Tab bar styles are in DealerShared.scss via TopBar component */
 
 /* ======== MAIN ======== */
 .garage-main { flex: 1; padding: 24px 28px 28px; display: flex; flex-direction: column; gap: 18px; overflow-y: auto; }

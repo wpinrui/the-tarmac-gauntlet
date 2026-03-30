@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useGameStore, type Screen } from "../state/store";
+import { TopBar } from "./TopBar";
 import { calculateEffectiveStats } from "../simulation/effectiveStats";
 import { calculateDriverStats, totalDriverStats } from "../simulation/driverLifecycle";
 import type { PlayerTeam, CarInstance, CarModel, Driver } from "../types";
@@ -25,6 +26,7 @@ const CAR_BACKDROPS: Partial<Record<CarClass, string>> = {
   // F1: carBackdropF1,
 };
 import { SKILL_TOOLTIPS } from "../shared/skillData";
+import "./DealerShared.scss";
 import "./GarageScreen.scss";
 
 const PersonIcon = () => (
@@ -103,25 +105,7 @@ export function GarageScreen() {
       } as React.CSSProperties}
     >
       <div className="garage-app">
-        {/* TAB BAR */}
-        <div className="tab-bar">
-          <div className="team-identity">
-            <div className="team-logo-icon">
-              <svg viewBox="0 0 48 48"><path d="M24 4L40 12v14c0 12-16 18-16 18S8 38 8 26V12z" /></svg>
-            </div>
-            <span className="team-name-label">{player.name}</span>
-          </div>
-          <div className="tab active">Garage</div>
-          <div className="tab">Finances</div>
-          <div className="tab">Race History</div>
-          <div className="tab">Standings</div>
-          <div className="tab">Scouting Report</div>
-          <div className="tab-spacer" />
-          <div className="tab-money">
-            <span className="money-label">Money</span>
-            <span className="money-value">${player.budget.toLocaleString()}</span>
-          </div>
-        </div>
+        <TopBar />
 
         {/* MAIN */}
         <div className="garage-main">
