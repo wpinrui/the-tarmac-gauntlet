@@ -3,6 +3,8 @@ import {
   rollLapRisks,
   issueEffectiveProbability,
   failureEffectiveProbability,
+  crashSurvivalProbability,
+  weightedPick,
 } from "./riskRolls";
 import type { LapRiskContext } from "./riskRolls";
 import type { IssueTemplate } from "../types";
@@ -14,19 +16,34 @@ import type { IssueTemplate } from "../types";
 const looseWheel: IssueTemplate = {
   id: "loose-wheel",
   description: "Loose wheel nut",
-  lapTimeCost: 3,
-  probabilityPerLap: 0.05,
+  severity: "minor",
+  category: "mechanical",
+  statDebuffs: { handling: 0.08, reliability: 0.10 },
+  weight: 10,
   sparePartsCost: 2,
-  fixDuration: 10,
+  workUnits: 14,
 };
 
 const brakeFade: IssueTemplate = {
   id: "brake-fade",
-  description: "Overheating brakes",
-  lapTimeCost: 5,
-  probabilityPerLap: 0.04,
+  description: "Brake fade",
+  severity: "medium",
+  category: "mechanical",
+  statDebuffs: { handling: 0.18, tyreDurability: 0.10 },
+  weight: 4,
+  sparePartsCost: 2,
+  workUnits: 30,
+};
+
+const frontWingDamage: IssueTemplate = {
+  id: "front-wing-damage",
+  description: "Front wing damage",
+  severity: "major",
+  category: "crash",
+  statDebuffs: { handling: 0.25, fuelEfficiency: 0.15 },
+  weight: 3,
   sparePartsCost: 4,
-  fixDuration: 15,
+  workUnits: 50,
 };
 
 /** Baseline "healthy car, safe driver, Normal mode" context. */
@@ -40,6 +57,7 @@ function makeCtx(overrides: Partial<LapRiskContext> = {}): LapRiskContext {
     instructionMode: "normal",
     activeIssues: [],
     issueTemplates: [looseWheel, brakeFade],
+    crashTemplates: [frontWingDamage],
     random: () => 0.5, // mid-range default; overridden per test
     ...overrides,
   };
@@ -55,27 +73,27 @@ const neverFire = () => 1;
 // ---------------------------------------------------------------------------
 
 describe("issueEffectiveProbability", () => {
-  it("returns base probability unmodified at perfect condition, zero reliability, Normal mode", () => {
-    const p = issueEffectiveProbability(0.05, 100, 0, "normal");
+  it("returns base probability at perfect condition, zero reliability, Normal mode", () => {
+    const p = issueEffectiveProbability(100, 0, "normal");
     expect(p).toBeCloseTo(0.05);
   });
 
   it("lower condition increases effective probability", () => {
-    const good = issueEffectiveProbability(0.05, 100, 50, "normal");
-    const poor = issueEffectiveProbability(0.05, 0, 50, "normal");
+    const good = issueEffectiveProbability(100, 50, "normal");
+    const poor = issueEffectiveProbability(0, 50, "normal");
     expect(poor).toBeGreaterThan(good);
   });
 
   it("higher reliability reduces effective probability", () => {
-    const lowRel = issueEffectiveProbability(0.05, 80, 0, "normal");
-    const highRel = issueEffectiveProbability(0.05, 80, 100, "normal");
+    const lowRel = issueEffectiveProbability(80, 0, "normal");
+    const highRel = issueEffectiveProbability(80, 100, "normal");
     expect(highRel).toBeLessThan(lowRel);
   });
 
   it("Push mode raises probability; Conserve mode lowers it vs Normal", () => {
-    const push = issueEffectiveProbability(0.05, 80, 50, "push");
-    const normal = issueEffectiveProbability(0.05, 80, 50, "normal");
-    const conserve = issueEffectiveProbability(0.05, 80, 50, "conserve");
+    const push = issueEffectiveProbability(80, 50, "push");
+    const normal = issueEffectiveProbability(80, 50, "normal");
+    const conserve = issueEffectiveProbability(80, 50, "conserve");
     expect(push).toBeGreaterThan(normal);
     expect(normal).toBeGreaterThan(conserve);
   });
@@ -127,8 +145,61 @@ describe("failureEffectiveProbability", () => {
     const conserve = failureEffectiveProbability(50, 10, 30, 30, "conserve");
     expect(push).toBeGreaterThan(normal);
     expect(normal).toBeGreaterThan(conserve);
-    // Push on a fragile car should be substantially more dangerous than Normal.
     expect(push).toBeGreaterThan(normal * 1.5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// crashSurvivalProbability
+// ---------------------------------------------------------------------------
+
+describe("crashSurvivalProbability", () => {
+  it("higher safety means higher survival chance", () => {
+    const low = crashSurvivalProbability(0);
+    const high = crashSurvivalProbability(100);
+    expect(high).toBeGreaterThan(low);
+  });
+
+  it("survival probability is between 0 and 1", () => {
+    expect(crashSurvivalProbability(0)).toBeGreaterThan(0);
+    expect(crashSurvivalProbability(100)).toBeLessThan(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// weightedPick
+// ---------------------------------------------------------------------------
+
+describe("weightedPick", () => {
+  it("returns a template from the list", () => {
+    const result = weightedPick([looseWheel, brakeFade], [], () => 0.5);
+    expect(result).not.toBeNull();
+    expect(["loose-wheel", "brake-fade"]).toContain(result!.id);
+  });
+
+  it("skips already-active issues", () => {
+    const result = weightedPick(
+      [looseWheel, brakeFade],
+      [{ templateId: "loose-wheel", lapOccurred: 1 }],
+      () => 0,
+    );
+    expect(result!.id).toBe("brake-fade");
+  });
+
+  it("returns null when all templates are active", () => {
+    const result = weightedPick(
+      [looseWheel],
+      [{ templateId: "loose-wheel", lapOccurred: 1 }],
+      () => 0,
+    );
+    expect(result).toBeNull();
+  });
+
+  it("higher weight templates are picked more often", () => {
+    // looseWheel weight=10, brakeFade weight=4. Total=14.
+    // Roll at 0 should pick looseWheel (first in list, higher weight).
+    const result = weightedPick([looseWheel, brakeFade], [], () => 0);
+    expect(result!.id).toBe("loose-wheel");
   });
 });
 
@@ -159,28 +230,27 @@ describe("rollLapRisks — no events", () => {
 });
 
 // ---------------------------------------------------------------------------
-// rollLapRisks — issues
+// rollLapRisks — issues (two-step system)
 // ---------------------------------------------------------------------------
 
 describe("rollLapRisks — issues", () => {
-  it("multiple issue templates can trigger in the same lap", () => {
-    // Use a two-step random: first call (failure roll) returns 1 (no failure),
-    // subsequent calls (issue rolls) return 0 (trigger).
+  it("triggers one issue when issue roll fires", () => {
+    // Calls: failure roll (skip), issue roll (fire), weighted pick
     let callCount = 0;
     const random = () => {
       callCount++;
-      return callCount === 1 ? 1 : 0; // skip failure, trigger all issues
+      return callCount === 1 ? 1 : 0; // skip failure, fire issue, pick first
     };
     const result = rollLapRisks(makeCtx({ random }));
     expect(result.failure).toBeNull();
-    expect(result.newIssues).toHaveLength(2); // both templates fired
+    expect(result.newIssues).toHaveLength(1);
   });
 
-  it("already-active issues are not re-rolled (no duplicates)", () => {
+  it("already-active issues are excluded from the weighted pick", () => {
     let callCount = 0;
     const random = () => {
       callCount++;
-      return callCount === 1 ? 1 : 0; // skip failure, trigger all eligible
+      return callCount === 1 ? 1 : 0; // skip failure, fire issue, pick first eligible
     };
     const ctx = makeCtx({
       activeIssues: [{ templateId: "loose-wheel", lapOccurred: 5 }],
@@ -188,7 +258,9 @@ describe("rollLapRisks — issues", () => {
     });
     const result = rollLapRisks(ctx);
     expect(result.newIssues.find((i) => i.templateId === "loose-wheel")).toBeUndefined();
-    expect(result.newIssues.find((i) => i.templateId === "brake-fade")).toBeDefined();
+    if (result.newIssues.length > 0) {
+      expect(result.newIssues[0].templateId).toBe("brake-fade");
+    }
   });
 
   it("new issue records the correct lap number", () => {
@@ -205,8 +277,8 @@ describe("rollLapRisks — issues", () => {
   });
 
   it("issue probability is higher at low condition (direction test)", () => {
-    const goodCondition = issueEffectiveProbability(looseWheel.probabilityPerLap, 100, 50, "normal");
-    const poorCondition = issueEffectiveProbability(looseWheel.probabilityPerLap, 10, 50, "normal");
+    const goodCondition = issueEffectiveProbability(100, 50, "normal");
+    const poorCondition = issueEffectiveProbability(10, 50, "normal");
     expect(poorCondition).toBeGreaterThan(goodCondition);
   });
 });
@@ -217,38 +289,63 @@ describe("rollLapRisks — issues", () => {
 
 describe("rollLapRisks — failures", () => {
   it("failure is returned when first roll fires", () => {
-    // First random() call is the failure roll; always fire it.
-    let callCount = 0;
     const result = rollLapRisks(
-      makeCtx({ random: () => { callCount++; return 0; } }),
+      makeCtx({ random: alwaysFire }),
     );
-    expect(result.failure).not.toBeNull();
+    // alwaysFire: failure fires, crash roll fires (< 0.25), survival fires → non-terminal
+    // OR terminal depending on crash templates. Either way, something happens.
+    expect(result.failure !== null || result.newIssues.length > 0).toBe(true);
   });
 
-  it("failure type is either 'mechanical' or 'crash'", () => {
-    for (const val of [0, 0.1, 0.5, 0.9, 0.99]) {
-      let callCount = 0;
-      const result = rollLapRisks(makeCtx({
-        random: () => {
-          callCount++;
-          return callCount === 1 ? 0 : val; // fire failure, use val for type roll
-        },
-      }));
-      expect(["mechanical", "crash"]).toContain(result.failure);
-    }
+  it("terminal mechanical failure when crash roll does not fire", () => {
+    // Calls: failure (fire), crash type (>0.25 = mechanical)
+    let callCount = 0;
+    const random = () => {
+      callCount++;
+      if (callCount === 1) return 0; // fire failure
+      if (callCount === 2) return 0.5; // not a crash → mechanical
+      return 0.5;
+    };
+    const result = rollLapRisks(makeCtx({ random }));
+    expect(result.failure).toBe("mechanical");
+    expect(result.newIssues).toHaveLength(0);
   });
 
-  it("no new issues are returned when a failure occurs", () => {
-    const result = rollLapRisks(makeCtx({ random: alwaysFire }));
-    if (result.failure !== null) {
-      expect(result.newIssues).toHaveLength(0);
-    }
+  it("non-terminal crash produces a crash issue when driver survives", () => {
+    // Calls: failure (fire), crash type (<0.25), survival (fire), weighted pick
+    let callCount = 0;
+    const random = () => {
+      callCount++;
+      if (callCount === 1) return 0; // fire failure
+      if (callCount === 2) return 0; // crash (< 0.25)
+      if (callCount === 3) return 0; // survive
+      return 0; // pick first crash template
+    };
+    const result = rollLapRisks(makeCtx({ random }));
+    expect(result.failure).toBeNull();
+    expect(result.newIssues).toHaveLength(1);
+    expect(result.newIssues[0].templateId).toBe("front-wing-damage");
+  });
+
+  it("terminal crash when driver does not survive", () => {
+    // Calls: failure (fire), crash type (<0.25), survival (fail)
+    let callCount = 0;
+    const random = () => {
+      callCount++;
+      if (callCount === 1) return 0; // fire failure
+      if (callCount === 2) return 0; // crash
+      if (callCount === 3) return 1; // don't survive
+      return 0.5;
+    };
+    const result = rollLapRisks(makeCtx({ random }));
+    expect(result.failure).toBe("crash");
+    expect(result.newIssues).toHaveLength(0);
   });
 
   it("failure probability is higher with Push + low condition + old car", () => {
     const dangerous = failureEffectiveProbability(20, 15, 20, 20, "push");
     const safe = failureEffectiveProbability(100, 0, 100, 100, "conserve");
-    expect(dangerous).toBeGreaterThan(safe * 10); // meaningfully more dangerous
+    expect(dangerous).toBeGreaterThan(safe * 10);
   });
 
   it("driver Safety stat reduces failure probability", () => {

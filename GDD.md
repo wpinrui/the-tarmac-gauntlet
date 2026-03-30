@@ -111,9 +111,11 @@ Configuration can be adjusted up until the car enters the pit. Once the stop beg
 | Factor | Effect |
 |--------|--------|
 | Car's Pit Stop Time stat | Base duration (lower = faster) |
-| Number of tasks | Each task (refuel, tyre change, driver swap) adds time |
+| Tasks performed | Each task (refuel, tyre change, driver swap, issue fixes) adds time |
 | Crew size | More crew = faster. 0 crew = player character does everything solo (very slow) |
 | Player's Engineer skill | Reduces total pit duration |
+
+Issue repairs add time based on their **work units** — a labour measure that scales with crew size and Engineer skill just like other pit tasks. Minor issues are quick to fix; major issues and crash damage take much longer. Multiple fixes in a single stop stack additively.
 
 A typical race involves **8–12 pit stops**.
 
@@ -121,28 +123,71 @@ The player is the **team strategist at all times** — they make all pit stop an
 
 ### Issues & Failures
 
-**Issues** are mechanical problems that occur randomly during the race and can be fixed in the pit.
+#### Issues
+
+Issues are mechanical problems that occur randomly during the race. They degrade car performance until fixed in the pit.
+
+**37 issue types** span 11 mechanical systems (engine, brakes, suspension, cooling, etc.) plus crash damage, across three severity tiers:
+
+| Severity | Count | Debuff Strength | Spare Parts | Work Units | Relative Frequency |
+|----------|-------|----------------|-------------|------------|-------------------|
+| Minor | 16 | Small (4–12%) | 1 | 8–20 | Common |
+| Medium | 7 | Moderate (12–20%) | 2–3 | 28–40 | Uncommon |
+| Major | 10 | Severe (25–35%) | 4–5 | 45–60 | Rare |
 
 Each issue type has:
 
 | Property | Description |
 |----------|-------------|
-| Description | What went wrong (e.g., "loose wheel nut," "overheating brakes") |
-| Lap time cost | Per-lap time penalty while the issue is unresolved |
-| Probability per lap | Base chance of occurring, modified by car condition, car Reliability stat, and instruction mode |
+| Description | What went wrong (e.g., "engine misfire," "cracked exhaust manifold") |
+| Stat debuffs | Percentage reductions to one or more car stats (e.g., −15% Power, −10% Handling) |
+| Weight | Relative likelihood of being drawn when an issue occurs (higher = more common) |
 | Spare parts cost | Number of spare parts consumed to fix (see §7: Spare Parts) |
-| Fix duration | Time added to a pit stop to repair it |
+| Work units | Labour required to fix — converted to pit time by crew size and Engineer skill |
 
-Minor issues are relatively common; major issues are rare. When an issue occurs, the player decides: pit to fix it (if they have enough spare parts), or keep racing with the lap time penalty. Fixing is **always optional** — the player is never forced to spend parts. If the player lacks sufficient spare parts, the issue simply cannot be fixed.
+**Stat debuffs replace flat lap time penalties.** An issue like "engine misfire" doesn't add a fixed number of seconds per lap — it reduces the car's effective Power stat by a percentage, which flows through the lap time formula naturally. This means issues interact with the car's existing stats: the same issue on a powerful car costs more raw pace than on a slow one.
 
-**Failures** are race-ending events:
+**Multiple issues stack.** Debuffs to the same stat are summed, then applied multiplicatively: `effective_stat = base_stat × (1 − total_debuff)`. A car with a 10% Power debuff from one issue and a 20% Power debuff from another runs at 70% effective Power.
 
-- Terminal mechanical failure (e.g., blown engine)
-- Terminal crash
-- Much rarer than issues
-- Probability influenced by: car condition, car age, car Reliability stat, driver Safety stat, and instruction mode (Push elevates probability; Conserve reduces it)
+**Fixing is always optional.** The player is never forced to spend parts. If the player lacks sufficient spare parts, the issue simply cannot be fixed — the car continues with reduced stats.
 
-A failure stops the car permanently. The team still receives prize money based on total laps completed up to that point.
+#### Issue Probability (Two-Step System)
+
+Issues use a **two-step probability system** each lap:
+
+**Step 1 — Base roll:** A single roll determines whether any issue occurs this lap. The base probability is modified by:
+- **Car condition** — lower condition significantly increases risk
+- **Car Reliability stat** — higher Reliability reduces risk
+- **Instruction mode** — Push increases risk; Conserve reduces it
+
+**Step 2 — Weighted pick:** If the base roll succeeds, a weighted draw selects which issue occurs from the full catalogue. Higher-weight issues (minor problems) are drawn far more often than low-weight issues (major problems). Issues already active on the car are excluded from the draw — the same issue cannot occur twice simultaneously.
+
+This two-step system means the *frequency* of issues is governed by car state and driving mode, while the *severity distribution* is governed by the catalogue weights.
+
+#### Failures
+
+Failures are checked independently from issues each lap. The base failure probability is much lower than issues but is more strongly affected by car condition and age.
+
+Failure probability is influenced by: car condition (strongest factor), car age, car Reliability stat, driver Safety stat, and instruction mode (Push doubles failure risk; Conserve reduces it by 40%).
+
+When a failure occurs, it is either a **mechanical failure** (75%) or a **crash** (25%):
+
+**Terminal mechanical failure** (e.g., blown engine) — the car stops permanently. The team still receives prize money based on total laps completed.
+
+**Crash** — the driver's **Safety stat** determines whether they survive:
+- A base survival chance is boosted by higher Safety — a high-Safety driver survives far more often than a low-Safety one
+- **Survived crash:** The car is not retired. Instead, a **crash issue** is spawned (e.g., "front wing damage," "bent suspension arm") — a severe stat debuff that can be fixed in the pit like any other issue. The car continues racing, damaged but alive.
+- **Terminal crash:** The driver did not survive the crash. The car is retired permanently.
+
+Non-terminal crashes create dramatic moments: the player's car spins, picks up heavy damage, but limps back to the pits for emergency repairs — if they have the spare parts and can afford the pit time.
+
+#### Crash Issues
+
+| Count | Debuff Strength | Spare Parts | Work Units | Frequency |
+|-------|----------------|-------------|------------|-----------|
+| 4 | Severe (10–35%) | 3–5 | 45–60 | Only from survived crashes |
+
+Crash issues (e.g., "front wing damage," "rear impact damage," "bent suspension arm") behave identically to mechanical issues once spawned — fixable in the pit, stat debuffs stack with other active issues, optional to repair.
 
 ### Race Results
 
@@ -430,7 +475,7 @@ The player begins year 1 with **$1,000** in cash. Plot armour provides the start
 
 - Purchased between races with money. **Business skill** reduces the cost.
 - Consumed by two systems:
-  - **In-race issue fixes** — each issue has a spare parts cost. If the player doesn't have enough parts, the issue cannot be fixed; they endure the lap time penalty instead.
+  - **In-race issue fixes** — each issue has a spare parts cost (1 for minor, 2–5 for medium/major/crash). If the player doesn't have enough parts, the issue cannot be fixed; they endure the stat debuffs instead.
   - **Between-race condition repair** — restoring car condition costs spare parts, scaled by the condition deficit and the car's tier (cheap cars cost fewer parts, expensive cars cost more). **Business skill** reduces the parts required.
 - Fixing and repairing are **always optional** — the player is never forced to spend parts.
 - Spare parts are carried into the race and depleted as issues are fixed. Unspent parts carry over to the next year.
