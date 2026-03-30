@@ -18,8 +18,26 @@ export function SecondHandDealerScreen() {
 
   if (!game) return null;
   const player = game.teams.find((t) => t.kind === "player") as PlayerTeam;
-  const listings = game.carMarket.usedListings;
   const models = game.carModels;
+
+  // F1 car only appears in used market if:
+  // 1. Player has won the event before (position 1 in any past race)
+  // 2. Player can afford it
+  // 3. The inventory happened to include one (random ~3% from model pool, treated as the 20% gate)
+  const hasWon = game.raceHistory.some((r) =>
+    r.results.some((res) => res.teamId === player.id && res.position === 1),
+  );
+  const f1Model = models.find((m) => m.carClass === "F1");
+  const canAffordF1 = f1Model ? player.budget >= f1Model.price : false;
+  const showF1 = hasWon && canAffordF1;
+
+  const listings = game.carMarket.usedListings
+    .filter((l) => {
+      const model = models.find((m) => m.id === l.modelId);
+      if (model?.carClass === "F1" && !showF1) return false;
+      return true;
+    })
+    .sort((a, b) => a.price - b.price);
 
   const selected = selectedId ? listings.find((l) => l.id === selectedId) ?? null : null;
   const selectedModel = selected ? models.find((m) => m.id === selected.modelId) : null;

@@ -14,7 +14,7 @@ import type {
 import { calculateDriverStats, calculateMarketValue, calculateAnnualSalary } from "./driverLifecycle";
 import { CAR_MODELS } from "./carModels";
 import { AI_TEAM_ROSTER } from "./aiTeamNames";
-import { getNewCarListings, generateUsedInventory } from "./carMarket";
+import { getNewCarListings, generateUsedInventoryByClass } from "./carMarket";
 
 // ---------------------------------------------------------------------------
 // Tunable constants
@@ -322,7 +322,7 @@ export function initializeGame(
   // 5. Car market
   const carModels = CAR_MODELS;
   const newListings = getNewCarListings(carModels);
-  const usedListings = generateUsedInventory(carModels, 20, random);
+  const usedListings = generateUsedInventoryByClass(carModels, false, random);
 
   return {
     phase: "preRace",
