@@ -17,6 +17,7 @@ export function SecondHandDealerScreen() {
   const buyCar = useGameStore((s) => s.buyCar);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [compareMode, setCompareMode] = useState<"new" | "current">("new");
 
   if (!game) return null;
   const player = game.teams.find((t) => t.kind === "player") as PlayerTeam;
@@ -159,16 +160,31 @@ export function SecondHandDealerScreen() {
                 {/* Stats */}
                 <div className="stats-section">
                   <div className="stats-section-title">
-                    Performance
-                    <span style={{ fontWeight: 400, color: "#4a6a88" }}>
-                      {" "}vs new{enteredModel ? ` · vs your ${enteredModel.name}` : ""}
+                    Performance{" "}
+                    <span
+                      onClick={() => setCompareMode("new")}
+                      style={{ fontWeight: 400, color: compareMode === "new" ? "#e8ecf4" : "#4a6a88", cursor: "pointer", transition: "color .15s" }}
+                    >
+                      vs new
                     </span>
+                    {enteredModel && (
+                      <>
+                        {" "}&middot;{" "}
+                        <span
+                          onClick={() => setCompareMode("current")}
+                          style={{ fontWeight: 400, color: compareMode === "current" ? "#e8ecf4" : "#4a6a88", cursor: "pointer", transition: "color .15s" }}
+                        >
+                          vs your {enteredModel.name}
+                        </span>
+                      </>
+                    )}
                   </div>
                   {(["power", "handling", "fuelEfficiency", "tyreDurability", "comfort", "reliability", "fuelCapacity"] as const).map((stat) => {
                     const val = selectedEffective[stat];
-                    const base = selectedModel.baseStats[stat];
-                    const vsNew = Math.round(val - base);
-                    const vsCurrent = enteredEffective ? Math.round(val - enteredEffective[stat]) : null;
+                    const ref = compareMode === "new"
+                      ? selectedModel.baseStats[stat]
+                      : enteredEffective ? enteredEffective[stat] : val;
+                    const delta = Math.round(val - ref);
                     return (
                       <div className="stat-row" key={stat}>
                         <span className="stat-name">{stat.replace(/([A-Z])/g, " $1")}</span>
@@ -176,14 +192,9 @@ export function SecondHandDealerScreen() {
                           <div className="stat-bar-fill" style={{ width: `${val}%` }} />
                         </div>
                         <span className="stat-value">{Math.round(val)}</span>
-                        <span className={`stat-delta ${vsNew < 0 ? "down" : vsNew > 0 ? "up" : "neutral"}`}>
-                          {vsNew < 0 ? `${vsNew}` : vsNew > 0 ? `+${vsNew}` : "\u2014"}
+                        <span className={`stat-delta ${delta < 0 ? "down" : delta > 0 ? "up" : "neutral"}`}>
+                          {delta < 0 ? `${delta}` : delta > 0 ? `+${delta}` : "\u2014"}
                         </span>
-                        {vsCurrent !== null && (
-                          <span className={`stat-delta ${vsCurrent > 0 ? "up" : vsCurrent < 0 ? "down" : "neutral"}`}>
-                            {vsCurrent > 0 ? `+${vsCurrent}` : vsCurrent < 0 ? `${vsCurrent}` : "\u2014"}
-                          </span>
-                        )}
                       </div>
                     );
                   })}
