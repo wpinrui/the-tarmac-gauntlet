@@ -42,9 +42,13 @@ export function SecondHandDealerScreen() {
   const selected = selectedId ? listings.find((l) => l.id === selectedId) ?? null : null;
   const selectedModel = selected ? models.find((m) => m.id === selected.modelId) : null;
 
+  const isShitbox = (listing: UsedCarListing) => listing.id.startsWith("used-shitbox-");
+
   const handleBuy = () => {
     if (!selected || !selectedModel) return;
-    if (player.budget < selected.price) return;
+    const shitbox = isShitbox(selected);
+    if (!shitbox && player.budget < selected.price) return;
+    const cost = shitbox ? Math.min(player.budget, selected.price) : selected.price;
     const newCar: CarInstance = {
       id: nextCarId(),
       modelId: selected.modelId,
@@ -52,7 +56,7 @@ export function SecondHandDealerScreen() {
       condition: selected.condition,
       installedUpgrades: selected.installedUpgrades,
     };
-    buyCar(newCar, selected.price);
+    buyCar(newCar, cost);
     setScreen("garage");
   };
 
@@ -210,7 +214,7 @@ export function SecondHandDealerScreen() {
                 <div className="buy-row">
                   <button
                     className="btn-buy"
-                    disabled={player.budget < selected.price}
+                    disabled={!isShitbox(selected) && player.budget < selected.price}
                     onClick={handleBuy}
                   >
                     Buy — ${selected.price.toLocaleString()}
