@@ -126,7 +126,7 @@ export function GarageScreen() {
                   <div className="chip-label">Crew Size</div>
                   <div className="chip-value">{player.crewSize} <span className="unit">/ 16</span></div>
                 </div>
-                <button className="btn-chip">Hire</button>
+                <button className="btn-chip" onClick={() => setScreen("crewHiring")}>Hire</button>
               </div>
             </div>
             <div className="stat-chip">
@@ -136,7 +136,7 @@ export function GarageScreen() {
                   <div className="chip-label">Drivers</div>
                   <div className="chip-value">{1 + hiredDrivers.length} <span className="unit">/ 4</span></div>
                 </div>
-                <button className="btn-chip">Recruit</button>
+                <button className="btn-chip" onClick={() => setScreen("driverMarket")}>Recruit</button>
               </div>
             </div>
           </div>
