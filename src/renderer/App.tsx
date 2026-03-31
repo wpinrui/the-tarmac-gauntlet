@@ -9,6 +9,8 @@ import { DriverMarketScreen } from "./screens/DriverMarketScreen";
 import { TeamRosterScreen } from "./screens/TeamRosterScreen";
 import { CrewHiringScreen } from "./screens/CrewHiringScreen";
 import { FinancesScreen } from "./screens/FinancesScreen";
+import { PostRaceSummaryScreen } from "./screens/PostRaceSummaryScreen";
+import { RaceHistoryScreen } from "./screens/RaceHistoryScreen";
 import { initializeGame } from "./simulation/gameInit";
 
 export function App() {
@@ -33,6 +35,11 @@ export function App() {
     return <NewGameScreen onStart={handleNewGame} />;
   }
 
+  // Post-race phase overrides screen routing
+  if (game.phase === "postRace") {
+    return <PostRaceSummaryScreen />;
+  }
+
   switch (screen) {
     case "newCarDealer":
       return <NewCarDealerScreen />;
@@ -48,6 +55,8 @@ export function App() {
       return <CrewHiringScreen />;
     case "finances":
       return <FinancesScreen />;
+    case "raceHistory":
+      return <RaceHistoryScreen />;
     case "garage":
     default:
       return <GarageScreen />;

@@ -1,0 +1,51 @@
+.racehistory-root {
+  position: fixed; inset: 0; background: #080d18; color: #d0d8e4;
+  font-family: 'Inter', 'Segoe UI', -apple-system, sans-serif;
+  overflow: hidden; display: flex; flex-direction: column;
+  *, *::before, *::after { box-sizing: border-box; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #1e3450; border-radius: 3px; }
+}
+
+.racehistory-app { display: flex; flex-direction: column; height: 100vh; }
+.racehistory-main { flex: 1; overflow-y: auto; padding: 24px 28px 28px; display: flex; flex-direction: column; gap: 18px; }
+
+.no-history { display: flex; align-items: center; justify-content: center; height: 100%; font-family: 'Oswald', sans-serif; font-size: 20px; letter-spacing: 2px; color: #3a5a78; }
+
+// Year selector
+.year-selector { display: flex; gap: 6px; flex-wrap: wrap; }
+.year-btn {
+  font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 15px; letter-spacing: 1.5px; text-transform: uppercase;
+  padding: 8px 18px; border-radius: 6px; border: 1px solid #2a4262; background: transparent; color: #7a96b0; cursor: pointer; transition: all .15s;
+  &:hover { border-color: #3a5a78; color: #a0b8d0; }
+  &.active { border-color: #00d4aa; color: #00d4aa; background: rgba(0,212,170,0.08); }
+  &.dimmed { opacity: 0.5; }
+}
+
+// Player summary bar
+.player-summary-bar {
+  display: flex; align-items: center; gap: 16px; padding: 12px 20px;
+  border-radius: 8px; border: 1px solid rgba(0,212,170,0.2); background: rgba(0,212,170,0.04);
+}
+.psb-item {
+  font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 16px; letter-spacing: 1px; color: #a0b8d0;
+  strong { font-weight: 700; color: #00d4aa; font-size: 20px; }
+}
+
+// Two col
+.history-two-col { display: flex; gap: 18px; flex: 1; min-height: 0; }
+
+// Results, panels, events in RaceShared.scss
+
+// Right column
+.right-col { width: 420px; flex-shrink: 0; display: flex; flex-direction: column; gap: 18px; }
+
+// Chart
+.chart-panel { flex: 1; }
+.chart-body { flex: 1; padding: 16px; display: flex; align-items: center; justify-content: center; }
+.lap-chart-svg { width: 100%; height: 100%; }
+.chart-empty { font-family: 'Inter', sans-serif; font-weight: 400; font-size: 14px; color: #3a5a78; font-style: italic; text-align: center; }
+
+// Events feed styles in RaceShared.scss
+.events-panel { flex: 1; }

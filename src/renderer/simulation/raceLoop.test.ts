@@ -55,6 +55,7 @@ const safeDriver: RaceDriver = {
 function makeEntry(overrides: Partial<CarEntry> = {}): CarEntry {
   return {
     carId: "car-1",
+    teamId: "team-1",
     instance: { ...baseInstance },
     model: testModel,
     drivers: [safeDriver],

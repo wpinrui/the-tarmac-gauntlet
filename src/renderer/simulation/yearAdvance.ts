@@ -2,6 +2,7 @@ import type {
   CarModel,
   Contract,
   Driver,
+  RaceHistoryEntry,
   Team,
   AITeam,
   PlayerTeam,
@@ -32,9 +33,14 @@ export interface YearAdvanceInput {
   playerHasWon?: boolean;
   /** Current game year (for transaction logging). */
   currentYear?: number;
+  /** Race history to trim (rolling window). */
+  raceHistory?: RaceHistoryEntry[];
   /** Generates unique IDs for newly purchased car instances. Must produce distinct values. */
   newCarId: () => string;
 }
+
+/** Number of years of rich race data to keep. Older entries lose per-lap detail. */
+export const RACE_HISTORY_WINDOW = 3;
 
 export interface YearAdvanceResult {
   /** Updated driver pool: aged survivors + 15 new rookies. */
@@ -47,6 +53,8 @@ export interface YearAdvanceResult {
   usedListings: UsedCarListing[];
   /** IDs of drivers retired this year. */
   retiredDriverIds: string[];
+  /** Trimmed race history (rich data stripped beyond window). */
+  raceHistory: RaceHistoryEntry[];
 }
 
 // ---------------------------------------------------------------------------
@@ -143,11 +151,22 @@ export function advanceYear(
     return result.updatedTeam;
   });
 
+  // 7. Trim race history rolling window
+  const trimmedHistory = (input.raceHistory ?? []).map((entry) => {
+    if (currentYear - entry.year >= RACE_HISTORY_WINDOW) {
+      // Strip rich data, keep results + fastestLap only
+      const { lapSnapshots, positionHistory, events, stints, modeCounters, ...slim } = entry;
+      return slim;
+    }
+    return entry;
+  });
+
   return {
     drivers: driverResult.drivers,
     contracts: activeContracts,
     teams: finalTeams,
     usedListings,
     retiredDriverIds: driverResult.retiredIds,
+    raceHistory: trimmedHistory,
   };
 }
