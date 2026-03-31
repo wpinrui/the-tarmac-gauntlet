@@ -24,7 +24,8 @@ export type Screen =
   | "driverMarket"
   | "teamRoster"
   | "crewHiring"
-  | "finances";
+  | "finances"
+  | "raceHistory";
 
 // ---------------------------------------------------------------------------
 // Store interface
