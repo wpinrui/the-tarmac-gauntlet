@@ -1,22 +1,9 @@
 import { useGameStore } from "../state/store";
-import type { PlayerTeam, RaceHistoryEntry, RaceEvent } from "../types";
+import type { PlayerTeam, RaceHistoryEntry } from "../types";
 import { ClassBadge } from "../shared/ClassBadge";
+import { ordinal, EVENT_ICONS } from "../shared/raceDisplay";
+import "./RaceShared.scss";
 import "./PostRaceSummary.scss";
-
-function ordinal(n: number): string {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return n + (s[(v - 20) % 10] || s[v] || s[0]);
-}
-
-const EVENT_ICONS: Record<string, { icon: string; color: string }> = {
-  retirement: { icon: "fa-solid fa-circle-xmark", color: "#e17055" },
-  issue: { icon: "fa-solid fa-bolt", color: "#e0943a" },
-  pitStop: { icon: "fa-solid fa-arrows-rotate", color: "#5ab8d8" },
-  fastestLap: { icon: "fa-solid fa-stopwatch", color: "#00d4aa" },
-  classLeadChange: { icon: "fa-solid fa-trophy", color: "#d4a840" },
-  lapped: { icon: "fa-solid fa-circle-down", color: "#7a96b0" },
-};
 
 export function PostRaceSummaryScreen() {
   const game = useGameStore((s) => s.game);

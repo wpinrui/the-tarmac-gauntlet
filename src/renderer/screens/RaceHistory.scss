@@ -36,28 +36,10 @@
 // Two col
 .history-two-col { display: flex; gap: 18px; flex: 1; min-height: 0; }
 
-// Results (same as post-race — reuse)
-.results-col { flex: 1; }
-.results-scroll { flex: 1; overflow-y: auto; }
-.results-table { width: 100%; border-collapse: collapse; }
-.results-table th {
-  font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 12px; letter-spacing: 1.2px; text-transform: uppercase; color: #5a7a98;
-  text-align: left; padding: 8px 12px; border-bottom: 1px solid rgba(42,66,98,0.4); position: sticky; top: 0; background: rgba(12,18,32,0.98); z-index: 1;
-}
-.results-table td { font-family: 'Inter', sans-serif; font-weight: 400; font-size: 13px; color: #a0b8d0; padding: 6px 12px; border-bottom: 1px solid rgba(42,66,98,0.1); }
-.results-table tr.player-row td { color: #00d4aa; font-weight: 600; }
-.results-table tr.retired-row td { color: #e17055; }
-.results-table tr.gold td:first-child { color: #d4a840; }
-.results-table tr.silver td:first-child { color: #b0b8c4; }
-.results-table tr.bronze td:first-child { color: #c47a3a; }
+// Results, panels, events in RaceShared.scss
 
 // Right column
 .right-col { width: 420px; flex-shrink: 0; display: flex; flex-direction: column; gap: 18px; }
-
-// Panels
-.panel { border-radius: 10px; border: 1px solid #2a4262; background: rgba(12,18,32,0.78); backdrop-filter: blur(10px); display: flex; flex-direction: column; overflow: hidden; }
-.panel-header { padding: 14px 20px; border-bottom: 1px solid rgba(42,66,98,0.4); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-.panel-title { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 17px; letter-spacing: 2.5px; text-transform: uppercase; color: #8a9cb4; }
 
 // Chart
 .chart-panel { flex: 1; }
@@ -65,11 +47,5 @@
 .lap-chart-svg { width: 100%; height: 100%; }
 .chart-empty { font-family: 'Inter', sans-serif; font-weight: 400; font-size: 14px; color: #3a5a78; font-style: italic; text-align: center; }
 
-// Events (same as post-race)
+// Events feed styles in RaceShared.scss
 .events-panel { flex: 1; }
-.events-scroll { flex: 1; overflow-y: auto; padding: 8px 0; }
-.event-row { display: flex; align-items: center; gap: 10px; padding: 8px 20px; border-bottom: 1px solid rgba(42,66,98,0.1); &.player-event { background: rgba(0,212,170,0.03); } }
-.event-lap { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 13px; color: #5a7a98; width: 32px; flex-shrink: 0; }
-.event-icon { font-size: 14px; width: 20px; text-align: center; flex-shrink: 0; }
-.event-text { font-family: 'Inter', sans-serif; font-weight: 400; font-size: 13px; color: #a0b8d0; flex: 1; }
-.events-empty { padding: 40px 20px; text-align: center; font-family: 'Oswald', sans-serif; font-size: 16px; color: #3a5a78; }

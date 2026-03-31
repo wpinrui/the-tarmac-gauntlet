@@ -3,6 +3,7 @@ import { useGameStore } from "../state/store";
 import { TopBar } from "./TopBar";
 import { PRIZE_TABLE } from "../simulation/postRace";
 import type { PlayerTeam, TransactionCategory } from "../types";
+import { ordinal } from "../shared/raceDisplay";
 import "./DealerShared.scss";
 import "./Finances.scss";
 
@@ -39,12 +40,6 @@ const FILTER_CATEGORIES: Record<FilterGroup, TransactionCategory[] | null> = {
   staff: ["driverSalary", "driverBuyout", "crewCost"],
   race: ["prizeMoney", "fuelCost"],
 };
-
-function ordinal(n: number): string {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return n + (s[(v - 20) % 10] || s[v] || s[0]);
-}
 
 // ---------------------------------------------------------------------------
 // Component

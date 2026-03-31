@@ -37,7 +37,7 @@ export interface RaceEvent {
   lap: number;
   type: "retirement" | "issue" | "pitStop" | "lapped" | "classLeadChange" | "fastestLap";
   text: string;
-  /** Team involved (for highlighting player events). */
+  carId: string;
   teamId: string;
 }
 
