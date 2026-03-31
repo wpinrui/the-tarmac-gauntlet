@@ -1,24 +1,56 @@
-import type { CarModel } from "./car";
+import type { CarModel, CarClass } from "./car";
 import type { Driver, Contract } from "./driver";
 import type { Team } from "./team";
-import type { RaceState } from "./race";
+import type { RaceState, CommentaryEntry } from "./race";
 import type { CarMarket, EconomyConfig } from "./economy";
 import type { Track } from "./track";
+import type { CarLapSnapshot } from "../simulation/raceLoop";
 
 // --- Race History ---
 
 export interface RaceResult {
   teamId: string;
+  carId: string;
+  carClass: CarClass;
   position: number;
   lapsCompleted: number;
   prizeMoney: number;
   retired: boolean;
 }
 
+/** A driver stint within a single race. */
+export interface Stint {
+  driverId: string;
+  startLap: number;
+  endLap: number;
+}
+
+/** Lap counts per instruction mode for a single car. */
+export interface ModeCounter {
+  push: number;
+  normal: number;
+  conserve: number;
+}
+
+/** An endurance-relevant race event. */
+export interface RaceEvent {
+  lap: number;
+  type: "retirement" | "issue" | "pitStop" | "lapped" | "classLeadChange" | "fastestLap";
+  text: string;
+  /** Team involved (for highlighting player events). */
+  teamId: string;
+}
+
 export interface RaceHistoryEntry {
   year: number;
   results: RaceResult[];
   fastestLap: { teamId: string; time: number } | null;
+  /** Optional rich data — stripped after the rolling window (default 3 years). */
+  lapSnapshots?: Record<string, CarLapSnapshot[]>;
+  positionHistory?: number[][];  // positionHistory[lap][carIndex] = position
+  events?: RaceEvent[];
+  stints?: Record<string, Stint[]>;
+  modeCounters?: Record<string, ModeCounter>;
 }
 
 // --- Save Metadata ---

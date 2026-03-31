@@ -127,12 +127,44 @@ export interface CarRaceResult {
   retirementReason: FailureType | null;
 }
 
-/** Final race results for all cars. */
-export interface RaceResult {
+/** Endurance-relevant race event for post-race display. */
+export interface RaceEventRecord {
+  lap: number;
+  type: "retirement" | "issue" | "pitStop" | "lapped" | "classLeadChange" | "fastestLap";
+  text: string;
+  carId: string;
+}
+
+/** Driver stint within a race. */
+export interface StintRecord {
+  driverId: string;
+  startLap: number;
+  endLap: number;
+}
+
+/** Instruction mode lap counts. */
+export interface ModeCounterRecord {
+  push: number;
+  normal: number;
+  conserve: number;
+}
+
+/** Full race results including rich per-lap data. */
+export interface RaceResultFull {
   /** All cars sorted by finalPosition (1st = index 0). */
   results: CarRaceResult[];
   /** Fastest single lap across all cars and all laps, or null if no laps ran. */
   fastestLap: { carId: string; lap: number; time: number } | null;
+  /** Per-lap snapshots: carId → CarLapSnapshot[]. */
+  lapSnapshots: Record<string, CarLapSnapshot[]>;
+  /** Position history: positionHistory[lap][carIndex] = position (1-indexed). */
+  positionHistory: number[][];
+  /** Endurance events logged during the race. */
+  events: RaceEventRecord[];
+  /** Driver stints: carId → Stint[]. */
+  stints: Record<string, StintRecord[]>;
+  /** Instruction mode counters: carId → ModeCounterRecord. */
+  modeCounters: Record<string, ModeCounterRecord>;
 }
 
 // ---------------------------------------------------------------------------
@@ -270,7 +302,7 @@ function aiPitDecider(
 export function simulateRace(
   cars: CarEntry[],
   options: RaceOptions = {},
-): RaceResult {
+): RaceResultFull {
   const totalLaps = options.totalLaps ?? DEFAULT_TOTAL_LAPS;
   const random = options.random ?? Math.random;
   const issueTemplates = options.issueTemplates ?? [];
@@ -298,6 +330,22 @@ export function simulateRace(
   }));
 
   let fastestLap: { carId: string; lap: number; time: number } | null = null;
+
+  // Rich data accumulators
+  const lapSnapshots: Record<string, CarLapSnapshot[]> = {};
+  const positionHistory: number[][] = [];
+  const events: RaceEventRecord[] = [];
+  const stints: Record<string, StintRecord[]> = {};
+  const modeCounters: Record<string, ModeCounterRecord> = {};
+
+  for (const entry of cars) {
+    lapSnapshots[entry.carId] = [];
+    stints[entry.carId] = [{ driverId: entry.startingDriverId, startLap: 1, endLap: -1 }];
+    modeCounters[entry.carId] = { push: 0, normal: 0, conserve: 0 };
+  }
+
+  // Track previous lap's class leaders for class lead change detection
+  let prevClassLeaders: Record<string, string> = {}; // class → carId
 
   // ---------------------------------------------------------------------------
   // Race loop
@@ -396,6 +444,20 @@ export function simulateRace(
           [state.currentDriverId]: newFatigue,
         };
         state.condition = newCondition;
+
+        // Log retirement event
+        events.push({
+          lap,
+          type: "retirement",
+          text: `${entry.carId} retired — ${riskResult.failure}`,
+          carId: entry.carId,
+        });
+        // Close the current stint
+        const carStints = stints[entry.carId];
+        if (carStints.length > 0) carStints[carStints.length - 1].endLap = lap;
+        // Count mode for this lap
+        modeCounters[entry.carId][state.instructionMode]++;
+
         continue;
       }
 
@@ -414,6 +476,21 @@ export function simulateRace(
         newTyreWear,
         newFuel,
       );
+
+      // --- Rich data capture ---
+      lapSnapshots[entry.carId].push(snapshot);
+      modeCounters[entry.carId][state.instructionMode]++;
+
+      // Track new issues as events
+      for (const issue of riskResult.newIssues) {
+        const template = allTemplates.find((t) => t.id === issue.templateId);
+        events.push({
+          lap,
+          type: "issue",
+          text: `${entry.carId} — ${template?.description ?? "mechanical issue"}`,
+          carId: entry.carId,
+        });
+      }
 
       // 10. Determine next instruction mode (overridden to "normal" if pitting)
       const nextMode: InstructionMode = entry.modeDecider
@@ -461,15 +538,83 @@ export function simulateRace(
         state.tyreWear = pitResult.tyreWear;
         state.tyreSetsAvailable = pitResult.tyreSetsRemaining;
         state.sparePartsAvailable = pitResult.sparePartsRemaining;
-        state.currentDriverId = pitResult.currentDriverId;
-        state.driverFatigue = pitResult.driverFatigue;
         state.activeIssues = pitResult.activeIssues;
         state.instructionMode = pitResult.instructionMode; // always "normal"
+
+        // Log pit stop event
+        const driverSwapped = pitResult.currentDriverId !== state.currentDriverId;
+        events.push({
+          lap,
+          type: "pitStop",
+          text: `${entry.carId} pits${driverSwapped ? ` — ${pitResult.currentDriverId} takes over` : ""}`,
+          carId: entry.carId,
+        });
+
+        // Track stint changes on driver swap
+        if (driverSwapped) {
+          const carStints = stints[entry.carId];
+          if (carStints.length > 0) carStints[carStints.length - 1].endLap = lap;
+          carStints.push({ driverId: pitResult.currentDriverId, startLap: lap + 1, endLap: -1 });
+        }
+
+        state.currentDriverId = pitResult.currentDriverId;
+        state.driverFatigue = pitResult.driverFatigue;
       } else {
         state.tyreWear = newTyreWear;
         state.fuelRemaining = newFuel;
         state.instructionMode = nextMode;
       }
+    }
+
+    // --- End-of-lap: compute standings and position history ---
+    const lapStandings = [...states].sort((a, b) => {
+      if (b.lapsCompleted !== a.lapsCompleted) return b.lapsCompleted - a.lapsCompleted;
+      return a.totalTime - b.totalTime;
+    });
+
+    const lapPositions: number[] = new Array(states.length);
+    for (let i = 0; i < lapStandings.length; i++) {
+      const stateIdx = states.indexOf(lapStandings[i]);
+      lapPositions[stateIdx] = i + 1;
+    }
+    positionHistory.push(lapPositions);
+
+    // Detect lapped cars (any car > 1 lap behind leader)
+    const leaderLaps = lapStandings[0]?.lapsCompleted ?? 0;
+    for (const s of lapStandings) {
+      if (!s.retired && s.lapsCompleted < leaderLaps - 0 && s.lapsCompleted === lap - 1) {
+        // Car didn't complete this lap (retired earlier) — skip
+      }
+    }
+
+    // Detect class lead changes
+    const classLeaders: Record<string, string> = {};
+    for (const s of lapStandings) {
+      const cls = s.entry.model.carClass;
+      if (!classLeaders[cls]) {
+        classLeaders[cls] = s.entry.carId;
+      }
+    }
+    for (const [cls, leadCarId] of Object.entries(classLeaders)) {
+      if (prevClassLeaders[cls] && prevClassLeaders[cls] !== leadCarId) {
+        events.push({
+          lap,
+          type: "classLeadChange",
+          text: `${leadCarId} takes the Class ${cls} lead`,
+          carId: leadCarId,
+        });
+      }
+    }
+    prevClassLeaders = classLeaders;
+
+    // Fastest lap event
+    if (fastestLap && fastestLap.lap === lap) {
+      events.push({
+        lap,
+        type: "fastestLap",
+        text: `Fastest lap: ${fastestLap.carId} — ${fastestLap.time.toFixed(1)}s`,
+        carId: fastestLap.carId,
+      });
     }
   }
 
@@ -492,5 +637,13 @@ export function simulateRace(
     retirementReason: state.retirementReason,
   }));
 
-  return { results, fastestLap };
+  // Close all open stints
+  for (const state of states) {
+    const carStints = stints[state.entry.carId];
+    if (carStints.length > 0 && carStints[carStints.length - 1].endLap === -1) {
+      carStints[carStints.length - 1].endLap = state.lapsCompleted;
+    }
+  }
+
+  return { results, fastestLap, lapSnapshots, positionHistory, events, stints, modeCounters };
 }

@@ -1,4 +1,4 @@
-import type { RaceHistoryEntry } from "../types";
+import type { RaceHistoryEntry, CarClass } from "../types";
 import { buildPrizeSchedule, distributePrizeMoney, PRIZE_TABLE } from "./postRace";
 
 // ---------------------------------------------------------------------------
@@ -7,7 +7,7 @@ import { buildPrizeSchedule, distributePrizeMoney, PRIZE_TABLE } from "./postRac
 
 export interface PostRaceFinancialInput {
   /** Race results: team positions + laps completed. */
-  results: { teamId: string; position: number; lapsCompleted: number }[];
+  results: { teamId: string; carId: string; carClass: CarClass; position: number; lapsCompleted: number; retired: boolean }[];
   /** Total fuel consumed during the race (litres). */
   playerFuelConsumed: number;
   /** Fuel cost per litre. */
@@ -57,10 +57,12 @@ export function processPostRaceFinancials(
     year,
     results: results.map((r) => ({
       teamId: r.teamId,
+      carId: r.carId,
+      carClass: r.carClass,
       position: r.position,
       lapsCompleted: r.lapsCompleted,
       prizeMoney: prizeMoney[r.teamId] ?? 0,
-      retired: r.lapsCompleted < 48, // Retired if didn't complete full race
+      retired: r.retired,
     })),
     fastestLap: null, // Populated by the race loop, not here
   };
