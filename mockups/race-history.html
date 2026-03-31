@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The 24h Tarmac Gauntlet — Race History</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #1e3450; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #2a4a68; }
+
+        html, body {
+            height: 100%;
+            background: #080d18;
+            color: #d0d8e4;
+            font-family: 'Inter', 'Segoe UI', -apple-system, sans-serif;
+            overflow: hidden;
+        }
+
+        .app {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* ======== TAB BAR ======== */
+        .tab-bar {
+            display: flex; align-items: stretch;
+            background: rgba(8, 12, 22, 0.85);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid #2a4262;
+            padding: 0 28px; flex-shrink: 0;
+            position: relative; z-index: 10;
+        }
+        .team-identity { display: flex; align-items: center; gap: 12px; padding: 10px 24px 10px 0; margin-right: 8px; border-right: 1px solid #1e3450; }
+        .team-logo { width: 32px; height: 32px; border-radius: 6px; background: rgba(0,212,170,0.1); border: 1px solid rgba(0,212,170,0.25); display: flex; align-items: center; justify-content: center; }
+        .team-logo svg { width: 18px; height: 18px; }
+        .team-logo path { fill: #00d4aa; }
+        .team-name { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 16px; letter-spacing: 1.5px; text-transform: uppercase; color: #e8ecf4; }
+        .tab { padding: 18px 24px; font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 17px; letter-spacing: 2.5px; text-transform: uppercase; color: #7a96b0; cursor: pointer; position: relative; transition: color .2s; }
+        .tab:hover { color: #a0b8d0; }
+        .tab.active { color: #e8ecf4; }
+        .tab.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: #00d4aa; }
+        .tab-spacer { flex: 1; }
+        .tab-resource { display: flex; align-items: center; gap: 7px; padding: 14px 12px; border-radius: 6px; cursor: pointer; transition: background .15s; position: relative; }
+        .tab-resource:hover { background: rgba(255,255,255,0.04); }
+        .tab-resource .res-icon { font-size: 18px; color: #7a96b0; transition: color .15s; flex-shrink: 0; position: relative; top: 2px; }
+        .tab-resource:hover .res-icon { color: #a0b8d0; }
+        .tab-resource .res-value { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 20px; color: #e8ecf4; }
+        .tab-resource.money .res-value { color: #00d4aa; }
+        .tab-resource .res-tooltip {
+            display: none; position: absolute; top: 100%; right: 0; margin-top: 8px;
+            background: rgba(8,12,22,0.95); border: 1px solid #2a4262;
+            padding: 12px 16px; border-radius: 8px; width: 240px; z-index: 10;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+        }
+        .tab-resource:hover .res-tooltip { display: block; }
+        .res-tooltip-title {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 14px;
+            letter-spacing: 1.5px; text-transform: uppercase; color: #e8ecf4; margin-bottom: 4px;
+        }
+        .res-tooltip-desc {
+            font-family: 'Inter', sans-serif; font-weight: 400; font-size: 13px;
+            color: #8a9cb4; line-height: 1.4;
+        }
+
+        /* ======== YEAR SELECTOR ======== */
+        .year-bar {
+            padding: 14px 28px;
+            display: flex; align-items: center; gap: 12px;
+            flex-shrink: 0;
+        }
+        .year-bar-label {
+            font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 14px;
+            letter-spacing: 1.5px; text-transform: uppercase; color: #7a96b0;
+        }
+        .year-btn {
+            font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 15px;
+            letter-spacing: 1px; padding: 6px 14px; border-radius: 4px;
+            border: 1px solid #2a4262; background: transparent; color: #7a96b0;
+            cursor: pointer; transition: all .15s;
+        }
+        .year-btn:hover { border-color: #3a5a78; color: #a0b8d0; }
+        .year-btn.active { border-color: #00d4aa; color: #00d4aa; background: rgba(0,212,170,0.08); }
+        .year-btn.no-detail {
+            opacity: 0.5;
+        }
+        .year-bar-note {
+            font-family: 'Inter', sans-serif; font-weight: 400; font-size: 12px;
+            color: #3a5a78; margin-left: auto;
+        }
+
+        /* ======== MAIN ======== */
+        .main {
+            flex: 1; overflow: hidden;
+            padding: 0 28px 28px;
+            display: flex; gap: 18px;
+        }
+
+        /* ======== PANELS ======== */
+        .panel {
+            border-radius: 10px;
+            border: 1px solid #2a4262;
+            background: rgba(12, 18, 32, 0.78);
+            backdrop-filter: blur(10px);
+            display: flex; flex-direction: column;
+            overflow: hidden;
+        }
+        .panel-header {
+            padding: 14px 20px;
+            border-bottom: 1px solid rgba(42,66,98,0.4);
+            display: flex; align-items: center; justify-content: space-between;
+            flex-shrink: 0;
+        }
+        .panel-title {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 17px;
+            letter-spacing: 2.5px; text-transform: uppercase; color: #8a9cb4;
+        }
+
+        /* ======== LEFT: Results + Lap chart ======== */
+        .left-col { flex: 1; display: flex; flex-direction: column; gap: 18px; overflow: hidden; }
+
+        /* Player summary bar */
+        .player-summary {
+            display: flex; align-items: center; gap: 16px;
+            padding: 14px 20px;
+            border-radius: 10px;
+            border: 1px solid rgba(0,212,170,0.2);
+            background: rgba(0,212,170,0.04);
+            flex-shrink: 0;
+        }
+        .ps-position {
+            font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 32px;
+            color: #00d4aa;
+        }
+        .ps-suffix { font-size: 16px; font-weight: 400; color: #7a96b0; }
+        .ps-info { flex: 1; }
+        .ps-team {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 17px;
+            letter-spacing: 1.5px; text-transform: uppercase; color: #fff;
+        }
+        .ps-details {
+            font-family: 'Inter', sans-serif; font-weight: 400; font-size: 13px;
+            color: #7a96b0;
+        }
+        .ps-stat {
+            text-align: center; padding: 0 12px;
+        }
+        .ps-stat-value {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 20px; color: #e8ecf4;
+        }
+        .ps-stat-value.prize { color: #00d4aa; }
+        .ps-stat-label {
+            font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 11px;
+            letter-spacing: 1.5px; text-transform: uppercase; color: #5a7a98;
+        }
+
+        /* Results table */
+        .results-panel { flex: 1; min-height: 0; }
+        .results-scroll { flex: 1; overflow-y: auto; }
+        .results-table { width: 100%; border-collapse: collapse; }
+        .results-table th {
+            font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 12px;
+            letter-spacing: 1.2px; text-transform: uppercase; color: #5a7a98;
+            text-align: left; padding: 8px 12px;
+            border-bottom: 1px solid rgba(42,66,98,0.4);
+            position: sticky; top: 0; background: rgba(12,18,32,0.98); z-index: 1;
+        }
+        .results-table th.right { text-align: right; }
+        .results-table td {
+            font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 14px;
+            color: #a0b8d0; padding: 6px 12px;
+            border-bottom: 1px solid rgba(42,66,98,0.1);
+        }
+        .results-table td.right { text-align: right; }
+        .results-table tr.player-row td { color: #00d4aa; font-weight: 500; }
+        .results-table tr.retired td { color: #e17055; }
+        .results-table tr.gold td:first-child { color: #d4a840; font-weight: 600; }
+        .results-table tr.silver td:first-child { color: #b0b8c4; font-weight: 600; }
+        .results-table tr.bronze td:first-child { color: #c47a3a; font-weight: 600; }
+
+        .class-badge-sm {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 10px;
+            letter-spacing: 1px; text-transform: uppercase;
+            padding: 1px 6px; border-radius: 6px; border: 1px solid;
+            display: inline-block;
+        }
+        .class-badge-sm.f { color: #a0785a; border-color: #a0785a; }
+        .class-badge-sm.e { color: #5ab8d8; border-color: #5ab8d8; }
+        .class-badge-sm.d { color: #d060a0; border-color: #d060a0; }
+        .class-badge-sm.c { color: #e0943a; border-color: #e0943a; }
+        .class-badge-sm.b { color: #d04040; border-color: #d04040; }
+        .class-badge-sm.a { color: #50c878; border-color: #50c878; }
+
+        /* ======== RIGHT: Lap chart + Key moments ======== */
+        .right-col { width: 440px; flex-shrink: 0; display: flex; flex-direction: column; gap: 18px; overflow: hidden; }
+
+        /* Lap chart */
+        .lap-chart-panel { flex-shrink: 0; height: 280px; }
+        .lap-chart-body { flex: 1; padding: 16px; position: relative; }
+        .lap-chart-svg { width: 100%; height: 100%; }
+        .lap-axis-label {
+            font-family: 'Oswald', sans-serif; font-size: 10px;
+            fill: #5a7a98; letter-spacing: 1px;
+        }
+        .lap-gridline { stroke: rgba(42,66,98,0.2); stroke-width: 1; }
+        .lap-line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .lap-line.player { stroke: #00d4aa; stroke-width: 2.5; }
+        .lap-line.other { stroke: #2a4262; stroke-width: 1; opacity: 0.4; }
+        .lap-line.highlight { stroke: #e8ecf4; stroke-width: 1.5; opacity: 0.6; }
+
+        .lap-chart-legend {
+            display: flex; gap: 14px; padding: 8px 16px 0;
+        }
+        .legend-item {
+            font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 12px;
+            color: #7a96b0; display: flex; align-items: center; gap: 5px;
+        }
+        .legend-line { width: 16px; height: 3px; border-radius: 2px; }
+
+        .no-detail-msg {
+            font-family: 'Inter', sans-serif; font-weight: 400; font-size: 14px;
+            color: #3a5a78; font-style: italic; text-align: center;
+            padding: 40px 20px;
+        }
+
+        /* Key moments */
+        .moments-panel { flex: 1; min-height: 0; }
+        .moments-scroll { flex: 1; overflow-y: auto; }
+
+        .moment-row {
+            display: flex; align-items: flex-start; gap: 10px;
+            padding: 8px 16px;
+            border-bottom: 1px solid rgba(42,66,98,0.15);
+        }
+        .moment-lap {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 13px;
+            color: #5a7a98; width: 44px; flex-shrink: 0;
+        }
+        .moment-icon {
+            font-size: 13px; width: 18px; text-align: center; flex-shrink: 0;
+            margin-top: 2px;
+        }
+        .moment-text {
+            font-family: 'Inter', sans-serif; font-weight: 400; font-size: 13px;
+            color: #a0b8d0; line-height: 1.4;
+        }
+        .moment-text .highlight { color: #e8ecf4; font-weight: 500; }
+        .moment-text .player-hl { color: #00d4aa; font-weight: 500; }
+    </style>
+</head>
+<body>
+
+<div class="app">
+    <!-- Tab bar -->
+    <div class="tab-bar">
+        <div class="team-identity">
+            <div class="team-logo"><svg viewBox="0 0 48 48"><path d="M24 4L40 12v14c0 12-16 18-16 18S8 38 8 26V12z"/></svg></div>
+            <span class="team-name">Backfire Racing</span>
+        </div>
+        <div class="tab">Garage</div>
+        <div class="tab">Finances</div>
+        <div class="tab active">Race History</div>
+        <div class="tab">Standings</div>
+        <div class="tab">Scouting Report</div>
+        <div class="tab-spacer"></div>
+        <div class="tab-resource">
+            <i class="fa-solid fa-wrench res-icon"></i>
+            <span class="res-value">12</span>
+            <div class="res-tooltip">
+                <div class="res-tooltip-title">Spare Parts</div>
+                <div class="res-tooltip-desc">Fix mechanical issues during races and repair car condition between races. Unspent parts carry over each year.</div>
+            </div>
+        </div>
+        <div class="tab-resource money">
+            <i class="fa-solid fa-sack-dollar res-icon"></i>
+            <span class="res-value">$187,420</span>
+            <div class="res-tooltip">
+                <div class="res-tooltip-title">Money</div>
+                <div class="res-tooltip-desc">Your team's funds. Buy cars, upgrades, spare parts, tyres, and hire drivers and crew.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Year selector -->
+    <div class="year-bar">
+        <span class="year-bar-label">Race:</span>
+        <button class="year-btn no-detail">Year 1</button>
+        <button class="year-btn no-detail">Year 2</button>
+        <button class="year-btn no-detail">Year 3</button>
+        <button class="year-btn no-detail">Year 4</button>
+        <button class="year-btn no-detail">Year 5</button>
+        <button class="year-btn no-detail">Year 6</button>
+        <button class="year-btn no-detail">Year 7</button>
+        <button class="year-btn active">Year 8</button>
+        <button class="year-btn">Year 9</button>
+        <button class="year-btn">Year 10</button>
+        <span class="year-bar-note"><i class="fa-solid fa-circle-info" style="margin-right:4px;"></i> Dimmed years have results only — no lap chart or key moments</span>
+    </div>
+
+    <!-- Main content -->
+    <div class="main">
+
+        <!-- Left: Player summary + Results -->
+        <div class="left-col">
+            <div class="player-summary">
+                <div class="ps-position">23<span class="ps-suffix">rd</span></div>
+                <div class="ps-info">
+                    <div class="ps-team">Backfire Racing</div>
+                    <div class="ps-details">Roadster RS 8K · Ivan Chen, Marco Ribeiro · 48 laps · 4 pit stops</div>
+                </div>
+                <div class="ps-stat">
+                    <div class="ps-stat-value prize">$200,000</div>
+                    <div class="ps-stat-label">Prize</div>
+                </div>
+                <div class="ps-stat">
+                    <div class="ps-stat-value">3rd</div>
+                    <div class="ps-stat-label">Class D</div>
+                </div>
+            </div>
+
+            <div class="panel results-panel">
+                <div class="panel-header">
+                    <span class="panel-title">Results</span>
+                </div>
+                <div class="results-scroll">
+                    <table class="results-table">
+                        <thead>
+                            <tr>
+                                <th>Pos</th>
+                                <th>Team</th>
+                                <th>Drivers</th>
+                                <th>Car</th>
+                                <th>Class</th>
+                                <th>Class Pos</th>
+                                <th class="right">Laps</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="gold"><td>1st</td><td>Glacier Racing</td><td>L. Hargreaves, S. Petrova, K. Yamada</td><td>Apex Stallion 500K</td><td><span class="class-badge-sm a">A</span></td><td>1st</td><td class="right">48</td></tr>
+                            <tr class="silver"><td>2nd</td><td>Midnight Apex</td><td>A. Johansson, R. Ferreira, D. Okafor</td><td>Apex Stallion 500K</td><td><span class="class-badge-sm a">A</span></td><td>2nd</td><td class="right">48</td></tr>
+                            <tr class="bronze"><td>3rd</td><td>Ironside Motorsport</td><td>C. Mendez, P. Duval</td><td>GT Viper 150K</td><td><span class="class-badge-sm b">B</span></td><td>1st</td><td class="right">48</td></tr>
+                            <tr><td>4th</td><td>Zenith Motors</td><td>T. Nakamura, J. Fischer, W. Santos</td><td>Apex Stallion 500K</td><td><span class="class-badge-sm a">A</span></td><td>3rd</td><td class="right">48</td></tr>
+                            <tr><td>5th</td><td>Viper Racing</td><td>E. Larsson, M. Kovač</td><td>GT Viper 150K</td><td><span class="class-badge-sm b">B</span></td><td>2nd</td><td class="right">48</td></tr>
+                            <tr><td>6th</td><td>Thunder Rally</td><td>N. Osei, H. Tanaka, B. Moreau</td><td>GT Viper 150K</td><td><span class="class-badge-sm b">B</span></td><td>3rd</td><td class="right">48</td></tr>
+                            <tr><td>7th</td><td>Eclipse Racing</td><td>F. Rossi, A. Kwame</td><td>GT Viper 150K</td><td><span class="class-badge-sm b">B</span></td><td>4th</td><td class="right">47</td></tr>
+                            <tr><td>8th</td><td>Track Hawks Inc</td><td>G. Park, S. Oliveira</td><td>Track Hawk 30K</td><td><span class="class-badge-sm c">C</span></td><td>1st</td><td class="right">47</td></tr>
+                            <tr><td>...</td><td colspan="6" style="color:#3a5a78; font-style:italic;">positions 9–22</td></tr>
+                            <tr class="player-row"><td>23rd</td><td>Backfire Racing</td><td>Ivan Chen, Marco Ribeiro</td><td>Roadster RS 8K</td><td><span class="class-badge-sm d">D</span></td><td>3rd</td><td class="right">48</td></tr>
+                            <tr><td>24th</td><td>Drift Syndicate</td><td>V. Petrov</td><td>Coupé GT 15K</td><td><span class="class-badge-sm d">D</span></td><td>4th</td><td class="right">47</td></tr>
+                            <tr><td>...</td><td colspan="6" style="color:#3a5a78; font-style:italic;">positions 25–93</td></tr>
+                            <tr class="retired"><td>94th</td><td>Burnout Brigade</td><td>L. Müller, T. Obi</td><td>Commuter GS 2000</td><td><span class="class-badge-sm e">E</span></td><td>—</td><td class="right">31</td></tr>
+                            <tr class="retired"><td>95th</td><td>Wreck Division</td><td>J. Asante</td><td>Dumpster Dart 1200</td><td><span class="class-badge-sm f">F</span></td><td>—</td><td class="right">28</td></tr>
+                            <tr class="retired"><td>96th</td><td>Salvage Motorsport</td><td>R. Kim, D. Costa</td><td>Rusty Rattler 750</td><td><span class="class-badge-sm f">F</span></td><td>—</td><td class="right">22</td></tr>
+                            <tr class="retired"><td>97th</td><td>Heap Racing</td><td>B. Okonkwo</td><td>Banger Box 900</td><td><span class="class-badge-sm f">F</span></td><td>—</td><td class="right">15</td></tr>
+                            <tr class="retired"><td>98th</td><td>Oxide Garage</td><td>P. Holm, Y. Tanaka</td><td>Sedan SE 3500</td><td><span class="class-badge-sm e">E</span></td><td>—</td><td class="right">8</td></tr>
+                            <tr class="retired"><td>99th</td><td>Terminal Speed</td><td>K. Ndiaye</td><td>Commuter GS 2000</td><td><span class="class-badge-sm e">E</span></td><td>—</td><td class="right">3</td></tr>
+                            <tr class="retired"><td>100th</td><td>Last Chance Garage</td><td>M. Sato</td><td>Salvage Special 1500</td><td><span class="class-badge-sm f">F</span></td><td>—</td><td class="right">1</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Lap chart + Key moments -->
+        <div class="right-col">
+            <!-- Lap chart -->
+            <div class="panel lap-chart-panel">
+                <div class="panel-header">
+                    <span class="panel-title">Lap Chart</span>
+                </div>
+                <div class="lap-chart-body">
+                    <svg class="lap-chart-svg" viewBox="0 0 400 200">
+                        <!-- Grid -->
+                        <line class="lap-gridline" x1="40" y1="10" x2="40" y2="180"/>
+                        <line class="lap-gridline" x1="40" y1="180" x2="390" y2="180"/>
+                        <!-- Y axis labels (position) -->
+                        <text class="lap-axis-label" x="35" y="14" text-anchor="end">1</text>
+                        <text class="lap-axis-label" x="35" y="56" text-anchor="end">25</text>
+                        <text class="lap-axis-label" x="35" y="98" text-anchor="end">50</text>
+                        <text class="lap-axis-label" x="35" y="140" text-anchor="end">75</text>
+                        <text class="lap-axis-label" x="35" y="182" text-anchor="end">100</text>
+                        <!-- X axis labels (laps) -->
+                        <text class="lap-axis-label" x="40" y="195">0</text>
+                        <text class="lap-axis-label" x="113" y="195">12</text>
+                        <text class="lap-axis-label" x="186" y="195">24</text>
+                        <text class="lap-axis-label" x="260" y="195">36</text>
+                        <text class="lap-axis-label" x="390" y="195" text-anchor="end">48</text>
+                        <!-- Horizontal grid -->
+                        <line class="lap-gridline" x1="40" y1="52" x2="390" y2="52"/>
+                        <line class="lap-gridline" x1="40" y1="94" x2="390" y2="94"/>
+                        <line class="lap-gridline" x1="40" y1="136" x2="390" y2="136"/>
+                        <!-- Sample car lines (other teams — faded) -->
+                        <polyline class="lap-line other" points="40,12 113,12 186,14 260,12 390,12"/>
+                        <polyline class="lap-line other" points="40,16 113,14 186,18 260,16 390,16"/>
+                        <polyline class="lap-line other" points="40,20 113,22 186,20 260,22 390,20"/>
+                        <polyline class="lap-line other" points="40,58 113,62 186,56 260,60 390,58"/>
+                        <polyline class="lap-line other" points="40,72 113,68 186,74 260,70 390,72"/>
+                        <polyline class="lap-line other" points="40,100 113,104 186,96 260,102 390,100"/>
+                        <polyline class="lap-line other" points="40,120 113,116 186,124 260,118 390,120"/>
+                        <polyline class="lap-line other" points="40,148 113,152 186,144 260,150 390,148"/>
+                        <polyline class="lap-line other" points="40,164 113,160 186,168 260,164 390,170"/>
+                        <!-- Winner line (highlighted) -->
+                        <polyline class="lap-line highlight" points="40,12 113,12 186,14 260,12 390,12"/>
+                        <!-- Player line -->
+                        <polyline class="lap-line player" points="40,68 113,58 186,52 260,48 390,46"/>
+                    </svg>
+                </div>
+                <div class="lap-chart-legend">
+                    <span class="legend-item"><span class="legend-line" style="background:#00d4aa;"></span> Backfire Racing</span>
+                    <span class="legend-item"><span class="legend-line" style="background:#e8ecf4;"></span> P1 (Glacier Racing)</span>
+                    <span class="legend-item"><span class="legend-line" style="background:#2a4262;"></span> Field</span>
+                </div>
+            </div>
+
+            <!-- Key moments -->
+            <div class="panel moments-panel">
+                <div class="panel-header">
+                    <span class="panel-title">Key Moments</span>
+                </div>
+                <div class="moments-scroll">
+                    <div class="moment-row">
+                        <span class="moment-lap">Lap 5</span>
+                        <i class="fa-solid fa-bolt moment-icon" style="color:#e0943a;"></i>
+                        <span class="moment-text"><span class="highlight">Eclipse Racing</span> — engine misfire</span>
+                    </div>
+                    <div class="moment-row">
+                        <span class="moment-lap">Lap 8</span>
+                        <i class="fa-solid fa-arrows-rotate moment-icon" style="color:#5ab8d8;"></i>
+                        <span class="moment-text"><span class="player-hl">Backfire Racing</span> pits — driver swap, tyres, refuel</span>
+                    </div>
+                    <div class="moment-row">
+                        <span class="moment-lap">Lap 12</span>
+                        <i class="fa-solid fa-stopwatch moment-icon" style="color:#d4a840;"></i>
+                        <span class="moment-text"><span class="highlight">Midnight Apex</span> fastest lap — 1:38.7</span>
+                    </div>
+                    <div class="moment-row">
+                        <span class="moment-lap">Lap 15</span>
+                        <i class="fa-solid fa-circle-xmark moment-icon" style="color:#e17055;"></i>
+                        <span class="moment-text"><span class="highlight">Terminal Speed</span> retires</span>
+                    </div>
+                    <div class="moment-row">
+                        <span class="moment-lap">Lap 18</span>
+                        <i class="fa-solid fa-trophy moment-icon" style="color:#d060a0;"></i>
+                        <span class="moment-text"><span class="highlight">Roadster United</span> takes Class D lead</span>
+                    </div>
+                    <div class="moment-row">
+                        <span class="moment-lap">Lap 21</span>
+                        <i class="fa-solid fa-arrows-rotate moment-icon" style="color:#5ab8d8;"></i>
+                        <span class="moment-text"><span class="player-hl">Backfire Racing</span> pits — swap, tyres, issue fix</span>
+                    </div>
+                    <div class="moment-row">
+                        <span class="moment-lap">Lap 24</span>
+                        <i class="fa-solid fa-circle-down moment-icon" style="color:#7a96b0;"></i>
+                        <span class="moment-text"><span class="highlight">Heap Racing</span> lapped</span>
+                    </div>
+                    <div class="moment-row">
+                        <span class="moment-lap">Lap 31</span>
+                        <i class="fa-solid fa-circle-xmark moment-icon" style="color:#e17055;"></i>
+                        <span class="moment-text"><span class="highlight">Burnout Brigade</span> retires</span>
+                    </div>
+                    <div class="moment-row">
+                        <span class="moment-lap">Lap 38</span>
+                        <i class="fa-solid fa-stopwatch moment-icon" style="color:#d4a840;"></i>
+                        <span class="moment-text"><span class="highlight">Glacier Racing</span> fastest lap — 1:37.2</span>
+                    </div>
+                    <div class="moment-row">
+                        <span class="moment-lap">Lap 42</span>
+                        <i class="fa-solid fa-trophy moment-icon" style="color:#e0943a;"></i>
+                        <span class="moment-text"><span class="highlight">Track Hawks Inc</span> takes Class C lead</span>
+                    </div>
+                    <div class="moment-row">
+                        <span class="moment-lap">Lap 44</span>
+                        <i class="fa-solid fa-circle-xmark moment-icon" style="color:#e17055;"></i>
+                        <span class="moment-text"><span class="highlight">Oxide Garage</span> retires</span>
+                    </div>
+                    <div class="moment-row">
+                        <span class="moment-lap">Lap 48</span>
+                        <i class="fa-solid fa-flag-checkered moment-icon" style="color:#00d4aa;"></i>
+                        <span class="moment-text"><span class="highlight">Glacier Racing</span> wins!</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>
