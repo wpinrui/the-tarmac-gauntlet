@@ -17,6 +17,7 @@ export interface BaseTeam {
   name: string;
   budget: number;
   prestige: number;
+  prestigeHistory: number[]; // prestige snapshot per year (index 0 = year 1)
   crewSize: number;          // 0–16
   cars: CarInstance[];
   contracts: Contract[];

@@ -25,7 +25,8 @@ export type Screen =
   | "teamRoster"
   | "crewHiring"
   | "finances"
-  | "raceHistory";
+  | "raceHistory"
+  | "standings";
 
 // ---------------------------------------------------------------------------
 // Store interface
@@ -65,6 +66,7 @@ interface GameStore {
   // Post-race financial actions
   awardPrizeMoney: (teamId: string, position: number, amount: number) => void;
   deductFuelCost: (totalCost: number) => void;
+
 }
 
 // ---------------------------------------------------------------------------
@@ -302,4 +304,5 @@ export const useGameStore = create<GameStore>()((set) => ({
         };
       });
     }),
+
 }));

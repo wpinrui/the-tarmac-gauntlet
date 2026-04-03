@@ -58,6 +58,7 @@ function makeAiTeam(
     name: `Team ${id}`,
     budget,
     prestige: 0,
+    prestigeHistory: [0],
     crewSize,
     cars,
     contracts: [],

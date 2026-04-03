@@ -140,10 +140,13 @@ describe("initializeGame", () => {
     expect(game.currentYear).toBe(1);
   });
 
-  it("all teams start with zero prestige", () => {
+  it("player starts with zero prestige, AI teams have seeded prestige", () => {
     const game = initializeGame(options, stable);
-    for (const team of game.teams) {
-      expect(team.prestige).toBe(0);
+    const player = game.teams.find((t) => t.kind === "player")!;
+    expect(player.prestige).toBe(0);
+    const aiTeams = game.teams.filter((t) => t.kind === "ai");
+    for (const team of aiTeams) {
+      expect(team.prestige).toBeGreaterThan(0);
     }
   });
 

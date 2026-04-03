@@ -1,0 +1,66 @@
+.standings-root {
+  position: fixed; inset: 0; background: #080d18; color: #d0d8e4;
+  font-family: 'Inter', 'Segoe UI', -apple-system, sans-serif;
+  overflow: hidden; display: flex; flex-direction: column;
+  *, *::before, *::after { box-sizing: border-box; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #1e3450; border-radius: 3px; }
+}
+
+.standings-app { display: flex; flex-direction: column; height: 100vh; }
+.standings-main { flex: 1; overflow: hidden; padding: 24px 28px 28px; display: flex; flex-direction: column; gap: 18px; }
+
+// Player highlight bar
+.player-bar {
+  display: flex; align-items: center; gap: 20px;
+  padding: 16px 24px; border-radius: 10px;
+  border: 1px solid rgba(0,212,170,0.2); background: rgba(0,212,170,0.04); flex-shrink: 0;
+}
+.pb-rank { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 40px; color: #00d4aa; line-height: 1; }
+.pb-suffix { font-size: 20px; font-weight: 400; color: #7a96b0; }
+.pb-info { flex: 1; }
+.pb-team { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 20px; letter-spacing: 1.5px; text-transform: uppercase; color: #fff; }
+.pb-details { font-family: 'Inter', sans-serif; font-weight: 400; font-size: 14px; color: #7a96b0; margin-top: 2px; }
+.pb-stat { text-align: center; padding: 0 16px; }
+.pb-stat-value { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 24px; color: #e8ecf4; }
+.pb-stat-label { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: #5a7a98; }
+.pb-trend { display: flex; align-items: center; gap: 4px; }
+.pb-trend-value { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 24px; &.up { color: #00d4aa; } &.down { color: #e17055; } }
+.pb-trend-label { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: #5a7a98; }
+
+// Panel (standalone for this screen — not importing RaceShared to avoid coupling)
+.standings-panel {
+  border-radius: 10px; border: 1px solid #2a4262; background: rgba(12,18,32,0.78);
+  backdrop-filter: blur(10px); display: flex; flex-direction: column; overflow: hidden; flex: 1; min-height: 0;
+}
+.standings-panel-header {
+  padding: 14px 20px; border-bottom: 1px solid rgba(42,66,98,0.4);
+  display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+}
+.standings-panel-title { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 17px; letter-spacing: 2.5px; text-transform: uppercase; color: #8a9cb4; }
+
+// Table
+.standings-scroll { flex: 1; overflow-y: auto; }
+.standings-table { width: 100%; border-collapse: collapse; }
+.standings-table th {
+  font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 12px; letter-spacing: 1.2px; text-transform: uppercase; color: #5a7a98;
+  text-align: left; padding: 8px 16px; border-bottom: 1px solid rgba(42,66,98,0.4);
+  position: sticky; top: 0; background: rgba(12,18,32,0.98); z-index: 1;
+  &.right { text-align: right; }
+}
+.standings-table td {
+  font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 15px; color: #a0b8d0; padding: 8px 16px;
+  border-bottom: 1px solid rgba(42,66,98,0.1);
+  &.right { text-align: right; }
+}
+.standings-table tr.player-row td { color: #00d4aa; font-weight: 500; }
+
+.rank-num { font-weight: 600; color: #e8ecf4; &.top3 { color: #d4a840; } }
+.team-cell { font-weight: 500; color: #d0dce8; }
+.standings-table tr.player-row .team-cell { color: #00d4aa; }
+.prestige-score { font-weight: 600; font-size: 17px; color: #e8ecf4; }
+.standings-table tr.player-row .prestige-score { color: #00d4aa; }
+.trend { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+.trend-arrow { font-size: 12px; &.up { color: #00d4aa; } &.down { color: #e17055; } &.flat { color: #5a7a98; } }
+.trend-delta { font-weight: 500; font-size: 14px; &.up { color: #00d4aa; } &.down { color: #e17055; } &.flat { color: #5a7a98; } }

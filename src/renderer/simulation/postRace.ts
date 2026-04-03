@@ -135,3 +135,4 @@ export function calculatePrestige(results: PastRaceResult[]): number {
 
   return weightedSum / totalWeight;
 }
+

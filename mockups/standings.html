@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The 24h Tarmac Gauntlet — Standings</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #1e3450; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #2a4a68; }
+
+        html, body {
+            height: 100%;
+            background: #080d18;
+            color: #d0d8e4;
+            font-family: 'Inter', 'Segoe UI', -apple-system, sans-serif;
+            overflow: hidden;
+        }
+
+        .app {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* ======== TAB BAR ======== */
+        .tab-bar {
+            display: flex; align-items: stretch;
+            background: rgba(8, 12, 22, 0.85);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid #2a4262;
+            padding: 0 28px; flex-shrink: 0;
+            position: relative; z-index: 10;
+        }
+        .team-identity { display: flex; align-items: center; gap: 12px; padding: 10px 24px 10px 0; margin-right: 8px; border-right: 1px solid #1e3450; }
+        .team-logo { width: 32px; height: 32px; border-radius: 6px; background: rgba(0,212,170,0.1); border: 1px solid rgba(0,212,170,0.25); display: flex; align-items: center; justify-content: center; }
+        .team-logo svg { width: 18px; height: 18px; }
+        .team-logo path { fill: #00d4aa; }
+        .team-name { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 16px; letter-spacing: 1.5px; text-transform: uppercase; color: #e8ecf4; }
+        .tab { padding: 18px 24px; font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 17px; letter-spacing: 2.5px; text-transform: uppercase; color: #7a96b0; cursor: pointer; position: relative; transition: color .2s; }
+        .tab:hover { color: #a0b8d0; }
+        .tab.active { color: #e8ecf4; }
+        .tab.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: #00d4aa; }
+        .tab-spacer { flex: 1; }
+        .tab-resource { display: flex; align-items: center; gap: 7px; padding: 14px 12px; border-radius: 6px; cursor: pointer; transition: background .15s; position: relative; }
+        .tab-resource:hover { background: rgba(255,255,255,0.04); }
+        .tab-resource .res-icon { font-size: 18px; color: #7a96b0; transition: color .15s; flex-shrink: 0; position: relative; top: 2px; }
+        .tab-resource:hover .res-icon { color: #a0b8d0; }
+        .tab-resource .res-value { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 20px; color: #e8ecf4; }
+        .tab-resource.money .res-value { color: #00d4aa; }
+        .tab-resource .res-tooltip {
+            display: none; position: absolute; top: 100%; right: 0; margin-top: 8px;
+            background: rgba(8,12,22,0.95); border: 1px solid #2a4262;
+            padding: 12px 16px; border-radius: 8px; width: 240px; z-index: 10;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+        }
+        .tab-resource:hover .res-tooltip { display: block; }
+        .res-tooltip-title {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 14px;
+            letter-spacing: 1.5px; text-transform: uppercase; color: #e8ecf4; margin-bottom: 4px;
+        }
+        .res-tooltip-desc {
+            font-family: 'Inter', sans-serif; font-weight: 400; font-size: 13px;
+            color: #8a9cb4; line-height: 1.4;
+        }
+
+        /* ======== MAIN ======== */
+        .main {
+            flex: 1; overflow: hidden;
+            padding: 24px 28px 28px;
+            display: flex; flex-direction: column; gap: 18px;
+        }
+
+        /* ======== PLAYER HIGHLIGHT BAR ======== */
+        .player-bar {
+            display: flex; align-items: center; gap: 20px;
+            padding: 16px 24px;
+            border-radius: 10px;
+            border: 1px solid rgba(0,212,170,0.2);
+            background: rgba(0,212,170,0.04);
+            flex-shrink: 0;
+        }
+        .pb-rank {
+            font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 40px;
+            color: #00d4aa; line-height: 1;
+        }
+        .pb-suffix { font-size: 20px; font-weight: 400; color: #7a96b0; }
+        .pb-info { flex: 1; }
+        .pb-team {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 20px;
+            letter-spacing: 1.5px; text-transform: uppercase; color: #fff;
+        }
+        .pb-details {
+            font-family: 'Inter', sans-serif; font-weight: 400; font-size: 14px;
+            color: #7a96b0; margin-top: 2px;
+        }
+        .pb-stat { text-align: center; padding: 0 16px; }
+        .pb-stat-value {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 24px; color: #e8ecf4;
+        }
+        .pb-stat-label {
+            font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 11px;
+            letter-spacing: 1.5px; text-transform: uppercase; color: #5a7a98;
+        }
+        .pb-trend {
+            display: flex; align-items: center; gap: 4px;
+        }
+        .pb-trend-value {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 24px;
+        }
+        .pb-trend-value.up { color: #00d4aa; }
+        .pb-trend-value.down { color: #e17055; }
+        .pb-trend-label {
+            font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 11px;
+            letter-spacing: 1.5px; text-transform: uppercase; color: #5a7a98;
+        }
+
+        /* ======== PANEL ======== */
+        .panel {
+            border-radius: 10px;
+            border: 1px solid #2a4262;
+            background: rgba(12, 18, 32, 0.78);
+            backdrop-filter: blur(10px);
+            display: flex; flex-direction: column;
+            overflow: hidden;
+            flex: 1; min-height: 0;
+        }
+        .panel-header {
+            padding: 14px 20px;
+            border-bottom: 1px solid rgba(42,66,98,0.4);
+            display: flex; align-items: center; gap: 12px;
+            flex-shrink: 0;
+        }
+        .panel-title {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 17px;
+            letter-spacing: 2.5px; text-transform: uppercase; color: #8a9cb4;
+        }
+
+        /* Class filter */
+        .class-filter { display: flex; gap: 4px; margin-left: auto; }
+        .class-btn {
+            font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 14px;
+            letter-spacing: 1px; padding: 5px 12px; border-radius: 4px;
+            border: 1px solid #2a4262; background: transparent; color: #8a9cb4;
+            cursor: pointer; transition: all .15s;
+        }
+        .class-btn:hover { border-color: #3a5a78; color: #a0b8d0; }
+        .class-btn.active { border-color: #00d4aa; color: #00d4aa; background: rgba(0,212,170,0.08); }
+
+        /* ======== STANDINGS TABLE ======== */
+        .standings-scroll { flex: 1; overflow-y: auto; }
+
+        .standings-table { width: 100%; border-collapse: collapse; }
+        .standings-table th {
+            font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 12px;
+            letter-spacing: 1.2px; text-transform: uppercase; color: #5a7a98;
+            text-align: left; padding: 8px 16px;
+            border-bottom: 1px solid rgba(42,66,98,0.4);
+            position: sticky; top: 0; background: rgba(12,18,32,0.98); z-index: 1;
+        }
+        .standings-table th.right { text-align: right; }
+        .standings-table th.center { text-align: center; }
+        .standings-table td {
+            font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 15px;
+            color: #a0b8d0; padding: 8px 16px;
+            border-bottom: 1px solid rgba(42,66,98,0.1);
+        }
+        .standings-table td.right { text-align: right; }
+        .standings-table td.center { text-align: center; }
+
+        .standings-table tr.player-row td { color: #00d4aa; font-weight: 500; }
+
+        .rank-num {
+            font-weight: 600; color: #e8ecf4;
+        }
+        .rank-num.top3 { color: #d4a840; }
+
+        .team-cell { font-weight: 500; color: #d0dce8; }
+        .standings-table tr.player-row .team-cell { color: #00d4aa; }
+
+        .prestige-score {
+            font-weight: 600; font-size: 17px; color: #e8ecf4;
+        }
+        .standings-table tr.player-row .prestige-score { color: #00d4aa; }
+
+        .class-badge-sm {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 10px;
+            letter-spacing: 1px; text-transform: uppercase;
+            padding: 1px 6px; border-radius: 6px; border: 1px solid;
+            display: inline-block;
+        }
+        .class-badge-sm.f { color: #a0785a; border-color: #a0785a; }
+        .class-badge-sm.e { color: #5ab8d8; border-color: #5ab8d8; }
+        .class-badge-sm.d { color: #d060a0; border-color: #d060a0; }
+        .class-badge-sm.c { color: #e0943a; border-color: #e0943a; }
+        .class-badge-sm.b { color: #d04040; border-color: #d04040; }
+        .class-badge-sm.a { color: #50c878; border-color: #50c878; }
+
+        .trend { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+        .trend-arrow { font-size: 12px; }
+        .trend-arrow.up { color: #00d4aa; }
+        .trend-arrow.down { color: #e17055; }
+        .trend-arrow.flat { color: #5a7a98; }
+        .trend-delta { font-weight: 500; font-size: 14px; }
+        .trend-delta.up { color: #00d4aa; }
+        .trend-delta.down { color: #e17055; }
+        .trend-delta.flat { color: #5a7a98; }
+
+        .class-pos { font-weight: 500; color: #7a96b0; }
+    </style>
+</head>
+<body>
+
+<div class="app">
+    <!-- Tab bar -->
+    <div class="tab-bar">
+        <div class="team-identity">
+            <div class="team-logo"><svg viewBox="0 0 48 48"><path d="M24 4L40 12v14c0 12-16 18-16 18S8 38 8 26V12z"/></svg></div>
+            <span class="team-name">Backfire Racing</span>
+        </div>
+        <div class="tab">Garage</div>
+        <div class="tab">Finances</div>
+        <div class="tab">Race History</div>
+        <div class="tab active">Standings</div>
+        <div class="tab">Scouting Report</div>
+        <div class="tab-spacer"></div>
+        <div class="tab-resource">
+            <i class="fa-solid fa-wrench res-icon"></i>
+            <span class="res-value">12</span>
+            <div class="res-tooltip">
+                <div class="res-tooltip-title">Spare Parts</div>
+                <div class="res-tooltip-desc">Fix mechanical issues during races and repair car condition between races. Unspent parts carry over each year.</div>
+            </div>
+        </div>
+        <div class="tab-resource money">
+            <i class="fa-solid fa-sack-dollar res-icon"></i>
+            <span class="res-value">$187,420</span>
+            <div class="res-tooltip">
+                <div class="res-tooltip-title">Money</div>
+                <div class="res-tooltip-desc">Your team's funds. Buy cars, upgrades, spare parts, tyres, and hire drivers and crew.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="main">
+
+        <!-- Player highlight -->
+        <div class="player-bar">
+            <div class="pb-rank">47<span class="pb-suffix">th</span></div>
+            <div class="pb-info">
+                <div class="pb-team">Backfire Racing</div>
+                <div class="pb-details">Year 8 · Class D · 8 races completed</div>
+            </div>
+            <div class="pb-stat">
+                <div class="pb-stat-value">52.4</div>
+                <div class="pb-stat-label">Prestige</div>
+            </div>
+            <div class="pb-stat">
+                <div class="pb-stat-value">3rd</div>
+                <div class="pb-stat-label">In Class D</div>
+            </div>
+            <div class="pb-stat">
+                <div class="pb-trend">
+                    <i class="fa-solid fa-caret-up" style="color:#00d4aa; font-size:18px;"></i>
+                    <span class="pb-trend-value up">+12</span>
+                </div>
+                <div class="pb-trend-label">vs Last Year</div>
+            </div>
+        </div>
+
+        <!-- Standings table -->
+        <div class="panel">
+            <div class="panel-header">
+                <span class="panel-title">All-Time Standings</span>
+                <div class="class-filter">
+                    <button class="class-btn active">All</button>
+                    <button class="class-btn">F</button>
+                    <button class="class-btn">E</button>
+                    <button class="class-btn">D</button>
+                    <button class="class-btn">C</button>
+                    <button class="class-btn">B</button>
+                    <button class="class-btn">A</button>
+                </div>
+            </div>
+            <div class="standings-scroll">
+                <table class="standings-table">
+                    <thead>
+                        <tr>
+                            <th style="width:60px;">Rank</th>
+                            <th>Team</th>
+                            <th style="width:70px;">Class</th>
+                            <th style="width:80px;" class="center">Class Pos</th>
+                            <th style="width:100px;" class="right">Prestige</th>
+                            <th style="width:100px;" class="right">Trend</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><span class="rank-num top3">1</span></td><td class="team-cell">Glacier Racing</td><td><span class="class-badge-sm a">A</span></td><td class="center class-pos">1st</td><td class="right"><span class="prestige-score">98.5</span></td><td><div class="trend"><i class="fa-solid fa-caret-up trend-arrow up"></i><span class="trend-delta up">+2</span></div></td></tr>
+                        <tr><td><span class="rank-num top3">2</span></td><td class="team-cell">Midnight Apex</td><td><span class="class-badge-sm a">A</span></td><td class="center class-pos">2nd</td><td class="right"><span class="prestige-score">97.2</span></td><td><div class="trend"><i class="fa-solid fa-caret-down trend-arrow down"></i><span class="trend-delta down">−1</span></div></td></tr>
+                        <tr><td><span class="rank-num top3">3</span></td><td class="team-cell">Zenith Motors</td><td><span class="class-badge-sm a">A</span></td><td class="center class-pos">3rd</td><td class="right"><span class="prestige-score">95.8</span></td><td><div class="trend"><i class="fa-solid fa-caret-up trend-arrow up"></i><span class="trend-delta up">+1</span></div></td></tr>
+                        <tr><td><span class="rank-num">4</span></td><td class="team-cell">Ironside Motorsport</td><td><span class="class-badge-sm b">B</span></td><td class="center class-pos">1st</td><td class="right"><span class="prestige-score">89.4</span></td><td><div class="trend"><span class="trend-delta flat">—</span></div></td></tr>
+                        <tr><td><span class="rank-num">5</span></td><td class="team-cell">Viper Racing</td><td><span class="class-badge-sm b">B</span></td><td class="center class-pos">2nd</td><td class="right"><span class="prestige-score">86.5</span></td><td><div class="trend"><i class="fa-solid fa-caret-up trend-arrow up"></i><span class="trend-delta up">+3</span></div></td></tr>
+                        <tr><td><span class="rank-num">6</span></td><td class="team-cell">Thunder Rally</td><td><span class="class-badge-sm b">B</span></td><td class="center class-pos">3rd</td><td class="right"><span class="prestige-score">82.1</span></td><td><div class="trend"><i class="fa-solid fa-caret-down trend-arrow down"></i><span class="trend-delta down">−2</span></div></td></tr>
+                        <tr><td><span class="rank-num">7</span></td><td class="team-cell">Eclipse Racing</td><td><span class="class-badge-sm b">B</span></td><td class="center class-pos">4th</td><td class="right"><span class="prestige-score">78.9</span></td><td><div class="trend"><i class="fa-solid fa-caret-down trend-arrow down"></i><span class="trend-delta down">−1</span></div></td></tr>
+                        <tr><td><span class="rank-num">8</span></td><td class="team-cell">Track Hawks Inc</td><td><span class="class-badge-sm c">C</span></td><td class="center class-pos">1st</td><td class="right"><span class="prestige-score">64.2</span></td><td><div class="trend"><i class="fa-solid fa-caret-up trend-arrow up"></i><span class="trend-delta up">+4</span></div></td></tr>
+                        <tr><td>...</td><td colspan="5" style="color:#3a5a78; font-style:italic;">positions 9–46</td></tr>
+                        <tr class="player-row"><td><span class="rank-num">47</span></td><td class="team-cell">Backfire Racing</td><td><span class="class-badge-sm d">D</span></td><td class="center class-pos">3rd</td><td class="right"><span class="prestige-score">52.4</span></td><td><div class="trend"><i class="fa-solid fa-caret-up trend-arrow up"></i><span class="trend-delta up">+12</span></div></td></tr>
+                        <tr><td><span class="rank-num">48</span></td><td class="team-cell">Drift Syndicate</td><td><span class="class-badge-sm d">D</span></td><td class="center class-pos">4th</td><td class="right"><span class="prestige-score">51.8</span></td><td><div class="trend"><i class="fa-solid fa-caret-up trend-arrow up"></i><span class="trend-delta up">+5</span></div></td></tr>
+                        <tr><td>...</td><td colspan="5" style="color:#3a5a78; font-style:italic;">positions 49–94</td></tr>
+                        <tr><td><span class="rank-num">95</span></td><td class="team-cell">Wreck Division</td><td><span class="class-badge-sm f">F</span></td><td class="center class-pos">8th</td><td class="right"><span class="prestige-score">8.5</span></td><td><div class="trend"><i class="fa-solid fa-caret-down trend-arrow down"></i><span class="trend-delta down">−3</span></div></td></tr>
+                        <tr><td><span class="rank-num">96</span></td><td class="team-cell">Salvage Motorsport</td><td><span class="class-badge-sm f">F</span></td><td class="center class-pos">9th</td><td class="right"><span class="prestige-score">7.2</span></td><td><div class="trend"><span class="trend-delta flat">—</span></div></td></tr>
+                        <tr><td><span class="rank-num">97</span></td><td class="team-cell">Heap Racing</td><td><span class="class-badge-sm f">F</span></td><td class="center class-pos">10th</td><td class="right"><span class="prestige-score">5.8</span></td><td><div class="trend"><i class="fa-solid fa-caret-down trend-arrow down"></i><span class="trend-delta down">−5</span></div></td></tr>
+                        <tr><td><span class="rank-num">98</span></td><td class="team-cell">Oxide Garage</td><td><span class="class-badge-sm e">E</span></td><td class="center class-pos">12th</td><td class="right"><span class="prestige-score">4.5</span></td><td><div class="trend"><i class="fa-solid fa-caret-down trend-arrow down"></i><span class="trend-delta down">−8</span></div></td></tr>
+                        <tr><td><span class="rank-num">99</span></td><td class="team-cell">Terminal Speed</td><td><span class="class-badge-sm e">E</span></td><td class="center class-pos">13th</td><td class="right"><span class="prestige-score">3.0</span></td><td><div class="trend"><i class="fa-solid fa-caret-down trend-arrow down"></i><span class="trend-delta down">−12</span></div></td></tr>
+                        <tr><td><span class="rank-num">100</span></td><td class="team-cell">Last Chance Garage</td><td><span class="class-badge-sm f">F</span></td><td class="center class-pos">11th</td><td class="right"><span class="prestige-score">1.5</span></td><td><div class="trend"><i class="fa-solid fa-caret-down trend-arrow down"></i><span class="trend-delta down">−4</span></div></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>
