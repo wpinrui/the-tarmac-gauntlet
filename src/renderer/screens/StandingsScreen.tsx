@@ -31,11 +31,7 @@ export function StandingsScreen() {
       const prevPrestige = history.length >= 2 ? history[history.length - 2] : null;
       return { team: t, carClass: cls, prevPrestige };
     });
-
-    // Sort by prestige descending
     teams.sort((a, b) => b.team.prestige - a.team.prestige);
-
-    // Assign overall rank
     return teams.map((t, i) => ({ ...t, rank: i + 1 }));
   }, [game.teams, game.carModels]);
 
@@ -44,29 +40,14 @@ export function StandingsScreen() {
     ? rankings
     : rankings.filter((r) => r.carClass === classFilter);
 
-  // Compute class positions within filtered view
-  const withClassPos = useMemo(() => {
-    if (classFilter !== "all") {
-      return filtered.map((r, i) => ({ ...r, classPos: i + 1 }));
-    }
-    // For "all" view, compute class position per team
-    const classCounters: Record<string, number> = {};
-    return rankings.map((r) => {
-      const cls = r.carClass ?? "?";
-      classCounters[cls] = (classCounters[cls] ?? 0) + 1;
-      return { ...r, classPos: classCounters[cls] };
-    }).filter((r) => classFilter === "all" || r.carClass === classFilter);
-  }, [filtered, rankings, classFilter]);
-
   // Player data
   const playerRanking = rankings.find((r) => r.team.id === "player");
   const playerRank = playerRanking?.rank ?? 100;
-  const playerClassPos = withClassPos.find((r) => r.team.id === "player")?.classPos ?? 0;
   const playerPrevPrestige = playerRanking?.prevPrestige;
   const playerTrend = playerPrevPrestige !== null && playerPrevPrestige !== undefined
     ? (() => {
         const prevRank = rankings.filter((r) => (r.prevPrestige ?? 0) > (playerPrevPrestige ?? 0)).length + 1;
-        return prevRank - playerRank; // positive = moved up
+        return prevRank - playerRank;
       })()
     : null;
 
@@ -90,10 +71,6 @@ export function StandingsScreen() {
             <div className="pb-stat">
               <div className="pb-stat-value">{player.prestige.toFixed(1)}</div>
               <div className="pb-stat-label">Prestige</div>
-            </div>
-            <div className="pb-stat">
-              <div className="pb-stat-value">{playerClassPos}</div>
-              <div className="pb-stat-label">Class Pos</div>
             </div>
             {playerTrend !== null && (
               <div className="pb-trend">
@@ -129,27 +106,24 @@ export function StandingsScreen() {
                     <th style={{ width: 60 }}>Rank</th>
                     <th>Team</th>
                     <th className="center" style={{ width: 80 }}>Class</th>
-                    <th className="center" style={{ width: 80 }}>Class Pos</th>
                     <th className="right" style={{ width: 100 }}>Prestige</th>
                     <th className="right" style={{ width: 100 }}>Trend</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {withClassPos.map((r) => {
+                  {filtered.map((r) => {
                     const isPlayer = r.team.id === "player";
-                    const displayRank = classFilter === "all" ? r.rank : r.classPos;
                     const history = r.team.prestigeHistory;
                     const prevPrestige = history.length >= 2 ? history[history.length - 2] : null;
                     const delta = prevPrestige !== null ? r.team.prestige - prevPrestige : null;
 
                     return (
                       <tr key={r.team.id} className={isPlayer ? "player-row" : ""}>
-                        <td><span className={`rank-num ${displayRank <= 3 ? "top3" : ""}`}>{displayRank}</span></td>
+                        <td><span className={`rank-num ${r.rank <= 3 ? "top3" : ""}`}>{r.rank}</span></td>
                         <td className="team-cell">{r.team.name}</td>
                         <td className="center">
                           {r.carClass && <ClassBadge carClass={r.carClass} />}
                         </td>
-                        <td className="center class-pos">{r.classPos}</td>
                         <td className="right"><span className="prestige-score">{r.team.prestige.toFixed(1)}</span></td>
                         <td className="right">
                           {delta !== null ? (
