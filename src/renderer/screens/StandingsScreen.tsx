@@ -3,7 +3,6 @@ import { useGameStore } from "../state/store";
 import { TopBar } from "./TopBar";
 import { ordinal } from "../shared/raceDisplay";
 import type { PlayerTeam } from "../types";
-import "./DealerShared.scss";
 import "./Standings.scss";
 
 
