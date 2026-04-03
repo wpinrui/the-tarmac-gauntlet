@@ -1,4 +1,4 @@
-import type { PrizeScheduleEntry } from "../types";
+import type { PrizeScheduleEntry, RaceHistoryEntry } from "../types";
 
 // ---------------------------------------------------------------------------
 // Tunable constants — balance values, adjust freely without touching logic
@@ -134,4 +134,43 @@ export function calculatePrestige(results: PastRaceResult[]): number {
   }
 
   return weightedSum / totalWeight;
+}
+
+/**
+ * Extracts PastRaceResult[] for a given team from race history (newest-first).
+ * Used to feed calculatePrestige().
+ */
+export function extractTeamResults(
+  teamId: string,
+  raceHistory: RaceHistoryEntry[],
+): PastRaceResult[] {
+  const results: PastRaceResult[] = [];
+  // Iterate newest-first
+  for (let i = raceHistory.length - 1; i >= 0; i--) {
+    const entry = raceHistory[i];
+    const teamResult = entry.results.find((r) => r.teamId === teamId);
+    if (teamResult) {
+      results.push({
+        position: teamResult.position,
+        totalCars: entry.results.length,
+      });
+    }
+  }
+  return results;
+}
+
+/**
+ * Recalculates prestige for all teams from race history.
+ * Returns a map of teamId → prestige score.
+ */
+export function recalculateAllPrestige(
+  teamIds: string[],
+  raceHistory: RaceHistoryEntry[],
+): Record<string, number> {
+  const result: Record<string, number> = {};
+  for (const teamId of teamIds) {
+    const pastResults = extractTeamResults(teamId, raceHistory);
+    result[teamId] = calculatePrestige(pastResults);
+  }
+  return result;
 }

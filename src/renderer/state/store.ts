@@ -65,6 +65,9 @@ interface GameStore {
   // Post-race financial actions
   awardPrizeMoney: (teamId: string, position: number, amount: number) => void;
   deductFuelCost: (totalCost: number) => void;
+
+  // Prestige
+  updatePrestige: (prestigeMap: Record<string, number>) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -301,5 +304,22 @@ export const useGameStore = create<GameStore>()((set) => ({
           ],
         };
       });
+    }),
+
+  // --- Prestige ---
+
+  updatePrestige: (prestigeMap) =>
+    set((state) => {
+      if (!state.game) return state;
+      const year = getYear(state);
+      const teams = state.game.teams.map((t) => {
+        const newPrestige = prestigeMap[t.id] ?? t.prestige;
+        return {
+          ...t,
+          prestige: newPrestige,
+          prestigeHistory: [...t.prestigeHistory, newPrestige],
+        };
+      });
+      return { game: { ...state.game, teams } };
     }),
 }));

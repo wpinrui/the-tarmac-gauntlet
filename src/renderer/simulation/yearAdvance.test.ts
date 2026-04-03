@@ -62,7 +62,7 @@ function makeDriver(id: string, totalStats: number): Driver {
 function makeAiTeam(id: string, budget: number, car?: CarInstance): AITeam {
   return {
     kind: "ai", id, name: `Team ${id}`, budget,
-    prestige: 0, crewSize: 0,
+    prestige: 0, prestigeHistory: [0], crewSize: 0,
     cars: car ? [car] : [],
     contracts: [],
     enteredCarId: car?.id ?? null,
@@ -74,7 +74,7 @@ function makePlayerTeam(id: string): PlayerTeam {
   const car = makeCarInstance("player-car", "m1", 0);
   return {
     kind: "player", id, name: "Player Team", budget: 10_000,
-    prestige: 0, crewSize: 2,
+    prestige: 0, prestigeHistory: [0], crewSize: 2,
     cars: [car], contracts: [], enteredCarId: car.id,
     playerName: "Ivan", logo: null,
     skills: { driver: 5, engineer: 5, business: 5 },
