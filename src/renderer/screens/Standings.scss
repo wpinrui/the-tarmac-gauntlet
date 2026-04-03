@@ -48,13 +48,11 @@
   text-align: left; padding: 8px 16px; border-bottom: 1px solid rgba(42,66,98,0.4);
   position: sticky; top: 0; background: rgba(12,18,32,0.98); z-index: 1;
   &.right { text-align: right; }
-  &.center { text-align: center; }
 }
 .standings-table td {
   font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 15px; color: #a0b8d0; padding: 8px 16px;
   border-bottom: 1px solid rgba(42,66,98,0.1);
   &.right { text-align: right; }
-  &.center { text-align: center; }
 }
 .standings-table tr.player-row td { color: #00d4aa; font-weight: 500; }
 
