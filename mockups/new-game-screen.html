@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The 24h Tarmac Gauntlet — New Game</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/flag-icons/7.2.1/css/flag-icons.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
 
@@ -191,6 +192,31 @@
         }
 
         .field-input::placeholder { color: #3a5068; }
+
+        /* Nationality selector */
+        .nationality-wrap { position: relative; }
+        .nationality-input {
+            width: 100%;
+            padding: 14px 18px 14px 46px;
+            background: rgba(6, 10, 20, 0.55);
+            border: 1px solid #3a5a78;
+            border-radius: 6px;
+            color: #eef0f6;
+            font-family: 'Oswald', sans-serif;
+            font-weight: 400;
+            font-size: 18px;
+            outline: none;
+            transition: border-color .2s, box-shadow .2s;
+        }
+        .nationality-input:focus {
+            border-color: #00d4aa;
+            box-shadow: 0 0 0 3px rgba(0,212,170,0.1);
+        }
+        .nationality-input::placeholder { color: #3a5068; }
+        .nationality-flag-preview {
+            position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+            border-radius: 2px; font-size: 18px; line-height: 1;
+        }
 
         /* ---- Logo grid (Step 2) ---- */
         .section-label {
@@ -438,6 +464,14 @@
                 <label class="field-label">Your Name</label>
                 <input class="field-input" type="text" id="playerName"
                        placeholder="Enter your name" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="field-group">
+                <label class="field-label">Nationality</label>
+                <div class="nationality-wrap">
+                    <span class="fi fi-sg nationality-flag-preview"></span>
+                    <input class="nationality-input" type="text" value="Singapore"
+                           placeholder="Search country..." autocomplete="off" spellcheck="false">
+                </div>
             </div>
             <div class="field-group">
                 <label class="field-label">Team Name</label>

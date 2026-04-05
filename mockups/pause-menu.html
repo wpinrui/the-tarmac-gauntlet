@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The 24h Tarmac Gauntlet — Pause Menu</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body {
+            height: 100%;
+            background: #080d18;
+            color: #d0d8e4;
+            font-family: 'Inter', 'Segoe UI', -apple-system, sans-serif;
+            overflow: hidden;
+        }
+
+        /* Simulated background screen (garage dashboard placeholder) */
+        .background-screen {
+            position: fixed; inset: 0;
+            background: #0c1220;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .bg-placeholder {
+            font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 18px;
+            letter-spacing: 3px; text-transform: uppercase; color: #1e3450;
+        }
+
+        /* ======== OVERLAY ======== */
+        .pause-overlay {
+            position: fixed; inset: 0;
+            background: rgba(4, 6, 12, 0.75);
+            backdrop-filter: blur(6px);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 100;
+        }
+
+        .pause-card {
+            width: 440px;
+            border-radius: 12px;
+            border: 1px solid #2a4262;
+            background: rgba(12, 18, 32, 0.92);
+            backdrop-filter: blur(24px);
+            padding: 48px 44px;
+            box-shadow: 0 8px 48px rgba(0,0,0,0.5);
+            text-align: center;
+        }
+
+        .pause-title {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 700; font-size: 36px;
+            letter-spacing: 5px; text-transform: uppercase;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+
+        .pause-subtitle {
+            font-family: 'Inter', sans-serif;
+            font-weight: 400; font-size: 16px;
+            color: #5a7a98;
+            margin-bottom: 40px;
+        }
+
+        .pause-actions {
+            display: flex; flex-direction: column;
+            gap: 12px;
+        }
+
+        .pause-btn {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 600; font-size: 18px;
+            letter-spacing: 2.5px; text-transform: uppercase;
+            padding: 16px 24px; border-radius: 8px;
+            border: none; cursor: pointer; transition: all .2s;
+            width: 100%;
+        }
+
+        .pause-btn.resume {
+            background: #00d4aa; color: #060a14;
+        }
+        .pause-btn.resume:hover {
+            background: #00e8bc;
+            box-shadow: 0 0 20px rgba(0,212,170,0.15);
+        }
+
+        .pause-btn.main-menu {
+            background: transparent;
+            border: 1px solid #2a4262;
+            color: #a0b8d0;
+        }
+        .pause-btn.main-menu:hover {
+            border-color: #3a5a78;
+            color: #e8ecf4;
+            background: rgba(255,255,255,0.02);
+        }
+
+        .pause-btn.quit {
+            background: transparent;
+            border: 1px solid rgba(225,112,85,0.3);
+            color: #e17055;
+        }
+        .pause-btn.quit:hover {
+            border-color: rgba(225,112,85,0.5);
+            background: rgba(225,112,85,0.06);
+        }
+
+        .pause-hint {
+            font-family: 'Inter', sans-serif;
+            font-weight: 400; font-size: 14px;
+            color: #3a5a78;
+            margin-top: 24px;
+        }
+        .pause-hint kbd {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 500; font-size: 14px;
+            color: #5a7a98;
+            background: rgba(6,10,20,0.4);
+            border: 1px solid #2a4262;
+            border-radius: 3px;
+            padding: 1px 6px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Simulated background -->
+<div class="background-screen">
+    <span class="bg-placeholder">[ Game screen behind overlay ]</span>
+</div>
+
+<!-- Pause overlay -->
+<div class="pause-overlay">
+    <div class="pause-card">
+        <div class="pause-title">Paused</div>
+        <div class="pause-subtitle">The 24h Tarmac Gauntlet</div>
+
+        <div class="pause-actions">
+            <button class="pause-btn resume">Resume</button>
+            <button class="pause-btn main-menu">Main Menu</button>
+            <button class="pause-btn quit">Quit to Desktop</button>
+        </div>
+
+        <div class="pause-hint">Press <kbd>Esc</kbd> to resume</div>
+    </div>
+</div>
+
+</body>
+</html>
