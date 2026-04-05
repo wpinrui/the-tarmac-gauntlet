@@ -9,7 +9,7 @@ import type {
   UsedCarListing,
 } from "../types";
 import { calculateDriverStats, totalDriverStats, calculateAnnualSalary } from "./driverLifecycle";
-import { CREW_COST_PER_MEMBER } from "../shared/dealerData";
+import { CREW_COST_PER_MEMBER, CONDITION_PER_PART } from "../shared/dealerData";
 
 // ---------------------------------------------------------------------------
 // Tunable constants
@@ -135,7 +135,8 @@ type SpendingOption =
   | { kind: "buyUsedCar";    value: number; cost: number; listing: UsedCarListing }
   | { kind: "hireCrew";      value: number; cost: number; newSize: number }
   | { kind: "buySpares";     value: number; cost: number }
-  | { kind: "buyTyres";      value: number; cost: number };
+  | { kind: "buyTyres";      value: number; cost: number }
+  | { kind: "repairCar";     value: number; cost: number; carId: string; partsNeeded: number; conditionGain: number };
 
 // ---------------------------------------------------------------------------
 // Option enumeration
@@ -231,11 +232,34 @@ function enumerateOptions(
     });
   }
 
+  // --- Car repair ---
+  if (current && current.instance.condition < 100) {
+    const conditionDeficit = 100 - current.instance.condition;
+    const partsNeeded = Math.ceil(conditionDeficit / CONDITION_PER_PART);
+    const partsAvailable = team.spareParts;
+    const partsToUse = Math.min(partsNeeded, partsAvailable);
+    if (partsToUse > 0) {
+      const conditionGain = Math.min(conditionDeficit, partsToUse * CONDITION_PER_PART);
+      // High value — keeping condition up is critical for race performance
+      options.push({
+        kind: "repairCar",
+        value: conditionGain * 2, // 2 value points per % condition restored
+        cost: 0, // spare parts already owned, no money cost
+        carId: current.instance.id,
+        partsNeeded: partsToUse,
+        conditionGain,
+      });
+    }
+  }
+
   // --- Consumables ---
+  // Boost spare parts value if car needs repair but team lacks parts
+  const needsRepair = current && current.instance.condition < 100;
+  const sparesValue = needsRepair && team.spareParts < 10 ? 50 : 3;
   if (team.spareParts < AI_MAX_SPARE_PARTS) {
     options.push({
       kind: "buySpares",
-      value: 3,
+      value: sparesValue,
       cost: AI_SPARE_PARTS_PER_BUY * AI_SPARE_PART_COST,
     });
   }
@@ -358,6 +382,23 @@ function applyOption(
           ...team,
           budget: team.budget - option.cost,
           tyreSets: team.tyreSets + AI_TYRE_SETS_PER_BUY,
+        },
+        contractedIds,
+        allContracts,
+      };
+    }
+
+    case "repairCar": {
+      const updatedCars = team.cars.map((c) =>
+        c.id === option.carId
+          ? { ...c, condition: Math.min(100, c.condition + option.conditionGain) }
+          : c,
+      );
+      return {
+        team: {
+          ...team,
+          spareParts: team.spareParts - option.partsNeeded,
+          cars: updatedCars,
         },
         contractedIds,
         allContracts,

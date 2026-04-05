@@ -3,14 +3,11 @@ import { useGameStore } from "../state/store";
 import { calculateEffectiveStats } from "../simulation/effectiveStats";
 import { calculateSalePrice } from "../simulation/carMarket";
 import { TopBar } from "./TopBar";
-import { UPGRADE_DESCS, DISPLAY_STATS, SALE_PRICE_MULTIPLIER } from "../shared/dealerData";
+import { UPGRADE_DESCS, DISPLAY_STATS, SALE_PRICE_MULTIPLIER, CONDITION_PER_PART } from "../shared/dealerData";
 import { ClassBadge } from "../shared/ClassBadge";
 import type { CarInstance, CarModel, PlayerTeam, UpgradePackType } from "../types";
 import backdropUrl from "../assets/workshop-backdrop.jpg";
 import "./DealerShared.scss";
-
-/** Placeholder: 1 spare part restores this much condition. */
-const CONDITION_PER_PART = 5;
 
 export function CarWorkshopScreen() {
   const game = useGameStore((s) => s.game);
