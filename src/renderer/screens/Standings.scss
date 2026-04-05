@@ -61,6 +61,5 @@
 .standings-table tr.player-row .team-cell { color: #00d4aa; }
 .prestige-score { font-weight: 600; font-size: 17px; color: #e8ecf4; }
 .standings-table tr.player-row .prestige-score { color: #00d4aa; }
+// Trend styles in RaceShared.scss
 .trend { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
-.trend-arrow { font-size: 12px; &.up { color: #00d4aa; } &.down { color: #e17055; } &.flat { color: #5a7a98; } }
-.trend-delta { font-weight: 500; font-size: 14px; &.up { color: #00d4aa; } &.down { color: #e17055; } &.flat { color: #5a7a98; } }

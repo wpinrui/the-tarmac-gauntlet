@@ -6,6 +6,7 @@ import { ordinal } from "../shared/raceDisplay";
 import { calculateEffectiveStats } from "../simulation/effectiveStats";
 import { calculateDriverStats, totalDriverStats } from "../simulation/driverLifecycle";
 import type { PlayerTeam, CarClass, Team, CarModel, Driver } from "../types";
+import "./RaceShared.scss";
 import "./ScoutingReport.scss";
 
 const CLASS_ORDER: CarClass[] = ["A", "B", "C", "D", "E", "F"];
@@ -80,7 +81,7 @@ export function ScoutingReportScreen() {
         // Player character
         if (team.kind === "player") {
           const pcOvr = (team as PlayerTeam).skills.driver * 5;
-          teamDrivers.push({ name: (team as PlayerTeam).playerName, nationality: "sg", ovr: pcOvr });
+          teamDrivers.push({ name: (team as PlayerTeam).playerName, nationality: "", ovr: pcOvr });
         }
 
         // Contracted drivers
@@ -247,7 +248,7 @@ export function ScoutingReportScreen() {
                                 {r.drivers.map((d, j) => (
                                   <span key={j}>
                                     {j > 0 && ", "}
-                                    <span className={`fi fi-${d.nationality} driver-flag`} />
+                                    {d.nationality && <span className={`fi fi-${d.nationality} driver-flag`} />}
                                     {d.name.includes(" ") ? `${d.name[0]}. ${d.name.split(" ").slice(1).join(" ")}` : d.name}
                                   </span>
                                 ))}
