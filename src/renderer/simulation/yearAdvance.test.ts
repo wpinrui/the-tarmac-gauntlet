@@ -76,7 +76,7 @@ function makePlayerTeam(id: string): PlayerTeam {
     kind: "player", id, name: "Player Team", budget: 10_000,
     prestige: 0, prestigeHistory: [0], crewSize: 2,
     cars: [car], contracts: [], enteredCarId: car.id,
-    playerName: "Ivan", logo: null,
+    playerName: "Ivan", nationality: "sg", logo: null,
     skills: { driver: 5, engineer: 5, business: 5 },
     spareParts: 10, tyreSets: 5,
     transactions: [],

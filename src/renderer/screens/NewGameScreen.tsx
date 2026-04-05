@@ -1,5 +1,6 @@
-import { useState, useCallback, useRef, type ReactNode } from "react";
+import { useState, useCallback, useRef, useMemo, type ReactNode } from "react";
 import { SKILL_TOOLTIPS } from "../shared/skillData";
+import { COUNTRIES } from "../shared/countries";
 import "./NewGameScreen.scss";
 import backdropUrl from "../assets/track-backdrop.jpg";
 
@@ -124,6 +125,7 @@ const TOTAL_POINTS = 15;
 interface NewGameScreenProps {
   onStart: (data: {
     playerName: string;
+    nationality: string;
     teamName: string;
     logo: string | null;
     skills: { driver: number; engineer: number; business: number };
@@ -133,6 +135,9 @@ interface NewGameScreenProps {
 export function NewGameScreen({ onStart }: NewGameScreenProps) {
   const [step, setStep] = useState(1);
   const [playerName, setPlayerName] = useState("");
+  const [nationalityCode, setNationalityCode] = useState("");
+  const [nationalitySearch, setNationalitySearch] = useState("");
+  const [nationalityOpen, setNationalityOpen] = useState(false);
   const [teamName, setTeamName] = useState("");
   const [selectedLogo, setSelectedLogo] = useState("shield");
   const [skills, setSkills] = useState({ driver: 0, engineer: 0, business: 0 });
@@ -140,7 +145,15 @@ export function NewGameScreen({ onStart }: NewGameScreenProps) {
   const [customLogoDataUrl, setCustomLogoDataUrl] = useState<string | null>(null);
 
   const remaining = TOTAL_POINTS - skills.driver - skills.engineer - skills.business;
-  const step1Valid = playerName.trim().length > 0 && teamName.trim().length > 0;
+  const step1Valid = playerName.trim().length > 0 && nationalityCode.length > 0 && teamName.trim().length > 0;
+
+  const filteredCountries = useMemo(() => {
+    if (!nationalitySearch) return COUNTRIES;
+    const q = nationalitySearch.toLowerCase();
+    return COUNTRIES.filter((c) => c.name.toLowerCase().includes(q) || c.code.includes(q));
+  }, [nationalitySearch]);
+
+  const selectedCountry = COUNTRIES.find((c) => c.code === nationalityCode);
 
   const adjustSkill = useCallback(
     (key: "driver" | "engineer" | "business", delta: number) => {
@@ -184,11 +197,12 @@ export function NewGameScreen({ onStart }: NewGameScreenProps) {
     const logo = selectedLogo === "custom" ? customLogoDataUrl : selectedLogo;
     onStart({
       playerName: playerName.trim(),
+      nationality: nationalityCode,
       teamName: teamName.trim(),
       logo,
       skills,
     });
-  }, [onStart, playerName, teamName, selectedLogo, customLogoDataUrl, skills]);
+  }, [onStart, playerName, nationalityCode, teamName, selectedLogo, customLogoDataUrl, skills]);
 
   // --- Step tabs ---
   const stepTab = (n: number, label: string) => {
@@ -239,6 +253,44 @@ export function NewGameScreen({ onStart }: NewGameScreenProps) {
                   autoComplete="off"
                   spellCheck={false}
                 />
+              </div>
+              <div className="field-group">
+                <label className="field-label">Nationality</label>
+                <div className="nationality-wrap">
+                  {selectedCountry && (
+                    <span className={`fi fi-${selectedCountry.code} nationality-flag-preview`} />
+                  )}
+                  <input
+                    className="nationality-input"
+                    type="text"
+                    value={nationalityOpen ? nationalitySearch : selectedCountry?.name ?? ""}
+                    onChange={(e) => { setNationalitySearch(e.target.value); setNationalityOpen(true); }}
+                    onFocus={() => { setNationalityOpen(true); setNationalitySearch(""); }}
+                    onBlur={() => setTimeout(() => setNationalityOpen(false), 150)}
+                    placeholder="Search country..."
+                    autoComplete="off"
+                    spellCheck={false}
+                    style={{ paddingLeft: selectedCountry ? 46 : 18 }}
+                  />
+                  {nationalityOpen && filteredCountries.length > 0 && (
+                    <div className="nationality-dropdown">
+                      {filteredCountries.map((c) => (
+                        <div
+                          key={c.code}
+                          className={`nationality-option ${c.code === nationalityCode ? "selected" : ""}`}
+                          onMouseDown={() => {
+                            setNationalityCode(c.code);
+                            setNationalitySearch("");
+                            setNationalityOpen(false);
+                          }}
+                        >
+                          <span className={`fi fi-${c.code}`} style={{ marginRight: 8, borderRadius: 2 }} />
+                          {c.name}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="field-group">
                 <label className="field-label">Team Name</label>
