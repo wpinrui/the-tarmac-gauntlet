@@ -21,6 +21,7 @@
 .class-group {
   border-radius: 10px; border: 1px solid #2a4262;
   background: rgba(12,18,32,0.78); backdrop-filter: blur(10px); overflow: hidden;
+  flex-shrink: 0;
   &.player-class { border-color: rgba(0,212,170,0.2); }
 }
 
