@@ -26,7 +26,9 @@
 
 .class-group-header {
   display: flex; align-items: center; gap: 12px; padding: 14px 20px;
+  min-height: 56px;
   cursor: pointer; transition: background .12s;
+  flex-shrink: 0;
   &:hover { background: rgba(255,255,255,0.02); }
 }
 
