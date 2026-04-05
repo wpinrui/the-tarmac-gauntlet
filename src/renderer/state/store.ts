@@ -26,7 +26,8 @@ export type Screen =
   | "crewHiring"
   | "finances"
   | "raceHistory"
-  | "standings";
+  | "standings"
+  | "scoutingReport";
 
 // ---------------------------------------------------------------------------
 // Store interface

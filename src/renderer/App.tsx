@@ -12,6 +12,7 @@ import { FinancesScreen } from "./screens/FinancesScreen";
 import { PostRaceSummaryScreen } from "./screens/PostRaceSummaryScreen";
 import { RaceHistoryScreen } from "./screens/RaceHistoryScreen";
 import { StandingsScreen } from "./screens/StandingsScreen";
+import { ScoutingReportScreen } from "./screens/ScoutingReportScreen";
 import { initializeGame } from "./simulation/gameInit";
 
 export function App() {
@@ -60,6 +61,8 @@ export function App() {
       return <RaceHistoryScreen />;
     case "standings":
       return <StandingsScreen />;
+    case "scoutingReport":
+      return <ScoutingReportScreen />;
     case "garage":
     default:
       return <GarageScreen />;

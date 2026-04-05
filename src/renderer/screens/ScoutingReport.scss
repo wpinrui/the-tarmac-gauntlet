@@ -1,0 +1,99 @@
+.scouting-root {
+  position: fixed; inset: 0; background: #080d18; color: #d0d8e4;
+  font-family: 'Inter', 'Segoe UI', -apple-system, sans-serif;
+  overflow: hidden; display: flex; flex-direction: column;
+  *, *::before, *::after { box-sizing: border-box; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #1e3450; border-radius: 3px; }
+}
+
+.scouting-app { display: flex; flex-direction: column; height: 100vh; }
+.scouting-main { flex: 1; overflow-y: auto; padding: 24px 28px 40px; display: flex; flex-direction: column; gap: 14px; }
+
+// No-car prompt
+.no-car-prompt {
+  display: flex; align-items: center; justify-content: center; height: 200px;
+  font-family: 'Oswald', sans-serif; font-size: 18px; letter-spacing: 2px; color: #3a5a78;
+}
+
+// Class group
+.class-group {
+  border-radius: 10px; border: 1px solid #2a4262;
+  background: rgba(12,18,32,0.78); backdrop-filter: blur(10px); overflow: hidden;
+  flex-shrink: 0;
+  &.player-class { border-color: rgba(0,212,170,0.2); }
+}
+
+.class-group-header {
+  display: flex; align-items: center; gap: 12px; padding: 14px 20px;
+  min-height: 56px;
+  cursor: pointer; transition: background .12s;
+  flex-shrink: 0;
+  &:hover { background: rgba(255,255,255,0.02); }
+}
+
+.class-group-title { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 17px; letter-spacing: 2px; text-transform: uppercase; color: #8a9cb4; flex: 1; }
+.class-group-count { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 14px; color: #5a7a98; }
+.class-group-leader { font-family: 'Inter', sans-serif; font-weight: 400; font-size: 13px; color: #7a96b0; strong { color: #a0b8d0; font-weight: 500; } }
+.class-chevron { color: #5a7a98; font-size: 14px; transition: transform .2s; }
+.class-group.expanded .class-chevron { transform: rotate(180deg); }
+.class-group-body { border-top: 1px solid rgba(42,66,98,0.4); }
+
+// Comparison bar
+.comparison-bar {
+  display: flex; align-items: center; gap: 16px; padding: 12px 20px;
+  background: rgba(0,212,170,0.03); border-bottom: 1px solid rgba(42,66,98,0.3);
+}
+.comparison-label { font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: #5a7a98; }
+.comparison-stat {
+  font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 15px; color: #00d4aa;
+  .vs { font-weight: 400; font-size: 12px; color: #5a7a98; margin: 0 4px; }
+  .avg { color: #7a96b0; font-weight: 400; }
+}
+
+// Team table
+.team-table { width: 100%; border-collapse: collapse; }
+.team-table th {
+  font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 13px;
+  letter-spacing: 1.2px; text-transform: uppercase; color: #5a7a98;
+  text-align: left; padding: 10px 14px; border-bottom: 1px solid rgba(42,66,98,0.3);
+  cursor: pointer; user-select: none; transition: color .15s;
+  &:hover { color: #a0b8d0; }
+  &.right { text-align: right; }
+  &.center { text-align: center; }
+  &.sorted { color: #00d4aa; }
+}
+.team-table td {
+  font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 15px;
+  color: #a0b8d0; padding: 10px 14px; border-bottom: 1px solid rgba(42,66,98,0.1); vertical-align: top;
+  &.right { text-align: right; }
+  &.center { text-align: center; }
+}
+.team-table tr.player-row td { color: #00d4aa; }
+.team-table tr:hover td { background: rgba(255,255,255,0.01); }
+
+.team-name-cell { font-weight: 500; color: #d0dce8; }
+.team-table tr.player-row .team-name-cell { color: #00d4aa; }
+
+.car-cell { color: #7a96b0; font-size: 14px; }
+.drivers-cell { font-family: 'Inter', sans-serif; font-size: 14px; color: #7a96b0; line-height: 1.5; }
+.drivers-cell .driver-flag { margin-right: 3px; border-radius: 1px; position: relative; top: 1px; }
+
+.str-cell { font-family: 'Oswald', sans-serif; font-size: 16px; font-weight: 500; }
+.str-high { color: #00d4aa; }
+.str-mid { color: #e8ecf4; }
+.str-low { color: #e17055; }
+
+.prestige-cell { font-weight: 600; color: #e8ecf4; }
+.team-table tr.player-row .prestige-cell { color: #00d4aa; }
+
+// Trend styles in RaceShared.scss
+
+.last-result { font-weight: 500; }
+.crew-cell { font-size: 15px; color: #7a96b0; }
+
+.condition-cell { font-size: 15px; }
+.cond-good { color: #00d4aa; }
+.cond-fair { color: #e0943a; }
+.cond-poor { color: #e17055; }

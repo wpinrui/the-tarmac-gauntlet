@@ -27,3 +27,8 @@
 .event-icon { font-size: 14px; width: 20px; text-align: center; flex-shrink: 0; }
 .event-text { font-family: 'Inter', sans-serif; font-weight: 400; font-size: 13px; color: #a0b8d0; flex: 1; }
 .events-empty { padding: 40px 20px; text-align: center; font-family: 'Oswald', sans-serif; font-size: 16px; color: #3a5a78; }
+
+// Shared trend indicators (Standings + Scouting Report)
+.trend-cell { display: flex; align-items: center; justify-content: flex-end; gap: 3px; }
+.trend-arrow { font-size: 13px; &.up { color: #00d4aa; } &.down { color: #e17055; } }
+.trend-delta { font-size: 15px; &.up { color: #00d4aa; } &.down { color: #e17055; } &.flat { color: #5a7a98; } }
