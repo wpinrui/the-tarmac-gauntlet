@@ -480,7 +480,7 @@ Prize money is distributed from a **hardcoded static table** — not a formula. 
 - Mid-pack drops steadily: P50: $50,000 · P75: $5,000
 - **P100: $500**
 - Cars that complete **0 laps receive nothing**. All others are paid by position.
-- The complete prize money schedule is **always visible** to the player in the Finances tab
+- The complete prize money schedule is viewable on the **Finances tab** (its only location — it is not repeated on other screens)
 - Prize money is the **sole source of income**
 
 ### Beg Mechanic

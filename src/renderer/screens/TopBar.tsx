@@ -22,7 +22,7 @@ export function TopBar() {
       <div className={`tab ${screen === "finances" ? "active" : ""}`} onClick={() => setScreen("finances")}>Finances</div>
       <div className={`tab ${screen === "raceHistory" ? "active" : ""}`} onClick={() => setScreen("raceHistory")}>Race History</div>
       <div className={`tab ${screen === "standings" ? "active" : ""}`} onClick={() => setScreen("standings")}>Standings</div>
-      <div className="tab">Scouting Report</div>
+      <div className={`tab ${screen === "scoutingReport" ? "active" : ""}`} onClick={() => setScreen("scoutingReport")}>Scouting Report</div>
       <div className="tab-spacer" />
       <div className="tab-resource">
         <i className="fa-solid fa-wrench res-icon" />
