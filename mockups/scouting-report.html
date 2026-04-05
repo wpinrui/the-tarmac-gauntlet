@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The 24h Tarmac Gauntlet — Scouting Report</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/flag-icons/7.2.1/css/flag-icons.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #1e3450; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #2a4a68; }
+
+        html, body {
+            height: 100%;
+            background: #080d18;
+            color: #d0d8e4;
+            font-family: 'Inter', 'Segoe UI', -apple-system, sans-serif;
+            overflow: hidden;
+        }
+
+        .app {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* ======== TAB BAR ======== */
+        .tab-bar {
+            display: flex; align-items: stretch;
+            background: rgba(8, 12, 22, 0.85);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid #2a4262;
+            padding: 0 28px; flex-shrink: 0;
+            position: relative; z-index: 10;
+        }
+        .team-identity { display: flex; align-items: center; gap: 12px; padding: 10px 24px 10px 0; margin-right: 8px; border-right: 1px solid #1e3450; }
+        .team-logo { width: 32px; height: 32px; border-radius: 6px; background: rgba(0,212,170,0.1); border: 1px solid rgba(0,212,170,0.25); display: flex; align-items: center; justify-content: center; }
+        .team-logo svg { width: 18px; height: 18px; }
+        .team-logo path { fill: #00d4aa; }
+        .team-name { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 16px; letter-spacing: 1.5px; text-transform: uppercase; color: #e8ecf4; }
+        .tab { padding: 18px 24px; font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 17px; letter-spacing: 2.5px; text-transform: uppercase; color: #7a96b0; cursor: pointer; position: relative; transition: color .2s; }
+        .tab:hover { color: #a0b8d0; }
+        .tab.active { color: #e8ecf4; }
+        .tab.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: #00d4aa; }
+        .tab-spacer { flex: 1; }
+        .tab-resource { display: flex; align-items: center; gap: 7px; padding: 14px 12px; border-radius: 6px; cursor: pointer; transition: background .15s; position: relative; }
+        .tab-resource:hover { background: rgba(255,255,255,0.04); }
+        .tab-resource .res-icon { font-size: 18px; color: #7a96b0; transition: color .15s; flex-shrink: 0; position: relative; top: 2px; }
+        .tab-resource:hover .res-icon { color: #a0b8d0; }
+        .tab-resource .res-value { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 20px; color: #e8ecf4; }
+        .tab-resource.money .res-value { color: #00d4aa; }
+        .tab-resource .res-tooltip {
+            display: none; position: absolute; top: 100%; right: 0; margin-top: 8px;
+            background: rgba(8,12,22,0.95); border: 1px solid #2a4262;
+            padding: 12px 16px; border-radius: 8px; width: 240px; z-index: 10;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+        }
+        .tab-resource:hover .res-tooltip { display: block; }
+        .res-tooltip-title {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 14px;
+            letter-spacing: 1.5px; text-transform: uppercase; color: #e8ecf4; margin-bottom: 4px;
+        }
+        .res-tooltip-desc {
+            font-family: 'Inter', sans-serif; font-weight: 400; font-size: 13px;
+            color: #8a9cb4; line-height: 1.4;
+        }
+
+        /* ======== MAIN ======== */
+        .main {
+            flex: 1; overflow-y: auto;
+            padding: 24px 28px 40px;
+            display: flex; flex-direction: column; gap: 14px;
+        }
+
+        /* ======== CLASS GROUP ======== */
+        .class-group {
+            border-radius: 10px;
+            border: 1px solid #2a4262;
+            background: rgba(12, 18, 32, 0.78);
+            backdrop-filter: blur(10px);
+            overflow: hidden;
+        }
+        .class-group.player-class { border-color: rgba(0,212,170,0.2); }
+
+        .class-group-header {
+            display: flex; align-items: center; gap: 12px;
+            padding: 14px 20px;
+            cursor: pointer; transition: background .12s;
+        }
+        .class-group-header:hover { background: rgba(255,255,255,0.02); }
+
+        .class-badge {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 12px;
+            letter-spacing: 1.5px; text-transform: uppercase;
+            padding: 2px 10px; border-radius: 8px; border: 1.5px solid;
+            background: transparent; display: inline-block;
+        }
+        .class-badge.f { color: #a0785a; border-color: #a0785a; }
+        .class-badge.e { color: #5ab8d8; border-color: #5ab8d8; }
+        .class-badge.d { color: #d060a0; border-color: #d060a0; }
+        .class-badge.c { color: #e0943a; border-color: #e0943a; }
+        .class-badge.b { color: #d04040; border-color: #d04040; }
+        .class-badge.a { color: #50c878; border-color: #50c878; }
+
+        .class-group-title {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 17px;
+            letter-spacing: 2px; text-transform: uppercase; color: #8a9cb4;
+            flex: 1;
+        }
+        .class-group-count {
+            font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 14px;
+            color: #5a7a98;
+        }
+        .class-group-leader {
+            font-family: 'Inter', sans-serif; font-weight: 400; font-size: 13px;
+            color: #7a96b0;
+        }
+        .class-group-leader strong { color: #a0b8d0; font-weight: 500; }
+        .class-chevron { color: #5a7a98; font-size: 14px; transition: transform .2s; }
+        .class-group.expanded .class-chevron { transform: rotate(180deg); }
+
+        .class-group-body { border-top: 1px solid rgba(42,66,98,0.4); }
+
+        /* ======== TEAM TABLE (inside class group) ======== */
+        .team-table { width: 100%; border-collapse: collapse; }
+        .team-table th {
+            font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 13px;
+            letter-spacing: 1.2px; text-transform: uppercase; color: #5a7a98;
+            text-align: left; padding: 10px 14px;
+            border-bottom: 1px solid rgba(42,66,98,0.3);
+        }
+        .team-table th.right { text-align: right; }
+        .team-table th.center { text-align: center; }
+        .team-table td {
+            font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 15px;
+            color: #a0b8d0; padding: 10px 14px;
+            border-bottom: 1px solid rgba(42,66,98,0.1);
+            vertical-align: top;
+        }
+        .team-table td.right { text-align: right; }
+        .team-table td.center { text-align: center; }
+        .team-table tr.player-row td { color: #00d4aa; }
+        .team-table tr:hover td { background: rgba(255,255,255,0.01); }
+
+        .team-name-cell { font-weight: 500; color: #d0dce8; }
+        .team-table tr.player-row .team-name-cell { color: #00d4aa; }
+
+        .car-cell { color: #7a96b0; font-size: 14px; }
+        .drivers-cell { font-family: 'Inter', sans-serif; font-size: 14px; color: #7a96b0; line-height: 1.5; }
+        .drivers-cell .driver-flag { margin-right: 3px; border-radius: 1px; position: relative; top: 1px; }
+
+        /* Strength components */
+        .str-cell { font-family: 'Oswald', sans-serif; font-size: 16px; font-weight: 500; }
+        .str-high { color: #00d4aa; }
+        .str-mid { color: #e8ecf4; }
+        .str-low { color: #e17055; }
+
+        .prestige-cell { font-weight: 600; color: #e8ecf4; }
+        .team-table tr.player-row .prestige-cell { color: #00d4aa; }
+
+        .trend-cell { display: flex; align-items: center; justify-content: flex-end; gap: 3px; }
+        .trend-arrow { font-size: 13px; }
+        .trend-arrow.up { color: #00d4aa; }
+        .trend-arrow.down { color: #e17055; }
+        .trend-delta { font-size: 15px; }
+        .trend-delta.up { color: #00d4aa; }
+        .trend-delta.down { color: #e17055; }
+        .trend-delta.flat { color: #5a7a98; }
+
+        .last-result { font-weight: 500; }
+
+        .crew-cell { font-size: 15px; color: #7a96b0; }
+
+        .condition-cell { font-size: 15px; }
+        .cond-good { color: #00d4aa; }
+        .cond-fair { color: #e0943a; }
+        .cond-poor { color: #e17055; }
+
+        /* ======== YOUR POSITION (comparison bar at top of player class) ======== */
+        .comparison-bar {
+            display: flex; align-items: center; gap: 16px;
+            padding: 12px 20px;
+            background: rgba(0,212,170,0.03);
+            border-bottom: 1px solid rgba(42,66,98,0.3);
+        }
+        .comparison-label {
+            font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 13px;
+            letter-spacing: 1.5px; text-transform: uppercase; color: #5a7a98;
+        }
+        .comparison-stat {
+            font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 15px;
+            color: #00d4aa;
+        }
+        .comparison-stat .vs {
+            font-weight: 400; font-size: 12px; color: #5a7a98; margin: 0 4px;
+        }
+        .comparison-stat .avg { color: #7a96b0; font-weight: 400; }
+    </style>
+</head>
+<body>
+
+<div class="app">
+    <!-- Tab bar -->
+    <div class="tab-bar">
+        <div class="team-identity">
+            <div class="team-logo"><svg viewBox="0 0 48 48"><path d="M24 4L40 12v14c0 12-16 18-16 18S8 38 8 26V12z"/></svg></div>
+            <span class="team-name">Backfire Racing</span>
+        </div>
+        <div class="tab">Garage</div>
+        <div class="tab">Finances</div>
+        <div class="tab">Race History</div>
+        <div class="tab">Standings</div>
+        <div class="tab active">Scouting Report</div>
+        <div class="tab-spacer"></div>
+        <div class="tab-resource">
+            <i class="fa-solid fa-wrench res-icon"></i>
+            <span class="res-value">12</span>
+            <div class="res-tooltip">
+                <div class="res-tooltip-title">Spare Parts</div>
+                <div class="res-tooltip-desc">Fix mechanical issues during races and repair car condition between races. Unspent parts carry over each year.</div>
+            </div>
+        </div>
+        <div class="tab-resource money">
+            <i class="fa-solid fa-sack-dollar res-icon"></i>
+            <span class="res-value">$187,420</span>
+            <div class="res-tooltip">
+                <div class="res-tooltip-title">Money</div>
+                <div class="res-tooltip-desc">Your team's funds. Buy cars, upgrades, spare parts, tyres, and hire drivers and crew.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main scrollable -->
+    <div class="main">
+
+        <!-- Class A (collapsed) -->
+        <div class="class-group">
+            <div class="class-group-header">
+                <span class="class-badge a">A</span>
+                <span class="class-group-title">Class A</span>
+                <span class="class-group-count">5 teams</span>
+                <span class="class-group-leader">Leader: <strong>Glacier Racing</strong></span>
+                <i class="fa-solid fa-chevron-down class-chevron"></i>
+            </div>
+        </div>
+
+        <!-- Class B (collapsed) -->
+        <div class="class-group">
+            <div class="class-group-header">
+                <span class="class-badge b">B</span>
+                <span class="class-group-title">Class B</span>
+                <span class="class-group-count">8 teams</span>
+                <span class="class-group-leader">Leader: <strong>Ironside Motorsport</strong></span>
+                <i class="fa-solid fa-chevron-down class-chevron"></i>
+            </div>
+        </div>
+
+        <!-- Class C (collapsed) -->
+        <div class="class-group">
+            <div class="class-group-header">
+                <span class="class-badge c">C</span>
+                <span class="class-group-title">Class C</span>
+                <span class="class-group-count">12 teams</span>
+                <span class="class-group-leader">Leader: <strong>Track Hawks Inc</strong></span>
+                <i class="fa-solid fa-chevron-down class-chevron"></i>
+            </div>
+        </div>
+
+        <!-- Class D — PLAYER'S CLASS (expanded) -->
+        <div class="class-group player-class expanded">
+            <div class="class-group-header">
+                <span class="class-badge d">D</span>
+                <span class="class-group-title">Class D — Your Class</span>
+                <span class="class-group-count">15 teams</span>
+                <span class="class-group-leader">Leader: <strong>Roadster United</strong></span>
+                <i class="fa-solid fa-chevron-down class-chevron"></i>
+            </div>
+
+            <!-- Comparison bar -->
+            <div class="comparison-bar">
+                <span class="comparison-label">Your pace</span>
+                <span class="comparison-stat">72 <span class="vs">vs</span> <span class="avg">avg 68</span></span>
+                <span class="comparison-label" style="margin-left:16px;">Reliability</span>
+                <span class="comparison-stat">45 <span class="vs">vs</span> <span class="avg">avg 52</span></span>
+                <span class="comparison-label" style="margin-left:16px;">Crew</span>
+                <span class="comparison-stat">4 <span class="vs">vs</span> <span class="avg">avg 6</span></span>
+                <span class="comparison-label" style="margin-left:16px;">Best driver</span>
+                <span class="comparison-stat">47 <span class="vs">vs</span> <span class="avg">avg 58</span></span>
+            </div>
+
+            <div class="class-group-body">
+                <table class="team-table">
+                    <thead>
+                        <tr>
+                            <th style="width:40px;">#</th>
+                            <th>Team</th>
+                            <th>Car</th>
+                            <th>Drivers</th>
+                            <th class="center">Pace</th>
+                            <th class="center">Reliab.</th>
+                            <th class="center">Durab.</th>
+                            <th class="center">Effic.</th>
+                            <th class="center">Cond.</th>
+                            <th class="center">Crew</th>
+                            <th class="right">Prestige</th>
+                            <th class="right">Trend</th>
+                            <th class="right">Last Race</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>1</td>
+                            <td class="team-name-cell">Roadster United</td>
+                            <td class="car-cell">Roadster RS 8K · Age 2</td>
+                            <td class="drivers-cell"><span class="fi fi-de driver-flag"></span>K. Weber, <span class="fi fi-it driver-flag"></span>L. Conti</td>
+                            <td class="center str-cell str-high">78</td>
+                            <td class="center str-cell str-mid">55</td>
+                            <td class="center str-cell str-mid">62</td>
+                            <td class="center str-cell str-mid">48</td>
+                            <td class="center condition-cell cond-good">92%</td>
+                            <td class="center crew-cell">8</td>
+                            <td class="right prestige-cell">58.2</td>
+                            <td class="right"><div class="trend-cell"><i class="fa-solid fa-caret-up trend-arrow up"></i><span class="trend-delta up">+3</span></div></td>
+                            <td class="right last-result">18th</td>
+                        </tr>
+                        <tr>
+                            <td>2</td>
+                            <td class="team-name-cell">Coupé Masters</td>
+                            <td class="car-cell">Coupé GT 15K · Age 1</td>
+                            <td class="drivers-cell"><span class="fi fi-kr driver-flag"></span>J. Park, <span class="fi fi-br driver-flag"></span>R. Silva, <span class="fi fi-nl driver-flag"></span>M. de Vries</td>
+                            <td class="center str-cell str-high">82</td>
+                            <td class="center str-cell str-low">38</td>
+                            <td class="center str-cell str-mid">50</td>
+                            <td class="center str-cell str-low">35</td>
+                            <td class="center condition-cell cond-good">100%</td>
+                            <td class="center crew-cell">6</td>
+                            <td class="right prestige-cell">55.8</td>
+                            <td class="right"><div class="trend-cell"><i class="fa-solid fa-caret-up trend-arrow up"></i><span class="trend-delta up">+7</span></div></td>
+                            <td class="right last-result">21st</td>
+                        </tr>
+                        <tr class="player-row">
+                            <td>3</td>
+                            <td class="team-name-cell">Backfire Racing</td>
+                            <td class="car-cell">Roadster RS 8K · Age 3</td>
+                            <td class="drivers-cell"><span class="fi fi-sg driver-flag"></span>Ivan Chen, <span class="fi fi-br driver-flag"></span>M. Ribeiro</td>
+                            <td class="center str-cell str-high">72</td>
+                            <td class="center str-cell str-low">45</td>
+                            <td class="center str-cell str-mid">58</td>
+                            <td class="center str-cell str-mid">52</td>
+                            <td class="center condition-cell cond-fair">72%</td>
+                            <td class="center crew-cell">4</td>
+                            <td class="right prestige-cell">52.4</td>
+                            <td class="right"><div class="trend-cell"><i class="fa-solid fa-caret-up trend-arrow up"></i><span class="trend-delta up">+12</span></div></td>
+                            <td class="right last-result">23rd</td>
+                        </tr>
+                        <tr>
+                            <td>4</td>
+                            <td class="team-name-cell">Drift Syndicate</td>
+                            <td class="car-cell">Coupé GT 15K · Age 4</td>
+                            <td class="drivers-cell"><span class="fi fi-ru driver-flag"></span>V. Petrov</td>
+                            <td class="center str-cell str-mid">68</td>
+                            <td class="center str-cell str-mid">60</td>
+                            <td class="center str-cell str-mid">55</td>
+                            <td class="center str-cell str-mid">50</td>
+                            <td class="center condition-cell cond-fair">65%</td>
+                            <td class="center crew-cell">6</td>
+                            <td class="right prestige-cell">51.8</td>
+                            <td class="right"><div class="trend-cell"><i class="fa-solid fa-caret-up trend-arrow up"></i><span class="trend-delta up">+5</span></div></td>
+                            <td class="right last-result">24th</td>
+                        </tr>
+                        <tr>
+                            <td>5</td>
+                            <td class="team-name-cell">Apex Pursuit</td>
+                            <td class="car-cell">Roadster RS 8K · Age 5</td>
+                            <td class="drivers-cell"><span class="fi fi-za driver-flag"></span>T. Nkosi, <span class="fi fi-gb driver-flag"></span>A. Clarke</td>
+                            <td class="center str-cell str-mid">65</td>
+                            <td class="center str-cell str-high">68</td>
+                            <td class="center str-cell str-high">70</td>
+                            <td class="center str-cell str-mid">55</td>
+                            <td class="center condition-cell cond-poor">48%</td>
+                            <td class="center crew-cell">4</td>
+                            <td class="right prestige-cell">48.5</td>
+                            <td class="right"><div class="trend-cell"><i class="fa-solid fa-caret-down trend-arrow down"></i><span class="trend-delta down">−4</span></div></td>
+                            <td class="right last-result">28th</td>
+                        </tr>
+                        <tr>
+                            <td>6</td>
+                            <td class="team-name-cell">Velocity GP</td>
+                            <td class="car-cell">Coupé GT 15K · Age 2</td>
+                            <td class="drivers-cell"><span class="fi fi-jp driver-flag"></span>H. Tanaka</td>
+                            <td class="center str-cell str-mid">70</td>
+                            <td class="center str-cell str-mid">52</td>
+                            <td class="center str-cell str-low">40</td>
+                            <td class="center str-cell str-mid">45</td>
+                            <td class="center condition-cell cond-good">88%</td>
+                            <td class="center crew-cell">3</td>
+                            <td class="right prestige-cell">45.2</td>
+                            <td class="right"><div class="trend-cell"><span class="trend-delta flat">—</span></div></td>
+                            <td class="right last-result">31st</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Class E (collapsed) -->
+        <div class="class-group">
+            <div class="class-group-header">
+                <span class="class-badge e">E</span>
+                <span class="class-group-title">Class E</span>
+                <span class="class-group-count">22 teams</span>
+                <span class="class-group-leader">Leader: <strong>Commuter Speed</strong></span>
+                <i class="fa-solid fa-chevron-down class-chevron"></i>
+            </div>
+        </div>
+
+        <!-- Class F (collapsed) -->
+        <div class="class-group">
+            <div class="class-group-header">
+                <span class="class-badge f">F</span>
+                <span class="class-group-title">Class F</span>
+                <span class="class-group-count">38 teams</span>
+                <span class="class-group-leader">Leader: <strong>Dustbowl Racing</strong></span>
+                <i class="fa-solid fa-chevron-down class-chevron"></i>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+</body>
+</html>
