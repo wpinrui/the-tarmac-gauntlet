@@ -7,6 +7,7 @@ import type {
   ContractLength,
   PlayerTeam,
   InstalledUpgrades,
+  RaceHistoryEntry,
   TransactionCategory,
   TransactionRecord,
   UpgradePackType,
@@ -68,6 +69,12 @@ interface GameStore {
   awardPrizeMoney: (teamId: string, position: number, amount: number) => void;
   deductFuelCost: (totalCost: number) => void;
 
+  // Skills
+  allocateSkillPoint: (skill: "driver" | "engineer" | "business") => void;
+
+  // Race + year advance helpers
+  pushRaceHistory: (entry: RaceHistoryEntry) => void;
+  setGameState: (updater: (game: GameState) => GameState) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -306,4 +313,27 @@ export const useGameStore = create<GameStore>()((set) => ({
       });
     }),
 
+  // --- Skills ---
+
+  allocateSkillPoint: (skill) =>
+    set((state) =>
+      updatePlayer(state, (p) => ({
+        ...p,
+        skills: { ...p.skills, [skill]: Math.min(20, p.skills[skill] + 1) },
+      })),
+    ),
+
+  // --- Race + year advance ---
+
+  pushRaceHistory: (entry) =>
+    set((state) => {
+      if (!state.game) return state;
+      return { game: { ...state.game, raceHistory: [...state.game.raceHistory, entry] } };
+    }),
+
+  setGameState: (updater) =>
+    set((state) => {
+      if (!state.game) return state;
+      return { game: updater(state.game) };
+    }),
 }));

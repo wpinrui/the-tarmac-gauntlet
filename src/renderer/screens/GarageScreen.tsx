@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useGameStore, type Screen } from "../state/store";
 import { TopBar } from "./TopBar";
+import { runPlaceholderRace } from "../simulation/placeholderRace";
 import { calculateEffectiveStats } from "../simulation/effectiveStats";
 import { calculateDriverStats, totalDriverStats } from "../simulation/driverLifecycle";
 import type { PlayerTeam, CarInstance, CarModel, Driver } from "../types";
@@ -55,11 +56,44 @@ function StatBar({ label, value, max = 100 }: { label: string; value: number; ma
 export function GarageScreen() {
   const game = useGameStore((s) => s.game);
   const setScreen = useGameStore((s) => s.setScreen);
+  const allocateSkillPoint = useGameStore((s) => s.allocateSkillPoint);
+  const awardPrizeMoney = useGameStore((s) => s.awardPrizeMoney);
+  const deductFuelCost = useGameStore((s) => s.deductFuelCost);
+  const pushRaceHistory = useGameStore((s) => s.pushRaceHistory);
+  const setPhase = useGameStore((s) => s.setPhase);
   const [selectedCarIdx, setSelectedCarIdx] = useState(0);
 
   if (!game) return null;
   const player = game.teams.find((t) => t.kind === "player") as PlayerTeam | undefined;
   if (!player) return null;
+
+  // Skill points: 15 at creation + 3 per completed race
+  const totalPoints = 15 + game.raceHistory.length * 3;
+  const allocatedPoints = player.skills.driver + player.skills.engineer + player.skills.business;
+  const unspentPoints = totalPoints - allocatedPoints;
+
+  const handleStartRace = useCallback(() => {
+    if (!game || !player.enteredCarId || unspentPoints > 0) return;
+
+    // 1. Run placeholder race
+    const { raceHistory, prizeMoney, fuelCost } = runPlaceholderRace(game);
+
+    // 2. Push race history
+    pushRaceHistory(raceHistory);
+
+    // 3. Award prize money to all teams
+    for (const [teamId, amount] of Object.entries(prizeMoney)) {
+      if (amount > 0) awardPrizeMoney(teamId, raceHistory.results.find((r) => r.teamId === teamId)?.position ?? 0, amount);
+    }
+
+    // 4. Deduct fuel cost for player
+    deductFuelCost(fuelCost);
+
+    // 5. Transition to post-race phase
+    setPhase("postRace");
+  }, [game, player.enteredCarId, unspentPoints, pushRaceHistory, awardPrizeMoney, deductFuelCost, setPhase]);
+
+  const canStartRace = !!player.enteredCarId && unspentPoints === 0;
 
   const cars = player.cars;
   const selectedCar: CarInstance | undefined = cars[selectedCarIdx];
@@ -229,9 +263,19 @@ export function GarageScreen() {
                     <span className="skill-label">{key.charAt(0).toUpperCase() + key.slice(1)}</span>
                     <span className="info-dot">i<span className="tip">{SKILL_TOOLTIPS[key]}</span></span>
                   </div>
-                  <span className="skill-val">{player.skills[key]} <span className="skill-max">/ 20</span></span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {unspentPoints > 0 && player.skills[key] < 20 && (
+                      <button className="btn-chip" onClick={() => allocateSkillPoint(key)} style={{ padding: "2px 8px", fontSize: 16, lineHeight: 1 }}>+</button>
+                    )}
+                    <span className="skill-val">{player.skills[key]} <span className="skill-max">/ 20</span></span>
+                  </div>
                 </div>
               ))}
+              {unspentPoints > 0 && (
+                <div className="skill-alloc-banner">
+                  <span className="alloc-text"><strong>{unspentPoints}</strong> pts available</span>
+                </div>
+              )}
             </div>
 
             {/* COL 3: NEWS */}
@@ -268,7 +312,9 @@ export function GarageScreen() {
           {/* Start Race row */}
           <div className="race-row">
             <span className="race-year">Year <strong>{game.currentYear}</strong> &middot; The 24h Tarmac Gauntlet</span>
-            <button className="btn-race" disabled={!player.enteredCarId}>Start Race</button>
+            <button className="btn-race" disabled={!canStartRace} onClick={handleStartRace}>
+              {unspentPoints > 0 ? `Allocate ${unspentPoints} Skill Points First` : "Start Race"}
+            </button>
           </div>
         </div>
       </div>
