@@ -29,6 +29,7 @@ export interface BaseTeam {
 export interface PlayerTeam extends BaseTeam {
   kind: "player";
   playerName: string;
+  nationality: string; // ISO 3166-1 alpha-2 country code
   logo: string | null;       // Data URL or asset path
   skills: PlayerSkills;
   spareParts: number;        // Consumable units carried over

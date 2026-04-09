@@ -1,5 +1,6 @@
-import { useCallback } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useGameStore } from "./state/store";
+import { PauseMenu } from "./screens/PauseMenu";
 import { NewGameScreen } from "./screens/NewGameScreen";
 import { GarageScreen } from "./screens/GarageScreen";
 import { NewCarDealerScreen } from "./screens/NewCarDealerScreen";
@@ -23,6 +24,7 @@ export function App() {
   const handleNewGame = useCallback(
     (data: {
       playerName: string;
+      nationality: string;
       teamName: string;
       logo: string | null;
       skills: { driver: number; engineer: number; business: number };
@@ -33,38 +35,44 @@ export function App() {
     [setGame],
   );
 
+  const [paused, setPaused] = useState(false);
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && game) {
+        e.preventDefault();
+        setPaused((p) => !p);
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [game]);
+
   if (!game) {
     return <NewGameScreen onStart={handleNewGame} />;
   }
 
-  // Post-race phase overrides screen routing
-  if (game.phase === "postRace") {
-    return <PostRaceSummaryScreen />;
-  }
+  const renderScreen = () => {
+    if (game.phase === "postRace") return <PostRaceSummaryScreen />;
+    switch (screen) {
+      case "newCarDealer": return <NewCarDealerScreen />;
+      case "secondHandDealer": return <SecondHandDealerScreen />;
+      case "carWorkshop": return <CarWorkshopScreen />;
+      case "driverMarket": return <DriverMarketScreen />;
+      case "teamRoster": return <TeamRosterScreen />;
+      case "crewHiring": return <CrewHiringScreen />;
+      case "finances": return <FinancesScreen />;
+      case "raceHistory": return <RaceHistoryScreen />;
+      case "standings": return <StandingsScreen />;
+      case "scoutingReport": return <ScoutingReportScreen />;
+      case "garage": default: return <GarageScreen />;
+    }
+  };
 
-  switch (screen) {
-    case "newCarDealer":
-      return <NewCarDealerScreen />;
-    case "secondHandDealer":
-      return <SecondHandDealerScreen />;
-    case "carWorkshop":
-      return <CarWorkshopScreen />;
-    case "driverMarket":
-      return <DriverMarketScreen />;
-    case "teamRoster":
-      return <TeamRosterScreen />;
-    case "crewHiring":
-      return <CrewHiringScreen />;
-    case "finances":
-      return <FinancesScreen />;
-    case "raceHistory":
-      return <RaceHistoryScreen />;
-    case "standings":
-      return <StandingsScreen />;
-    case "scoutingReport":
-      return <ScoutingReportScreen />;
-    case "garage":
-    default:
-      return <GarageScreen />;
-  }
+  return (
+    <>
+      {renderScreen()}
+      {paused && <PauseMenu onResume={() => setPaused(false)} />}
+    </>
+  );
 }

@@ -55,6 +55,7 @@ describe("seedDriverPool", () => {
 describe("initializeGame", () => {
   const options = {
     playerName: "Ivan",
+    nationality: "sg",
     teamName: "Irene Racing",
     logo: null,
     skills: { driver: 5, engineer: 5, business: 5 },

@@ -62,7 +62,7 @@ export function TeamRosterScreen() {
                 onClick={() => setSelectedId("player")}
               >
                 <div className="roster-item-info">
-                  <div className="roster-item-name">{player.playerName}</div>
+                  <div className="roster-item-name">{player.nationality && <span className={`fi fi-${player.nationality} driver-item-flag`} />} {player.playerName}</div>
                   <div className="roster-item-meta">Team Owner &middot; You</div>
                 </div>
                 <div className="roster-item-overall">{playerCharOvr}</div>
@@ -105,7 +105,7 @@ export function TeamRosterScreen() {
               <>
                 <div className="detail-header">
                   <div>
-                    <div className="detail-name">{player.playerName}</div>
+                    <div className="detail-name">{player.nationality && <span className={`fi fi-${player.nationality} driver-item-flag`} />} {player.playerName}</div>
                     <div className="detail-meta">Team Owner &middot; <span className="you-badge">You</span></div>
                   </div>
                 </div>

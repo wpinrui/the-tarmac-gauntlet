@@ -232,6 +232,7 @@ function createAiTeam(
 
 function createPlayerTeam(
   playerName: string,
+  nationality: string,
   teamName: string,
   logo: string | null,
   skills: { driver: number; engineer: number; business: number },
@@ -251,6 +252,7 @@ function createPlayerTeam(
     contracts: [],
     enteredCarId: null,
     playerName,
+    nationality,
     logo,
     skills,
     spareParts: 0,
@@ -277,6 +279,7 @@ const PLACEHOLDER_TRACK: Track = {
 
 export interface NewGameOptions {
   playerName: string;
+  nationality: string; // ISO 3166-1 alpha-2 country code
   teamName: string;
   logo: string | null;
   skills: { driver: number; engineer: number; business: number };
@@ -328,6 +331,7 @@ export function initializeGame(
   // 3. Create player team
   const playerTeam = createPlayerTeam(
     options.playerName,
+    options.nationality,
     options.teamName,
     options.logo,
     options.skills,

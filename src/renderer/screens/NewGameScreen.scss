@@ -194,6 +194,42 @@
 
 .field-input::placeholder { color: #3a5068; }
 
+/* Nationality selector */
+.nationality-wrap { position: relative; }
+.nationality-input {
+  width: 100%;
+  padding: 14px 18px 14px 18px;
+  background: rgba(6,10,20,0.55);
+  border: 1px solid #3a5a78;
+  border-radius: 6px;
+  color: #eef0f6;
+  font-family: 'Oswald', sans-serif;
+  font-weight: 400;
+  font-size: 18px;
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+}
+.nationality-input:focus { border-color: #00d4aa; box-shadow: 0 0 0 3px rgba(0,212,170,0.1); }
+.nationality-input::placeholder { color: #3a5068; }
+.nationality-flag-preview {
+  position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+  border-radius: 2px; font-size: 18px; line-height: 1;
+}
+.nationality-dropdown {
+  position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px;
+  max-height: 200px; overflow-y: auto;
+  background: rgba(8,12,22,0.95); border: 1px solid #2a4262;
+  border-radius: 6px; z-index: 20;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+.nationality-option {
+  padding: 10px 16px;
+  font-family: 'Oswald', sans-serif; font-weight: 400; font-size: 16px;
+  color: #a0b8d0; cursor: pointer; transition: background .1s;
+}
+.nationality-option:hover { background: rgba(0,212,170,0.06); color: #e8ecf4; }
+.nationality-option.selected { color: #00d4aa; }
+
 /* ---------- Logo grid (Step 2) ---------- */
 
 .section-label {

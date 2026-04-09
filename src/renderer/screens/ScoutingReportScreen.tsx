@@ -81,7 +81,7 @@ export function ScoutingReportScreen() {
         // Player character
         if (team.kind === "player") {
           const pcOvr = (team as PlayerTeam).skills.driver * 5;
-          teamDrivers.push({ name: (team as PlayerTeam).playerName, nationality: "", ovr: pcOvr });
+          teamDrivers.push({ name: (team as PlayerTeam).playerName, nationality: (team as PlayerTeam).nationality, ovr: pcOvr });
         }
 
         // Contracted drivers
