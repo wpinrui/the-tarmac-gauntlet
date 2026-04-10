@@ -1,11 +1,11 @@
-import type { GameState, RaceHistoryEntry, RaceResult, CarClass } from "../types";
-import { buildPrizeSchedule, distributePrizeMoney } from "./postRace";
+import type { GameState, RaceHistoryEntry, CarClass } from "../types";
+import { processPostRaceFinancials } from "./postRaceFinancials";
 
 const DNF_PROBABILITY = 0.12;
 
 /**
  * Generates placeholder race results with random finishing positions and ~12% DNFs.
- * Does NOT call simulateRace — just random positions for the core loop.
+ * Delegates financial processing to processPostRaceFinancials.
  */
 export function runPlaceholderRace(game: GameState): {
   raceHistory: RaceHistoryEntry;
@@ -15,7 +15,7 @@ export function runPlaceholderRace(game: GameState): {
   const teams = game.teams;
   const year = game.currentYear;
 
-  // Assign random order
+  // Generate random positions
   const shuffled = teams.map((t) => {
     const car = t.cars.find((c) => c.id === t.enteredCarId);
     const model = car ? game.carModels.find((m) => m.id === car.modelId) : null;
@@ -37,34 +37,23 @@ export function runPlaceholderRace(game: GameState): {
     return a.time - b.time;
   });
 
-  // Prize money
-  const schedule = buildPrizeSchedule(shuffled.length);
-  const resultsForPrize = shuffled.map((r, i) => ({
-    teamId: r.teamId,
-    position: i + 1,
-    lapsCompleted: r.laps,
-  }));
-  const prizeMoney = distributePrizeMoney(resultsForPrize, schedule);
-
-  // Build race results
-  const results: RaceResult[] = shuffled.map((r, i) => ({
+  // Delegate to post-race pipeline
+  const results = shuffled.map((r, i) => ({
     teamId: r.teamId,
     carId: r.carId,
     carClass: r.carClass,
     position: i + 1,
     lapsCompleted: r.laps,
-    prizeMoney: prizeMoney[r.teamId] ?? 0,
     retired: r.retired,
   }));
 
-  const raceHistory: RaceHistoryEntry = {
-    year,
+  const fuelConsumed = Math.round(50 + Math.random() * 100); // placeholder litres
+  const { prizeMoney, playerFuelCost, raceHistoryEntry } = processPostRaceFinancials({
     results,
-    fastestLap: null,
-  };
+    playerFuelConsumed: fuelConsumed,
+    fuelCostPerLitre: game.economyConfig.fuelConfig.costPerLitre,
+    year,
+  });
 
-  // Placeholder fuel cost: ~$200 for the player
-  const fuelCost = Math.round(100 + Math.random() * 200);
-
-  return { raceHistory, prizeMoney, fuelCost };
+  return { raceHistory: raceHistoryEntry, prizeMoney, fuelCost: playerFuelCost };
 }

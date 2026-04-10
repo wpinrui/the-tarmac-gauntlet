@@ -3,12 +3,11 @@ import { useGameStore } from "../state/store";
 import type { PlayerTeam, RaceHistoryEntry } from "../types";
 import { ClassBadge } from "../shared/ClassBadge";
 import { ordinal, EVENT_ICONS } from "../shared/raceDisplay";
-import { calculatePrestige, type PastRaceResult } from "../simulation/postRace";
+import { recalculateAllPrestige } from "../simulation/postRace";
 import { advanceYear } from "../simulation/yearAdvance";
+import { nextCarId } from "../shared/dealerData";
 import "./RaceShared.scss";
 import "./PostRaceSummary.scss";
-
-let yearAdvanceIdCounter = Date.now() + 500_000;
 
 export function PostRaceSummaryScreen() {
   const game = useGameStore((s) => s.game);
@@ -19,16 +18,10 @@ export function PostRaceSummaryScreen() {
     if (!game) return;
 
     // 1. Recalculate prestige for all teams
+    const teamIds = game.teams.map((t) => t.id);
+    const prestigeMap = recalculateAllPrestige(teamIds, game.raceHistory);
     const updatedTeams = game.teams.map((t) => {
-      const teamResults: PastRaceResult[] = [];
-      for (let i = game.raceHistory.length - 1; i >= 0; i--) {
-        const entry = game.raceHistory[i];
-        const teamResult = entry.results.find((r) => r.teamId === t.id);
-        if (teamResult) {
-          teamResults.push({ position: teamResult.position, totalCars: entry.results.length });
-        }
-      }
-      const newPrestige = calculatePrestige(teamResults);
+      const newPrestige = prestigeMap[t.id] ?? t.prestige;
       return { ...t, prestige: newPrestige, prestigeHistory: [...t.prestigeHistory, newPrestige] };
     });
 
@@ -54,7 +47,7 @@ export function PostRaceSummaryScreen() {
         playerHasWon,
         currentYear: game.currentYear,
         raceHistory: game.raceHistory,
-        newCarId: () => `car-${++yearAdvanceIdCounter}`,
+        newCarId: nextCarId,
       },
       Math.random,
     );
