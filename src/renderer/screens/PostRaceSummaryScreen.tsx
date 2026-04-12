@@ -1,13 +1,69 @@
+import { useCallback } from "react";
 import { useGameStore } from "../state/store";
 import type { PlayerTeam, RaceHistoryEntry } from "../types";
 import { ClassBadge } from "../shared/ClassBadge";
 import { ordinal, EVENT_ICONS } from "../shared/raceDisplay";
+import { recalculateAllPrestige } from "../simulation/postRace";
+import { advanceYear } from "../simulation/yearAdvance";
+import { nextCarId } from "../shared/dealerData";
 import "./RaceShared.scss";
 import "./PostRaceSummary.scss";
 
 export function PostRaceSummaryScreen() {
   const game = useGameStore((s) => s.game);
   const setPhase = useGameStore((s) => s.setPhase);
+  const setGameState = useGameStore((s) => s.setGameState);
+
+  const handleContinue = useCallback(() => {
+    if (!game) return;
+
+    // 1. Recalculate prestige for all teams
+    const teamIds = game.teams.map((t) => t.id);
+    const prestigeMap = recalculateAllPrestige(teamIds, game.raceHistory);
+    const updatedTeams = game.teams.map((t) => {
+      const newPrestige = prestigeMap[t.id] ?? t.prestige;
+      return { ...t, prestige: newPrestige, prestigeHistory: [...t.prestigeHistory, newPrestige] };
+    });
+
+    // 2. Check if player has won
+    const playerHasWon = game.raceHistory.some((r) =>
+      r.results.some((res) => res.teamId === "player" && res.position === 1),
+    );
+
+    // 3. Run year advance
+    const rookieSpecs = Array.from({ length: 15 }, (_, i) => ({
+      id: `rookie-y${game.currentYear}-${i}`,
+      name: `Rookie ${game.currentYear}-${i}`,
+      nationality: ["gb", "de", "br", "jp", "us", "fr", "it", "es", "au", "nl", "se", "fi", "kr", "mx", "ar"][i % 15],
+    }));
+
+    const yearResult = advanceYear(
+      {
+        drivers: game.drivers,
+        contracts: game.contracts,
+        teams: updatedTeams,
+        carModels: game.carModels,
+        rookieSpecs,
+        playerHasWon,
+        currentYear: game.currentYear,
+        raceHistory: game.raceHistory,
+        newCarId: nextCarId,
+      },
+      Math.random,
+    );
+
+    // 4. Update game state: next year, new drivers, new contracts, etc.
+    setGameState((g) => ({
+      ...g,
+      currentYear: g.currentYear + 1,
+      phase: "preRace" as const,
+      drivers: yearResult.drivers,
+      contracts: yearResult.contracts,
+      teams: yearResult.teams,
+      carMarket: { ...g.carMarket, usedListings: yearResult.usedListings },
+      raceHistory: yearResult.raceHistory,
+    }));
+  }, [game, setGameState]);
 
   if (!game) return null;
   const player = game.teams.find((t) => t.kind === "player") as PlayerTeam;
@@ -18,7 +74,7 @@ export function PostRaceSummaryScreen() {
       <div className="postrace-root">
         <div className="header-bar">
           <div><div className="header-title">No Race Data</div></div>
-          <button className="btn-continue" onClick={() => setPhase("preRace")}>Continue</button>
+          <button className="btn-continue" onClick={handleContinue}>Continue</button>
         </div>
       </div>
     );
@@ -45,7 +101,7 @@ export function PostRaceSummaryScreen() {
           <div className="header-title">Race {game.currentYear} Complete</div>
           <div className="header-subtitle">Year {game.currentYear} &middot; 24 Hours &middot; {entry.results.length} Cars</div>
         </div>
-        <button className="btn-continue" onClick={() => setPhase("preRace")}>Continue</button>
+        <button className="btn-continue" onClick={handleContinue}>Continue</button>
       </div>
 
       <div className="postrace-main">
