@@ -2,9 +2,8 @@ import { useState, useMemo } from "react";
 import { useGameStore } from "../state/store";
 import { TopBar } from "./TopBar";
 import { calculateDriverStats, totalDriverStats, calculateAnnualSalary, calculateContractSalary, calculateBuyoutCost } from "../simulation/driverLifecycle";
-import { DISPLAY_STATS } from "../shared/dealerData";
 import { DRIVER_STAT_KEYS, DRIVER_STAT_LABELS } from "../shared/driverData";
-import type { PlayerTeam, Driver, Contract, ContractLength } from "../types";
+import type { PlayerTeam, ContractLength } from "../types";
 import backdropUrl from "../assets/driver-market-backdrop.jpg";
 import "./DealerShared.scss";
 import "./DriverMarket.scss";
@@ -24,12 +23,9 @@ export function DriverMarketScreen() {
   const [sortKey, setSortKey] = useState<SortKey>("overall");
   const [selectedLength, setSelectedLength] = useState<ContractLength>(1);
 
-  if (!game) return null;
-  const player = game.teams.find((t) => t.kind === "player") as PlayerTeam;
-  const playerDriverCount = 1 + game.contracts.filter((c) => c.teamId === "player" && c.remainingYears > 0).length;
-
-  // Build driver list with computed values
+  // Build driver list with computed values (hooks must run unconditionally)
   const driverData = useMemo(() => {
+    if (!game) return [];
     return game.drivers.map((d) => {
       const stats = calculateDriverStats(d);
       const ovr = Math.round(totalDriverStats(stats) / 5);
@@ -39,9 +35,8 @@ export function DriverMarketScreen() {
       const contractTeam = contract ? game.teams.find((t) => t.id === contract.teamId)?.name ?? contract.teamId : null;
       return { driver: d, stats, ovr, salary, contract, isFree, contractTeam };
     });
-  }, [game.drivers, game.contracts, game.teams]);
+  }, [game]);
 
-  // Filter
   const filtered = useMemo(() => {
     switch (filter) {
       case "free": return driverData.filter((d) => d.isFree);
@@ -50,7 +45,6 @@ export function DriverMarketScreen() {
     }
   }, [driverData, filter]);
 
-  // Sort
   const sorted = useMemo(() => {
     const arr = [...filtered];
     switch (sortKey) {
@@ -62,6 +56,10 @@ export function DriverMarketScreen() {
     }
     return arr;
   }, [filtered, sortKey]);
+
+  if (!game) return null;
+  const player = game.teams.find((t) => t.kind === "player") as PlayerTeam;
+  const playerDriverCount = 1 + game.contracts.filter((c) => c.teamId === "player" && c.remainingYears > 0).length;
 
   const selected = selectedId ? driverData.find((d) => d.driver.id === selectedId) ?? null : null;
 

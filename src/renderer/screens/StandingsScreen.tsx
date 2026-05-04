@@ -2,17 +2,22 @@ import { useMemo } from "react";
 import { useGameStore } from "../state/store";
 import { TopBar } from "./TopBar";
 import { ordinal } from "../shared/raceDisplay";
-import type { PlayerTeam } from "../types";
+import type { PlayerTeam, Team } from "../types";
+
+interface Ranking {
+  team: Team;
+  prevPrestige: number | null;
+  rank: number;
+}
 import "./RaceShared.scss";
 import "./Standings.scss";
 
 
 export function StandingsScreen() {
   const game = useGameStore((s) => s.game);
-  if (!game) return null;
-  const player = game.teams.find((t) => t.kind === "player") as PlayerTeam;
 
-  const rankings = useMemo(() => {
+  const rankings = useMemo<Ranking[]>(() => {
+    if (!game) return [];
     const teams = game.teams.map((t) => {
       const history = t.prestigeHistory;
       const prevPrestige = history.length >= 2 ? history[history.length - 2] : null;
@@ -20,7 +25,10 @@ export function StandingsScreen() {
     });
     teams.sort((a, b) => b.team.prestige - a.team.prestige);
     return teams.map((t, i) => ({ ...t, rank: i + 1 }));
-  }, [game.teams]);
+  }, [game]);
+
+  if (!game) return null;
+  const player = game.teams.find((t) => t.kind === "player") as PlayerTeam;
 
   const playerRanking = rankings.find((r) => r.team.id === "player");
   const playerRank = playerRanking?.rank ?? 100;

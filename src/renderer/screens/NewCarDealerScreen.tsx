@@ -18,10 +18,7 @@ export function NewCarDealerScreen() {
   const [classFilter, setClassFilter] = useState<CarClass | "all">("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  if (!game) return null;
-  const player = game.teams.find((t) => t.kind === "player") as PlayerTeam;
-
-  const models = game.carModels.filter((m) => m.carClass !== "F1");
+  const models = game?.carModels.filter((m) => m.carClass !== "F1") ?? [];
   const filtered = classFilter === "all" ? models : models.filter((m) => m.carClass === classFilter);
 
   const grouped = useMemo(() => {
@@ -32,6 +29,9 @@ export function NewCarDealerScreen() {
     }
     return groups;
   }, [filtered]);
+
+  if (!game) return null;
+  const player = game.teams.find((t) => t.kind === "player") as PlayerTeam;
 
   const selected = selectedId ? models.find((m) => m.id === selectedId) ?? null : null;
 

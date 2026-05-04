@@ -2,23 +2,22 @@ import { useState } from "react";
 import { useGameStore } from "../state/store";
 import { TopBar } from "./TopBar";
 import { ClassBadge } from "../shared/ClassBadge";
-import { ordinal, EVENT_ICONS } from "../shared/raceDisplay";
+import { EVENT_ICONS } from "../shared/raceDisplay";
 import { RACE_HISTORY_WINDOW } from "../simulation/yearAdvance";
-import type { PlayerTeam, RaceHistoryEntry } from "../types";
+import type { PlayerTeam } from "../types";
 import "./DealerShared.scss";
 import "./RaceShared.scss";
 import "./RaceHistory.scss";
 
 export function RaceHistoryScreen() {
   const game = useGameStore((s) => s.game);
-
-  if (!game) return null;
-  const player = game.teams.find((t) => t.kind === "player") as PlayerTeam;
-  const history = game.raceHistory;
-
+  const history = game?.raceHistory ?? [];
   const [selectedYear, setSelectedYear] = useState<number | null>(
     history.length > 0 ? history[history.length - 1].year : null,
   );
+
+  if (!game) return null;
+  const player = game.teams.find((t) => t.kind === "player") as PlayerTeam;
 
   const entry = selectedYear !== null ? history.find((h) => h.year === selectedYear) : null;
   const isWithinWindow = entry ? game.currentYear - entry.year < RACE_HISTORY_WINDOW : false;
@@ -123,10 +122,12 @@ export function RaceHistoryScreen() {
                                 <line key={p} x1={0} y1={posToY(p)} x2={chartW} y2={posToY(p)} stroke="#1e3450" strokeWidth={0.5} />
                               ))}
                               {/* Car lines */}
-                              {entry.results.map((r, carIdx) => {
+                              {entry.results.map((r) => {
                                 const isPlayer = r.teamId === "player";
                                 const isP1 = r.position === 1;
-                                const positions = entry.positionHistory!.map((lapPositions) => lapPositions[carIdx]);
+                                const slot = entry.carIndexById?.[r.carId];
+                                if (slot === undefined) return null;
+                                const positions = entry.positionHistory!.map((lapPositions) => lapPositions[slot]);
                                 const points = positions.map((pos, lap) => `${lapToX(lap)},${posToY(pos)}`).join(" ");
                                 return (
                                   <polyline

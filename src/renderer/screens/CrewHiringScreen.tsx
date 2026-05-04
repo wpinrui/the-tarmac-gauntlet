@@ -17,10 +17,10 @@ export function CrewHiringScreen() {
   const setScreen = useGameStore((s) => s.setScreen);
   const setCrewSize = useGameStore((s) => s.setCrewSize);
 
-  if (!game) return null;
-  const player = game.teams.find((t) => t.kind === "player") as PlayerTeam;
+  const player = game?.teams.find((t) => t.kind === "player") as PlayerTeam | undefined;
+  const [newSize, setNewSize] = useState(player?.crewSize ?? 0);
 
-  const [newSize, setNewSize] = useState(player.crewSize);
+  if (!game || !player) return null;
   const annualCost = newSize * CREW_COST_PER_MEMBER;
   const costDelta = (newSize - player.crewSize) * CREW_COST_PER_MEMBER;
 

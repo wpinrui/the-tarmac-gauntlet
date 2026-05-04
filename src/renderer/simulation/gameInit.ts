@@ -1,7 +1,6 @@
 import type {
   AITeam,
   CarInstance,
-  CarModel,
   Contract,
   ContractLength,
   Driver,
@@ -22,8 +21,6 @@ import { getNewCarListings, generateUsedInventoryByClass } from "./carMarket";
 
 /** Total drivers in the global pool. */
 const DRIVER_POOL_SIZE = 310;
-/** Number of AI teams. */
-const AI_TEAM_COUNT = 99;
 /** Drivers per AI team. */
 const DRIVERS_PER_AI_TEAM = 3;
 /** Player's starting budget. */

@@ -51,12 +51,12 @@ export function FinancesScreen() {
   const [filterGroup, setFilterGroup] = useState<FilterGroup>("all");
   const [yearFilter, setYearFilter] = useState<number | "all">("all");
 
-  if (!game) return null;
-  const player = game.teams.find((t) => t.kind === "player") as PlayerTeam;
-  const currentYear = game.currentYear;
+  const player = game?.teams.find((t) => t.kind === "player") as PlayerTeam | undefined;
+  const currentYear = game?.currentYear ?? 1;
 
   // --- Year summary (last 3 years) ---
   const yearCards = useMemo(() => {
+    const transactions = player?.transactions ?? [];
     const years: number[] = [];
     for (let y = currentYear; y >= Math.max(1, currentYear - 2); y--) {
       years.push(y);
@@ -64,22 +64,22 @@ export function FinancesScreen() {
     years.sort((a, b) => a - b);
 
     return years.map((y) => {
-      const yearTxns = player.transactions.filter((t) => t.year === y);
+      const yearTxns = transactions.filter((t) => t.year === y);
       const income = yearTxns.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0);
       const expenses = yearTxns.filter((t) => t.amount < 0).reduce((s, t) => s + t.amount, 0);
       const net = income + expenses;
       return { year: y, income, expenses, net, isCurrent: y === currentYear };
     });
-  }, [player.transactions, currentYear]);
+  }, [player, currentYear]);
 
-  // --- Transaction filtering ---
   const allYears = useMemo(() => {
-    const ys = [...new Set(player.transactions.map((t) => t.year))].sort((a, b) => b - a);
-    return ys;
-  }, [player.transactions]);
+    const transactions = player?.transactions ?? [];
+    return [...new Set(transactions.map((t) => t.year))].sort((a, b) => b - a);
+  }, [player]);
 
   const filteredTxns = useMemo(() => {
-    let txns = [...player.transactions].reverse(); // most recent first
+    const transactions = player?.transactions ?? [];
+    let txns = [...transactions].reverse(); // most recent first
     if (yearFilter !== "all") {
       txns = txns.filter((t) => t.year === yearFilter);
     }
@@ -88,7 +88,9 @@ export function FinancesScreen() {
       txns = txns.filter((t) => cats.includes(t.category));
     }
     return txns;
-  }, [player.transactions, yearFilter, filterGroup]);
+  }, [player, yearFilter, filterGroup]);
+
+  if (!game || !player) return null;
 
   return (
     <div className="finances-root">

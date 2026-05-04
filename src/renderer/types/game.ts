@@ -1,7 +1,7 @@
 import type { CarModel, CarClass } from "./car";
 import type { Driver, Contract } from "./driver";
 import type { Team } from "./team";
-import type { RaceState, CommentaryEntry } from "./race";
+import type { RaceState } from "./race";
 import type { CarMarket, EconomyConfig } from "./economy";
 import type { Track } from "./track";
 import type { CarLapSnapshot } from "../simulation/raceLoop";
@@ -48,6 +48,8 @@ export interface RaceHistoryEntry {
   /** Optional rich data — stripped after the rolling window (default 3 years). */
   lapSnapshots?: Record<string, CarLapSnapshot[]>;
   positionHistory?: number[][];  // positionHistory[lap][carIndex] = position
+  /** Maps carId → its slot in positionHistory[lap]. Required to read a specific car's positions. */
+  carIndexById?: Record<string, number>;
   events?: RaceEvent[];
   stints?: Record<string, Stint[]>;
   modeCounters?: Record<string, ModeCounter>;

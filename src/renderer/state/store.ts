@@ -12,6 +12,17 @@ import type {
   TransactionRecord,
   UpgradePackType,
 } from "../types";
+import type { RaceResultFull } from "../simulation/raceLoop";
+
+// ---------------------------------------------------------------------------
+// Race session (transient — not persisted with GameState)
+// ---------------------------------------------------------------------------
+
+export interface RaceSession {
+  result: RaceResultFull;
+  currentLap: number;
+  status: "running" | "finished";
+}
 
 // ---------------------------------------------------------------------------
 // Navigation state
@@ -37,11 +48,17 @@ export type Screen =
 interface GameStore {
   game: GameState | null;
   screen: Screen;
+  raceSession: RaceSession | null;
 
   // Lifecycle
   setGame: (game: GameState) => void;
   setPhase: (phase: GamePhase) => void;
   clearGame: () => void;
+
+  // Race session
+  setRaceSession: (session: RaceSession) => void;
+  advanceRaceLap: () => void;
+  clearRaceSession: () => void;
 
   // Navigation
   setScreen: (screen: Screen) => void;
@@ -112,14 +129,32 @@ function updatePlayer(
 export const useGameStore = create<GameStore>()((set) => ({
   game: null,
   screen: "garage" as Screen,
+  raceSession: null,
 
-  setGame: (game) => set({ game, screen: "garage" }),
+  setGame: (game) => set({ game, screen: "garage", raceSession: null }),
   setPhase: (phase) =>
     set((state) => {
       if (!state.game) return state;
       return { game: { ...state.game, phase } };
     }),
-  clearGame: () => set({ game: null, screen: "garage" }),
+  clearGame: () => set({ game: null, screen: "garage", raceSession: null }),
+
+  // --- Race session ---
+
+  setRaceSession: (session) => set({ raceSession: session }),
+
+  advanceRaceLap: () =>
+    set((state) => {
+      if (!state.raceSession || state.raceSession.status !== "running") return state;
+      const totalLaps = state.raceSession.result.positionHistory.length;
+      const next = state.raceSession.currentLap + 1;
+      if (next >= totalLaps) {
+        return { raceSession: { ...state.raceSession, currentLap: totalLaps, status: "finished" } };
+      }
+      return { raceSession: { ...state.raceSession, currentLap: next } };
+    }),
+
+  clearRaceSession: () => set({ raceSession: null }),
 
   setScreen: (screen) => set({ screen }),
 

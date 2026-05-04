@@ -1,7 +1,9 @@
 import { useState, useCallback } from "react";
-import { useGameStore, type Screen } from "../state/store";
+import { useGameStore } from "../state/store";
 import { TopBar } from "./TopBar";
-import { runPlaceholderRace } from "../simulation/placeholderRace";
+import { simulateRace } from "../simulation/raceLoop";
+import { buildCarEntries } from "../simulation/raceEntry";
+import { MECHANICAL_ISSUES, CRASH_ISSUE_TEMPLATES } from "../simulation/issueTemplates";
 import { calculateEffectiveStats } from "../simulation/effectiveStats";
 import { calculateDriverStats, totalDriverStats } from "../simulation/driverLifecycle";
 import type { PlayerTeam, CarInstance, CarModel, Driver } from "../types";
@@ -57,41 +59,34 @@ export function GarageScreen() {
   const game = useGameStore((s) => s.game);
   const setScreen = useGameStore((s) => s.setScreen);
   const allocateSkillPoint = useGameStore((s) => s.allocateSkillPoint);
-  const awardPrizeMoney = useGameStore((s) => s.awardPrizeMoney);
-  const deductFuelCost = useGameStore((s) => s.deductFuelCost);
-  const pushRaceHistory = useGameStore((s) => s.pushRaceHistory);
+  const setRaceSession = useGameStore((s) => s.setRaceSession);
   const setPhase = useGameStore((s) => s.setPhase);
   const [selectedCarIdx, setSelectedCarIdx] = useState(0);
 
-  if (!game) return null;
-  const player = game.teams.find((t) => t.kind === "player") as PlayerTeam | undefined;
-  if (!player) return null;
+  const player = game?.teams.find((t) => t.kind === "player") as PlayerTeam | undefined;
+
+  const handleStartRace = useCallback(() => {
+    if (!game || !player?.enteredCarId) return;
+    const totalPoints = 15 + game.raceHistory.length * 3;
+    const allocated = player.skills.driver + player.skills.engineer + player.skills.business;
+    if (totalPoints - allocated > 0) return;
+
+    const entries = buildCarEntries(game);
+    const result = simulateRace(entries, {
+      issueTemplates: MECHANICAL_ISSUES,
+      crashTemplates: CRASH_ISSUE_TEMPLATES,
+    });
+
+    setRaceSession({ result, currentLap: 0, status: "running" });
+    setPhase("race");
+  }, [game, player, setRaceSession, setPhase]);
+
+  if (!game || !player) return null;
 
   // Skill points: 15 at creation + 3 per completed race
   const totalPoints = 15 + game.raceHistory.length * 3;
   const allocatedPoints = player.skills.driver + player.skills.engineer + player.skills.business;
   const unspentPoints = totalPoints - allocatedPoints;
-
-  const handleStartRace = useCallback(() => {
-    if (!game || !player.enteredCarId || unspentPoints > 0) return;
-
-    // 1. Run placeholder race
-    const { raceHistory, prizeMoney, fuelCost } = runPlaceholderRace(game);
-
-    // 2. Push race history
-    pushRaceHistory(raceHistory);
-
-    // 3. Award prize money to all teams
-    for (const [teamId, amount] of Object.entries(prizeMoney)) {
-      if (amount > 0) awardPrizeMoney(teamId, raceHistory.results.find((r) => r.teamId === teamId)?.position ?? 0, amount);
-    }
-
-    // 4. Deduct fuel cost for player
-    deductFuelCost(fuelCost);
-
-    // 5. Transition to post-race phase
-    setPhase("postRace");
-  }, [game, player.enteredCarId, unspentPoints, pushRaceHistory, awardPrizeMoney, deductFuelCost, setPhase]);
 
   const canStartRace = !!player.enteredCarId && unspentPoints === 0;
 

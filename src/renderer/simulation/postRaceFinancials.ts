@@ -1,5 +1,5 @@
 import type { RaceHistoryEntry, CarClass } from "../types";
-import { buildPrizeSchedule, distributePrizeMoney, PRIZE_TABLE } from "./postRace";
+import { buildPrizeSchedule, distributePrizeMoney } from "./postRace";
 
 // ---------------------------------------------------------------------------
 // Types
