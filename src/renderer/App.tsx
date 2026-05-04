@@ -3,6 +3,7 @@ import { useGameStore } from "./state/store";
 import { PauseMenu } from "./screens/PauseMenu";
 import { NewGameScreen } from "./screens/NewGameScreen";
 import { GarageScreen } from "./screens/GarageScreen";
+import { RaceScreen } from "./screens/RaceScreen";
 import { NewCarDealerScreen } from "./screens/NewCarDealerScreen";
 import { SecondHandDealerScreen } from "./screens/SecondHandDealerScreen";
 import { CarWorkshopScreen } from "./screens/CarWorkshopScreen";
@@ -53,6 +54,7 @@ export function App() {
   }
 
   const renderScreen = () => {
+    if (game.phase === "race") return <RaceScreen />;
     if (game.phase === "postRace") return <PostRaceSummaryScreen />;
     switch (screen) {
       case "newCarDealer": return <NewCarDealerScreen />;

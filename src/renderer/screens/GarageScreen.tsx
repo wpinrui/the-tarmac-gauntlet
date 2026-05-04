@@ -1,7 +1,9 @@
 import { useState, useCallback } from "react";
 import { useGameStore, type Screen } from "../state/store";
 import { TopBar } from "./TopBar";
-import { runPlaceholderRace } from "../simulation/placeholderRace";
+import { simulateRace } from "../simulation/raceLoop";
+import { buildCarEntries } from "../simulation/raceEntry";
+import { MECHANICAL_ISSUES, CRASH_ISSUE_TEMPLATES } from "../simulation/issueTemplates";
 import { calculateEffectiveStats } from "../simulation/effectiveStats";
 import { calculateDriverStats, totalDriverStats } from "../simulation/driverLifecycle";
 import type { PlayerTeam, CarInstance, CarModel, Driver } from "../types";
@@ -57,9 +59,7 @@ export function GarageScreen() {
   const game = useGameStore((s) => s.game);
   const setScreen = useGameStore((s) => s.setScreen);
   const allocateSkillPoint = useGameStore((s) => s.allocateSkillPoint);
-  const awardPrizeMoney = useGameStore((s) => s.awardPrizeMoney);
-  const deductFuelCost = useGameStore((s) => s.deductFuelCost);
-  const pushRaceHistory = useGameStore((s) => s.pushRaceHistory);
+  const setRaceSession = useGameStore((s) => s.setRaceSession);
   const setPhase = useGameStore((s) => s.setPhase);
   const [selectedCarIdx, setSelectedCarIdx] = useState(0);
 
@@ -75,23 +75,15 @@ export function GarageScreen() {
   const handleStartRace = useCallback(() => {
     if (!game || !player.enteredCarId || unspentPoints > 0) return;
 
-    // 1. Run placeholder race
-    const { raceHistory, prizeMoney, fuelCost } = runPlaceholderRace(game);
+    const entries = buildCarEntries(game);
+    const result = simulateRace(entries, {
+      issueTemplates: MECHANICAL_ISSUES,
+      crashTemplates: CRASH_ISSUE_TEMPLATES,
+    });
 
-    // 2. Push race history
-    pushRaceHistory(raceHistory);
-
-    // 3. Award prize money to all teams
-    for (const [teamId, amount] of Object.entries(prizeMoney)) {
-      if (amount > 0) awardPrizeMoney(teamId, raceHistory.results.find((r) => r.teamId === teamId)?.position ?? 0, amount);
-    }
-
-    // 4. Deduct fuel cost for player
-    deductFuelCost(fuelCost);
-
-    // 5. Transition to post-race phase
-    setPhase("postRace");
-  }, [game, player.enteredCarId, unspentPoints, pushRaceHistory, awardPrizeMoney, deductFuelCost, setPhase]);
+    setRaceSession({ result, currentLap: 0, status: "running" });
+    setPhase("race");
+  }, [game, player.enteredCarId, unspentPoints, setRaceSession, setPhase]);
 
   const canStartRace = !!player.enteredCarId && unspentPoints === 0;
 
