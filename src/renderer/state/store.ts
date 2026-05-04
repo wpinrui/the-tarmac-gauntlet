@@ -20,7 +20,6 @@ import type { RaceResultFull } from "../simulation/raceLoop";
 
 export interface RaceSession {
   result: RaceResultFull;
-  currentLap: number;
   status: "running" | "finished";
 }
 
@@ -57,7 +56,7 @@ interface GameStore {
 
   // Race session
   setRaceSession: (session: RaceSession) => void;
-  advanceRaceLap: () => void;
+  finishRaceSession: () => void;
   clearRaceSession: () => void;
 
   // Navigation
@@ -143,15 +142,10 @@ export const useGameStore = create<GameStore>()((set) => ({
 
   setRaceSession: (session) => set({ raceSession: session }),
 
-  advanceRaceLap: () =>
+  finishRaceSession: () =>
     set((state) => {
       if (!state.raceSession || state.raceSession.status !== "running") return state;
-      const totalLaps = state.raceSession.result.positionHistory.length;
-      const next = state.raceSession.currentLap + 1;
-      if (next >= totalLaps) {
-        return { raceSession: { ...state.raceSession, currentLap: totalLaps, status: "finished" } };
-      }
-      return { raceSession: { ...state.raceSession, currentLap: next } };
+      return { raceSession: { ...state.raceSession, status: "finished" } };
     }),
 
   clearRaceSession: () => set({ raceSession: null }),

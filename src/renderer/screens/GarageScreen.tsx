@@ -77,7 +77,7 @@ export function GarageScreen() {
       crashTemplates: CRASH_ISSUE_TEMPLATES,
     });
 
-    setRaceSession({ result, currentLap: 0, status: "running" });
+    setRaceSession({ result, status: "running" });
     setPhase("race");
   }, [game, player, setRaceSession, setPhase]);
 
