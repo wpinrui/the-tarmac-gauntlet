@@ -50,8 +50,9 @@ describe("phase='race' route", () => {
     render(<App />);
 
     expect(screen.getByText("Race in progress…")).toBeTruthy();
-    expect(screen.getByText("7")).toBeTruthy();
-    expect(screen.getByText("48")).toBeTruthy();
+    // currentLap=7 of totalLaps=48 over 24min → 7/48 × 1440s = 210s = 03:30
+    expect(screen.getByText("03:30")).toBeTruthy();
+    expect(screen.getByText("24:00")).toBeTruthy();
     expect(screen.getByText("Finish race")).toBeTruthy();
   });
 });

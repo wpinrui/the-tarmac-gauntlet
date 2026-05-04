@@ -38,22 +38,23 @@
   color: #a0b8d0;
 }
 
-.race-lap-counter {
+.race-clock {
   font-family: "Oswald", sans-serif;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
   display: flex;
   align-items: baseline;
   gap: 6px;
 
-  .lap-current {
+  .clock-elapsed {
     font-size: 64px;
     color: #00d4aa;
   }
-  .lap-divider {
+  .clock-divider {
     font-size: 32px;
     color: #3a5a78;
   }
-  .lap-total {
+  .clock-total {
     font-size: 32px;
     color: #5a7a98;
   }

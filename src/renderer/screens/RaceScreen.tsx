@@ -6,7 +6,10 @@ import type { CarClass, GameState, PlayerTeam, RaceHistoryEntry } from "../types
 import type { CarLapSnapshot } from "../simulation/raceLoop";
 import "./RaceScreen.scss";
 
-const LAP_TICK_MS = 500;
+// GDD §2: race plays out in 24 real-time minutes. Lap count (~48) is a derived
+// guideline — the actual figure varies with field pace — so the tick is paced
+// off RACE_DURATION_MS / totalLaps, never a fixed lap-time.
+const RACE_DURATION_MS = 24 * 60 * 1000;
 
 export function RaceScreen() {
   const game = useGameStore((s) => s.game);
@@ -19,12 +22,20 @@ export function RaceScreen() {
   const deductFuelCost = useGameStore((s) => s.deductFuelCost);
 
   const totalLaps = raceSession?.result.positionHistory.length ?? 0;
+  const lapTickMs = totalLaps > 0 ? Math.floor(RACE_DURATION_MS / totalLaps) : RACE_DURATION_MS;
+  const elapsedMs =
+    totalLaps > 0
+      ? Math.min(
+          RACE_DURATION_MS,
+          Math.floor(((raceSession?.currentLap ?? 0) / totalLaps) * RACE_DURATION_MS),
+        )
+      : 0;
 
   useEffect(() => {
     if (!raceSession || raceSession.status !== "running") return;
-    const id = setInterval(advanceRaceLap, LAP_TICK_MS);
+    const id = setInterval(advanceRaceLap, lapTickMs);
     return () => clearInterval(id);
-  }, [raceSession, advanceRaceLap]);
+  }, [raceSession, advanceRaceLap, lapTickMs]);
 
   const handleFinish = useCallback(() => {
     if (!game || !raceSession) return;
@@ -102,10 +113,10 @@ export function RaceScreen() {
         <div className="race-status">
           {raceSession.status === "running" ? "Race in progress…" : "Race complete"}
         </div>
-        <div className="race-lap-counter">
-          <span className="lap-current">{raceSession.currentLap}</span>
-          <span className="lap-divider">/</span>
-          <span className="lap-total">{totalLaps}</span>
+        <div className="race-clock">
+          <span className="clock-elapsed">{formatMmSs(elapsedMs)}</span>
+          <span className="clock-divider">/</span>
+          <span className="clock-total">24:00</span>
         </div>
         <button className="btn-finish" onClick={handleFinish}>
           Finish race
@@ -118,6 +129,13 @@ export function RaceScreen() {
 interface CarRef {
   teamId: string;
   carClass: CarClass;
+}
+
+function formatMmSs(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
 function buildCarIndex(game: { teams: { id: string; cars: { id: string; modelId: string }[] }[]; carModels: { id: string; carClass: CarClass }[] }): Map<string, CarRef> {
