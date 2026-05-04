@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { useGameStore, type Screen } from "../state/store";
+import { useGameStore } from "../state/store";
 import { TopBar } from "./TopBar";
 import { simulateRace } from "../simulation/raceLoop";
 import { buildCarEntries } from "../simulation/raceEntry";
@@ -63,17 +63,13 @@ export function GarageScreen() {
   const setPhase = useGameStore((s) => s.setPhase);
   const [selectedCarIdx, setSelectedCarIdx] = useState(0);
 
-  if (!game) return null;
-  const player = game.teams.find((t) => t.kind === "player") as PlayerTeam | undefined;
-  if (!player) return null;
-
-  // Skill points: 15 at creation + 3 per completed race
-  const totalPoints = 15 + game.raceHistory.length * 3;
-  const allocatedPoints = player.skills.driver + player.skills.engineer + player.skills.business;
-  const unspentPoints = totalPoints - allocatedPoints;
+  const player = game?.teams.find((t) => t.kind === "player") as PlayerTeam | undefined;
 
   const handleStartRace = useCallback(() => {
-    if (!game || !player.enteredCarId || unspentPoints > 0) return;
+    if (!game || !player?.enteredCarId) return;
+    const totalPoints = 15 + game.raceHistory.length * 3;
+    const allocated = player.skills.driver + player.skills.engineer + player.skills.business;
+    if (totalPoints - allocated > 0) return;
 
     const entries = buildCarEntries(game);
     const result = simulateRace(entries, {
@@ -83,7 +79,14 @@ export function GarageScreen() {
 
     setRaceSession({ result, currentLap: 0, status: "running" });
     setPhase("race");
-  }, [game, player.enteredCarId, unspentPoints, setRaceSession, setPhase]);
+  }, [game, player, setRaceSession, setPhase]);
+
+  if (!game || !player) return null;
+
+  // Skill points: 15 at creation + 3 per completed race
+  const totalPoints = 15 + game.raceHistory.length * 3;
+  const allocatedPoints = player.skills.driver + player.skills.engineer + player.skills.business;
+  const unspentPoints = totalPoints - allocatedPoints;
 
   const canStartRace = !!player.enteredCarId && unspentPoints === 0;
 

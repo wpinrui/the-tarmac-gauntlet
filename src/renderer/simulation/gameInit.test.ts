@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { initializeGame, seedDriverPool } from "./gameInit";
+import type { PlayerTeam } from "../types";
 
 const stable = () => 0.5;
 
@@ -78,7 +79,7 @@ describe("initializeGame", () => {
     const game = initializeGame(options, stable);
     const player = game.teams.find((t) => t.kind === "player")!;
     expect(player.name).toBe("Irene Racing");
-    expect((player as any).playerName).toBe("Ivan");
+    expect((player as PlayerTeam).playerName).toBe("Ivan");
   });
 
   it("player team has $1,000 starting budget", () => {
@@ -96,7 +97,7 @@ describe("initializeGame", () => {
 
   it("player team has 0 crew, no contracts, no spare parts, no tyre sets", () => {
     const game = initializeGame(options, stable);
-    const player = game.teams.find((t) => t.kind === "player")! as any;
+    const player = game.teams.find((t) => t.kind === "player")! as PlayerTeam;
     expect(player.crewSize).toBe(0);
     expect(player.contracts).toHaveLength(0);
     expect(player.spareParts).toBe(0);
@@ -105,7 +106,7 @@ describe("initializeGame", () => {
 
   it("player skills are set correctly", () => {
     const game = initializeGame(options, stable);
-    const player = game.teams.find((t) => t.kind === "player")! as any;
+    const player = game.teams.find((t) => t.kind === "player")! as PlayerTeam;
     expect(player.skills).toEqual({ driver: 5, engineer: 5, business: 5 });
   });
 

@@ -34,7 +34,7 @@ function makeModel(id: string, price: number, power = 50, handling = 50): CarMod
   };
 }
 
-function makeInstance(id: string, modelId: string, power = 50, handling = 50): CarInstance {
+function makeInstance(id: string, modelId: string): CarInstance {
   return {
     id,
     modelId,

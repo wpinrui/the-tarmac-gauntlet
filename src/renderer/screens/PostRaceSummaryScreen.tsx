@@ -11,7 +11,6 @@ import "./PostRaceSummary.scss";
 
 export function PostRaceSummaryScreen() {
   const game = useGameStore((s) => s.game);
-  const setPhase = useGameStore((s) => s.setPhase);
   const setGameState = useGameStore((s) => s.setGameState);
 
   const handleContinue = useCallback(() => {

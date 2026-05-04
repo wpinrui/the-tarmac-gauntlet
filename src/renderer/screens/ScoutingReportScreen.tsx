@@ -5,7 +5,7 @@ import { ClassBadge } from "../shared/ClassBadge";
 import { ordinal } from "../shared/raceDisplay";
 import { calculateEffectiveStats } from "../simulation/effectiveStats";
 import { calculateDriverStats, totalDriverStats } from "../simulation/driverLifecycle";
-import type { PlayerTeam, CarClass, Team, CarModel, Driver } from "../types";
+import type { PlayerTeam, CarClass, Team, CarModel } from "../types";
 import "./RaceShared.scss";
 import "./ScoutingReport.scss";
 
@@ -43,11 +43,9 @@ export function ScoutingReportScreen() {
   const [expandedClasses, setExpandedClasses] = useState<Set<CarClass>>(new Set());
   const [sortKey, setSortKey] = useState<SortKey>("pace");
 
-  if (!game) return null;
-  const player = game.teams.find((t) => t.kind === "player") as PlayerTeam;
-
-  const playerClass = getTeamClass(player, game.carModels);
-  const hasEnteredCar = !!player.enteredCarId;
+  const player = game?.teams.find((t) => t.kind === "player") as PlayerTeam | undefined;
+  const playerClass = player ? getTeamClass(player, game!.carModels) : null;
+  const hasEnteredCar = !!player?.enteredCarId;
 
   // Auto-expand player's class
   const effectiveExpanded = useMemo(() => {
@@ -67,6 +65,7 @@ export function ScoutingReportScreen() {
 
   // Build team rows
   const allRows = useMemo((): TeamRow[] => {
+    if (!game) return [];
     return game.teams
       .map((team): TeamRow | null => {
         const car = team.cars.find((c) => c.id === team.enteredCarId);
@@ -124,7 +123,7 @@ export function ScoutingReportScreen() {
         };
       })
       .filter((r): r is TeamRow => r !== null);
-  }, [game.teams, game.carModels, game.contracts, game.drivers, game.raceHistory]);
+  }, [game]);
 
   // Group by class
   const classGroups = useMemo(() => {
@@ -161,6 +160,8 @@ export function ScoutingReportScreen() {
     if (cond >= 50) return "cond-fair";
     return "cond-poor";
   }
+
+  if (!game || !player) return null;
 
   // Player comparison data
   const playerRow = allRows.find((r) => r.isPlayer);

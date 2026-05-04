@@ -1,4 +1,4 @@
-import { useGameStore, type Screen } from "../state/store";
+import { useGameStore } from "../state/store";
 import type { PlayerTeam } from "../types";
 
 export function TopBar() {

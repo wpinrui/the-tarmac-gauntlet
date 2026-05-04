@@ -9,6 +9,16 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    rules: {
+      // Allow `_`-prefixed names to opt out of unused checks (idiomatic for
+      // destructure-to-strip patterns and intentionally-ignored params).
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" },
+      ],
+    },
+  },
+  {
     files: ["src/renderer/**/*.{ts,tsx}"],
     plugins: {
       "react-hooks": reactHooks,
