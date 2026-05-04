@@ -68,6 +68,7 @@ export function RaceScreen() {
         : null,
       lapSnapshots: raceSession.result.lapSnapshots,
       positionHistory: raceSession.result.positionHistory,
+      carIndexById: raceSession.result.carIndexById,
       events: raceSession.result.events,
       stints: raceSession.result.stints,
       modeCounters: raceSession.result.modeCounters,

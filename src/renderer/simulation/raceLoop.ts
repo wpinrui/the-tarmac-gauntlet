@@ -141,6 +141,13 @@ export interface RaceResultFull {
   lapSnapshots: Record<string, CarLapSnapshot[]>;
   /** Position history: positionHistory[lap][carIndex] = position (1-indexed). */
   positionHistory: number[][];
+  /**
+   * Maps carId → its slot in `positionHistory[lap]` (i.e. the original entry
+   * order passed to simulateRace). Use this to read a specific car's positions
+   * across laps; iterating `results` directly with the array index will read
+   * the wrong car because `results` is sorted by finalPosition.
+   */
+  carIndexById: Record<string, number>;
   /** Endurance events logged during the race. */
   events: RaceEvent[];
   /** Driver stints: carId → Stint[]. */
@@ -316,14 +323,17 @@ export function simulateRace(
   // Rich data accumulators
   const lapSnapshots: Record<string, CarLapSnapshot[]> = {};
   const positionHistory: number[][] = [];
+  const carIndexById: Record<string, number> = {};
   const events: RaceEvent[] = [];
   const stints: Record<string, Stint[]> = {};
   const modeCounters: Record<string, ModeCounter> = {};
 
-  for (const entry of cars) {
+  for (let i = 0; i < cars.length; i++) {
+    const entry = cars[i];
     lapSnapshots[entry.carId] = [];
     stints[entry.carId] = [{ driverId: entry.startingDriverId, startLap: 1, endLap: -1 }];
     modeCounters[entry.carId] = { push: 0, normal: 0, conserve: 0 };
+    carIndexById[entry.carId] = i;
   }
 
   // Track previous lap's class leaders for class lead change detection
@@ -622,5 +632,5 @@ export function simulateRace(
     }
   }
 
-  return { results, fastestLap, lapSnapshots, positionHistory, events, stints, modeCounters };
+  return { results, fastestLap, lapSnapshots, positionHistory, carIndexById, events, stints, modeCounters };
 }

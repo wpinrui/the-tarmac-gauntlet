@@ -14,6 +14,7 @@ function stubRaceResult(): RaceResultFull {
     fastestLap: null,
     lapSnapshots: {},
     positionHistory: Array.from({ length: 48 }, () => []),
+    carIndexById: {},
     events: [],
     stints: {},
     modeCounters: {},

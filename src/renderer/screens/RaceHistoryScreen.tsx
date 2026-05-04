@@ -122,10 +122,12 @@ export function RaceHistoryScreen() {
                                 <line key={p} x1={0} y1={posToY(p)} x2={chartW} y2={posToY(p)} stroke="#1e3450" strokeWidth={0.5} />
                               ))}
                               {/* Car lines */}
-                              {entry.results.map((r, carIdx) => {
+                              {entry.results.map((r) => {
                                 const isPlayer = r.teamId === "player";
                                 const isP1 = r.position === 1;
-                                const positions = entry.positionHistory!.map((lapPositions) => lapPositions[carIdx]);
+                                const slot = entry.carIndexById?.[r.carId];
+                                if (slot === undefined) return null;
+                                const positions = entry.positionHistory!.map((lapPositions) => lapPositions[slot]);
                                 const points = positions.map((pos, lap) => `${lapToX(lap)},${posToY(pos)}`).join(" ");
                                 return (
                                   <polyline

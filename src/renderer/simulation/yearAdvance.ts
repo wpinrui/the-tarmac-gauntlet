@@ -155,7 +155,7 @@ export function advanceYear(
   const trimmedHistory = (input.raceHistory ?? []).map((entry) => {
     if (currentYear - entry.year >= RACE_HISTORY_WINDOW) {
       // Strip rich data, keep results + fastestLap only
-      const { lapSnapshots: _lapSnapshots, positionHistory: _positionHistory, events: _events, stints: _stints, modeCounters: _modeCounters, ...slim } = entry;
+      const { lapSnapshots: _lapSnapshots, positionHistory: _positionHistory, carIndexById: _carIndexById, events: _events, stints: _stints, modeCounters: _modeCounters, ...slim } = entry;
       return slim;
     }
     return entry;

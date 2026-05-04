@@ -58,7 +58,6 @@ interface GameStore {
   // Race session
   setRaceSession: (session: RaceSession) => void;
   advanceRaceLap: () => void;
-  finishRaceSession: () => void;
   clearRaceSession: () => void;
 
   // Navigation
@@ -153,18 +152,6 @@ export const useGameStore = create<GameStore>()((set) => ({
         return { raceSession: { ...state.raceSession, currentLap: totalLaps, status: "finished" } };
       }
       return { raceSession: { ...state.raceSession, currentLap: next } };
-    }),
-
-  finishRaceSession: () =>
-    set((state) => {
-      if (!state.raceSession) return state;
-      return {
-        raceSession: {
-          ...state.raceSession,
-          currentLap: state.raceSession.result.positionHistory.length,
-          status: "finished",
-        },
-      };
     }),
 
   clearRaceSession: () => set({ raceSession: null }),

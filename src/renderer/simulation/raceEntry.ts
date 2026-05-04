@@ -3,10 +3,15 @@ import type { CarEntry, RaceDriver } from "./raceLoop";
 import { calculateDriverStats } from "./driverLifecycle";
 import { calculateEffectiveStats } from "./effectiveStats";
 
+/** Stable ID for the player-character driver (the player owner-driver). */
+export const PLAYER_CHARACTER_DRIVER_ID = "player-character";
+
 /**
- * Builds a CarEntry for every team that has an entered car and at least one
- * contracted driver. Teams missing either are skipped (defensive — should not
- * happen in fresh games, but avoids crashing simulateRace mid-season).
+ * Builds a CarEntry for every team that has an entered car. AI teams need at
+ * least one active contracted driver; the player team always includes the
+ * player character (no contract — stats from skills.driver). Teams that can't
+ * be raced are skipped — should not happen in fresh games but avoids crashing
+ * simulateRace mid-season.
  *
  * Player and AI cars share the same shape; pitDecider/modeDecider are left
  * undefined so simulateRace falls back to its built-in defaults (Phase 5 will
@@ -32,12 +37,15 @@ function buildEntryForTeam(team: Team, game: GameState): CarEntry | null {
   const model = game.carModels.find((m) => m.id === car.modelId);
   if (!model) return null;
 
+  const drivers: RaceDriver[] = [];
+
+  if (team.kind === "player") {
+    drivers.push(playerCharacterRaceDriver(team));
+  }
+
   const teamContracts = game.contracts.filter(
     (c) => c.teamId === team.id && c.remainingYears > 0,
   );
-  if (teamContracts.length === 0) return null;
-
-  const drivers: RaceDriver[] = [];
   for (const contract of teamContracts) {
     const driver = game.drivers.find((d) => d.id === contract.driverId);
     if (!driver) continue;
@@ -58,6 +66,17 @@ function buildEntryForTeam(team: Team, game: GameState): CarEntry | null {
     tyreSetsAvailable: team.tyreSets,
     sparePartsAvailable: team.spareParts,
     crewSize: team.crewSize,
-    engineerSkill: team.kind === "player" ? (team as PlayerTeam).skills.engineer : 0,
+    engineerSkill: team.kind === "player" ? team.skills.engineer : 0,
+  };
+}
+
+function playerCharacterRaceDriver(player: PlayerTeam): RaceDriver {
+  // Per GDD/UI convention, player-character OVR = skills.driver × 5. Phase 1
+  // collapses all five DriverStats to that single value; Phase 5 may
+  // differentiate (e.g., separate consistency/safety from pace).
+  const stat = player.skills.driver * 5;
+  return {
+    id: PLAYER_CHARACTER_DRIVER_ID,
+    stats: { pace: stat, consistency: stat, stamina: stat, safety: stat, smoothness: stat },
   };
 }
