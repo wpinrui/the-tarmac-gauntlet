@@ -1,41 +1,35 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useGameStore } from "../state/store";
+import { useRaceClock } from "../hooks/useRaceClock";
 import { processPostRaceFinancials } from "../simulation/postRaceFinancials";
 import { calculateEffectiveStats } from "../simulation/effectiveStats";
+import {
+  TOTAL_RACE_SECONDS,
+  leaderLapAt,
+  leaderTotalLaps,
+} from "../simulation/raceClock";
 import type { CarClass, GameState, PlayerTeam, RaceHistoryEntry } from "../types";
 import type { CarLapSnapshot } from "../simulation/raceLoop";
 import "./RaceScreen.scss";
 
-// GDD §2: race plays out in 24 real-time minutes. Lap count (~48) is a derived
-// guideline — the actual figure varies with field pace — so the tick is paced
-// off RACE_DURATION_MS / totalLaps, never a fixed lap-time.
-const RACE_DURATION_MS = 24 * 60 * 1000;
-
 export function RaceScreen() {
   const game = useGameStore((s) => s.game);
   const raceSession = useGameStore((s) => s.raceSession);
-  const advanceRaceLap = useGameStore((s) => s.advanceRaceLap);
+  const finishRaceSession = useGameStore((s) => s.finishRaceSession);
   const clearRaceSession = useGameStore((s) => s.clearRaceSession);
   const setPhase = useGameStore((s) => s.setPhase);
   const pushRaceHistory = useGameStore((s) => s.pushRaceHistory);
   const awardPrizeMoney = useGameStore((s) => s.awardPrizeMoney);
   const deductFuelCost = useGameStore((s) => s.deductFuelCost);
 
-  const totalLaps = raceSession?.result.positionHistory.length ?? 0;
-  const lapTickMs = totalLaps > 0 ? Math.floor(RACE_DURATION_MS / totalLaps) : RACE_DURATION_MS;
-  const elapsedMs =
-    totalLaps > 0
-      ? Math.min(
-          RACE_DURATION_MS,
-          Math.floor(((raceSession?.currentLap ?? 0) / totalLaps) * RACE_DURATION_MS),
-        )
-      : 0;
+  const elapsedSec = useRaceClock(
+    raceSession?.status === "running",
+    TOTAL_RACE_SECONDS,
+  );
 
-  useEffect(() => {
-    if (!raceSession || raceSession.status !== "running") return;
-    const id = setInterval(advanceRaceLap, lapTickMs);
-    return () => clearInterval(id);
-  }, [raceSession, advanceRaceLap, lapTickMs]);
+  const totalLaps = raceSession ? leaderTotalLaps(raceSession.result) : 0;
+  const leaderLap = raceSession ? leaderLapAt(raceSession.result, elapsedSec) : 0;
+  const remainingSec = Math.max(0, TOTAL_RACE_SECONDS - elapsedSec);
 
   const handleFinish = useCallback(() => {
     if (!game || !raceSession) return;
@@ -92,6 +86,7 @@ export function RaceScreen() {
     }
     deductFuelCost(playerFuelCost);
 
+    finishRaceSession();
     clearRaceSession();
     setPhase("postRace");
   }, [
@@ -100,9 +95,25 @@ export function RaceScreen() {
     pushRaceHistory,
     awardPrizeMoney,
     deductFuelCost,
+    finishRaceSession,
     clearRaceSession,
     setPhase,
   ]);
+
+  // Auto-finish at 24:00 wall-clock. Guarded so the effect can't double-fire
+  // if the clock pins at the cap across re-renders.
+  const autoFinishedRef = useRef(false);
+  useEffect(() => {
+    if (
+      !autoFinishedRef.current &&
+      raceSession &&
+      game &&
+      elapsedSec >= TOTAL_RACE_SECONDS
+    ) {
+      autoFinishedRef.current = true;
+      handleFinish();
+    }
+  }, [elapsedSec, raceSession, game, handleFinish]);
 
   if (!game || !raceSession) return null;
 
@@ -114,10 +125,16 @@ export function RaceScreen() {
           {raceSession.status === "running" ? "Race in progress…" : "Race complete"}
         </div>
         <div className="race-clock">
-          <span className="clock-elapsed">{formatMmSs(elapsedMs)}</span>
+          <span className="clock-elapsed">{formatMmSs(elapsedSec)}</span>
           <span className="clock-divider">/</span>
           <span className="clock-total">24:00</span>
         </div>
+        <div className="race-laps">
+          Lap <span className="laps-leader">{leaderLap}</span>
+          <span className="laps-divider"> / </span>
+          <span className="laps-total">{totalLaps}</span>
+        </div>
+        <div className="race-eta">ETA {formatMmSs(remainingSec)}</div>
         <button className="btn-finish" onClick={handleFinish}>
           Finish race
         </button>
@@ -131,10 +148,10 @@ interface CarRef {
   carClass: CarClass;
 }
 
-function formatMmSs(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const m = Math.floor(totalSeconds / 60);
-  const s = totalSeconds % 60;
+function formatMmSs(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
