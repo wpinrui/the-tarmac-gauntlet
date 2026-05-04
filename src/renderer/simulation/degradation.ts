@@ -13,8 +13,12 @@ const MODE_DEGRADATION_SCALE: Record<InstructionMode, number> = {
 };
 
 // --- Tyre wear ---
+// Baseline calibrated for the time-bounded sim (1440 s race budget): a top
+// class-A car wears ~6 wear/lap, giving ~13-lap tyre stints and ~3 stops on
+// tyres alone — leaving room for ~48 laps inside the budget. Drop this and
+// the leader does too few laps; raise it and pit overhead crowds out laps.
 /** Wear added per lap (0–100 scale) with baseline stats and Normal mode. */
-const BASE_TYRE_WEAR_PER_LAP = 20;
+const BASE_TYRE_WEAR_PER_LAP = 8;
 /**
  * Maximum fractional reduction in wear rate from combined Tyre Durability + Smoothness stats.
  * At both stats = 100, wear rate is halved.
@@ -22,8 +26,12 @@ const BASE_TYRE_WEAR_PER_LAP = 20;
 const MAX_TYRE_STAT_REDUCTION = 0.5;
 
 // --- Fuel consumption ---
+// Baseline calibrated for time-bounded sim. At ~6 L/lap a class-A 70 L tank
+// covers ~12 laps, so refuelling is on a similar cadence to tyres rather
+// than driving extra stops. Aggressive reductions here also shorten the
+// refuel task time (fewer litres × per-litre seconds).
 /** Litres consumed per lap with baseline Fuel Efficiency and Normal mode. */
-const BASE_FUEL_PER_LAP = 20;
+const BASE_FUEL_PER_LAP = 7;
 /** Maximum fractional reduction in fuel consumption from Fuel Efficiency. */
 const MAX_FUEL_STAT_REDUCTION = 0.5;
 
@@ -34,8 +42,13 @@ const BASE_FATIGUE_PER_LAP = 3;
 const MAX_FATIGUE_STAT_REDUCTION = 0.5;
 
 // --- Car condition ---
+// Condition multiplies power/handling directly via effectiveStats — at 1.0 %/lap
+// a 48-lap race drops a fresh car to 52 %, which compresses peak-class lap
+// times by ~25 %. That single knob alone can eat 5+ laps off the leader's
+// total. 0.4 keeps a fresh car above 80 % across one race; cars still
+// deteriorate meaningfully across the season's multi-race timescale.
 /** Condition lost per lap (0–100 scale) at age 0, skill 0, Normal mode. */
-const BASE_CONDITION_DECAY_PER_LAP = 1.0;
+const BASE_CONDITION_DECAY_PER_LAP = 0.25;
 /** Fractional increase in condition decay rate per year of car age. */
 const AGE_CONDITION_RATE = 0.05;
 /** Cap on the age multiplier — prevents unbounded decay on very old cars (mirrors effectiveStats.ts). */
