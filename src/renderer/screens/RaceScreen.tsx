@@ -190,8 +190,9 @@ function playerStartingFuelLitres(game: GameState, player: PlayerTeam, carId: st
 // Phase 1 approximation: walks per-lap snapshots and counts negative
 // fuelRemaining deltas as consumption. Understates total burn for laps that
 // ended with a pit stop (in-lap consumption is hidden by the post-pit
-// snapshot), but is deterministic and tied to sim data. Phase 2/3 replaces
-// this with real per-lap fuel accounting.
+// snapshot), but is deterministic and tied to sim data. A later phase
+// replaces this with real per-lap fuel accounting once the snapshot record
+// carries pre-pit consumption.
 function approximatePlayerFuelConsumed(
   snapshots: CarLapSnapshot[],
   startingFuel: number,
