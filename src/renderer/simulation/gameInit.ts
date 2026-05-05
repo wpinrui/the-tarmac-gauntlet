@@ -363,7 +363,6 @@ export function initializeGame(
     },
     carMarket: { newListings, usedListings },
     track: PLACEHOLDER_TRACK,
-    race: null,
     raceHistory: [],
   };
 }

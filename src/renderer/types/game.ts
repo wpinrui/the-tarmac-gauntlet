@@ -1,7 +1,6 @@
 import type { CarModel, CarClass } from "./car";
 import type { Driver, Contract } from "./driver";
 import type { Team } from "./team";
-import type { RaceState } from "./race";
 import type { CarMarket, EconomyConfig } from "./economy";
 import type { Track } from "./track";
 import type { CarLapSnapshot } from "../simulation/raceLoop";
@@ -90,9 +89,6 @@ export interface GameState {
 
   // Track
   track: Track;
-
-  // Race
-  race: RaceState | null;     // Non-null only during race phase
 
   // History
   raceHistory: RaceHistoryEntry[];
