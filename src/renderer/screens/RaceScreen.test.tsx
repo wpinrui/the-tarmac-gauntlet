@@ -45,6 +45,9 @@ beforeEach(() => {
     x: 0, y: 0, top: 0, left: 0, right: 600, bottom: 360,
     width: 600, height: 360, toJSON: () => ({}),
   });
+  // Silence jsdom's "Not implemented: HTMLCanvasElement's getContext()" log.
+  // TrackMap's draw effect early-returns on a null context.
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
   useGameStore.setState({ game: null, screen: "garage", raceSession: null });
 });
 

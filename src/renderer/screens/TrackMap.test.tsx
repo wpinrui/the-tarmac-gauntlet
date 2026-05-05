@@ -56,6 +56,11 @@ beforeEach(() => {
     height: 360,
     toJSON: () => ({}),
   });
+  // jsdom logs "Not implemented: HTMLCanvasElement's getContext()" on every
+  // call, which floods test stderr. The component's `if (!ctx) return`
+  // already handles a null context; mocking it explicitly silences the
+  // log without changing behaviour.
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
 });
 
 afterEach(() => {

@@ -135,7 +135,11 @@ function buildPathLUT(
   // Start/finish arc length: sample inside the start/finish segment whose
   // Bézier-t is closest to the configured t. Resolved against the raw
   // (Bézier-t-spaced) array because that's where (segmentIndex, t) maps
-  // cleanly to an index.
+  // cleanly to an index. The result is in metres along `totalLength`, so it
+  // shares a coordinate system with the resampled `s[]` produced below and
+  // can be added to resampled arc lengths directly. Quantisation error is
+  // bounded by the dense-pass spacing (~1.5 m on the shipped track),
+  // invisible at the rendered scale.
   const startRawIdx =
     startSegmentIndex * RAW_SAMPLES_PER_CURVE +
     Math.round(startSegmentT * RAW_SAMPLES_PER_CURVE);
