@@ -3,11 +3,7 @@ import { useGameStore } from "../state/store";
 import { useRaceClock } from "../hooks/useRaceClock";
 import { processPostRaceFinancials } from "../simulation/postRaceFinancials";
 import { calculateEffectiveStats } from "../simulation/effectiveStats";
-import {
-  TOTAL_RACE_SECONDS,
-  leaderLapAt,
-  leaderTotalLaps,
-} from "../simulation/raceClock";
+import { TOTAL_RACE_SECONDS, leaderLapAt } from "../simulation/raceClock";
 import type { CarClass, GameState, PlayerTeam, RaceHistoryEntry } from "../types";
 import type { CarLapSnapshot } from "../simulation/raceLoop";
 import { TrackMap } from "./TrackMap";
@@ -28,7 +24,6 @@ export function RaceScreen() {
     TOTAL_RACE_SECONDS,
   );
 
-  const totalLaps = raceSession ? leaderTotalLaps(raceSession.result) : 0;
   const leaderLap = raceSession ? leaderLapAt(raceSession.result, elapsedSec) : 0;
   const remainingSec = Math.max(0, TOTAL_RACE_SECONDS - elapsedSec);
 
@@ -150,8 +145,6 @@ export function RaceScreen() {
         </div>
         <div className="race-laps">
           Lap <span className="laps-leader">{leaderLap}</span>
-          <span className="laps-divider"> / </span>
-          <span className="laps-total">{totalLaps}</span>
         </div>
         <div className="race-eta">ETA {formatMmSs(remainingSec)}</div>
         <button className="btn-finish" onClick={handleFinish}>

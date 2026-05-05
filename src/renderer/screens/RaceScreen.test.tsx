@@ -79,8 +79,6 @@ describe("phase='race' route", () => {
     expect(screen.getByText("00:00")).toBeTruthy();
     // Static "/ 24:00" suffix on the wall clock.
     expect(screen.getByText("24:00")).toBeTruthy();
-    // Leader's total lap count derived from result.results[0].lapsCompleted.
-    expect(screen.getByText("48")).toBeTruthy();
     expect(screen.getByText("Finish race")).toBeTruthy();
     // Phase-3 layout: TrackMap canvas is mounted and the standings slot is
     // a placeholder pending Phase 4.
