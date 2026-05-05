@@ -1,8 +1,11 @@
 import type { CarLapSnapshot, RaceResultFull } from "./raceLoop";
 
-// GDD §2 / Appendix A: 24 real-time minutes per race. Per-lap pacing is
-// derived from `raceSimDuration(result) / leader_total_laps`, never a fixed
-// 30s/lap. Tests/dev can pass a smaller `totalRaceSec` to compress playback.
+// GDD §2 / Appendix A: 24 real-time minutes per race. Wall-clock time is mapped
+// linearly onto sim time via `wallElapsed / totalRaceSec * raceSimDuration`,
+// so a class-A leader's 48 laps and an F-class backmarker's 35 laps are both
+// played back across the same 24-minute wall-clock window — there is never a
+// fixed seconds-per-lap rate. Tests/dev can pass a smaller `totalRaceSec` to
+// compress playback.
 export const TOTAL_RACE_SECONDS = 1440;
 
 /**
@@ -45,7 +48,11 @@ export function lapsCompletedAtSim(
 /**
  * The leader's lap count at wall-clock elapsed time. The "leader" is whichever
  * car has completed the most laps at that sim moment — not necessarily P1
- * mid-race.
+ * mid-race. Retired cars are still counted: their last logged snapshot
+ * legitimately reflects laps they ran in race-time, so a high-class retiree
+ * can briefly hold this number until a still-running car overtakes their
+ * total. By the end of the race the value converges to `leaderTotalLaps` for
+ * the no-tie case.
  */
 export function leaderLapAt(
   result: RaceResultFull,

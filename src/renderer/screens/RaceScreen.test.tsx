@@ -4,26 +4,10 @@ import { render, screen, cleanup } from "@testing-library/react";
 import { App } from "../App";
 import { useGameStore } from "../state/store";
 import { initializeGame } from "../simulation/gameInit";
-import type { CarLapSnapshot, RaceResultFull } from "../simulation/raceLoop";
+import type { RaceResultFull } from "../simulation/raceLoop";
+import { snap } from "../simulation/testFixtures";
 
 const stable = () => 0.5;
-
-function snap(lapsCompleted: number, totalTime: number): CarLapSnapshot {
-  return {
-    lapsCompleted,
-    totalTime,
-    tyreWear: 0,
-    fuelRemaining: 0,
-    fuelCapacity: 0,
-    condition: 100,
-    currentDriverId: "d",
-    driverFatigue: {},
-    instructionMode: "normal",
-    activeIssues: [],
-    tyreSetsAvailable: 0,
-    sparePartsAvailable: 0,
-  };
-}
 
 function stubRaceResult(): RaceResultFull {
   // 48-lap race, P1 finishes at sim t=1440 (each lap = 30s).

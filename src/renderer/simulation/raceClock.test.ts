@@ -9,24 +9,8 @@ import {
   raceSimDuration,
   wallToSim,
 } from "./raceClock";
-import type { CarLapSnapshot, RaceResultFull } from "./raceLoop";
-
-function snap(lapsCompleted: number, totalTime: number): CarLapSnapshot {
-  return {
-    lapsCompleted,
-    totalTime,
-    tyreWear: 0,
-    fuelRemaining: 0,
-    fuelCapacity: 0,
-    condition: 100,
-    currentDriverId: "d",
-    driverFatigue: {},
-    instructionMode: "normal",
-    activeIssues: [],
-    tyreSetsAvailable: 0,
-    sparePartsAvailable: 0,
-  };
-}
+import type { RaceResultFull } from "./raceLoop";
+import { snap } from "./testFixtures";
 
 /** Two cars, 4 laps each. A wins, B trails by 8 sim seconds at the line. */
 function fixture(): RaceResultFull {
@@ -141,6 +125,13 @@ describe("leaderLapAt", () => {
   it("picks the car with the most laps at the moment, not P1", () => {
     // Mid-race at sim=20: A done 2, B done 1 → leader = 2
     expect(leaderLapAt(fixture(), 30, 60)).toBe(2);
+  });
+
+  it("converges to leaderTotalLaps at the end of the race when there's no tie", () => {
+    // The wall-clock display "Lap X / N" must agree once the race is over —
+    // otherwise the player sees e.g. "Lap 47 / 48" when the leader has crossed.
+    const r = fixture();
+    expect(leaderLapAt(r, 60, 60)).toBe(leaderTotalLaps(r));
   });
 });
 
