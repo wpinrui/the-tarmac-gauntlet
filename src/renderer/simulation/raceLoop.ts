@@ -27,8 +27,22 @@ import type { FailureType } from "./riskRolls";
 // Tunable constants — balance values, adjust freely without touching logic
 // ---------------------------------------------------------------------------
 
-/** Default number of laps per race (GDD §2). */
-const DEFAULT_TOTAL_LAPS = 48;
+/**
+ * Default sim-time budget per race in seconds (GDD §2: 24 real-time minutes
+ * mapped 1:1 onto 1440 sim seconds). The race ends when each car's totalTime
+ * would exceed this — the leader hits the budget first with the most laps,
+ * slower classes finish on fewer laps. This is the load-bearing invariant;
+ * "48 laps" is illustrative, not prescriptive.
+ */
+const DEFAULT_RACE_DURATION_SEC = 1440;
+
+/**
+ * Hard cap on lap iterations to prevent runaway loops if a degenerate seed
+ * produces extremely fast laps (e.g. dt=0.1s × 1440 = 14_400 iterations would
+ * be pathological). 200 leaves ample headroom over realistic counts (~55 for
+ * an F1 car) while keeping the safety net tight.
+ */
+const SAFETY_LAP_CAP = 200;
 
 /** AI pits when tyre wear exceeds this threshold. */
 const AI_TYRE_PIT_THRESHOLD = 80;
@@ -107,7 +121,18 @@ export interface CarEntry {
 
 /** Options for the race simulation. */
 export interface RaceOptions {
-  /** Total laps to simulate. Defaults to 48 (GDD §2). */
+  /**
+   * Sim-time budget in seconds. Default 1440 (GDD §2). When set, each car runs
+   * laps until its `totalTime + nextLapTime` would exceed this — slower classes
+   * finish fewer laps. Pass `Infinity` (or set `totalLaps`) to disable.
+   */
+  raceDurationSec?: number;
+  /**
+   * Hard lap cap. Mostly for tests that want a small deterministic race
+   * (e.g. `totalLaps: 5`). When set without `raceDurationSec`, the time budget
+   * is disabled and every non-retired car runs exactly this many laps —
+   * matching the legacy lap-bounded behaviour.
+   */
   totalLaps?: number;
   /** Injectable random source for deterministic testing. */
   random?: () => number;
@@ -176,6 +201,12 @@ interface CarWorkingState {
   retired: boolean;
   retirementLap: number | null;
   retirementReason: FailureType | null;
+  /**
+   * Frozen because the sim-time budget would be exceeded by another lap. Not
+   * a retirement — the car simply ran out of race time. Excluded from further
+   * lap iterations but still ranked in standings by its final lap count.
+   */
+  outOfTime: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -272,13 +303,17 @@ function aiPitDecider(
  * Each lap, for every non-retired car:
  *   1. Calculate effective stats (2A) using current condition.
  *   2. Calculate lap time (2B) — includes active-issue lap-time penalties.
- *   3. Roll for issues and failures (2E).
- *   4. Apply degradation: tyre wear, fuel, fatigue, condition (2C).
- *   5. If failure: retire the car; no pit stop runs.
- *   6. If fuel is exhausted: trigger a forced pit stop.
- *   7. Otherwise: ask the car's pit decider (or AI strategy) whether to pit.
- *   8. Execute pit stop if requested (2D); adds duration to total time.
- *   9. Apply the next-lap instruction mode from the mode decider (no-op if pitting).
+ *   3. Time-budget gate: if running this lap would push totalTime past
+ *      `raceDurationSec`, mark the car `outOfTime` and skip the rest of the
+ *      per-lap body — no risk roll, degradation, or pit step happens for a
+ *      lap the car never actually ran.
+ *   4. Roll for issues and failures (2E).
+ *   5. Apply degradation: tyre wear, fuel, fatigue, condition (2C).
+ *   6. If failure: retire the car; no pit stop runs.
+ *   7. If fuel is exhausted: trigger a forced pit stop.
+ *   8. Otherwise: ask the car's pit decider (or AI strategy) whether to pit.
+ *   9. Execute pit stop if requested (2D); adds duration to total time.
+ *  10. Apply the next-lap instruction mode from the mode decider (no-op if pitting).
  *
  * Standings are ranked by laps completed descending, then total time ascending for ties.
  *
@@ -292,7 +327,13 @@ export function simulateRace(
   cars: CarEntry[],
   options: RaceOptions = {},
 ): RaceResultFull {
-  const totalLaps = options.totalLaps ?? DEFAULT_TOTAL_LAPS;
+  // Resolve race-end semantics. A bare `totalLaps` (legacy) disables the time
+  // budget; otherwise the budget defaults to GDD §2's 1440 s. A bare
+  // `raceDurationSec` keeps a generous safety lap cap. Both can be set.
+  const raceDurationSec =
+    options.raceDurationSec ??
+    (options.totalLaps !== undefined ? Infinity : DEFAULT_RACE_DURATION_SEC);
+  const lapCap = options.totalLaps ?? SAFETY_LAP_CAP;
   const random = options.random ?? Math.random;
   const issueTemplates = options.issueTemplates ?? [];
   const crashTemplates = options.crashTemplates ?? [];
@@ -316,6 +357,7 @@ export function simulateRace(
     retired: false,
     retirementLap: null,
     retirementReason: null,
+    outOfTime: false,
   }));
 
   let fastestLap: { carId: string; lap: number; time: number } | null = null;
@@ -343,9 +385,15 @@ export function simulateRace(
   // Race loop
   // ---------------------------------------------------------------------------
 
-  for (let lap = 1; lap <= totalLaps; lap++) {
+  for (let lap = 1; lap <= lapCap; lap++) {
+    // Stop the race once every car is either retired or out of time. Checked
+    // at the top of each iteration so we only push a positionHistory entry
+    // for laps that actually had at least one active car.
+    const anyActive = states.some((s) => !s.retired && !s.outOfTime);
+    if (!anyActive) break;
+
     for (const state of states) {
-      if (state.retired) continue;
+      if (state.retired || state.outOfTime) continue;
 
       const entry = state.entry;
 
@@ -375,6 +423,21 @@ export function simulateRace(
         state.fuelRemaining,
         random,
       );
+
+      // 4.5. Time budget gate — if completing this lap would push the car
+      // past the race-duration budget, freeze it at its current lap count and
+      // skip the rest of the per-lap body. Their final state reflects
+      // pre-bail data (no extra wear / fuel burn / risk roll for a lap they
+      // didn't actually run).
+      if (state.totalTime + lapTime > raceDurationSec) {
+        state.outOfTime = true;
+        // Close the open stint at the last completed lap.
+        const carStints = stints[entry.carId];
+        if (carStints.length > 0 && carStints[carStints.length - 1].endLap === -1) {
+          carStints[carStints.length - 1].endLap = state.lapsCompleted;
+        }
+        continue;
+      }
 
       // Track fastest lap (total on-track time including issue penalties)
       if (fastestLap === null || lapTime < fastestLap.time) {

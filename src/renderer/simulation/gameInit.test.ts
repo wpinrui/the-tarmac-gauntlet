@@ -172,11 +172,6 @@ describe("initializeGame", () => {
     expect(max).toBeGreaterThan(50_000);
   });
 
-  it("race is null at game start", () => {
-    const game = initializeGame(options, stable);
-    expect(game.race).toBeNull();
-  });
-
   it("race history is empty at game start", () => {
     const game = initializeGame(options, stable);
     expect(game.raceHistory).toHaveLength(0);

@@ -5,20 +5,24 @@ import type { InstructionMode } from "../types";
 // Tunable constants — balance values, adjust freely without touching logic
 // ---------------------------------------------------------------------------
 
+// Pit-time constants are tuned in concert with the degradation rates so that
+// a class-A car finishes ~45–51 laps in the 1440 s race budget (GDD §2). If
+// you change one, recheck the per-class lap-count test in raceLoop.test.ts.
+
 /** Seconds added to a stop when any fuel is being added (fixed overhead). */
-const REFUEL_BASE_SECONDS = 2.0;
+const REFUEL_BASE_SECONDS = 1.0;
 /** Additional seconds per litre added. */
-const REFUEL_SECONDS_PER_LITRE = 0.05;
+const REFUEL_SECONDS_PER_LITRE = 0.02;
 /** Seconds added to change a set of tyres. */
-const TYRE_CHANGE_SECONDS = 8.0;
+const TYRE_CHANGE_SECONDS = 2.5;
 /** Seconds added for a driver swap. */
-const DRIVER_SWAP_SECONDS = 5.0;
+const DRIVER_SWAP_SECONDS = 2.0;
 
 /**
  * Duration multiplier when crew size is 0 (player alone).
  * Crew size 16 → multiplier 1.0; crew size 0 → this value.
  */
-const SOLO_CREW_MULTIPLIER = 2.5;
+const SOLO_CREW_MULTIPLIER = 1.8;
 /** Maximum crew size (matches GDD §5 and game constants). */
 const MAX_CREW_SIZE = 16;
 

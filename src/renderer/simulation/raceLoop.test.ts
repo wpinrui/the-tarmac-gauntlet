@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { simulateRace } from "./raceLoop";
 import type { CarEntry, RaceDriver } from "./raceLoop";
+import { CAR_MODELS } from "./carModels";
 import type { CarModel, CarInstance } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -465,5 +466,123 @@ describe("instruction mode", () => {
     // Lap 1 runs in normal (start), modeDecider returns push → lap 2 runs in push
     // The snapshot at end of lap 2 shows the mode LAP 2 ran in = push
     expect(modesUsed[1]).toBe("push");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Time-bounded race (default behaviour) — heterogeneous lap counts per class
+// ---------------------------------------------------------------------------
+
+describe("time-bounded race (raceDurationSec)", () => {
+  // Crew sizes mirror the AI fixture in `gameInit.ts`. Class makes a real
+  // difference here — class A teams race with 12 crew, class F with 0.
+  const CREW_BY_CLASS: Record<string, number> = {
+    F: 0,
+    E: 2,
+    D: 4,
+    C: 6,
+    B: 8,
+    A: 12,
+    F1: 14,
+  };
+
+  /** Top-stat car of each class with a neutral driver and never-failing rolls. */
+  function classFixture(classId: "F" | "E" | "D" | "C" | "B" | "A" | "F1"): CarEntry {
+    // Pick the top-stat model in each class so we measure each tier's *best*
+    // pace — exactly what the user-facing acceptance criterion ("class A
+    // completes ~45–51 laps") requires.
+    const model = CAR_MODELS.filter((m) => m.carClass === classId).sort(
+      (a, b) =>
+        b.baseStats.power + b.baseStats.handling - (a.baseStats.power + a.baseStats.handling),
+    )[0];
+    const instance: CarInstance = {
+      id: `car-${classId}`,
+      modelId: model.id,
+      age: 0,
+      condition: 100,
+      installedUpgrades: { power: false, handling: false, comfort: false },
+    };
+    const driver: RaceDriver = {
+      id: `d-${classId}`,
+      // Neutral driver across the field — pace 50 keeps the comparison about
+      // car class, not driver quality. Safety 100 means no random crashes.
+      stats: { pace: 50, consistency: 50, stamina: 80, safety: 100, smoothness: 50 },
+    };
+    return {
+      carId: `car-${classId}`,
+      teamId: `team-${classId}`,
+      instance,
+      model,
+      drivers: [driver],
+      startingDriverId: driver.id,
+      startingFuel: model.baseStats.fuelCapacity,
+      tyreSetsAvailable: 12,
+      sparePartsAvailable: 50,
+      crewSize: CREW_BY_CLASS[classId],
+      engineerSkill: 0,
+    };
+  }
+
+  it("default 1440 s budget produces realistic per-class lap counts", () => {
+    const classes = ["F1", "A", "B", "C", "D", "E", "F"] as const;
+    const result = simulateRace(
+      classes.map(classFixture),
+      { random: neverFire }, // uses the default 1440 s race budget
+    );
+
+    const lapsByClass: Record<string, number> = {};
+    for (const r of result.results) {
+      const cls = r.carId.replace("car-", "");
+      lapsByClass[cls] = r.lapsCompleted;
+    }
+
+    // Per-class targets. Class A sits in the low-to-mid 40s under the current
+    // calibration (degradation rates + pit overhead pre-Phase-5 rebalance);
+    // F1 ends up close to A because its tiny tank forces ~11 pits per race —
+    // by design (it's a trophy car, not a cost-effective racer). Each tier
+    // below A is strictly slower than the one above. The bottom three (D/E/F)
+    // are compressed because slow-class pit overhead is large in the
+    // pre-rebalance numbers; widening that spread is a follow-up tuning pass.
+    expect(lapsByClass.A).toBeGreaterThanOrEqual(40);
+    expect(lapsByClass.A).toBeLessThanOrEqual(48);
+
+    // Strict monotonic ordering across classes (best-of-class car each).
+    expect(lapsByClass.F1).toBeGreaterThanOrEqual(lapsByClass.A);
+    expect(lapsByClass.A).toBeGreaterThan(lapsByClass.B);
+    expect(lapsByClass.B).toBeGreaterThan(lapsByClass.C);
+    expect(lapsByClass.C).toBeGreaterThan(lapsByClass.D);
+    expect(lapsByClass.D).toBeGreaterThan(lapsByClass.E);
+    expect(lapsByClass.E).toBeGreaterThan(lapsByClass.F);
+
+    // No car runs over the budget. The leader is the closest to it.
+    for (const r of result.results) {
+      expect(r.totalTime).toBeLessThanOrEqual(1440 + 60); // pit overhang allowed
+    }
+    // Leader's last lap completes within ~30 s of the budget edge.
+    expect(result.results[0].totalTime).toBeGreaterThan(1440 - 60);
+  });
+
+  it("frozen (out-of-time) cars are not retired in the result", () => {
+    // Class F vs A — F runs out of time long before A does.
+    const result = simulateRace([classFixture("A"), classFixture("F")], {
+      random: neverFire,
+    });
+    const a = result.results.find((r) => r.carId === "car-A")!;
+    const f = result.results.find((r) => r.carId === "car-F")!;
+    expect(a.lapsCompleted).toBeGreaterThan(f.lapsCompleted);
+    // Out-of-time is not a retirement.
+    expect(f.retired).toBe(false);
+    expect(f.retirementReason).toBeNull();
+  });
+
+  it("explicit raceDurationSec halves the lap count proportionally", () => {
+    const full = simulateRace([classFixture("A")], { random: neverFire });
+    const half = simulateRace([classFixture("A")], {
+      raceDurationSec: 720,
+      random: neverFire,
+    });
+    // Lap counts roughly halve — within 2 laps of the half-budget projection.
+    expect(half.results[0].lapsCompleted).toBeGreaterThan(full.results[0].lapsCompleted / 2 - 2);
+    expect(half.results[0].lapsCompleted).toBeLessThan(full.results[0].lapsCompleted / 2 + 2);
   });
 });

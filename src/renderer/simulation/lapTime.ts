@@ -35,10 +35,14 @@ const MODE_LAP_TIME_MODIFIER: Record<InstructionMode, number> = {
 };
 
 /** Maximum fractional lap time penalty from fully worn tyres (100% wear). */
-const MAX_TYRE_WEAR_PENALTY = 0.15;
+const MAX_TYRE_WEAR_PENALTY = 0.10;
 
-/** Fractional lap time penalty per litre of fuel on board. */
-const FUEL_PENALTY_PER_LITRE = 0.001;
+/**
+ * Fractional lap time penalty per litre of fuel on board. Calibrated for the
+ * time-bounded race: at full ~70 L tank a class-A car runs ~3.5 % slower than
+ * empty, which is meaningful but doesn't crowd out the 1440 s lap budget.
+ */
+const FUEL_PENALTY_PER_LITRE = 0.0005;
 
 /**
  * Maximum lap time variance (± seconds) at 0% consistency, Normal mode, 0% fatigue.
