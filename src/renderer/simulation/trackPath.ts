@@ -254,10 +254,10 @@ export function loadTrackPath(track: Track): TrackPath {
   return { path, pacing };
 }
 
-/** Normalize lap fraction to [0, 1). Negative values wrap. */
+/** Normalize lap fraction to [0, 1). Handles negative inputs (wraps) and
+ *  values ≥ 1 (modulo). */
 function normFraction(f: number): number {
-  const n = f - Math.floor(f);
-  return n < 0 ? n + 1 : n;
+  return ((f % 1) + 1) % 1;
 }
 
 /** Resolve lap fraction → arc length (metres) via the pacing LUT, including the start/finish offset. */
@@ -307,7 +307,11 @@ export function pointAtLapFraction(track: TrackPath, f: number): Point2D {
   };
 }
 
-/** Unit-tangent at a lap fraction. Useful for orienting discs / chevrons. */
+/**
+ * Unit-tangent at a lap fraction. Reserved for orienting discs / chevrons in
+ * a later phase — no live caller in Phase 3 since current discs are unrotated
+ * circles. Tested to lock the contract before consumers exist.
+ */
 export function tangentAtLapFraction(track: TrackPath, f: number): Point2D {
   const s = arcLengthAtLapFraction(track, f);
   const { idx } = pathSampleAt(track.path, s);
@@ -318,7 +322,9 @@ export function tangentAtLapFraction(track: TrackPath, f: number): Point2D {
 /**
  * Polyline samples for stroking the track to a canvas. `spacingMetres` defaults
  * to the LUT's native spacing; pass a larger value for cheaper offscreen
- * pre-renders.
+ * pre-renders. Reserved for offscreen track-stroke prerendering in a later
+ * phase — TrackMap currently strokes `path.points` directly each frame.
+ * Tested to lock the contract before consumers exist.
  */
 export function samplePolyline(track: TrackPath, spacingMetres = 0): Point2D[] {
   if (spacingMetres <= 0) return [...track.path.points, track.path.points[0]];
@@ -364,13 +370,14 @@ export function lapFractionForCar(
     return { lapsCompleted: 0, fractionOfLap: 0 };
   }
 
-  // Largest index whose totalTime ≤ simElapsed. Same walking pattern as
-  // `lapsCompletedAtSim` in raceClock.ts — kept inline so the file stays
-  // self-contained for testing.
+  // Largest index whose totalTime ≤ simElapsed. We scan the full array
+  // rather than break on the first miss: snapshots are ordered today, but
+  // a future scheduling change (retirements, alt branches) could violate
+  // that, and silently returning the wrong position would be invisible.
+  // Linear cost is fine — snapshot counts are O(laps).
   let lastCompletedIdx = -1;
   for (let i = 0; i < snapshots.length; i++) {
     if (snapshots[i].totalTime <= simElapsed) lastCompletedIdx = i;
-    else break;
   }
 
   if (lastCompletedIdx === -1) {
@@ -393,6 +400,9 @@ export function lapFractionForCar(
 
 function clamp01(x: number): number {
   if (x < 0) return 0;
-  if (x >= 1) return 0.999999; // strict <1 so wrapping doesn't lap-double
+  // Strict <1 so wrapping doesn't lap-double. 1e-6 is well below the
+  // pacing-LUT's bucket spacing (1/PACING_BUCKETS ≈ 1.4e-3), so the cap is
+  // visually indistinguishable from 1 while staying clearly inside [0, 1).
+  if (x >= 1) return 0.999999;
   return x;
 }
