@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect } from "react";
 import { useGameStore } from "../state/store";
 import { useRaceClock } from "../hooks/useRaceClock";
 import { processPostRaceFinancials } from "../simulation/postRaceFinancials";
@@ -100,17 +100,15 @@ export function RaceScreen() {
     setPhase,
   ]);
 
-  // Auto-finish at 24:00 wall-clock. Guarded so the effect can't double-fire
-  // if the clock pins at the cap across re-renders.
-  const autoFinishedRef = useRef(false);
+  // Auto-finish at 24:00 wall-clock. The `status === "running"` guard prevents
+  // a double-fire: handleFinish flips status to "finished", so the next render
+  // skips the branch even though elapsedSec is still pinned at the cap.
   useEffect(() => {
     if (
-      !autoFinishedRef.current &&
-      raceSession &&
+      raceSession?.status === "running" &&
       game &&
       elapsedSec >= TOTAL_RACE_SECONDS
     ) {
-      autoFinishedRef.current = true;
       handleFinish();
     }
   }, [elapsedSec, raceSession, game, handleFinish]);
