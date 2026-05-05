@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useGameStore } from "../state/store";
 import { useRaceClock } from "../hooks/useRaceClock";
 import { processPostRaceFinancials } from "../simulation/postRaceFinancials";
@@ -10,6 +10,7 @@ import {
 } from "../simulation/raceClock";
 import type { CarClass, GameState, PlayerTeam, RaceHistoryEntry } from "../types";
 import type { CarLapSnapshot } from "../simulation/raceLoop";
+import { TrackMap } from "./TrackMap";
 import "./RaceScreen.scss";
 
 export function RaceScreen() {
@@ -31,11 +32,19 @@ export function RaceScreen() {
   const leaderLap = raceSession ? leaderLapAt(raceSession.result, elapsedSec) : 0;
   const remainingSec = Math.max(0, TOTAL_RACE_SECONDS - elapsedSec);
 
+  const carIndex = useMemo(() => (game ? buildCarIndex(game) : new Map<string, CarRef>()), [game]);
+  const carTeamIds = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const [carId, ref] of carIndex) out[carId] = ref.teamId;
+    return out;
+  }, [carIndex]);
+  const playerCarId =
+    (game?.teams.find((t) => t.kind === "player") as PlayerTeam | undefined)?.enteredCarId ?? null;
+
   const handleFinish = useCallback(() => {
     if (!game || !raceSession) return;
 
     const player = game.teams.find((t) => t.kind === "player") as PlayerTeam | undefined;
-    const playerCarId = player?.enteredCarId ?? null;
     const playerFuelConsumed = playerCarId
       ? approximatePlayerFuelConsumed(
           raceSession.result.lapSnapshots[playerCarId] ?? [],
@@ -43,7 +52,6 @@ export function RaceScreen() {
         )
       : 0;
 
-    const carIndex = buildCarIndex(game);
     const results = raceSession.result.results.map((r) => {
       const ref = carIndex.get(r.carId);
       return {
@@ -92,6 +100,8 @@ export function RaceScreen() {
   }, [
     game,
     raceSession,
+    playerCarId,
+    carIndex,
     pushRaceHistory,
     awardPrizeMoney,
     deductFuelCost,
@@ -117,6 +127,17 @@ export function RaceScreen() {
 
   return (
     <div className="race-root">
+      <div className="race-left">
+        <div className="race-trackmap">
+          <TrackMap
+            result={raceSession.result}
+            elapsedSec={elapsedSec}
+            playerCarId={playerCarId}
+            carTeamIds={carTeamIds}
+          />
+        </div>
+        <div className="standings-placeholder">Standings — Phase 4</div>
+      </div>
       <div className="race-panel">
         <div className="race-title">The 24h Tarmac Gauntlet</div>
         <div className="race-status">
