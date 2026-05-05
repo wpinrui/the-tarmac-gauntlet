@@ -1,8 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   TOTAL_RACE_SECONDS,
-  carLapAt,
-  carLapProgressAt,
   lapsCompletedAtSim,
   leaderLapAt,
   leaderTotalLaps,
@@ -132,34 +130,6 @@ describe("leaderLapAt", () => {
     // otherwise the player sees e.g. "Lap 47 / 48" when the leader has crossed.
     const r = fixture();
     expect(leaderLapAt(r, 60, 60)).toBe(leaderTotalLaps(r));
-  });
-});
-
-describe("carLapAt", () => {
-  it("tracks each car independently", () => {
-    const r = fixture();
-    expect(carLapAt(r, "A", 30, 60)).toBe(2);
-    expect(carLapAt(r, "B", 30, 60)).toBe(1);
-  });
-
-  it("returns 0 for unknown carId", () => {
-    expect(carLapAt(fixture(), "ghost", 30, 60)).toBe(0);
-  });
-});
-
-describe("carLapProgressAt", () => {
-  it("returns 0 at lap boundaries and ramps to 1 between them", () => {
-    const r = fixture();
-    expect(carLapProgressAt(r, "A", 0, 60)).toBe(0);
-    // wall=15 → sim=10 → just completed lap 1, lap 2 starting → progress 0.
-    expect(carLapProgressAt(r, "A", 15, 60)).toBe(0);
-    // wall=22.5 → sim=15 → halfway through lap 2 (10..20).
-    expect(carLapProgressAt(r, "A", 22.5, 60)).toBeCloseTo(0.5, 5);
-  });
-
-  it("returns 0 once the car has no further laps", () => {
-    const r = fixture();
-    expect(carLapProgressAt(r, "A", 60, 60)).toBe(0);
   });
 });
 

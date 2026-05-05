@@ -68,41 +68,6 @@ export function leaderLapAt(
   return max;
 }
 
-/** A specific car's lap count at wall-clock elapsed time. */
-export function carLapAt(
-  result: RaceResultFull,
-  carId: string,
-  wallElapsedSec: number,
-  totalRaceSec: number = TOTAL_RACE_SECONDS,
-): number {
-  const snaps = result.lapSnapshots[carId];
-  if (!snaps) return 0;
-  return lapsCompletedAtSim(snaps, wallToSim(wallElapsedSec, result, totalRaceSec));
-}
-
-/**
- * 0..1 fractional progress through the in-progress lap for a car at
- * wall-clock elapsed time. Returns 0 if the car has no further laps.
- * Useful for smooth interpolation of bars / track positions between snapshots.
- */
-export function carLapProgressAt(
-  result: RaceResultFull,
-  carId: string,
-  wallElapsedSec: number,
-  totalRaceSec: number = TOTAL_RACE_SECONDS,
-): number {
-  const snaps = result.lapSnapshots[carId];
-  if (!snaps || snaps.length === 0) return 0;
-  const sim = wallToSim(wallElapsedSec, result, totalRaceSec);
-  const lapsDone = lapsCompletedAtSim(snaps, sim);
-  if (lapsDone >= snaps.length) return 0;
-  const lapStartSim = lapsDone === 0 ? 0 : snaps[lapsDone - 1].totalTime;
-  const lapEndSim = snaps[lapsDone].totalTime;
-  const span = lapEndSim - lapStartSim;
-  if (span <= 0) return 0;
-  return Math.min(1, Math.max(0, (sim - lapStartSim) / span));
-}
-
 /**
  * Final lap count of the standings winner — the displayed "total laps" for
  * the race. Falls back to 0 if results are empty.
