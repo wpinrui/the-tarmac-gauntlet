@@ -527,7 +527,7 @@ describe("time-bounded race (raceDurationSec)", () => {
     const classes = ["F1", "A", "B", "C", "D", "E", "F"] as const;
     const result = simulateRace(
       classes.map(classFixture),
-      { random: neverFire }, // no duration / lapcap → defaults apply
+      { random: neverFire }, // uses the default 1440 s race budget
     );
 
     const lapsByClass: Record<string, number> = {};

@@ -303,13 +303,17 @@ function aiPitDecider(
  * Each lap, for every non-retired car:
  *   1. Calculate effective stats (2A) using current condition.
  *   2. Calculate lap time (2B) — includes active-issue lap-time penalties.
- *   3. Roll for issues and failures (2E).
- *   4. Apply degradation: tyre wear, fuel, fatigue, condition (2C).
- *   5. If failure: retire the car; no pit stop runs.
- *   6. If fuel is exhausted: trigger a forced pit stop.
- *   7. Otherwise: ask the car's pit decider (or AI strategy) whether to pit.
- *   8. Execute pit stop if requested (2D); adds duration to total time.
- *   9. Apply the next-lap instruction mode from the mode decider (no-op if pitting).
+ *   3. Time-budget gate: if running this lap would push totalTime past
+ *      `raceDurationSec`, mark the car `outOfTime` and skip the rest of the
+ *      per-lap body — no risk roll, degradation, or pit step happens for a
+ *      lap the car never actually ran.
+ *   4. Roll for issues and failures (2E).
+ *   5. Apply degradation: tyre wear, fuel, fatigue, condition (2C).
+ *   6. If failure: retire the car; no pit stop runs.
+ *   7. If fuel is exhausted: trigger a forced pit stop.
+ *   8. Otherwise: ask the car's pit decider (or AI strategy) whether to pit.
+ *   9. Execute pit stop if requested (2D); adds duration to total time.
+ *  10. Apply the next-lap instruction mode from the mode decider (no-op if pitting).
  *
  * Standings are ranked by laps completed descending, then total time ascending for ties.
  *
