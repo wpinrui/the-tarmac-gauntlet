@@ -30,12 +30,31 @@ beforeEach(() => {
   // Stub RAF so the wall-clock hook doesn't tick between render and assertions.
   vi.stubGlobal("requestAnimationFrame", () => 0);
   vi.stubGlobal("cancelAnimationFrame", () => undefined);
+  // jsdom lacks ResizeObserver — TrackMap consumes one for its fit-transform.
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+  // Non-zero bounding rect so TrackMap's redraw effect runs against the
+  // (jsdom-stubbed) canvas API. Width/height are arbitrary.
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+    x: 0, y: 0, top: 0, left: 0, right: 600, bottom: 360,
+    width: 600, height: 360, toJSON: () => ({}),
+  });
+  // Silence jsdom's "Not implemented: HTMLCanvasElement's getContext()" log.
+  // TrackMap's draw effect early-returns on a null context.
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
   useGameStore.setState({ game: null, screen: "garage", raceSession: null });
 });
 
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
   useGameStore.setState({ game: null, screen: "garage", raceSession: null });
 });
 
@@ -63,8 +82,10 @@ describe("phase='race' route", () => {
     expect(screen.getByText("00:00")).toBeTruthy();
     // Static "/ 24:00" suffix on the wall clock.
     expect(screen.getByText("24:00")).toBeTruthy();
-    // Leader's total lap count derived from result.results[0].lapsCompleted.
-    expect(screen.getByText("48")).toBeTruthy();
     expect(screen.getByText("Finish race")).toBeTruthy();
+    // Phase-3 layout: TrackMap canvas is mounted and the standings slot is
+    // a placeholder pending Phase 4.
+    expect(document.querySelector(".track-map-canvas")).not.toBeNull();
+    expect(screen.getByText("Standings — Phase 4")).toBeTruthy();
   });
 });

@@ -1,15 +1,12 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useGameStore } from "../state/store";
 import { useRaceClock } from "../hooks/useRaceClock";
 import { processPostRaceFinancials } from "../simulation/postRaceFinancials";
 import { calculateEffectiveStats } from "../simulation/effectiveStats";
-import {
-  TOTAL_RACE_SECONDS,
-  leaderLapAt,
-  leaderTotalLaps,
-} from "../simulation/raceClock";
+import { TOTAL_RACE_SECONDS, leaderLapAt } from "../simulation/raceClock";
 import type { CarClass, GameState, PlayerTeam, RaceHistoryEntry } from "../types";
 import type { CarLapSnapshot } from "../simulation/raceLoop";
+import { TrackMap } from "./TrackMap";
 import "./RaceScreen.scss";
 
 export function RaceScreen() {
@@ -27,15 +24,22 @@ export function RaceScreen() {
     TOTAL_RACE_SECONDS,
   );
 
-  const totalLaps = raceSession ? leaderTotalLaps(raceSession.result) : 0;
   const leaderLap = raceSession ? leaderLapAt(raceSession.result, elapsedSec) : 0;
   const remainingSec = Math.max(0, TOTAL_RACE_SECONDS - elapsedSec);
+
+  const carIndex = useMemo(() => (game ? buildCarIndex(game) : new Map<string, CarRef>()), [game]);
+  const carTeamIds = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const [carId, ref] of carIndex) out[carId] = ref.teamId;
+    return out;
+  }, [carIndex]);
+  const playerCarId =
+    (game?.teams.find((t) => t.kind === "player") as PlayerTeam | undefined)?.enteredCarId ?? null;
 
   const handleFinish = useCallback(() => {
     if (!game || !raceSession) return;
 
     const player = game.teams.find((t) => t.kind === "player") as PlayerTeam | undefined;
-    const playerCarId = player?.enteredCarId ?? null;
     const playerFuelConsumed = playerCarId
       ? approximatePlayerFuelConsumed(
           raceSession.result.lapSnapshots[playerCarId] ?? [],
@@ -43,7 +47,6 @@ export function RaceScreen() {
         )
       : 0;
 
-    const carIndex = buildCarIndex(game);
     const results = raceSession.result.results.map((r) => {
       const ref = carIndex.get(r.carId);
       return {
@@ -92,6 +95,8 @@ export function RaceScreen() {
   }, [
     game,
     raceSession,
+    playerCarId,
+    carIndex,
     pushRaceHistory,
     awardPrizeMoney,
     deductFuelCost,
@@ -117,6 +122,17 @@ export function RaceScreen() {
 
   return (
     <div className="race-root">
+      <div className="race-left">
+        <div className="race-trackmap">
+          <TrackMap
+            result={raceSession.result}
+            elapsedSec={elapsedSec}
+            playerCarId={playerCarId}
+            carTeamIds={carTeamIds}
+          />
+        </div>
+        <div className="standings-placeholder">Standings — Phase 4</div>
+      </div>
       <div className="race-panel">
         <div className="race-title">The 24h Tarmac Gauntlet</div>
         <div className="race-status">
@@ -129,8 +145,6 @@ export function RaceScreen() {
         </div>
         <div className="race-laps">
           Lap <span className="laps-leader">{leaderLap}</span>
-          <span className="laps-divider"> / </span>
-          <span className="laps-total">{totalLaps}</span>
         </div>
         <div className="race-eta">ETA {formatMmSs(remainingSec)}</div>
         <button className="btn-finish" onClick={handleFinish}>
@@ -176,8 +190,9 @@ function playerStartingFuelLitres(game: GameState, player: PlayerTeam, carId: st
 // Phase 1 approximation: walks per-lap snapshots and counts negative
 // fuelRemaining deltas as consumption. Understates total burn for laps that
 // ended with a pit stop (in-lap consumption is hidden by the post-pit
-// snapshot), but is deterministic and tied to sim data. Phase 2/3 replaces
-// this with real per-lap fuel accounting.
+// snapshot), but is deterministic and tied to sim data. A later phase
+// replaces this with real per-lap fuel accounting once the snapshot record
+// carries pre-pit consumption.
 function approximatePlayerFuelConsumed(
   snapshots: CarLapSnapshot[],
   startingFuel: number,
