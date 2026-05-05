@@ -23,17 +23,24 @@ const SAMPLES_PER_CURVE = 64;
 const PACING_BUCKETS = 720;
 /**
  * Curvature-to-slowdown coefficient. v = clamp(1 / (1 + α·κ), v_min, 1).
- * α ≈ 75 puts a ~50m-radius corner (κ = 0.02 /m) at v ≈ 0.4 ≈ 2.5× slower
- * than a straight. Retune by eye after the map is rendering.
+ * α = 150 puts a ~100m-radius sweeper (κ = 0.01 /m) at v = 0.4 (2.5× slower
+ * than a straight); a ~50m hairpin (κ = 0.02 /m) clamps at v_min. Retune by
+ * eye if a future track has tighter corners or longer straights.
  */
-const CURVATURE_ALPHA = 75;
-/** Floor on the speed multiplier so hairpins don't crawl to a halt. */
-const CURVATURE_MIN_SPEED = 0.35;
+const CURVATURE_ALPHA = 150;
 /**
- * Half-window (in samples) for curvature smoothing. Single-sample κ spikes
- * from numerical noise produce jittery pacing without this.
+ * Floor on the speed multiplier. Low enough that hairpin apexes visibly
+ * crawl, high enough that discs never quite stop.
  */
-const CURVATURE_SMOOTH_HALF = 5;
+const CURVATURE_MIN_SPEED = 0.2;
+/**
+ * Half-window (in samples) for curvature smoothing. With ~3m sample spacing,
+ * ±15 samples is a ~90m smoothing radius — wide enough that approach and
+ * exit ramps before/after a corner accumulate non-trivial κ, which is what
+ * makes a disc *look like* it brakes into and accelerates out of the corner
+ * rather than instantly snapping to apex speed.
+ */
+const CURVATURE_SMOOTH_HALF = 15;
 
 // ---------------------------------------------------------------------------
 // Public types
