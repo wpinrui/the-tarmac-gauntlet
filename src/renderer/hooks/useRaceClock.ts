@@ -18,6 +18,10 @@ const RENDER_INTERVAL_MS = 33;
  * Stops scheduling frames once `capSec` is reached and pins the value at the
  * cap, which lets callers detect the auto-finish boundary by reading
  * `elapsed >= capSec`.
+ *
+ * GDD §2 user-facing pause (black screen) is deferred to Phase 7 (issue #29
+ * "Scope (out)") — the `running` flag here is a clock control, not the
+ * player-visible pause UX.
  */
 export function useRaceClock(running: boolean, capSec: number): number {
   const [elapsedSec, setElapsedSec] = useState(0);
