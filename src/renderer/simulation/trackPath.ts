@@ -17,30 +17,37 @@ import type { CarLapSnapshot } from "./raceLoop";
 // Tunables. Phase-3 "feel" knobs. Top-of-file so retuning is a one-line edit.
 // ---------------------------------------------------------------------------
 
-/** Bézier samples per cubic segment. 64 × 48 ≈ 3k samples = ~3m spacing on 9km. */
-const SAMPLES_PER_CURVE = 64;
+/**
+ * Dense Bézier-t samples per cubic segment, used only to measure the curve.
+ * 128 × 48 ≈ 6k raw samples — plenty for accurate arc-length integration on a
+ * 9km loop. These are NOT what we compute curvature against; see
+ * `RESAMPLE_SPACING_M` below.
+ */
+const RAW_SAMPLES_PER_CURVE = 128;
+/**
+ * Uniform arc-length spacing for the resampled path LUT. Cubic Bézier curves
+ * sampled at uniform t cluster near anchor points, which makes
+ * central-difference tangents biased and produces phantom "sharp bends" on
+ * actually-straight sections. Resampling uniformly along arc length kills
+ * that bias: every Δs is the same, so κ = |Δθ| / Δs reflects true curvature.
+ */
+const RESAMPLE_SPACING_M = 3;
 /** Buckets in the pacing LUT (lap fraction → arc length). Half-degree resolution. */
 const PACING_BUCKETS = 720;
 /**
  * Curvature-to-slowdown coefficient. v = clamp(1 / (1 + α·κ), v_min, 1).
- * α = 150 puts a ~100m-radius sweeper (κ = 0.01 /m) at v = 0.4 (2.5× slower
- * than a straight); a ~50m hairpin (κ = 0.02 /m) clamps at v_min. Retune by
- * eye if a future track has tighter corners or longer straights.
+ * α = 75 puts a ~50m hairpin (κ = 0.02 /m) at v ≈ 0.4. Retune by eye if a
+ * future track has tighter corners or longer straights.
  */
-const CURVATURE_ALPHA = 150;
+const CURVATURE_ALPHA = 75;
+/** Floor on the speed multiplier so hairpins don't crawl to a halt. */
+const CURVATURE_MIN_SPEED = 0.35;
 /**
- * Floor on the speed multiplier. Low enough that hairpin apexes visibly
- * crawl, high enough that discs never quite stop.
+ * Half-window (in samples) for curvature smoothing. With 3m uniform spacing,
+ * ±5 samples = ±15m smoothing radius — wide enough to kill any residual
+ * single-sample noise without bleeding corners onto neighbouring straights.
  */
-const CURVATURE_MIN_SPEED = 0.2;
-/**
- * Half-window (in samples) for curvature smoothing. With ~3m sample spacing,
- * ±15 samples is a ~90m smoothing radius — wide enough that approach and
- * exit ramps before/after a corner accumulate non-trivial κ, which is what
- * makes a disc *look like* it brakes into and accelerates out of the corner
- * rather than instantly snapping to apex speed.
- */
-const CURVATURE_SMOOTH_HALF = 15;
+const CURVATURE_SMOOTH_HALF = 5;
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -100,38 +107,83 @@ function buildPathLUT(
   startSegmentIndex: number,
   startSegmentT: number,
 ): TrackPathLUT {
-  // Sample every curve at uniform parameter spacing. We don't include t=1.0
-  // because the next curve's t=0 equals it (anchors are shared in the JSON).
-  const points: Point2D[] = [];
+  // Pass 1: dense Bézier-t sampling. Used only to measure total arc length
+  // and the start/finish offset. Discarded after resampling because the
+  // sample density is non-uniform — Bézier curves with control points
+  // pulling toward anchors bunch samples near anchors, which biases
+  // central-difference tangents and produces phantom curvature spikes on
+  // sections that are actually straight.
+  const rawPoints: Point2D[] = [];
   for (const c of curves) {
-    for (let i = 0; i < SAMPLES_PER_CURVE; i++) {
-      points.push(bezierPoint(c, i / SAMPLES_PER_CURVE));
+    for (let i = 0; i < RAW_SAMPLES_PER_CURVE; i++) {
+      rawPoints.push(bezierPoint(c, i / RAW_SAMPLES_PER_CURVE));
     }
   }
-
-  // Cumulative arc length. The closing chord (last sample → first) makes the
-  // loop measurable as a single span; totalLength is consumed by the pacing
-  // LUT and by wrap-around lookups.
-  const s = new Array<number>(points.length);
-  s[0] = 0;
-  for (let i = 1; i < points.length; i++) {
-    const dx = points[i].x - points[i - 1].x;
-    const dy = points[i].y - points[i - 1].y;
-    s[i] = s[i - 1] + Math.hypot(dx, dy);
+  const rawCumS = new Array<number>(rawPoints.length);
+  rawCumS[0] = 0;
+  for (let i = 1; i < rawPoints.length; i++) {
+    const dx = rawPoints[i].x - rawPoints[i - 1].x;
+    const dy = rawPoints[i].y - rawPoints[i - 1].y;
+    rawCumS[i] = rawCumS[i - 1] + Math.hypot(dx, dy);
   }
-  const closing = Math.hypot(
-    points[0].x - points[points.length - 1].x,
-    points[0].y - points[points.length - 1].y,
+  const closingD = Math.hypot(
+    rawPoints[0].x - rawPoints[rawPoints.length - 1].x,
+    rawPoints[0].y - rawPoints[rawPoints.length - 1].y,
   );
-  const totalLength = s[s.length - 1] + closing;
+  const totalLength = rawCumS[rawCumS.length - 1] + closingD;
 
-  // Tangents via central difference, wrapping at the closure so segment 0
-  // and the final segment have continuous angles.
-  const tangents = new Array<number>(points.length);
-  const n = points.length;
-  for (let i = 0; i < n; i++) {
-    const next = points[(i + 1) % n];
-    const prev = points[(i - 1 + n) % n];
+  // Start/finish arc length: sample inside the start/finish segment whose
+  // Bézier-t is closest to the configured t. Resolved against the raw
+  // (Bézier-t-spaced) array because that's where (segmentIndex, t) maps
+  // cleanly to an index.
+  const startRawIdx =
+    startSegmentIndex * RAW_SAMPLES_PER_CURVE +
+    Math.round(startSegmentT * RAW_SAMPLES_PER_CURVE);
+  const startFinishS = rawCumS[startRawIdx % rawPoints.length];
+
+  // Pass 2: uniform arc-length resample. Walks the raw cumulative arc length
+  // monotonically, interpolating between raw anchors (and into the closing
+  // chord) so each output sample sits at a fixed arc-length offset.
+  const N = Math.max(2, Math.round(totalLength / RESAMPLE_SPACING_M));
+  const points = new Array<Point2D>(N);
+  const s = new Array<number>(N);
+  let cursor = 0;
+  for (let i = 0; i < N; i++) {
+    const targetS = (i / N) * totalLength;
+    while (
+      cursor < rawCumS.length - 1 &&
+      rawCumS[cursor + 1] <= targetS
+    ) {
+      cursor++;
+    }
+    let a: Point2D;
+    let b: Point2D;
+    let sLo: number;
+    let sHi: number;
+    if (cursor < rawCumS.length - 1) {
+      a = rawPoints[cursor];
+      b = rawPoints[cursor + 1];
+      sLo = rawCumS[cursor];
+      sHi = rawCumS[cursor + 1];
+    } else {
+      // Past the last raw sample → walk the closing chord rawPoints[last] → rawPoints[0].
+      a = rawPoints[rawPoints.length - 1];
+      b = rawPoints[0];
+      sLo = rawCumS[rawCumS.length - 1];
+      sHi = totalLength;
+    }
+    const span = sHi - sLo;
+    const t = span > 0 ? (targetS - sLo) / span : 0;
+    points[i] = { x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) };
+    s[i] = targetS;
+  }
+
+  // Tangents via central difference on the *uniformly-spaced* samples. Now
+  // that Δs is constant, the tangent is unbiased and curvature is clean.
+  const tangents = new Array<number>(N);
+  for (let i = 0; i < N; i++) {
+    const next = points[(i + 1) % N];
+    const prev = points[(i - 1 + N) % N];
     tangents[i] = Math.atan2(next.y - prev.y, next.x - prev.x);
   }
 
@@ -146,14 +198,6 @@ function buildPathLUT(
     if (p.y < minY) minY = p.y;
     if (p.y > maxY) maxY = p.y;
   }
-
-  // Arc length at the start/finish line. Resolve to the sample inside that
-  // segment whose Bézier-t is closest to startSegmentT — within ~3 m of the
-  // exact point, which is invisible at the rendered scale.
-  const startSampleIdx =
-    startSegmentIndex * SAMPLES_PER_CURVE +
-    Math.round(startSegmentT * SAMPLES_PER_CURVE);
-  const startFinishS = s[startSampleIdx % points.length];
 
   return {
     totalLength,
