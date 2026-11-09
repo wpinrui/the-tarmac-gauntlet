@@ -21,6 +21,7 @@ namespace TarmacGauntlet.Raceday
         public readonly float[] LaneLateral;
 
         private readonly float[] heights;
+        private readonly float[] untouched;   // the ground as generated, before anything sank it
 
         public Circuit(CircuitData data)
         {
@@ -51,6 +52,7 @@ namespace TarmacGauntlet.Raceday
             }
 
             heights = DecodeHeights(data.terrain);
+            untouched = (float[])heights.Clone();
         }
 
         public int Wrap(int k) => ((k % Count) + Count) % Count;
@@ -72,15 +74,20 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>Height of the ground mesh as drawn: each cell split from (x+1, z) to (x, z+1).</summary>
-        public float TerrainHeight(float x, float z)
+        public float TerrainHeight(float x, float z) => Height(heights, x, z);
+
+        /// <summary>Height of the ground as generated, before anything laid on it sank it.</summary>
+        public float UntouchedHeight(float x, float z) => Height(untouched, x, z);
+
+        private float Height(float[] h, float x, float z)
         {
             GroundData t = Data.terrain;
             float fx = Mathf.Clamp((x - t.originX) / t.spacing, 0, t.countX - 1.001f);
             float fz = Mathf.Clamp((z - t.originZ) / t.spacing, 0, t.countZ - 1.001f);
             int ix = (int)fx, iz = (int)fz;
             float u = fx - ix, v = fz - iz;
-            float a = heights[iz * t.countX + ix], b = heights[iz * t.countX + ix + 1];
-            float d = heights[(iz + 1) * t.countX + ix], e = heights[(iz + 1) * t.countX + ix + 1];
+            float a = h[iz * t.countX + ix], b = h[iz * t.countX + ix + 1];
+            float d = h[(iz + 1) * t.countX + ix], e = h[(iz + 1) * t.countX + ix + 1];
             return u + v <= 1f ? a + (b - a) * u + (d - a) * v : e + (d - e) * (1f - u) + (b - e) * (1f - v);
         }
 
