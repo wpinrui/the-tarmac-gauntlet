@@ -79,6 +79,7 @@ namespace TarmacGauntlet.Raceday
             RaceCameras views = cam.gameObject.AddComponent<RaceCameras>();
             views.Car = car;
             views.Keys = keys;
+            cam.gameObject.AddComponent<DriveHud>().Car = car;
         }
     }
 }
