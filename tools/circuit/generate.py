@@ -340,12 +340,18 @@ def main():
     bypass_s = chicane['s'] - 20 + lap
     bypass_e = chicane['e'] + 40 + lap
     lane_out = hairpin['e'] + 200 + lap
+    # The lane starts and ends on a track sample, so the runoff that stops for it stops exactly where it begins.
+    lane_in = round(lane_in / step) * step
+    lane_out = round(lane_out / step) * step
     p0, p1 = left(bypass_s, LANE_OFFSET), left(bypass_e, LANE_OFFSET)
     lane = []
     lane_d = []
     dd = lane_in
+    def lane_offset(dd):
+        return LANE_OFFSET * smoothstep((dd - lane_in) / 300) * smoothstep((lane_out - dd) / 300)
+
     while dd <= lane_out + 1e-6:
-        o = LANE_OFFSET * smoothstep((dd - lane_in) / 300) * smoothstep((lane_out - dd) / 300)
+        o = lane_offset(dd)
         if bypass_s < dd < bypass_e:
             t = (dd - bypass_s) / (bypass_e - bypass_s)
             lane.append([p0[i] + (p1[i] - p0[i]) * t for i in range(3)])
@@ -355,8 +361,9 @@ def main():
         dd += step
 
     # Garages on the far side of the lane, evenly spaced by length.
-    gl_off = LANE_OFFSET + PIT_LANE / 2 + 1 + GARAGE_DEPTH / 2
-    line = [left(garages_s + i * 1.0, gl_off) for i in range(int(garages_e - garages_s) + 1)]
+    # They follow the lane's own offset, which is still easing out from the track where the row starts.
+    gl_off = PIT_LANE / 2 + 1 + GARAGE_DEPTH / 2
+    line = [left(garages_s + i * 1.0, lane_offset(garages_s + i * 1.0) + gl_off) for i in range(int(garages_e - garages_s) + 1)]
     acc = [0.0]
     for i in range(1, len(line)):
         acc.append(acc[-1] + math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]))
@@ -404,6 +411,9 @@ def main():
                     gap = np.abs(ks[:, None] - idx[None, :])
                     gap = np.minimum(gap, n - gap) * step
                     ok &= gap > 250
+                else:
+                    # Only things past this side's road edge: a pit lane point lying on the road is not beside it.
+                    ok &= lat > W[ks][:, None] / 2
                 dist = np.where(ok, lat - rad[None, :], 1e9)
                 best[ks] = np.minimum(best[ks], dist.min(axis=1))
         # Track meets track: share the gap. Anything else: keep 3 m short of it.

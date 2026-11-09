@@ -8,7 +8,7 @@
 //                    and the camera moves to another car every 40 s, as V does. Cars switch both ways
 //                    many times without leaving the track, getting stuck or touching, and after waking
 //                    no car strays more than 2 m from its path
-//   fast forward     100 cars glide for 5 minutes, as at 16x: those within 500 m of the camera step
+//   fast forward     100 cars glide for 5 minutes, as at 16x: those within 600 m of the camera step
 //                    every 0.1 s and the rest every 0.2 s. Every car laps, pace is within 1% of
 //                    stepping every 0.01 s, and no car in sight runs through another faster than
 //                    8 m/s (the same racecraft gives light touches in a pack this dense; harder means
@@ -124,8 +124,9 @@ static partial class Check
     }
 
     /// <summary>
-    /// The whole field gliding as at 16x: cars within 500 m of the camera (on car 50) step every
-    /// 0.1 s, the rest every 0.2 s, as PhysicsRange sets them.
+    /// The whole field gliding as at 16x: cars within 600 m of the camera (on car 50) step every
+    /// 0.1 s, the rest every 0.2 s, as PhysicsRange sets them. Overlaps count as in sight within 500 m,
+    /// so a car coming into view has already raced at the finer step for a while.
     /// </summary>
     static void FastForward()
     {
@@ -134,7 +135,7 @@ static partial class Check
         {
             var race = new Race(circuit, Hundred(), LineFor) { Physics = _ => false };
             race.Camera = race.Racers[50];
-            if (!fine) race.GlideStepFor = r => Apart(r, race.Camera) < 500f ? 0.1f : 0.2f;
+            if (!fine) race.GlideStepFor = r => Apart(r, race.Camera) < 600f ? 0.1f : 0.2f;
             while (race.Time < Length) race.Step();
             ms = race.ThinkTicks / (double)Stopwatch.Frequency * 1000.0;
             return race;

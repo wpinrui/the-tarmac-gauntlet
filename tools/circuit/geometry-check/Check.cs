@@ -8,10 +8,20 @@
 //   no cliffs             where a flat surface ends, the next thing outside it (another surface or the ground,
 //                         carried back to the edge along its slope) is at most 0.4 m lower, so no road or
 //                         runoff edge stands up off the ground
-//   barriers grounded     every armco, tyre wall and pit wall reaches down into what it stands on, so no gap shows under it
+//   barriers and buildings grounded  every armco, tyre wall, pit wall, garage and bollard reaches down into what it
+//                         stands on, so no gap shows under it
 //   fences never cross    no armco or pit wall line crosses another, or itself, seen from above
 //   fences run smooth     along each armco or pit wall line no joint turns more than 30 degrees, and no piece
 //                         is shorter than 30 m, so no fence zigzags or stands as a stray stub
+//   no surfaces fighting  no two surfaces lie within 2 cm of each other, so none flickers through another
+//   no holes              every spot from the road out to the fence is covered, so no bare ground shows through
+//   no steps to drive over  where two surfaces meet, or a surface meets bare ground, the step is at most 6 cm,
+//                         and 1.5 cm where asphalt meets asphalt
+//   no launching crests   no crest on the racing line is sharp enough to lift a car at 250 km/h
+//   fences clear of the road  no fence stands on or leans over the road or pit lane
+//   no ground walls       past an unfenced runoff edge the ground rises no steeper than 1 in 1
+//   no missing faces      fences and buildings are closed solids, with no open face to see through
+// GC_KINDS=1 lists failures per pair of parts; GC_STEP or GC_FIGHT set to such a pair lists its spots.
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -20,7 +30,7 @@ using System.Text.Json;
 using TarmacGauntlet.Raceday;
 using UnityEngine;
 
-static class Check
+static partial class Check
 {
     const float Cliff = 0.4f;
     const float Cell = 2f;
@@ -35,6 +45,7 @@ static class Check
     };
 
     static Circuit circuit;
+    static CircuitBuilder builder;
     static readonly List<(Vector3 a, Vector3 b, Vector3 c)> tris = new List<(Vector3, Vector3, Vector3)>();
     static readonly List<string> triPart = new List<string>();
     static readonly Dictionary<long, List<int>> grid = new Dictionary<long, List<int>>();
@@ -44,7 +55,8 @@ static class Check
     {
         var data = JsonSerializer.Deserialize<CircuitData>(File.ReadAllText(args[0]), new JsonSerializerOptions { IncludeFields = true });
         circuit = new Circuit(data);
-        List<CircuitPart> parts = new CircuitBuilder(circuit, null).Build();
+        builder = new CircuitBuilder(circuit, null);
+        List<CircuitPart> parts = builder.Build();
 
         foreach (CircuitPart p in parts.Where(p => !NotCover.Contains(p.Name)))
             foreach (var t in TopTriangles(p)) Add(t, p.Name);
@@ -54,6 +66,7 @@ static class Check
         NoCliffs(parts);
         BarriersGrounded(parts);
         FenceRules(parts);
+        MoreRules(parts);
         return failed ? 1 : 0;
     }
 
@@ -139,13 +152,15 @@ static class Check
 
     static void IndexBarriers(List<CircuitPart> parts)
     {
-        foreach (CircuitPart part in parts.Where(p => Barriers.Contains(p.Name)))
+        // Garage walls stop a car as a barrier does; their floor slabs do not.
+        foreach (CircuitPart part in parts.Where(p => Barriers.Contains(p.Name) || p.Name == "Garages"))
         {
             var v = part.Kit.Vertices;
             var t = part.Kit.Triangles;
             for (int i = 0; i < t.Count; i += 3)
             {
                 Vector3 a = v[t[i]], b = v[t[i + 1]], c = v[t[i + 2]];
+                if (part.Name == "Garages" && Math.Max(a.y, Math.Max(b.y, c.y)) - Math.Min(a.y, Math.Min(b.y, c.y)) < 3f) continue;
                 // Mark half-metre cells along each edge of the triangle.
                 foreach (var (p, q) in new[] { (a, b), (b, c), (c, a) })
                 {
@@ -164,7 +179,7 @@ static class Check
     {
         var bad = new List<(float, Vector3, string)>();
         int n = 0;
-        foreach (CircuitPart part in parts.Where(p => Barriers.Contains(p.Name)))
+        foreach (CircuitPart part in parts.Where(p => Barriers.Contains(p.Name) || p.Name == "Garages" || p.Name == "Pit entry bollard"))
         {
             // Lowest point of each upright face of the barrier at each spot along it.
             var lowest = new Dictionary<(int, int), Vector3>();
@@ -184,12 +199,14 @@ static class Check
             foreach (Vector3 v in lowest.Values)
             {
                 n++;
-                float floor = Below(v.x, v.z, v.y + 3f);
+                // A foot right on the edge of what it stands on counts as standing on it.
+                float floor = new[] { (0f, 0f), (0.05f, 0f), (-0.05f, 0f), (0f, 0.05f), (0f, -0.05f) }
+                    .Max(o => Below(v.x + o.Item1, v.z + o.Item2, v.y + 3f));
                 float gap = v.y - floor;
                 if (gap > 0.02f) bad.Add((gap, v, part.Name));
             }
         }
-        Report("barriers grounded", bad, n, "barrier feet", "m gap underneath");
+        Report("barriers and buildings grounded", bad, n, "feet", "m gap underneath");
     }
 
     static readonly HashSet<string> Fences = new HashSet<string> { "Armco", "Pit wall" };
@@ -213,6 +230,9 @@ static class Check
                 if (tri[1].y - tri[2].y < 0.3f) continue;
                 long ka = FlatKey(tri[0]), kb = FlatKey(tri[1]);
                 if (ka == kb) continue;
+                Vector3 run = tri[1] - tri[0];
+                run.y = 0;
+                if (run.magnitude < 0.7f) continue;   // the end cap across a wall, not part of its line
                 var k = ka < kb ? (ka, kb) : (kb, ka);
                 if (seen.Add(k)) segs.Add((tri[0], tri[1], ka, kb, part.Name));
             }
@@ -324,7 +344,7 @@ static class Check
         }
     }
 
-    static long Key(Vector3 p) => ((long)Math.Round(p.x * 100) * 2000003L) ^ ((long)Math.Round(p.z * 100) * 1000003L) ^ (long)Math.Round(p.y * 100);
+    static long Key(Vector3 p) => ((long)Math.Round(p.x * 1000) * 2000003L) ^ ((long)Math.Round(p.z * 1000) * 1000003L) ^ (long)Math.Round(p.y * 1000);
 
     static long CellKey(int x, int z) => ((long)x << 32) ^ (uint)z;
 
@@ -358,17 +378,22 @@ static class Check
         return best;
     }
 
-    static bool HeightIn(Vector3 a, Vector3 b, Vector3 c, float x, float z, out float h)
+    static bool HeightIn(Vector3 a, Vector3 b, Vector3 c, float x, float z, out float h, double inside = -1e-3)
     {
         h = 0;
-        float d = (b.z - c.z) * (a.x - c.x) + (c.x - b.x) * (a.z - c.z);
-        if (Math.Abs(d) < 1e-9f) return false;
-        float u = ((b.z - c.z) * (x - c.x) + (c.x - b.x) * (z - c.z)) / d;
-        float v = ((c.z - a.z) * (x - c.x) + (a.x - c.x) * (z - c.z)) / d;
-        float w = 1 - u - v;
-        const float e = -1e-4f;
-        if (u < e || v < e || w < e) return false;
-        h = u * a.y + v * b.y + w * c.y;
+        // In double, relative to c, and with a margin in metres (negative reaches past the sides): the builder cuts surfaces into pieces
+        // a few centimetres across, where a tolerance in barycentric terms would be far too tight.
+        double ax = a.x - c.x, az = a.z - c.z, bx = b.x - c.x, bz = b.z - c.z, px = x - c.x, pz = z - c.z;
+        double d = bz * ax - bx * az;
+        if (Math.Abs(d) < 1e-9) return false;
+        double u = (bz * px - bx * pz) / d;
+        double v = (-az * px + ax * pz) / d;
+        double w = 1 - u - v;
+        // Each weight times the corner's height above the opposite side is the distance in from that side.
+        double la = Math.Sqrt(bx * bx + bz * bz), lb = Math.Sqrt(ax * ax + az * az);
+        double lc = Math.Sqrt((ax - bx) * (ax - bx) + (az - bz) * (az - bz));
+        if (u * Math.Abs(d) / la < inside || v * Math.Abs(d) / lb < inside || w * Math.Abs(d) / lc < inside) return false;
+        h = (float)(u * a.y + v * b.y + w * c.y);
         return true;
     }
 
@@ -395,6 +420,9 @@ static class Check
             return;
         }
         failed = true;
+        if (Environment.GetEnvironmentVariable("GC_KINDS") != null)
+            foreach (var g in bad.GroupBy(b => b.part).OrderByDescending(g => g.Count()))
+                Console.WriteLine($"  {rule}: {g.Key} x{g.Count()} worst {g.Max(b => b.amount):0.00}");
         // Worst spot per 50 m of lap, worst first.
         var worst = bad.Select(b => (b.amount, b.part, place: Place(b.at)))
             .GroupBy(b => (int)(b.place.lap / 50))

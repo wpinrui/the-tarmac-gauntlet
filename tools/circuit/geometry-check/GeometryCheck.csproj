@@ -9,7 +9,7 @@
     <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)../../../out/geometry-check/obj/</BaseIntermediateOutputPath>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Check.cs;UnityStubs.cs" />
+    <Compile Include="Check.cs;MoreRules.cs;UnityStubs.cs" />
     <Compile Include="../../../unity/Assets/Raceday/Scripts/Circuit.cs" />
     <Compile Include="../../../unity/Assets/Raceday/Scripts/CircuitData.cs" />
     <Compile Include="../../../unity/Assets/Raceday/Scripts/CircuitBuilder.cs" />

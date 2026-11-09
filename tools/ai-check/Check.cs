@@ -104,6 +104,29 @@ static partial class Check
             if (only == null || only == "mistakes") { Mistakes(); GlideMistakes(); }
             if (only == null || only == "handovers") Handovers();
             if (only == null || only == "ff") FastForward();
+            if (only == null || only == "pits") PitStopsCheck("gliding pit stops", i => i % 2 == 1, verbose: only != null, glide: true);
+            if (only == null || only == "start") RollingStartCheck(100, verbose: false, glide: true);
+            return failed ? 1 : 0;
+        }
+        if (args.Length > 1 && args[1] == "running")
+        {
+            RaceRunning(verbose: true);
+            return failed ? 1 : 0;
+        }
+        if (args.Length > 1 && args[1] == "start")
+        {
+            RollingStartCheck(args.Length > 2 ? int.Parse(args[2]) : 100, verbose: true);
+            return failed ? 1 : 0;
+        }
+        if (args.Length > 1 && args[1] == "pits")
+        {
+            PitStopsCheck("pit stops", i => i % 2 == 1, verbose: true);
+            PitStopsCheck("crowded pits", i => true, verbose: true);
+            return failed ? 1 : 0;
+        }
+        if (args.Length > 1 && args[1] == "supplies")
+        {
+            SuppliesCheck(verbose: true);
             return failed ? 1 : 0;
         }
         if (args.Length > 1 && args[1] == "race")
@@ -127,6 +150,7 @@ static partial class Check
         Defends();
         LapsAtHairpin();
         RacePack(4, verbose: false);
+        RaceRunning(verbose: false);
         GlidePace();
         GlideMistakes();
         Handovers();

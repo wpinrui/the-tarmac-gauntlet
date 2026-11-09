@@ -25,9 +25,10 @@ namespace TarmacGauntlet.Raceday
         private const float Settle = 1f;
         /// <summary>
         /// Gliding cars nearer the camera than this look around and move on every 0.05 s (0.1 s at 16x),
-        /// so they are drawn smoothly and race closely. The rest, out of sight, do it every 0.2 s.
+        /// so they are drawn smoothly and race closely. The rest, out of sight, do it every 0.2 s. It
+        /// reaches past what the camera shows, so a car has settled into the finer step before it is seen.
         /// </summary>
-        private const float Watched = 500f;
+        private const float Watched = 600f;
 
         public AiDriver[] Drivers;
         /// <summary>The player's car.</summary>

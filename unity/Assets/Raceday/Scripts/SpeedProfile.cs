@@ -34,7 +34,8 @@ namespace TarmacGauntlet.Raceday
         private const float TableStep = 0.5f;
         private float[] engineTable;   // full-throttle acceleration every half metre per second
 
-        public SpeedProfile(RacingLine line, CarSpec spec, float limit)
+        /// <param name="maxSpeed">Optional cap on the speed at each sample, m/s, such as the pit lane limiter.</param>
+        public SpeedProfile(RacingLine line, CarSpec spec, float limit, float[] maxSpeed = null)
         {
             Line = line;
             this.spec = spec;
@@ -58,6 +59,7 @@ namespace TarmacGauntlet.Raceday
             {
                 float v2 = Mathf.Min(CornerSpeed2(k, frontWeight, frontAero), CornerSpeed2(k, rearWeight, rearAero));
                 corner[k] = Mathf.Min(Mathf.Sqrt(Mathf.Max(v2, 25f)), top);
+                if (maxSpeed != null) corner[k] = Mathf.Min(corner[k], maxSpeed[k]);
             }
 
             // Start from the slowest corner, so one pass each way settles the whole lap.

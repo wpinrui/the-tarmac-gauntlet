@@ -13,6 +13,8 @@ namespace TarmacGauntlet.Raceday
         public const float AirDensity = 1.2f;
 
         public string Name;
+        /// <summary>The car's game stats, for fuel, tyre wear and pit stops.</summary>
+        public CarStats Stats;
         public float Mass;            // kg
         public float PeakPower;       // W, reached at the redline
         public float Redline;         // engine speed, rad/s
@@ -46,6 +48,7 @@ namespace TarmacGauntlet.Raceday
             var spec = new CarSpec
             {
                 Name = model.Name,
+                Stats = s,
                 Mass = model.CarClass switch
                 {
                     CarClass.F => 950f,

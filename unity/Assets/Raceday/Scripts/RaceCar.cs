@@ -9,6 +9,8 @@ namespace TarmacGauntlet.Raceday
     /// all of them. Once per physics step the cars are brought up to date together, into
     /// <see cref="Field"/>, and each car on physics gets the slipstream of the cars ahead of it.
     /// A gliding car is read from its pilot, which knows exactly where it is on its path.
+    /// It also switches the pit lane limiter on and off, and serves the player in their box: stop
+    /// in it and the crew fills the tank and fits new tyres.
     /// </summary>
     [DefaultExecutionOrder(-20)]   // before the AI drivers think
     [RequireComponent(typeof(CarController))]
@@ -16,20 +18,31 @@ namespace TarmacGauntlet.Raceday
     {
         private const float G = 9.81f;
 
-        /// <summary>Every car, as of this physics step, in lap order.</summary>
+        /// <summary>Every car on the track, as of this physics step, in lap order: cars in the pit lane are left out.</summary>
         public static readonly TrafficField Field = new TrafficField();
-        private static readonly List<TrafficCar> all = new List<TrafficCar>();
+        private static readonly List<TrafficCar> onTrack = new List<TrafficCar>();
+        /// <summary>Where every car is, the pit lane included, as of this physics step.</summary>
+        public static readonly List<CarState> All = new List<CarState>();
         private static readonly List<RaceCar> cars = new List<RaceCar>();
         private static float updated = -1f;
         private static int nextId;
 
         public TrafficCar Traffic { get; private set; }
         public int Laps { get; private set; }
+        public int Id => id;
+        /// <summary>True while the car is off the track in the pit lane.</summary>
+        public bool InPitLane { get; private set; }
+        /// <summary>The pit lane, and this car's garage in it, or -1 for none.</summary>
+        public PitLane Pits;
+        public int Garage = -1;
+        /// <summary>The player's stop in progress, or null.</summary>
+        public PitService Service { get; private set; }
 
         private CarController car;
         private AiDriver driver;
         private int id;
         private int index = -1;
+        private Vector3 velocity;
 
         private void Awake()
         {
@@ -50,12 +63,18 @@ namespace TarmacGauntlet.Raceday
         {
             if (updated == Time.fixedTime) return;
             updated = Time.fixedTime;
-            all.Clear();
+            onTrack.Clear();
+            All.Clear();
             foreach (RaceCar r in cars) r.Measure();
-            foreach (RaceCar r in cars) all.Add(r.Traffic);
-            if (cars.Count > 0) Field.Set(all, cars[0].car.Circuit.Lap);
             foreach (RaceCar r in cars)
-                if (!r.car.Asleep) r.car.DragScale = Racecraft.Slipstream(r.car.Circuit, r.Traffic, all);
+            {
+                All.Add(new CarState { Id = r.id, Position = r.transform.position, Velocity = r.velocity });
+                if (!r.InPitLane) onTrack.Add(r.Traffic);
+            }
+            if (cars.Count > 0) Field.Set(onTrack, cars[0].car.Circuit.Lap);
+            foreach (RaceCar r in cars) r.ServePlayer();
+            foreach (RaceCar r in cars)
+                if (!r.car.Asleep) r.car.DragScale = Racecraft.Slipstream(r.car.Circuit, r.Traffic, onTrack);
         }
 
         /// <summary>Finds the car on the lap, counts the laps, and fills in <see cref="Traffic"/>.</summary>
@@ -64,11 +83,15 @@ namespace TarmacGauntlet.Raceday
             Circuit c = car.Circuit;
             if (driver == null) driver = GetComponent<AiDriver>();
             AiPilot pilot = driver != null ? driver.Pilot : null;
-            if (pilot != null && pilot.Gliding)
+            if (driver != null && driver.Gliding)
             {
-                int g = pilot.Index;
-                Count(c, g);
-                Traffic = Describe(pilot, Laps * c.Lap + pilot.GlideDistance, pilot.GlideLateral, pilot.GlideSpeed);
+                // Gliding: racing or in the formation, on the track, never in the pit lane.
+                AiPilot active = driver.Racer.Active;
+                Count(c, active.Index);
+                InPitLane = false;
+                car.SpeedLimit = float.PositiveInfinity;
+                velocity = active.Line.Tangent[active.Index] * active.GlideSpeed;
+                Traffic = Describe(pilot, Laps * c.Lap + active.GlideDistance, active.GlideLateral, active.GlideSpeed);
                 return;
             }
             Vector3 p = transform.position;
@@ -78,9 +101,12 @@ namespace TarmacGauntlet.Raceday
             Vector3 d = p - c.Centre[k];
             Vector3 f = c.Forward[k];
             Vector3 v = car.Velocity;
+            velocity = v;
+            float lateral = d.x * c.Left[k].x + d.z * c.Left[k].z;
+            InPitLane = Pits != null && Pits.OffTrackInLane(k, lateral);
+            car.SpeedLimit = Pits != null && Pits.InLimitZone(p, k) ? Pits.LimitSpeed : float.PositiveInfinity;
             // Between samples too, so gaps don't jump in 2 m steps.
-            Traffic = Describe(pilot, Laps * c.Lap + k * c.Step + d.x * f.x + d.z * f.z,
-                d.x * c.Left[k].x + d.z * c.Left[k].z, v.x * f.x + v.z * f.z);
+            Traffic = Describe(pilot, Laps * c.Lap + k * c.Step + d.x * f.x + d.z * f.z, lateral, v.x * f.x + v.z * f.z);
         }
 
         /// <summary>Counts the laps as the car moves to sample k.</summary>
@@ -100,8 +126,43 @@ namespace TarmacGauntlet.Raceday
             Speed = speed,
             LapPace = pilot != null ? pilot.Profile.LapTime : 0f,
             Braking = car.Spec.BrakeDecel * G * AiPilot.LimitFor(pilot != null ? pilot.Pace : 100f),
-            GivingWay = driver != null && driver.enabled && driver.Craft != null && driver.Craft.State == Racecraft.Mode.GivingWay,
+            GivingWay = driver != null && driver.enabled && driver.Craft != null && !driver.Pitting && driver.Craft.State == Racecraft.Mode.GivingWay,
         };
+
+        /// <summary>Takes one lap off every car's count, at the green: the formation lap doesn't count.</summary>
+        public static void StartRace()
+        {
+            foreach (RaceCar r in cars) r.Laps--;
+        }
+
+        /// <summary>
+        /// A player who stops in their own box is served: held on the brakes while the crew refuels
+        /// and changes the tyres, then let go. AI cars are served by their own driver.
+        /// </summary>
+        private void ServePlayer()
+        {
+            if (car.AiDriving || Pits == null || Garage < 0 || car.Supplies == null)
+            {
+                if (Service != null && car.AiDriving) { Service = null; car.Hold = false; }
+                return;
+            }
+            if (Service == null)
+            {
+                Vector3 box = Pits.BoxPoint(Garage) - transform.position;
+                box.y = 0f;
+                if (box.sqrMagnitude < 2.5f * 2.5f && car.Speed < 0.5f) Service = new PitService(car.Supplies, car.Spec);
+                else return;
+            }
+            Service.Step(Time.fixedDeltaTime);
+            car.Hold = !Service.Done;
+            if (Service.Done)
+            {
+                // Stay put until the car has left the box, so the stop isn't started again.
+                Vector3 box = Pits.BoxPoint(Garage) - transform.position;
+                box.y = 0f;
+                if (box.sqrMagnitude > 6f * 6f) Service = null;
+            }
+        }
 
         /// <summary>The centre line sample nearest the car, searching near the last one, or the whole lap after a reset.</summary>
         private int Nearest(Circuit c, Vector3 p)
