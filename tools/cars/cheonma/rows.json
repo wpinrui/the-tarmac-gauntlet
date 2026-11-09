@@ -884,5 +884,10 @@
   "z0": 0.1918,
   "z1": 0.3031,
   "rain_hw": 0.06
+ },
+ "picks": {
+  "frontbadge": 1,
+  "rearbadge": 2,
+  "name": 1
  }
 }

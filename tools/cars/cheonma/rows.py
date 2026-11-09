@@ -154,6 +154,9 @@ data = {
     "rear_lamps": {"y0": 0.55, "y1": 0.75, "z0": Z(512), "z1": Z(465), "rain_hw": 0.06},
 }
 
+# Ivan's picks from the viewer.
+data["picks"] = {"frontbadge": 1, "rearbadge": 2, "name": 1}
+
 data["head"]["yf"] = {"scale": S_FRONT, "centre": 569}
 
 if __name__ == "__main__":

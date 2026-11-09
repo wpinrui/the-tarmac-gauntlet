@@ -16,7 +16,9 @@ import body
 import parts
 from body import ROWS
 
-OUT = Path(sys.argv[1] if len(sys.argv) > 1 else Path(__file__).with_name("out"))
+ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
+GAME = "--game" in sys.argv  # only Ivan's picks, axes for Unity
+OUT = Path(ARGS[0] if ARGS else Path(__file__).with_name("out"))
 NAME = "CheonmaCX24Si"
 
 MATERIALS = {
@@ -368,9 +370,14 @@ def options(bvh):
     import decals
     obs = []
 
+    picks = ROWS["picks"]
+
     def add(group, n, pieces):
+        if GAME and picks[group] != n:
+            return
         for i, (v, f, mat) in enumerate(pieces):
-            obs.append(make(f"opt_{group}_{n}_{i}", v, f, mat, recalc=False))
+            label = f"{group}_{i}" if GAME else f"opt_{group}_{n}_{i}"
+            obs.append(make(label, v, f, mat, recalc=False))
 
     # Front badge: 1 nose top ahead of the windscreen, 2 nose tip.
     add("frontbadge", 1, decals.badge(bvh, (1.22, 0, 1.5), (-1, 0, 0), (0, -1, 0), (0, 0, -1), 0.085))
@@ -415,9 +422,18 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     tris = sum(sum(len(p.vertices) - 2 for p in ob.data.polygons) for ob in obs)
     print("triangles", tris)
+    if GAME:
+        # Unity reads OBJ as right-handed and mirrors x: write forward as +z, left as +x, up as +y.
+        from mathutils import Matrix
+        m = Matrix(((0, 1, 0, 0), (0, 0, 1, 0), (1, 0, 0, 0), (0, 0, 0, 1)))
+        for ob in obs:
+            ob.data.transform(m)
+        axes = dict(forward_axis="Y", up_axis="Z")
+    else:
+        axes = dict(forward_axis="NEGATIVE_Z", up_axis="Y")
     bpy.ops.wm.obj_export(filepath=str(OUT / f"{NAME}.obj"), export_selected_objects=False,
                           export_materials=True, export_normals=True, export_uv=False,
-                          forward_axis="NEGATIVE_Z", up_axis="Y", path_mode="RELATIVE")
+                          path_mode="RELATIVE", **axes)
     write_mtl(OUT / f"{NAME}.mtl")
 
 

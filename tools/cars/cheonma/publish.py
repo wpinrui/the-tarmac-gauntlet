@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from export import MATERIALS, NAME
+from body import ROWS
 
 src = Path(sys.argv[1] if len(sys.argv) > 1 else Path(__file__).with_name("out"))
 dst = Path(sys.argv[2]) if len(sys.argv) > 2 else Path(__file__).with_name("viewer.html")
@@ -45,6 +46,7 @@ button:focus-visible { outline: 2px solid var(--chip-on); outline-offset: 2px; }
 <script type="text/plain" id="obj">__OBJ__</script>
 <script>
 const MATS = __MATS__;
+const PICKS = __PICKS__;
 const view = document.getElementById('view');
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -91,7 +93,7 @@ for (const [g, label] of Object.entries(GROUPS)) {
     wrap.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === k)); };
   keys.forEach(k => { const b = document.createElement('button'); b.textContent = k; b.dataset.k = k; b.id = `o-${g}-${k}`;
     b.addEventListener('click', () => pick(k)); wrap.appendChild(b); });
-  bar.appendChild(wrap); pick(keys[0]);
+  bar.appendChild(wrap); pick(String(PICKS[g] || keys[0]));
 }
 obj.traverse(o => {
   if (!o.isMesh) return;
@@ -118,5 +120,5 @@ window.setView = (x, y, z, fov) => { camera.position.set(x, y, z); if (fov) { ca
 (function loop() { controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); })();
 </script>
 """
-dst.write_text(html.replace("__OBJ__", obj).replace("__MATS__", json.dumps(mats)))
+dst.write_text(html.replace("__OBJ__", obj).replace("__MATS__", json.dumps(mats)).replace("__PICKS__", json.dumps(ROWS["picks"])))
 print("wrote", dst, dst.stat().st_size // 1024, "KB")
