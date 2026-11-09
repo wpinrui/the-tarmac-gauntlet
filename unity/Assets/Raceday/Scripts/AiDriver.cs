@@ -10,6 +10,7 @@ namespace TarmacGauntlet.Raceday
     /// Changing the stats in the inspector during Play takes effect straight away.
     /// It starts on the minimum-curvature line and switches to the line tuned for this car's lap time
     /// once that is worked out in the background, a couple of seconds in.
+    /// With a <see cref="RaceCar"/> on the car, <see cref="Racecraft"/> races the cars around it first.
     /// </summary>
     [DefaultExecutionOrder(-10)]   // before the car's own physics step
     [RequireComponent(typeof(CarController))]
@@ -26,30 +27,41 @@ namespace TarmacGauntlet.Raceday
         /// <summary>The minimum-curvature line, shared by every car.</summary>
         public RacingLine Line;
         public AiPilot Pilot { get; private set; }
+        public Racecraft Craft { get; private set; }
 
         private CarController car;
         private float stuckTimer, crashTimer;
         private int lastIndex = -1;
         private float lapStart = -1f;
         private int lap;
-        private Task<RacingLine> tuning;
+        private RaceCar race;
+        private Task<AiPilot> tuning;
 
         private void Start()
         {
             car = GetComponent<CarController>();
+            race = GetComponent<RaceCar>();
+            Craft = new Racecraft(Seed);
             Build();
             if (Line != null && car.Spec != null)
             {
+                // The tuned line and the pilot's lanes beside it take a while: both are made off the main thread.
                 Circuit circuit = Line.Circuit;
                 CarSpec spec = car.Spec;
-                tuning = Task.Run(() => new RacingLine(circuit, spec));
+                float pace = Pace, consistency = Consistency, safety = Safety;
+                int seed = Seed;
+                tuning = Task.Run(() => new AiPilot(new RacingLine(circuit, spec), spec, pace, consistency, safety, seed));
             }
         }
 
         private void OnEnable()
         {
             if (car != null) car.AiDriving = true;
-            Pilot?.Lost();
+            if (Pilot != null)
+            {
+                Pilot.Lost();
+                Pilot.Offset = 0f;
+            }
             lastIndex = -1;
             lapStart = -1f;
         }
@@ -71,7 +83,14 @@ namespace TarmacGauntlet.Raceday
         private void Build()
         {
             if (Line == null || car == null || car.Spec == null) return;
-            Pilot = new AiPilot(Line, car.Spec, Pace, Consistency, Safety, Seed);
+            Use(new AiPilot(Line, car.Spec, Pace, Consistency, Safety, Seed));
+        }
+
+        private void Use(AiPilot pilot)
+        {
+            if (Pilot != null) pilot.Offset = Pilot.Offset;   // carry on where it was across the track
+            Pilot = pilot;
+            Line = pilot.Line;
             car.AiDriving = enabled;
             string which = Line.TunedLapTime > 0f ? "tuned line" : "minimum-curvature line";
             Debug.Log($"{car.Spec.Name}: AI predicted lap {FormatTime(Pilot.Profile.LapTime)} at Pace {Pace:0} on the {which}");
@@ -84,8 +103,10 @@ namespace TarmacGauntlet.Raceday
             {
                 if (tuning.Status == TaskStatus.RanToCompletion)
                 {
-                    Line = tuning.Result;
-                    Build();
+                    AiPilot tuned = tuning.Result;
+                    // Stats changed in the inspector meanwhile: keep the line, take the new stats.
+                    if (tuned.Pace == Pace && tuned.Consistency == Consistency && tuned.Safety == Safety) Use(tuned);
+                    else { Line = tuned.Line; Build(); }
                 }
                 else Debug.LogException(tuning.Exception);
                 tuning = null;
@@ -101,6 +122,11 @@ namespace TarmacGauntlet.Raceday
             }
             crashTimer = 0f;
 
+            if (race != null)
+            {
+                Craft.Think(Pilot, race.Traffic, RaceCar.Field, dt);
+                Pilot.Towed = car.DragScale < 0.97f;
+            }
             AiPilot.Controls c = Pilot.Drive(t.position, t.forward, car.Velocity, car.YawRate);
             car.SetControls(c.Throttle, c.Brake, c.Steer);
 
@@ -117,6 +143,7 @@ namespace TarmacGauntlet.Raceday
         {
             car.ResetToTrack();
             Pilot.Lost();
+            Pilot.Offset = 0f;
             stuckTimer = crashTimer = 0f;
             lastIndex = -1;
         }
