@@ -235,10 +235,16 @@ namespace TarmacGauntlet.Raceday
                 // Rear tyres grip a little more than the fronts, so the car leans towards understeer.
                 float cap = Spec.Grip * TrackSurface.Grip(kind) * load * (w.Front ? 0.97f : 1.06f);
 
-                // Lateral: slip-angle curve at speed, plain damping when nearly stopped.
+                // Static grip: when nearly stopped the tyre holds against the slope it stands on,
+                // up to its grip limit, instead of creeping down it.
+                float upright = Mathf.Max(-Vector3.Dot(Physics.gravity, n), 1f);
+                float slopeSide = -Vector3.Dot(Physics.gravity, side) / upright * load;
+                float slopeAlong = -Vector3.Dot(Physics.gravity, forward) / upright * load;
+
+                // Lateral: slip-angle curve at speed, static grip when nearly stopped.
                 float fy;
                 if (Mathf.Abs(vLong) < 4f && Mathf.Abs(vLat) < 4f)
-                    fy = Mathf.Clamp(-vLat * corner * 8f, -cap, cap);
+                    fy = Mathf.Clamp(-vLat * corner * 8f + slopeSide, -cap, cap);
                 else
                 {
                     float slip = Mathf.Atan2(vLat, Mathf.Abs(vLong));
@@ -250,9 +256,14 @@ namespace TarmacGauntlet.Raceday
                 // Longitudinal: drive, brakes (holding the car still when nearly stopped), rolling resistance.
                 float fx = drive;
                 bool braking = wheelBrake > 0f;
-                if (braking)
-                    fx += Mathf.Abs(vLong) < 0.5f ? Mathf.Clamp(-vLong * corner * 10f, -wheelBrake, wheelBrake) : -Mathf.Sign(vLong) * wheelBrake;
-                fx -= Mathf.Clamp(vLong * 4f, -1f, 1f) * TrackSurface.Rolling(kind) * load;
+                bool holding = throttle < 0.01f && Mathf.Abs(vLong) < 0.5f;
+                if (holding)
+                    fx += Mathf.Clamp(-vLong * corner * 10f + slopeAlong, -cap, cap);
+                else
+                {
+                    if (braking) fx -= Mathf.Sign(vLong) * wheelBrake;
+                    fx -= Mathf.Clamp(vLong * 4f, -1f, 1f) * TrackSurface.Rolling(kind) * load;
+                }
 
                 // Friction circle. Anti-lock keeps steering under braking; wheelspin costs side grip.
                 if (fx * fx + fy * fy > cap * cap)
