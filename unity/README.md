@@ -19,3 +19,20 @@ dotnet test unity/dotnet/TarmacGauntlet.Simulation.Tests
 `dotnet/TarmacGauntlet.Simulation` builds the sources against netstandard2.1 and C# 9,
 the same API level and language version Unity uses, so anything that passes here also
 compiles in Unity.
+
+## Raceday scene
+
+`Assets/Raceday/Raceday.unity` opens when the editor starts. Press Play to fly round the circuit.
+
+Camera: `W` `A` `S` `D` move, `Q` and `E` go down and up, `Shift` is faster, hold the right mouse
+button to look around, and the scroll wheel changes speed.
+
+The circuit is built at runtime from `Assets/Raceday/Resources/Tracks/circuit.json`, which
+`tools/circuit/generate.py` writes (`python3 tools/circuit/generate.py`, needs numpy). Change the
+layout there, never by hand in the JSON.
+
+Markings follow FIA Appendix O and race-director practice: white edge lines (part of the track),
+red and white kerbs outside them, a 15 m wide start straight through turn 1, 30 grid slots (white
+outline open at the back, yellow front-wheel line sticking out sideways), safety car lines, and a
+12 m pit lane with a 3.5 m fast lane, speed limit lines, pit box outlines, red and white hatching at
+the entry and a solid white line along the exit. Everything beside the track is a placeholder.
