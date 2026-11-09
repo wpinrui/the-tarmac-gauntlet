@@ -26,7 +26,8 @@ compiles in Unity.
 Cheonma CX-24Si from pole.
 
 Driving: left and right arrows steer, up accelerates, down brakes (hold it at a standstill to
-reverse). `A` and `Z` shift up and down and switch to manual; `M` goes back to automatic. `H`
+reverse). `M` toggles automatic and manual; `A` and `Z` shift up and down and also switch to manual. The
+bottom right shows speed in km/h and the gear, blue in automatic and white in manual. `H`
 toggles steering help. Anti-lock brakes are always on. `R` puts the car back on track, which you
 need after a hard hit on a barrier. `C` cycles the chase, bonnet and bumper views and the free camera.
 

@@ -6,7 +6,7 @@ namespace TarmacGauntlet.Raceday
     /// <summary>
     /// A drivable car: raycast suspension, a simple tyre model with a friction circle, engine and
     /// gearbox, brakes with anti-lock, downforce and drag. Arrows steer, accelerate and brake,
-    /// A and Z shift up and down, M goes back to the automatic gearbox, H toggles steering help
+    /// A and Z shift up and down (and switch to manual), M toggles automatic and manual, H toggles steering help
     /// and R puts the car back on track.
     /// </summary>
     [RequireComponent(typeof(Rigidbody))]
@@ -89,7 +89,7 @@ namespace TarmacGauntlet.Raceday
             {
                 if (Keys.Pressed(KeyCode.R)) ResetToTrack();
                 if (Keys.Pressed(KeyCode.H)) SteeringHelp = !SteeringHelp;
-                if (Keys.Pressed(KeyCode.M)) Automatic = true;
+                if (Keys.Pressed(KeyCode.M)) Automatic = !Automatic;
                 if (Keys.Pressed(KeyCode.A)) Shift(+1);
                 if (Keys.Pressed(KeyCode.Z)) Shift(-1);
             }
