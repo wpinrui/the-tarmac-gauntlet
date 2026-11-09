@@ -94,12 +94,14 @@ namespace TarmacGauntlet.Raceday
             Traffic = new TrafficCar
             {
                 Id = id,
-                Distance = Laps * c.Lap + k * c.Step,
+                Distance = Laps * c.Lap + c.DistanceAt(k, p),
                 Lateral = lateral,
                 Speed = v.x * f.x + v.z * f.z,
                 LapPace = pilot != null ? pilot.Profile.LapTime : 0f,
                 Braking = car.Spec.BrakeDecel * G * AiPilot.LimitFor(pilot != null ? pilot.Pace : 100f),
                 GivingWay = driver != null && driver.enabled && driver.Craft != null && !driver.Pitting && driver.Craft.State == Racecraft.Mode.GivingWay,
+                // A player's car has no plan: the AI expects it to carry on as it is going.
+                Craft = driver != null && driver.enabled ? driver.Craft : null,
             };
         }
 

@@ -182,7 +182,7 @@ sealed class Session
             if (s.Last > circuit.Count - 50 && k < 50) s.Laps++;
             else if (s.Last < 50 && k > circuit.Count - 50) s.Laps--;
             s.Last = k;
-            s.Distance = s.Laps * circuit.Lap + k * circuit.Step;
+            s.Distance = s.Laps * circuit.Lap + circuit.DistanceAt(k, car.Position);
             s.InPitLane = pits.OffTrackInLane(k, car.Lateral);
             car.SpeedLimit = pits.InLimitZone(car.Position, k) ? pits.LimitSpeed : float.PositiveInfinity;
             Vector3 f = circuit.Forward[k];
@@ -195,6 +195,7 @@ sealed class Session
                 LapPace = s.Racer.Pilot.Profile.LapTime,
                 Braking = car.Spec.BrakeDecel * 9.81f * AiPilot.LimitFor(s.Racer.Pilot.Pace),
                 GivingWay = !s.Racer.Pitting && s.Racer.Craft.State == Racecraft.Mode.GivingWay,
+                Craft = s.Racer.Craft,
             };
             traffic.Add(t);
             if (!s.InPitLane) field.Add(t);
