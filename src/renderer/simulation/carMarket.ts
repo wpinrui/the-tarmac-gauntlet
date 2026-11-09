@@ -190,7 +190,7 @@ export function generateUsedInventoryByClass(
   const classes = ["F", "E", "D", "C", "B", "A"] as const;
   const listings: UsedCarListing[] = [];
 
-  // Guaranteed shitbox: Neutrino Sago (f-01), max age, minimum condition, no upgrades.
+  // Guaranteed shitbox: Nusa Carrier (f-01), max age, minimum condition, no upgrades.
   // Always available, always purchasable (plot armour lives here).
   const shitboxModel = models.find((m) => m.id === "f-01");
   if (shitboxModel) {
@@ -213,7 +213,7 @@ export function generateUsedInventoryByClass(
   }
 
   for (const cls of classes) {
-    // Exclude f-01 (Neutrino Sago) from randomisation — it's the designated shitbox above
+    // Exclude f-01 (Nusa Carrier) from randomisation — it's the designated shitbox above
     const classModels = models.filter((m) => m.carClass === cls && m.id !== "f-01");
     if (classModels.length === 0) continue;
     for (let i = 0; i < 2; i++) {
