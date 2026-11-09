@@ -93,6 +93,21 @@ static partial class Check
             LapsAtHairpin();
             return failed ? 1 : 0;
         }
+        if (args.Length > 1 && args[1] == "glide")
+        {
+            string only = args.Length > 2 ? args[2] : null;
+            if (only == null || only == "pace")
+            {
+                foreach (string id in new[] { "f-01", "c-19", "a-29" }) physicsLaps[id] = Drive(id, 100f, 100f, 100f, 2, 1).Laps[1];
+                GlidePace(new[] { "f-01", "c-19", "a-29" });
+            }
+            if (only == null || only == "mistakes") { Mistakes(); GlideMistakes(); }
+            if (only == null || only == "handovers") Handovers();
+            if (only == null || only == "ff") FastForward();
+            if (only == null || only == "pits") PitStopsCheck("gliding pit stops", i => i % 2 == 1, verbose: only != null, glide: true);
+            if (only == null || only == "start") RollingStartCheck(100, verbose: false, glide: true);
+            return failed ? 1 : 0;
+        }
         if (args.Length > 1 && args[1] == "running")
         {
             RaceRunning(verbose: true);
@@ -137,6 +152,10 @@ static partial class Check
         RacePack(4, verbose: false);
         RacePack(4, verbose: false, reversed: true);
         RaceRunning(verbose: false);
+        GlidePace();
+        GlideMistakes();
+        Handovers();
+        FastForward();
         return failed ? 1 : 0;
     }
 
@@ -366,6 +385,7 @@ static partial class Check
         {
             Run r = Drive(model.Id, 100f, 100f, 100f, 2, 1);
             float flying = r.Laps.Count > 1 ? r.Laps[1] : float.NaN;
+            physicsLaps[model.Id] = flying;
             float gap = (flying - r.Predicted) / r.Predicted;
             rows.Add($"    {model.Id,-6} {r.Name,-26} profile {Time(r.Predicted)}  driven {Time(flying)}  {gap * 100f,5:+0.0;-0.0}%  worst off line {r.WorstError:0.0} m, past edge {Math.Max(r.WorstOff, 0f):0.0} m");
             if (r.Stuck) problems.Add($"{model.Id} did not finish two laps");
@@ -405,6 +425,7 @@ static partial class Check
         if (r.Stuck) problems.Add("did not finish 6 laps");
         Run careful = Drive("a-29", 90f, 100f, 100f, 6, 7);
         if (!careful.Stuck && !r.Stuck && careful.Laps.Sum() >= r.Laps.Sum()) problems.Add("overcooking corners cost no time");
+        physicsMistakeCost = r.Mistakes > 0 ? (r.Laps.Sum() - careful.Laps.Sum()) / r.Mistakes : float.NaN;
         Report($"mistakes ({r.Mistakes} overcooked corners in 6 laps cost {r.Laps.Sum() - careful.Laps.Sum():0.0} s, furthest {Math.Max(r.WorstOff, 0f):0.0} m past the edge)", problems);
     }
 

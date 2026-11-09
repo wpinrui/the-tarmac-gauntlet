@@ -68,6 +68,27 @@ sealed class StandInCar
         while (Gear < Spec.Gears.Length && wheel * Spec.Gears[Gear - 1] / Spec.Redline > 0.9f) Gear++;
     }
 
+    /// <summary>Puts the car where a gliding car is drawn, moving along its path: no physics.</summary>
+    public void Pose(Vector3 position, Vector3 forward, float speed, float yawRate)
+    {
+        X = position.x; Z = position.z;
+        float flat = (float)Math.Sqrt(forward.x * forward.x + forward.z * forward.z);
+        Heading = (float)Math.Atan2(forward.x, forward.z);
+        Vx = forward.x / flat * speed; Vz = forward.z / flat * speed;
+        YawRate = yawRate;
+        ax = ay = 0f;
+        UpdateTrackPosition();
+    }
+
+    /// <summary>Back to physics from a glide, as CarController.Wake: moving, in gear, wheels already turned for the bend.</summary>
+    public void Wake(Vector3 position, Vector3 forward, float speed, float yawRate, float steerAngle)
+    {
+        Pose(position, forward, speed, yawRate);
+        steer = steerAngle;
+        shiftTimer = 0f;
+        Gear = Spec.GearFor(speed);
+    }
+
     public void Step(float dt, float throttle, float brake, float steerTarget)
     {
         UpdateTrackPosition();

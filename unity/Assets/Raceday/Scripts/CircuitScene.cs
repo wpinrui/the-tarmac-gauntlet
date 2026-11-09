@@ -7,12 +7,16 @@ namespace TarmacGauntlet.Raceday
     /// Builds the circuit, the sun, a grid of 100 AI cars from every class, the pace car and the
     /// cameras when the scene starts, and the rolling start begins. The grid is reversed, so the
     /// quickest car starts last and has to carve through. I hands it to you and back. V moves the
-    /// cameras to the next car, and P to the next car making a pit stop.
+    /// cameras to the next car, and P to the next car making a pit stop. F steps the race through
+    /// normal speed, 4x and 16x while the AI drives your car. Cars away from the camera glide
+    /// without physics (<see cref="PhysicsRange"/>).
     /// </summary>
     public sealed class CircuitScene : MonoBehaviour
     {
         private KeyboardState keys;
         private AiDriver ai;
+        private static readonly float[] Speeds = { 1f, 4f, 16f };
+        private int speed;
 
         private const string PlayerCar = "a-29";
         private const string PlayerModel = "Assets/Art/Vehicles/CheonmaCX24Si/CheonmaCX24Si.obj";
@@ -59,6 +63,7 @@ namespace TarmacGauntlet.Raceday
             System.Array.Reverse(field);   // slowest on pole, quickest last
             var cars = new CarController[field.Length];
             var grid = new RaceCar[field.Length];
+            var drivers = new AiDriver[field.Length];
             RaceStart start = new GameObject("Race start").AddComponent<RaceStart>();
             for (int i = 0; i < field.Length; i++)
             {
@@ -93,7 +98,11 @@ namespace TarmacGauntlet.Raceday
                 if (player) ai = driver;
                 cars[i] = car;
                 grid[i] = race;
+                drivers[i] = driver;
             }
+            PhysicsRange range = new GameObject("Physics range").AddComponent<PhysicsRange>();
+            range.Drivers = drivers;
+            range.Player = ai.Car;
 
             // The pace car waits ahead of pole, in pole's column.
             CarController paceCar = CarBuilder.Spawn(PaceCarModel, null, circuit, null, new Color(0.95f, 0.95f, 0.95f));
@@ -147,7 +156,17 @@ namespace TarmacGauntlet.Raceday
 
         private void Update()
         {
-            if (keys != null && ai != null && keys.Pressed(KeyCode.I)) ai.enabled = !ai.enabled;
+            if (keys == null || ai == null) return;
+            if (keys.Pressed(KeyCode.I)) ai.enabled = !ai.enabled;
+            if (keys.Pressed(KeyCode.F)) speed = (speed + 1) % Speeds.Length;
+            // Fast forward is for watching: taking the wheel drops back to normal speed.
+            if (!ai.enabled) speed = 0;
+            if (Time.timeScale != Speeds[speed])
+            {
+                Time.timeScale = Speeds[speed];
+                // Let a slow frame catch up with all its physics steps rather than fall behind the clock.
+                Time.maximumDeltaTime = Mathf.Max(1f / 3f, Speeds[speed] / 30f);
+            }
         }
 
         private static void Sun()

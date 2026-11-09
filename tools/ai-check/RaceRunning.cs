@@ -11,6 +11,9 @@
 //                   limiter, stops within a metre of its own box, leaves full, rejoins, and nobody touches
 //                   in the pit lane; the full cars don't stop
 //   crowded pits    the same with every car short of fuel, so the whole field is in the pit lane at once
+//   gliding         (run.sh glide) the rolling start and pit stops again with only the nearest 24 cars
+//                   within 300 m of the last car on physics, as PhysicsRange does: the far cars glide,
+//                   are called in to pit while gliding, and the same holds
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -34,10 +37,11 @@ static partial class Check
         return field;
     }
 
-    static void RollingStartCheck(int cars, bool verbose)
+    static void RollingStartCheck(int cars, bool verbose, bool glide = false)
     {
         var entries = SceneField().Take(cars).Select(m => (m, 1f)).ToList();
         var s = new Session(circuit, line, entries, rolling: true, LineFor);
+        if (glide) Watch(s, s.Cars[s.Cars.Count - 1]);
         var watch = System.Diagnostics.Stopwatch.StartNew();
         float worstSlip = 0f;
         string worstCar = "";
@@ -78,8 +82,19 @@ static partial class Check
             if (c.OffTime >= 0f) problems.Add($"{s.Name(c)} left the track at {Session.Clock(c.OffTime)} at {c.OffWhere:0} m");
         }
         float lastBack = s.Cars[0].Distance - s.Cars.Min(c => c.Distance);
-        Report($"rolling start ({cars} cars: green at {Session.Clock(Math.Max(s.GreenTime, 0f))}, worst place {worstSlip:0} m out, {s.Contacts.Count - Math.Max(contactsAtGreen, 0)} contacts from the green to {Session.Clock(Math.Max(s.Time, 0f))}, {s.Contacts.Count(c => c.Speed > 1f)} over 1 m/s, field {lastBack:0} m long, {watch.Elapsed.TotalSeconds:0} s to run)", problems);
+        Report($"{(glide ? "gliding rolling start" : "rolling start")} ({cars} cars{(glide ? $", {s.MostOnPhysics} on physics at most, {s.Cars.Sum(c => c.Handovers)} switches, {s.GhostOverlaps} overlaps while gliding" : "")}: green at {Session.Clock(Math.Max(s.GreenTime, 0f))}, worst place {worstSlip:0} m out, {s.Contacts.Count - Math.Max(contactsAtGreen, 0)} contacts from the green to {Session.Clock(Math.Max(s.Time, 0f))}, {s.Contacts.Count(c => c.Speed > 1f)} over 1 m/s, field {lastBack:0} m long, {watch.Elapsed.TotalSeconds:0} s to run)", problems);
         if (verbose) foreach (Contact c in s.Contacts) Console.WriteLine("  contact " + Describe(c));
+    }
+
+    /// <summary>PhysicsRange's rule with the camera on one car: the nearest 24 within 300 m run physics, kept to 375 m.</summary>
+    static void Watch(Session s, SessionCar watched)
+    {
+        s.Apart = c =>
+        {
+            float dx = c.Car.Position.x - watched.Car.Position.x, dz = c.Car.Position.z - watched.Car.Position.z;
+            return (float)Math.Sqrt(dx * dx + dz * dz);
+        };
+        s.Physics = c => s.Apart(c) < (c.Racer.Active.Gliding ? 300f : 375f);
     }
 
     static string Describe(Contact c) => $"{Session.Clock(c.Time)} {c.A} and {c.B} at {c.Where:0} m, {c.Speed:0.0} m/s";
@@ -107,11 +122,12 @@ static partial class Check
         if (verbose) foreach (string l in lines) Console.WriteLine(l);
     }
 
-    static void PitStopsCheck(string name, Func<int, bool> shortOfFuel, bool verbose)
+    static void PitStopsCheck(string name, Func<int, bool> shortOfFuel, bool verbose, bool glide = false)
     {
         string[] models = { "a-29", "a-27", "a-26", "b-24", "b-22", "b-21", "c-19", "c-18", "c-16", "d-15", "d-13", "e-09", "e-07", "f-06", "f-03", "f-01" };
         var entries = models.Select((m, i) => (m, shortOfFuel(i) ? 0.13f : 1f)).ToList();
         var s = new Session(circuit, line, entries, rolling: false, LineFor);
+        if (glide) Watch(s, s.Cars[s.Cars.Count - 1]);
         var due = s.Cars.Where(c => shortOfFuel(c.Id)).ToList();
         // Until every car short of fuel has stopped, rejoined and done a lap after it.
         var lapsAtRejoin = new Dictionary<int, int>();
@@ -141,7 +157,7 @@ static partial class Check
         if (pitContacts.Count > 0) problems.Add($"{pitContacts.Count} contacts with a pitting car: {Describe(pitContacts[0])}");
         if (!due.All(c => lapsAtRejoin.ContainsKey(c.Id))) problems.Add("ran out of time before every stop was done");
         float worstMiss = s.Cars.Max(c => c.WorstBoxMiss);
-        Report($"{name} ({due.Count} of {s.Cars.Count} cars pit, {s.MostInLane} in the lane at once, worst box miss {worstMiss:0.00} m, top speed in the limiter zone {s.Cars.Max(c => c.LimitZoneTop) * 3.6f:0.0} km/h, {s.Contacts.Count} contacts in all, {Session.Clock(s.Time)} run)", problems);
+        Report($"{name} ({due.Count} of {s.Cars.Count} cars pit,{(glide ? $" {s.Cars.Sum(c => c.GlidingStops)} called in while gliding," : "")} {s.MostInLane} in the lane at once, worst box miss {worstMiss:0.00} m, top speed in the limiter zone {s.Cars.Max(c => c.LimitZoneTop) * 3.6f:0.0} km/h, {s.Contacts.Count} contacts in all, {Session.Clock(s.Time)} run)", problems);
         if (!verbose) return;
         foreach (SessionCar c in s.Cars)
             foreach (string stop in c.Stops) Console.WriteLine($"  {s.Name(c)} {stop}");

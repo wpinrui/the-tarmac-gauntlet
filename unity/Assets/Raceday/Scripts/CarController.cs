@@ -42,6 +42,11 @@ namespace TarmacGauntlet.Raceday
         public bool Automatic { get; private set; } = true;
         public bool SteeringHelp { get; private set; } = true;
         public bool Crashed { get; private set; }
+        /// <summary>
+        /// True while the car has no physics: far from the camera an AI car glides along its path and
+        /// moves the car itself (<see cref="AiDriver"/>). See <see cref="Sleep"/> and <see cref="Wake"/>.
+        /// </summary>
+        public bool Asleep { get; private set; }
         /// <summary>0 is reverse, 1 and up are forward gears.</summary>
         public int Gear { get; private set; } = 1;
         public float Speed { get; private set; }
@@ -110,7 +115,7 @@ namespace TarmacGauntlet.Raceday
 
         private void Update()
         {
-            if (Spec == null || Keys == null || AiDriving) return;
+            if (Spec == null || Keys == null || AiDriving || Asleep) return;
             bool on = InputEnabled && !Crashed;
             float left = on && Keys.Held(KeyCode.LeftArrow) ? 1f : 0f;
             float right = on && Keys.Held(KeyCode.RightArrow) ? 1f : 0f;
@@ -169,7 +174,7 @@ namespace TarmacGauntlet.Raceday
 
         private void FixedUpdate()
         {
-            if (Spec == null) return;
+            if (Spec == null || Asleep) return;
             float dt = Time.fixedDeltaTime;
             if (AiDriving)
             {
@@ -364,6 +369,63 @@ namespace TarmacGauntlet.Raceday
             return kind;
         }
 
+        // ---------------------------------------------------------------- gliding
+
+        /// <summary>
+        /// Takes the car off physics: the body stops simulating and colliding, and whoever moves the
+        /// car sets its transform each frame and its speed with <see cref="Coast"/>.
+        /// </summary>
+        public void Sleep()
+        {
+            if (Asleep) return;
+            Asleep = true;
+            throttle = brake = 0f;
+            body.interpolation = RigidbodyInterpolation.None;
+            body.collisionDetectionMode = CollisionDetectionMode.Discrete;   // a kinematic body can't use continuous dynamic
+            body.isKinematic = true;
+            body.detectCollisions = false;
+        }
+
+        /// <summary>Speed, gear and front wheel angle to show while asleep, for the speedometer and the wheels.</summary>
+        public void Coast(float speed, float steerAngle)
+        {
+            Speed = speed;
+            steer = Mathf.Clamp(steerAngle, -Spec.SteerLock, Spec.SteerLock);
+            Gear = Spec.GearFor(speed);
+            Automatic = true;
+        }
+
+        /// <summary>
+        /// Back to physics, at a pose and moving straight ahead at a speed and turn rate, in the gear the
+        /// automatic would hold, with the front wheels already turned for the bend and the springs
+        /// already loaded by the downforce at that speed, so the car carries on without a jolt.
+        /// </summary>
+        public void Wake(Vector3 position, Quaternion rotation, float speed, float yawRate, float steerAngle)
+        {
+            float down = 0.5f * CarSpec.AirDensity * Spec.LiftArea * speed * speed;
+            float compression = Mathf.Min(Spec.StaticCompression * (1f + down / (Spec.Mass * Gravity)), Spec.Travel);
+            Vector3 up = rotation * Vector3.up;
+            position -= up * (compression - Spec.StaticCompression);
+
+            Asleep = false;
+            body.isKinematic = false;
+            body.detectCollisions = true;
+            body.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+            body.interpolation = RigidbodyInterpolation.Interpolate;
+            body.position = position;
+            body.rotation = rotation;
+            transform.SetPositionAndRotation(position, rotation);
+            body.linearVelocity = rotation * Vector3.forward * speed;
+            body.angularVelocity = up * yawRate;
+
+            foreach (Wheel w in wheels) w.Compression = compression;
+            Speed = speed;
+            Gear = Spec.GearFor(speed);
+            shiftTimer = 0f;
+            steer = Mathf.Clamp(steerAngle, -Spec.SteerLock, Spec.SteerLock);
+            Crashed = false;
+        }
+
         // ---------------------------------------------------------------- visuals
 
         private void LateUpdate()
@@ -372,6 +434,13 @@ namespace TarmacGauntlet.Raceday
             foreach (Wheel w in wheels)
             {
                 if (w.Visual == null) continue;
+                if (Asleep)
+                {
+                    // Gliding: wheels at rest height, spinning with the car's speed.
+                    w.Compression = Spec.StaticCompression;
+                    w.Grounded = true;
+                    w.Spin += Speed / Spec.WheelRadius * Time.deltaTime;
+                }
                 float drop = Spec.StaticCompression - w.Compression;
                 if (!w.Grounded) drop = Spec.StaticCompression - 0f;
                 w.Visual.localPosition = w.VisualRest + Vector3.down * Mathf.Min(drop, Spec.Travel);

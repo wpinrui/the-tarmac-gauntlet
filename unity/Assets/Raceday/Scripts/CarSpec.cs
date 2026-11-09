@@ -95,6 +95,15 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Engine power at a fraction of the redline: rises to its peak at the redline.</summary>
         public float PowerAt(float x) => PeakPower * (1.5f * x - 0.5f * x * x * x);
 
+        /// <summary>The gear the automatic holds at a speed: the lowest one below its upshift point.</summary>
+        public int GearFor(float speed)
+        {
+            float wheel = speed / WheelRadius;
+            int gear = 1;
+            while (gear < Gears.Length && wheel * Gears[gear - 1] / Redline > 0.9f) gear++;
+            return gear;
+        }
+
         /// <summary>Speed where full power just balances drag and rolling resistance.</summary>
         private static float SolveTopSpeed(CarSpec s)
         {

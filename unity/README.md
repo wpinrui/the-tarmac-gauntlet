@@ -34,11 +34,20 @@ target speed for every 2 m sample (`SpeedProfile.cs`, from the car's grip, downf
 brakes). After a hard crash, or when stuck or spun, it puts the car back on track itself. The console
 shows its predicted lap time and each lap it drives.
 
+`F` cycles normal speed, 4x and 16x while the AI drives, and `I` drops back to normal speed. Only cars
+near the camera, and near your car while you drive it, run full physics (`PhysicsRange.cs`: the
+nearest 24 within 300 m at normal speed, 8 within 120 m at 4x, none at 16x). The rest glide along
+their racing lines with no rigidbody (`AiPilot.Glide`), at the pace and with the racecraft, fuel,
+tyre wear and pit stops they would have on physics, and switch back to physics where they are.
+
 After changing the AI or the car physics, run `bash tools/ai-check/run.sh` (needs the .NET 8 SDK). It
 checks the line goes outside, apex, outside and that tuning shortens the lap, then drives the AI in a
 flat stand-in for `CarController` and checks that every car model laps without
 leaving the track and within 5% of its predicted time, that Pace, Consistency and Safety do what they
-say, and that overcooked corners cost time. `StandInCar.cs` copies `CarController`'s formulas, so keep
+say, and that overcooked corners cost time. `run.sh glide` checks gliding: every model's gliding lap
+is within 1.5% of its driven one, a gliding mistake costs about what a driven one does, cars switch
+between gliding and physics without leaving the track or touching, 100 gliding cars at 16x keep their
+pace, and gliding cars still pit and start rolling with the pack. `StandInCar.cs` copies `CarController`'s formulas, so keep
 it in step when those change.
 
 Driving: left and right arrows steer, up accelerates, down brakes (hold it at a standstill to

@@ -160,12 +160,7 @@ namespace TarmacGauntlet.Raceday
             Vector3 flatVelocity = new Vector3(velocity.x, 0f, velocity.z);
             float speed = flatVelocity.magnitude;
 
-            // The path is a blend of the two lanes either side of the offset.
-            float lane = Mathf.Clamp(Offset, LaneShifts[0], LaneShifts[LaneShifts.Length - 1]);
-            int a = 0;
-            while (a < LaneShifts.Length - 2 && lane > LaneShifts[a + 1]) a++;
-            int b = a + 1;
-            float blend = (lane - LaneShifts[a]) / (LaneShifts[b] - LaneShifts[a]);
+            Blend(out int a, out int b, out float blend);
             RacingLine nearLane = Lanes[blend < 0.5f ? a : b];
 
             Index = nearLane.Nearest(position, Index);
@@ -243,6 +238,189 @@ namespace TarmacGauntlet.Raceday
                 controls.Brake = 1f;
             }
             return controls;
+        }
+
+        /// <summary>The path is a blend of the two lanes either side of the offset.</summary>
+        private void Blend(out int a, out int b, out float blend)
+        {
+            float lane = Mathf.Clamp(Offset, LaneShifts[0], LaneShifts[LaneShifts.Length - 1]);
+            a = 0;
+            while (a < LaneShifts.Length - 2 && lane > LaneShifts[a + 1]) a++;
+            b = a + 1;
+            blend = (lane - LaneShifts[a]) / (LaneShifts[b] - LaneShifts[a]);
+        }
+
+        // ---------------------------------------------------------------- gliding
+
+        /// <summary>
+        /// Share of the profile's speeds a gliding car drives at. Driven in physics the car is never
+        /// exactly on its limit and laps 2 to 3% slower than its profile, so a gliding car does too
+        /// and keeps the same pace whichever way it is run.
+        /// </summary>
+        public const float GlidePace = 0.976f;
+        /// <summary>Share of its speed a gliding car loses through a corner it overcooks, as if it ran wide.</summary>
+        private const float OvercookLoss = 0.65f;
+
+        /// <summary>
+        /// True while the car glides: far from the camera it has no physics and moves along its path
+        /// at the speed this driver would manage, held back by the same racecraft as a driven car.
+        /// </summary>
+        public bool Gliding { get; private set; }
+        /// <summary>Speed along the path while gliding, m/s.</summary>
+        public float GlideSpeed { get; private set; }
+        /// <summary>Where a gliding car is: a fractional sample along its path.</summary>
+        private float glideAt;
+
+        /// <summary>Starts gliding from where the car is now, at its speed along the track.</summary>
+        public void StartGlide(Vector3 position, float speed)
+        {
+            Circuit c = Line.Circuit;
+            int k = Line.Nearest(position, Index);
+            Vector3 lineLeft = new Vector3(-Line.Tangent[k].z, 0f, Line.Tangent[k].x);
+            Vector3 fromLine = position - Line.Point[k];
+            Offset = Mathf.Clamp(fromLine.x * lineLeft.x + fromLine.z * lineLeft.z, LaneShifts[0], LaneShifts[LaneShifts.Length - 1]);
+            Blend(out int a, out int b, out float blend);
+            float along = fromLine.x * Line.Tangent[k].x + fromLine.z * Line.Tangent[k].z;
+            float segment = Mathf.Lerp(Lanes[a].Segment[k], Lanes[b].Segment[k], blend);
+            glideAt = Mathf.Repeat(k + Mathf.Clamp(along / Mathf.Max(segment, 0.1f), -0.5f, 0.5f), c.Count);
+            Index = frontIndex = (int)glideAt % c.Count;
+            GlideSpeed = Mathf.Max(speed, 0f);
+            Shift = Offset;
+            LateralError = 0f;
+            committed = false;
+            Gliding = true;
+        }
+
+        /// <summary>Back to physics: <see cref="Drive"/> takes over from where the glide left the car.</summary>
+        public void StopGlide() => Gliding = false;
+
+        /// <summary>How far the gliding car is from the start line, metres along the track.</summary>
+        public float GlideDistance => glideAt * Line.Circuit.Step;
+
+        /// <summary>The gliding car's offset from the track centre, metres, positive left.</summary>
+        public float GlideLateral
+        {
+            get
+            {
+                Blend(out int a, out int b, out float blend);
+                return Mathf.Lerp(Lanes[a].Lateral[Index], Lanes[b].Lateral[Index], blend);
+            }
+        }
+
+        /// <summary>
+        /// Moves a gliding car on by dt: racecraft has set the offset and speed limits, as for
+        /// <see cref="Drive"/>. Its speed follows the target for where it will be at the end of the
+        /// step, gaining no faster than the engine allows, and the corners wander lap to lap as a
+        /// driven car's do. An overcooked corner costs time instead of sending the car off.
+        /// </summary>
+        public void Glide(float dt)
+        {
+            Circuit c = Line.Circuit;
+            Blend(out int a, out int b, out float blend);
+            int k = (int)glideAt % c.Count;
+            Index = frontIndex = k;
+            RollCorners();
+
+            float v = GlideSpeed;
+            float end = glideAt + v * dt / c.Step;
+            int ke = c.Wrap(Mathf.FloorToInt(end));
+            float laneSpeed = Mathf.Lerp(LaneProfiles[a].SpeedAt(end), LaneProfiles[b].SpeedAt(end), blend);
+            float worn = Mathf.Sqrt(Mathf.Clamp(Grip, 0.3f, 1f));
+            float target = laneSpeed * GlideScaleAt(ke) * SpeedScale * worn * GlidePace;
+            bool held = SpeedCap < target;
+            HeldBy = held ? target - SpeedCap : 0f;
+            if (held) target = SpeedCap;
+            TargetSpeed = target;
+
+            float next;
+            if (target >= v) next = Mathf.Min(target, v + Mathf.Max(Profile.DriveAccel(v) - Profile.Resist(k, v), 0.3f) * dt);
+            else next = Mathf.Max(target, v - (Spec.BrakeDecel * G + Profile.Resist(k, v)) * dt);
+            GlideSpeed = next;
+
+            // Along the path, sample by sample.
+            float distance = 0.5f * (v + next) * dt;
+            while (distance > 0f)
+            {
+                int j = (int)glideAt % c.Count;
+                float segment = Mathf.Max(Mathf.Lerp(Lanes[a].Segment[j], Lanes[b].Segment[j], blend), 0.01f);
+                float left = (1f - (glideAt - Mathf.Floor(glideAt))) * segment;
+                if (distance < left) { glideAt += distance / segment; distance = 0f; }
+                else { glideAt = Mathf.Floor(glideAt) + 1f; distance -= left; }
+                if (glideAt >= c.Count) glideAt -= c.Count;
+            }
+            Index = frontIndex = (int)glideAt % c.Count;
+            Shift = Offset;
+            LateralError = 0f;
+        }
+
+        /// <summary>
+        /// Where a gliding car is drawn: on its path <c>ahead</c> metres on from its last step, so it
+        /// moves smoothly between steps. Forward follows the slope, up the track's crossfall.
+        /// </summary>
+        public void GlidePose(float ahead, out Vector3 position, out Vector3 forward, out Vector3 up)
+        {
+            Circuit c = Line.Circuit;
+            Blend(out int a, out int b, out float blend);
+            float at = glideAt;
+            int k = (int)at % c.Count;
+            float segment = Mathf.Max(Mathf.Lerp(Lanes[a].Segment[k], Lanes[b].Segment[k], blend), 0.01f);
+            at += Mathf.Clamp(ahead, 0f, 20f) / segment;
+            k = c.Wrap(Mathf.FloorToInt(at));
+            int k1 = c.Wrap(k + 1);
+            float t = at - Mathf.Floor(at);
+            Vector3 p0 = Vector3.Lerp(Lanes[a].Point[k], Lanes[b].Point[k], blend);
+            Vector3 p1 = Vector3.Lerp(Lanes[a].Point[k1], Lanes[b].Point[k1], blend);
+            position = p0 + (p1 - p0) * t;
+            Vector3 tangent = (Vector3.Lerp(Lanes[a].Tangent[k], Lanes[b].Tangent[k], blend) * (1f - t)
+                + Vector3.Lerp(Lanes[a].Tangent[k1], Lanes[b].Tangent[k1], blend) * t).normalized;
+            float grade = Mathf.Lerp(Lanes[a].Grade[k], Lanes[b].Grade[k], blend);
+            forward = new Vector3(tangent.x, grade, tangent.z).normalized;
+            Vector3 left = new Vector3(-tangent.z, 0f, tangent.x);
+            up = (Vector3.up - left * c.Data.crossfall[k]).normalized;
+        }
+
+        /// <summary>Steering a driven car needs to hold the gliding car's path: the path's own bend.</summary>
+        public float GlideSteer => Mathf.Atan(2f * Spec.HalfWheelbase * GlideCurvature);
+
+        /// <summary>Plan curvature of the gliding car's path where it is, 1/m, positive turning right.</summary>
+        public float GlideCurvature
+        {
+            get
+            {
+                Blend(out int a, out int b, out float blend);
+                return Mathf.Lerp(Lanes[a].Curvature[Index], Lanes[b].Curvature[Index], blend);
+            }
+        }
+
+        /// <summary>
+        /// <see cref="ScaleAt"/> for a gliding car: the corners wander as for a driven car, but an
+        /// overcooked one is taken slower, for the time a driven car loses running wide.
+        /// </summary>
+        private float GlideScaleAt(int k)
+        {
+            Circuit c = Line.Circuit;
+            float d = k * c.Step;
+            float scale = 1f;
+            for (int i = 0; i < corners.Length; i++)
+            {
+                float length = corners[i].e - corners[i].s;
+                float before = c.Ahead(d, corners[i].s);
+                float into = c.Ahead(corners[i].s, d);
+                if (overcooked[i])
+                {
+                    if (into <= length) scale *= 1f - OvercookLoss;
+                    else if (into <= length + WindowOut) scale *= 1f - OvercookLoss * (1f - (into - length) / WindowOut);
+                    continue;
+                }
+                float weight;
+                if (into <= length) weight = 1f;
+                else if (into <= length + WindowOut) weight = 1f - (into - length) / WindowOut;
+                else if (before <= WindowIn) weight = 1f;
+                else if (before <= WindowIn + RampLength) weight = 1f - (before - WindowIn) / RampLength;
+                else continue;
+                scale *= 1f + (cornerScale[i] - 1f) * weight;
+            }
+            return scale;
         }
 
         /// <summary>

@@ -33,6 +33,11 @@ sealed class SessionCar
     public readonly List<float> LapTimes = new List<float>();
     public readonly List<(float Fuel, float Wear)> LapUse = new List<(float, float)>();
     public float LapFuel = -1f, LapWear;
+    /// <summary>Time since the gliding car last stepped, and how many times it switched to or from gliding.</summary>
+    public float GlideClock;
+    public int Handovers;
+    /// <summary>Pit stops booked while gliding.</summary>
+    public int GlidingStops;
 }
 
 sealed class Session
@@ -49,6 +54,19 @@ sealed class Session
     public float PaceCarTop;
     /// <summary>Most cars stood still in their box at once, and most in the pit lane at once.</summary>
     public int MostInLane;
+    /// <summary>Which cars run physics, checked four times a second as PhysicsRange does. Null: all of them.</summary>
+    public Func<SessionCar, bool> Physics;
+    /// <summary>With Physics: how far each car is from the camera, nearest first up to MostCars, as PhysicsRange.</summary>
+    public Func<SessionCar, float> Apart;
+    public int MostCars = 24;
+    /// <summary>Each gliding car's step, seconds.</summary>
+    public Func<SessionCar, float> GlideStep = _ => 0.05f;
+    /// <summary>Gliding cars overlapping another car: in the game they pass through it.</summary>
+    public int GhostOverlaps;
+    /// <summary>Most cars on physics at once.</summary>
+    public int MostOnPhysics;
+    float lodClock = 1f;
+    readonly TrafficField sorted = new TrafficField();
 
     readonly Circuit circuit;
     readonly PitLane pits;
@@ -132,6 +150,22 @@ sealed class Session
     {
         Measure();
         float[] caps = Start != null && Cars.Any(c => Start.Holds(c.Laps)) ? StartStep() : null;
+        lodClock += Dt;
+        if (Physics != null && lodClock >= 0.25f)
+        {
+            lodClock = 0f;
+            int on = 0, wanted = 0;
+            IEnumerable<SessionCar> order = Apart == null ? Cars : Cars.OrderBy(Apart);
+            foreach (SessionCar s in order)
+            {
+                bool want = Physics(s) && (Apart == null || wanted < MostCars);
+                if (want) wanted++;
+                if (want && s.Racer.Active.Gliding) Wake(s);
+                else if (!want && !s.Racer.Active.Gliding && s.Racer.CanGlide) Sleep(s);
+                if (!s.Racer.Active.Gliding) on++;
+            }
+            if (Time > 2f) MostOnPhysics = Math.Max(MostOnPhysics, on);   // every car starts on physics
+        }
 
         int inLane = 0;
         for (int i = 0; i < Cars.Count; i++)
@@ -149,9 +183,25 @@ sealed class Session
                 r.FormationCap = caps[s.Slot];
             }
             else r.InFormation = false;
+            if (r.Active.Gliding)
+            {
+                s.GlideClock += Dt;
+                if (s.GlideClock >= GlideStep(s) - 1e-5f)
+                {
+                    bool gliding = r.Glide(traffic[i], sorted, Racing && !held, car.Spec, s.GlideClock);
+                    s.GlideClock = 0f;
+                    if (!gliding) { s.GlidingStops++; Wake(s); }
+                }
+                if (r.Active.Gliding)
+                {
+                    Pose(s);
+                    Watch(s, default);
+                    continue;
+                }
+            }
             car.DragScale = Racecraft.Slipstream(circuit, traffic[i], field);
             r.Active.Towed = car.DragScale < 0.97f;
-            AiPilot.Controls c = r.Step(car.Position, car.Forward, car.Velocity, car.YawRate, traffic[i], field, all, Racing && !held, car.Spec, Dt);
+            AiPilot.Controls c = r.Step(car.Position, car.Forward, car.Velocity, car.YawRate, traffic[i], sorted, all, Racing && !held, car.Spec, Dt);
             car.Hold = r.Hold;
             car.Step(Dt, c.Throttle, c.Brake, c.Steer);
 
@@ -167,6 +217,33 @@ sealed class Session
         }
         Collide();
         Time += Dt;
+    }
+
+    /// <summary>PhysicsRange taking a car off physics: it glides on from where it is.</summary>
+    void Sleep(SessionCar s)
+    {
+        int k = Math.Max(s.Car.TrackIndex, 0);
+        Vector3 f = circuit.Forward[k];
+        s.Racer.Active.StartGlide(s.Car.Position, s.Car.Vx * f.x + s.Car.Vz * f.z);
+        s.GlideClock = (s.Id % 5) * Dt;
+        s.Handovers++;
+    }
+
+    /// <summary>Back to physics where the gliding car is, moving along its path.</summary>
+    void Wake(SessionCar s)
+    {
+        AiPilot p = s.Racer.Active;
+        p.GlidePose(p.GlideSpeed * s.GlideClock, out Vector3 at, out Vector3 forward, out _);
+        s.Car.Wake(at, forward, p.GlideSpeed, p.GlideSpeed * p.GlideCurvature, p.GlideSteer);
+        p.StopGlide();
+        s.Handovers++;
+    }
+
+    void Pose(SessionCar s)
+    {
+        AiPilot p = s.Racer.Active;
+        p.GlidePose(p.GlideSpeed * s.GlideClock, out Vector3 at, out Vector3 forward, out _);
+        s.Car.Pose(at, forward, p.GlideSpeed, p.GlideSpeed * p.GlideCurvature);
     }
 
     /// <summary>RaceCar's part: laps, race distance, pit lane and limiter, and the lists the AI reads.</summary>
@@ -201,6 +278,7 @@ sealed class Session
             if (!s.InPitLane) field.Add(t);
             all.Add(new CarState { Id = s.Id, Position = car.Position, Velocity = car.Velocity });
         }
+        sorted.Set(field, circuit.Lap);
     }
 
     /// <summary>RaceStart's part: the pace car, everyone's formation speed, and the green.</summary>
@@ -323,7 +401,7 @@ sealed class Session
     void Collide()
     {
         var bodies = new List<(StandInCar Car, string Name, bool Pits)>();
-        foreach (SessionCar s in Cars) bodies.Add((s.Car, Name(s), s.InPitLane || s.Racer.Pitting));
+        foreach (SessionCar s in Cars) bodies.Add((s.Car, Name(s) + (s.Racer.Active.Gliding ? " (gliding)" : ""), s.InPitLane || s.Racer.Pitting));
         if (PaceCar != null && !PaceCarGone) bodies.Add((PaceCar, "pace car", false));
         for (int i = 0; i < bodies.Count; i++)
             for (int j = i + 1; j < bodies.Count; j++)
@@ -334,6 +412,12 @@ sealed class Session
                 bool hit = dx * dx + dz * dz < 30f && Race.Overlap(a, b, out nx, out nz, out depth);
                 var key = (i, j);
                 if (!hit) { touching.Remove(key); continue; }
+                if (bodies[i].Name.EndsWith("(gliding)") || bodies[j].Name.EndsWith("(gliding)"))
+                {
+                    // No bodies to bump: a gliding car has no collider in the game.
+                    if (touching.Add(key)) GhostOverlaps++;
+                    continue;
+                }
                 a.X -= nx * depth * 0.5f; a.Z -= nz * depth * 0.5f;
                 b.X += nx * depth * 0.5f; b.Z += nz * depth * 0.5f;
                 float vn = (b.Vx - a.Vx) * nx + (b.Vz - a.Vz) * nz;
