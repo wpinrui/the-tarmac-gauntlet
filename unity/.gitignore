@@ -1,0 +1,19 @@
+# Unity generated
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+*.csproj
+*.sln
+*.slnx
+!/dotnet/**/*.csproj
+.vs/
+.idea/
+
+# dotnet test build output
+/dotnet/**/bin/
+/dotnet/**/obj/

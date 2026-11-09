@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Builds the Unity simulation sources outside Unity, against the same API level and C# version. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>TarmacGauntlet.Simulation</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Assets/Simulation/**/*.cs" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,55 @@
+#nullable enable
+using System;
+using System.Collections.Generic;
+
+namespace TarmacGauntlet.Simulation
+{
+    // --- Player Skills ---
+
+    public sealed record PlayerSkills
+    {
+        public int Driver { get; init; }   // 0 to 20, sets player character driver stats (level x 5)
+        public int Engineer { get; init; } // 0 to 20, reduces pit duration + slows condition degradation
+        public int Business { get; init; } // 0 to 20, discounts on purchases, improves sale prices
+    }
+
+    // --- Base Team (shared between player and AI) ---
+
+    /// <summary>
+    /// TS <c>BaseTeam</c>. TS <c>Team = PlayerTeam | AITeam</c> is this abstract record;
+    /// TS <c>team.kind === "player"</c> becomes <c>team is PlayerTeam</c>.
+    /// </summary>
+    public abstract record BaseTeam
+    {
+        public string Id { get; init; } = "";
+        public string Name { get; init; } = "";
+        public double Budget { get; init; }
+        public double Prestige { get; init; }
+        public IReadOnlyList<double> PrestigeHistory { get; init; } = Array.Empty<double>(); // prestige snapshot per year (index 0 = year 1)
+        public int CrewSize { get; init; }                                                     // 0 to 16
+        public IReadOnlyList<CarInstance> Cars { get; init; } = Array.Empty<CarInstance>();
+        public IReadOnlyList<Contract> Contracts { get; init; } = Array.Empty<Contract>();
+        public string? EnteredCarId { get; init; } // Which car is entered for the next/current race
+    }
+
+    // --- Player Team ---
+
+    public sealed record PlayerTeam : BaseTeam
+    {
+        public string PlayerName { get; init; } = "";
+        public string Nationality { get; init; } = ""; // ISO 3166-1 alpha-2 country code
+        public string? Logo { get; init; }             // Data URL or asset path
+        public PlayerSkills Skills { get; init; } = new PlayerSkills();
+        public int SpareParts { get; init; }           // Consumable units carried over
+        public int TyreSets { get; init; }             // Tyre sets carried over
+        public IReadOnlyList<TransactionRecord> Transactions { get; init; } = Array.Empty<TransactionRecord>();
+    }
+
+    // --- AI Team ---
+
+    public sealed record AITeam : BaseTeam
+    {
+        public int SpareParts { get; init; }
+        public int TyreSets { get; init; }
+    }
+}
