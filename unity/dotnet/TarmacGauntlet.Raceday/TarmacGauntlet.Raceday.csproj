@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Compile check for the Unity scene scripts outside Unity. It builds Assets/Raceday against
+    Unity's engine reference assemblies (2021.3 API, a subset of Unity 6). Nothing here runs.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <NoWarn>NU1701</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Assets/Raceday/**/*.cs" Exclude="../../Assets/Raceday/Editor/**" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="UnityEngine.Modules" Version="2021.3.33" PrivateAssets="all" />
+    <ProjectReference Include="../TarmacGauntlet.Simulation/TarmacGauntlet.Simulation.csproj" />
+  </ItemGroup>
+</Project>
