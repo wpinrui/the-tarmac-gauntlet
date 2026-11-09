@@ -11,7 +11,8 @@ namespace TarmacGauntlet.Raceday
     public sealed class FreeCamera : MonoBehaviour
     {
         private readonly HashSet<KeyCode> held = new HashSet<KeyCode>();
-        private float speed = 30f;
+        private float speed = 100f;
+        private bool shift;
         private float yaw, pitch;
         private Vector2 look;
 
@@ -37,10 +38,10 @@ namespace TarmacGauntlet.Raceday
                     look += ev.delta;
                     break;
                 case EventType.ScrollWheel:
-                    speed = Mathf.Clamp(speed * (ev.delta.y < 0 ? 1.25f : 0.8f), 2f, 400f);
+                    speed = Mathf.Clamp(speed * (ev.delta.y < 0 ? 1.4f : 0.7f), 5f, 3000f);
                     break;
             }
-            if (!ev.shift) held.Remove(KeyCode.LeftShift);
+            shift = ev.shift;
         }
 
         private void OnApplicationFocus(bool focus)
@@ -63,9 +64,7 @@ namespace TarmacGauntlet.Raceday
             Vector3 world = transform.TransformDirection(move);
             if (held.Contains(KeyCode.E)) world += Vector3.up;
             if (held.Contains(KeyCode.Q)) world += Vector3.down;
-            bool fast = Event.current != null ? Event.current.shift : false;
-            fast |= held.Contains(KeyCode.LeftShift) || held.Contains(KeyCode.RightShift);
-            transform.position += world * (speed * (fast ? 4f : 1f) * Time.unscaledDeltaTime);
+            transform.position += world * (speed * (shift ? 5f : 1f) * Time.unscaledDeltaTime);
         }
     }
 }
