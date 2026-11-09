@@ -1,11 +1,13 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// Builds the circuit, the sun, a grid of AI cars from every class and the cameras when the scene
-    /// starts, and the race begins. I hands the quickest car, at the back of the grid, to you and back. V moves the cameras to
-    /// the next car.
+    /// Builds the circuit, the sun, a grid of 100 AI cars from every class, the pace car and the
+    /// cameras when the scene starts, and the rolling start begins. The grid is reversed, so the
+    /// quickest car starts last and has to carve through. I hands it to you and back. V moves the
+    /// cameras to the next car, and P to the next car making a pit stop.
     /// </summary>
     public sealed class CircuitScene : MonoBehaviour
     {
@@ -14,13 +16,14 @@ namespace TarmacGauntlet.Raceday
 
         private const string PlayerCar = "a-29";
         private const string PlayerModel = "Assets/Art/Vehicles/CheonmaCX24Si/CheonmaCX24Si.obj";
-        /// <summary>The field, quickest first: three of each of the top classes, two of the rest. The grid is
-        /// reversed, so the slowest car takes pole and the quickest starts last and has to carve through.</summary>
-        private static readonly string[] Field =
-        {
-            "a-29", "a-27", "a-26", "b-24", "b-22", "b-21", "c-19", "c-18",
-            "c-16", "d-15", "d-13", "e-09", "e-07", "f-06", "f-03", "f-01",
-        };
+        private const string PaceCarModel = "c-19";
+        /// <summary>How many of the field come from each class, fastest class first: 100 cars.</summary>
+        private static readonly (char Class, int Count)[] ClassCounts = { ('a', 17), ('b', 17), ('c', 17), ('d', 17), ('e', 16), ('f', 16) };
+        /// <summary>
+        /// AI cars start with between this share of a tank and a full one, so some need to stop in
+        /// the first laps and the pit stops can be seen early.
+        /// </summary>
+        private const float StartFuelMin = 0.12f;
         /// <summary>Paint for the stand-in boxes, by class, so the classes can be told apart on track.</summary>
         private static readonly Color[] ClassPaint =
         {
@@ -50,28 +53,96 @@ namespace TarmacGauntlet.Raceday
 
             keys = new GameObject("Keyboard").AddComponent<KeyboardState>();
             var line = new RacingLine(circuit);
+            var pits = new PitLane(circuit);
             var rng = new System.Random(11);
-            var cars = new CarController[Field.Length];
-            for (int i = 0; i < Field.Length; i++)
+            string[] field = Field();
+            System.Array.Reverse(field);   // slowest on pole, quickest last
+            var cars = new CarController[field.Length];
+            var grid = new RaceCar[field.Length];
+            RaceStart start = new GameObject("Race start").AddComponent<RaceStart>();
+            for (int i = 0; i < field.Length; i++)
             {
-                bool player = i == 0;
-                string id = Field[i];
+                bool player = i == field.Length - 1;
+                string id = field[i];
                 Color paint = ClassPaint[Mathf.Clamp(id[0] - 'a', 0, ClassPaint.Length - 1)];
                 CarController car = CarBuilder.Spawn(id, player ? PlayerModel : null, circuit, player ? keys : null, paint);
-                GridSlot slot = circuit.Data.grid.slots[Field.Length - 1 - i];
-                car.PlaceAt(circuit.IndexOf(slot.d - 2.6f), slot.lateral);   // front wheels just behind the line
-                car.gameObject.AddComponent<RaceCar>();
+                GridPlace(circuit, i, out float d, out float lateral);
+                car.PlaceAt(circuit.IndexOf(d - 2.6f), lateral);   // front wheels just behind the line
+
+                // Drivers differ: some quicker, some steadier, some more prone to overcooking a corner.
+                float pace = 70f + 30f * (float)rng.NextDouble();
+                float consistency = 60f + 40f * (float)rng.NextDouble();
+                float safety = 80f + 20f * (float)rng.NextDouble();
+                float smoothness = 30f + 60f * (float)rng.NextDouble();
+                car.Supplies = Consumables.For(car.Spec, new SpeedProfile(line, car.Spec, AiPilot.LimitFor(pace)), smoothness);
+                if (!player) car.Supplies.Fuel = car.Supplies.Capacity * Mathf.Lerp(StartFuelMin, 1f, (float)rng.NextDouble());
+
+                int garage = i % pits.Garages;
+                RaceCar race = car.gameObject.AddComponent<RaceCar>();
+                race.Pits = pits;
+                race.Garage = garage;
                 AiDriver driver = car.gameObject.AddComponent<AiDriver>();
                 driver.Line = line;
                 driver.Seed = i + 1;
-                // Drivers differ: some quicker, some steadier, some more prone to overcooking a corner.
-                driver.Pace = 70f + 30f * (float)rng.NextDouble();
-                driver.Consistency = 60f + 40f * (float)rng.NextDouble();
-                driver.Safety = 80f + 20f * (float)rng.NextDouble();
+                driver.Pace = pace;
+                driver.Consistency = consistency;
+                driver.Safety = safety;
+                driver.Pits = pits;
+                driver.Garage = garage;
+                driver.Starter = start;
                 if (player) ai = driver;
                 cars[i] = car;
+                grid[i] = race;
             }
+
+            // The pace car waits ahead of pole, in pole's column.
+            CarController paceCar = CarBuilder.Spawn(PaceCarModel, null, circuit, null, new Color(0.95f, 0.95f, 0.95f));
+            paceCar.name = "Pace car";
+            paceCar.PlaceAt(circuit.IndexOf(circuit.Data.grid.slots[0].d + 40f), RollingStart.ColumnOf(0));
+            start.Grid = grid;
+            start.PaceCar = paceCar;
+            start.Pits = pits;
             Camera(circuit, cars, keys);
+        }
+
+        /// <summary>The field, quickest first: classes fastest first, each cycling through its models.</summary>
+        private static string[] Field()
+        {
+            var field = new List<string> { PlayerCar };
+            foreach ((char cls, int count) in ClassCounts)
+            {
+                var models = new List<string>();
+                foreach (TarmacGauntlet.Simulation.CarModel m in TarmacGauntlet.Simulation.CarModels.All)
+                    if (m.Id[0] == cls && m.Id[1] == '-') models.Add(m.Id);
+                models.Sort((x, y) => string.CompareOrdinal(y, x));
+                int have = cls == PlayerCar[0] ? 1 : 0;
+                for (int j = 0; have < count; j++)
+                {
+                    string id = models[j % models.Count];
+                    field.Add(id);
+                    have++;
+                }
+            }
+            return field.ToArray();
+        }
+
+        /// <summary>
+        /// A grid place, pole first: the painted slots, then on down the straight at the same
+        /// spacing, two by two.
+        /// </summary>
+        private static void GridPlace(Circuit circuit, int i, out float d, out float lateral)
+        {
+            GridSlot[] slots = circuit.Data.grid.slots;
+            if (i < slots.Length)
+            {
+                d = slots[i].d;
+                lateral = slots[i].lateral;
+                return;
+            }
+            int last = slots.Length - 1;
+            float spacing = slots[last - 1].d - slots[last].d;
+            d = slots[last].d - (i - last) * spacing;
+            lateral = slots[i % 2].lateral;
         }
 
         private void Update()
@@ -122,10 +193,10 @@ namespace TarmacGauntlet.Raceday
             cam.gameObject.AddComponent<FreeCamera>();
             RaceCameras views = cam.gameObject.AddComponent<RaceCameras>();
             views.Cars = cars;
-            views.Car = cars[0];
+            views.Car = cars[cars.Length - 1];   // the quickest car, at the back
             views.Keys = keys;
             views.Hud = cam.gameObject.AddComponent<DriveHud>();
-            views.Hud.Car = cars[0];
+            views.Hud.Car = cars[cars.Length - 1];
         }
     }
 }
