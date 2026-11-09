@@ -128,7 +128,13 @@ def build_terrain(np, P, E, W, lane, garages, spacing=8.0, margin=700.0):
         d2 = ((c[:, None, :] - sub[None, :, :]) ** 2).sum(axis=2)
         k = d2.argmin(axis=1)
         near_d[i:i + 4096] = np.sqrt(d2[np.arange(len(c)), k])
-        near_h[i:i + 4096] = hsub[k]
+        # Blend the heights of nearby track, lane and garage points so the ground has no steps
+        # where surfaces at different heights sit side by side.
+        # A soft minimum, so the ground tucks under the lower of two surfaces side by side.
+        g = np.exp(-d2 / (2 * 12.0 ** 2))
+        lo_h = hsub.min()
+        soft = lo_h - 0.6 * np.log((g * np.exp(-(hsub[None, :] - lo_h) / 0.6)).sum(axis=1) / (g.sum(axis=1) + 1e-300) + 1e-300)
+        near_h[i:i + 4096] = np.where(g.sum(axis=1) > 1e-6, soft, hsub[k])
         w = 1.0 / (d2 + 150.0 ** 2)
         far[i:i + 4096] = (w * hsub[None, :]).sum(axis=1) / w.sum(axis=1)
     flat_zone = 60.0
@@ -138,7 +144,10 @@ def build_terrain(np, P, E, W, lane, garages, spacing=8.0, margin=700.0):
              + 5 * np.sin(flat[:, 0] / 97 - flat[:, 1] / 131 + 2.1)
              + 3 * np.cos(flat[:, 0] / 53 + flat[:, 1] / 71))
     reach = np.clip((near_d - flat_zone) / 600.0, 0, 1)
-    h = (near_h - 1.2) * (1 - blend) + (far + hills * (0.4 + 1.6 * reach)) * blend
+    # Close to the track the ground sits just under the runoff, which falls 1.5% away from the edge,
+    # so any gap between surfaces shows as a shallow dip rather than a trench.
+    under = near_h - 0.5 - 0.015 * np.clip(near_d - 6.0, 0, None)
+    h = under * (1 - blend) + (far + hills * (0.4 + 1.6 * reach)) * blend
     lo = float(h.min()) - 1.0
     q = np.clip(np.round((h - lo) * 100), 0, 65535).astype('<u2')
     return {'originX': round(float(x0), 2), 'originZ': round(float(z0), 2), 'spacing': spacing,

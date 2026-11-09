@@ -23,6 +23,7 @@ namespace TarmacGauntlet.Raceday
         private const float Paint = 0.012f;        // paint sits this far above the surface
         private const float PitWallGap = 6f;       // the pit wall starts once the lane is this far off the track
         private const float LineAcross = 0.3f;     // thickness of lines painted across a surface
+        private const float LaneWiden = 1.2f;      // pit lane surface runs this far past its track-side line
 
         private readonly Circuit c;
         private readonly CircuitMaterials m;
@@ -36,6 +37,10 @@ namespace TarmacGauntlet.Raceday
         private readonly bool[][] pitWall = { null, null };
         private readonly bool[][] open = { null, null };   // no verge, runoff or barrier (pit road joins here)
         private readonly float[] laneGap;                  // gap between left road edge and pit lane edge, or NaN
+        private readonly bool[] joining;                   // the pit entry or exit road meets the track here
+        private readonly float[] trackToLane;              // straight-line gap from the left road edge to the pit lane surface, or NaN
+        private readonly float[] laneToTrack;              // per lane sample: gap from the lane surface's track side to the nearest road edge
+        private readonly int[] laneNearest;                // per lane sample: the nearest track sample
 
         /// <param name="materials">May be null outside Unity (tests and previews).</param>
         public CircuitBuilder(Circuit circuit, CircuitMaterials materials)
@@ -54,6 +59,40 @@ namespace TarmacGauntlet.Raceday
                     if (!float.IsNaN(a) && !float.IsNaN(b)) lat = (a + b) * 0.5f;
                 }
                 laneGap[k] = float.IsNaN(lat) ? float.NaN : lat - laneHalf - c.HalfWidth(k);
+            }
+
+            PitData pit = c.Data.pit;
+            joining = new bool[n];
+            for (int k = 0; k < n; k++)
+            {
+                float d = k * c.Step;
+                bool nearEnds = c.Ahead(pit.entry, d) < 400f || c.Ahead(d, pit.exit) < 400f;
+                joining[k] = !float.IsNaN(laneGap[k]) && laneGap[k] < PitWallGap && nearEnds;
+            }
+
+            // Measured as the crow flies, because lateral offsets swing about wherever the track
+            // bends hard beside the pit lane (the chicane bypass).
+            Vector3[] lane = c.Lane;
+            trackToLane = new float[n];
+            for (int k = 0; k < n; k++)
+            {
+                trackToLane[k] = float.NaN;
+                if (float.IsNaN(laneGap[k])) continue;
+                float best = float.MaxValue;
+                foreach (Vector3 q in lane) best = Mathf.Min(best, Flat(c.Centre[k], q));
+                trackToLane[k] = best - c.HalfWidth(k) - laneHalf - LaneWiden;
+            }
+            laneToTrack = new float[lane.Length];
+            laneNearest = new int[lane.Length];
+            for (int i = 0; i < lane.Length; i++)
+            {
+                float best = float.MaxValue;
+                for (int k = 0; k < n; k++)
+                {
+                    float g = Flat(c.Centre[k], lane[i]) - c.HalfWidth(k);
+                    if (g < best) { best = g; laneNearest[i] = k; }
+                }
+                laneToTrack[i] = best - laneHalf - LaneWiden;
             }
             PlanSides();
         }
@@ -115,12 +154,13 @@ namespace TarmacGauntlet.Raceday
                     bar[k] = Mathf.Max(0f, Mathf.Min(want[k], limit));
                     if (s == 0 && !float.IsNaN(laneGap[k]))
                     {
-                        if (laneGap[k] >= PitWallGap)
+                        // The pit wall runs along the lane, so the runoff just reaches over to it.
+                        if (joining[k]) shut[k] = true;
+                        else
                         {
                             wall[k] = true;
-                            bar[k] = laneGap[k] - 1f;
+                            bar[k] = Mathf.Max(0f, Mathf.Min(limit, trackToLane[k] - 0.2f));
                         }
-                        else shut[k] = true;
                     }
                     if (!wall[k] && bar[k] < Verge + 0.5f) shut[k] = true;
                     grav[k] = Mathf.Min(grav[k], bar[k] - 1.5f);
@@ -186,7 +226,7 @@ namespace TarmacGauntlet.Raceday
             {
                 float sign = s == 0 ? 1 : -1;
                 // FIA: the edge line breaks only where the pit entry and exit roads join.
-                bool Draw(int k) => s == 1 || float.IsNaN(laneGap[k]) || laneGap[k] >= PitWallGap;
+                bool Draw(int k) => s == 1 || !joining[k];
                 foreach (List<int> run in Runs(Draw))
                     kit.Strip(Rows(run, k => new[] { sign > 0 ? c.HalfWidth(k) : -(c.HalfWidth(k) - EdgeLine),
                                                      sign > 0 ? c.HalfWidth(k) - EdgeLine : -c.HalfWidth(k) }, Paint), 1f, 1f);
@@ -272,16 +312,28 @@ namespace TarmacGauntlet.Raceday
                     tyres.Strip(Vertical(run, k => c.HalfWidth(k) + barrier[side][k] - 1.2f, sign, -0.2f, 1.0f), 1f, 1f, true);
                 }
 
-                // Pit wall: concrete, between the start straight and the pit lane.
-                foreach (List<int> run in Runs(k => pitWall[side][k]))
-                {
-                    wall.Strip(Rows(run, k => Across(sign, c.HalfWidth(k) + barrier[side][k] - 0.3f, c.HalfWidth(k) + barrier[side][k] + 0.3f), 1.2f, true), 1f, 1f);
-                    wall.Strip(Vertical(run, k => c.HalfWidth(k) + barrier[side][k] - 0.3f, sign, -Skirt, 1.2f), 2f, 2f, true);
-                    wall.Strip(Vertical(run, k => c.HalfWidth(k) + barrier[side][k] + 0.3f, sign, -Skirt, 1.2f), 2f, 2f, true);
-                }
             }
             Emit("Armco", armco, m?.Armco, true);
             Emit("Tyre walls", tyres, m?.Tyres, true);
+
+            // Pit wall: concrete, following the pit lane on its track side wherever the lane is apart from the track.
+            float inner = -laneHalf - LaneWiden;
+            foreach (List<int> run in LaneRuns(i => !joining[LaneTrackIndex(i)] && laneToTrack[i] > 1f))
+            {
+                var top = new List<Vector3[]>();
+                var near = new List<Vector3[]>();
+                var far = new List<Vector3[]>();
+                foreach (int i in run)
+                {
+                    Vector3 a = LanePoint(i, inner, 1.2f), b = LanePoint(i, inner - 0.6f, 1.2f);
+                    top.Add(new[] { a, b });
+                    near.Add(new[] { a, a + Vector3.down * (1.2f + Skirt) });
+                    far.Add(new[] { b, b + Vector3.down * (1.2f + Skirt) });
+                }
+                wall.Strip(top, 1f, 1f);
+                wall.Strip(near, 2f, 2f, true);
+                wall.Strip(far, 2f, 2f, true);
+            }
             Emit("Pit wall", wall, m?.Concrete, true);
         }
 
@@ -336,7 +388,7 @@ namespace TarmacGauntlet.Raceday
             var skirtR = new List<Vector3[]>();
             for (int i = 0; i < count; i++)
             {
-                Vector3 l = LanePoint(i, laneHalf, 0), r = LanePoint(i, -laneHalf - 1.2f, 0);
+                Vector3 l = LanePoint(i, laneHalf, 0), r = LanePoint(i, -laneHalf - LaneWiden, 0);
                 rows.Add(new[] { l, r });
                 skirtL.Add(new[] { l, l + Vector3.down * Skirt });
                 skirtR.Add(new[] { r, r + Vector3.down * Skirt });
@@ -345,6 +397,30 @@ namespace TarmacGauntlet.Raceday
             surface.Strip(skirtL, 4f, 4f, true);
             surface.Strip(skirtR, 4f, 4f, true);
             Emit("Pit lane", surface, m?.PitAsphalt, true);
+
+            // Grass between the pit wall and the track, laid from the lane's side so it never
+            // folds where the track bends hard. The track's own runoff sits just above it.
+            var fill = new MeshKit();
+            float wallOut = -laneHalf - LaneWiden - 0.6f;
+            foreach (List<int> run in LaneRuns(i => !joining[LaneTrackIndex(i)] && laneToTrack[i] - Verge > 1.6f))
+            {
+                var band = new List<Vector3[]>();
+                var edge = new List<Vector3[]>();
+                foreach (int i in run)
+                {
+                    float w = Mathf.Min(laneToTrack[i] - Verge - 0.6f, 40f);
+                    Vector3 a = LanePoint(i, wallOut, -0.06f);
+                    // Ramp from the lane's level to the track's verge so the two grass areas meet.
+                    Vector3 b = LanePoint(i, wallOut - w, 0);
+                    int k = laneNearest[i];
+                    b.y = c.Surface(k, Mathf.Sign(Vector3.Dot(b - c.Centre[k], c.Left[k])) * c.HalfWidth(k)).y - Verge * RunoffFall - 0.06f;
+                    band.Add(new[] { a, b });
+                    edge.Add(new[] { b, b + Vector3.down * Skirt });
+                }
+                fill.Strip(band, 6f, 6f);
+                fill.Strip(edge, 6f, 6f, true);
+            }
+            Emit("Pit lane infield", fill, m?.Grass);
 
             var paint = new MeshKit();
             // Edge lines: garage side all along; track side wherever the lane is clear of the track.
@@ -361,6 +437,14 @@ namespace TarmacGauntlet.Raceday
             AcrossLane(paint, NearestLane(pit.limitStart));
             AcrossLane(paint, NearestLane(pit.limitEnd));
             Emit("Pit lane lines", paint, m?.White);
+        }
+
+        private int LaneTrackIndex(int i) => c.IndexOf(c.Data.pit.laneTrackDistance[i]);
+
+        private static float Flat(Vector3 a, Vector3 b)
+        {
+            float dx = a.x - b.x, dz = a.z - b.z;
+            return Mathf.Sqrt(dx * dx + dz * dz);
         }
 
         private int NearestLane(float trackDistance)
@@ -413,7 +497,7 @@ namespace TarmacGauntlet.Raceday
             var white = new MeshKit();
             var bollard = new MeshKit();
 
-            bool Joining(int k) => !float.IsNaN(laneGap[k]) && laneGap[k] > 0f && laneGap[k] < PitWallGap;
+            bool Joining(int k) => joining[k] && laneGap[k] > 0f;
             bool NearEntry(int k) => c.Ahead(pit.entry, k * c.Step) < 400f;
             bool NearExit(int k) => c.Ahead(k * c.Step, pit.exit) < 400f;
 
