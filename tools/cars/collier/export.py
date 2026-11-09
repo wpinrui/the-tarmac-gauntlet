@@ -11,7 +11,7 @@ import bmesh
 import numpy as np
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
-from shapely.geometry import LineString, Polygon, box as sbox
+from shapely.geometry import LineString, Point, Polygon, box as sbox
 from shapely.ops import unary_union
 
 import body
@@ -197,19 +197,22 @@ def cut_arches(shell):
             boolean(shell, cylinder_y("arch", x, w["r"], w["arch_r"], y0, y1, "trim"), "DIFFERENCE")
 
 
-def mirrors(bvh):
-    """Body-coloured housing with glass in its flat back, on a black stalk and sail plate."""
+def mirrors(bvh, trim):
+    """Body-coloured housing with glass in its flat back, on a black stalk and sail plate.
+    The housing, stalk and sail are joined to the window surround they mount on."""
     m = ROWS["mirror"]
     obs = []
     for sgn, tag in ((1, "l"), (-1, "r")):
         house = make(f"mirror_{tag}", *parts.mirror_housing(sgn), "body")
         boolean(house, make("recess", *parts.mirror_recess(sgn), "trim"), "DIFFERENCE")
-        obs.append(house)
         obs.append(make(f"mirror_glass_{tag}", *parts.mirror_glass(sgn), "mirror_glass"))
-        p, _n = hit(bvh, SIDE(sgn), m["x_rear"] + 0.06, m["z"] - 0.012)
-        obs.append(make(f"mirror_stalk_{tag}", *parts.mirror_stalk(sgn, abs(p[1])), "trim"))
-        sail = Polygon(smooth_poly(m["sail"], 6)).buffer(0).difference(side_outline())
-        obs += lay(bvh, f"mirror_sail_{tag}", sail, SIDE(sgn), 0.0015, 0.0045, "trim")
+        surface = lambda x, z: abs(hit(bvh, SIDE(sgn), x, z)[0][1])
+        boolean(house, make("stalk", *parts.mirror_stalk(sgn, surface), "trim"), "UNION")
+        boolean(trim, house, "UNION")
+        # overlaps the surround by 3 mm and sits inside its thickness, so the union is clean
+        sail = Polygon(smooth_poly(m["sail"], 6)).buffer(0).difference(side_outline().buffer(-0.003))
+        for ob in lay(bvh, "sail", sail, SIDE(sgn), 0.0018, 0.0062, "trim"):
+            boolean(trim, ob, "UNION")
     return obs
 
 
@@ -329,7 +332,7 @@ def pillar_strip(bvh):
             grid.append(row)
         ni, nj = len(grid), len(grid[0])
         verts = []
-        for d in (0.004, 0.0005):
+        for d in (0.0062, 0.0018):   # inside the surround's thickness, so the union is clean
             for row in grid:
                 for loc, nrm in row:
                     p = loc + nrm * d
@@ -389,20 +392,35 @@ def glass_shapes():
     }
 
 
+def merge(obs, name):
+    """Union same-mounted pieces into one solid, so no two of them overlap or touch."""
+    base = obs[0]
+    base.name = name
+    for ob in obs[1:]:
+        boolean(base, ob, "UNION")
+    return base
+
+
 def windows(bvh):
+    """One black surround for all the glass, with a slot under its inner edge that each pane
+    sits in, clear of the trim on every face."""
     g = glass_shapes()
-    obs = []
+    trims, slots, glass = [], [], []
     for s, tag in ((1, "l"), (-1, "r")):
         dlo, panes = g["side"]
-        trim = dlo.difference(unary_union(panes))
-        obs += lay(bvh, f"side_trim_{tag}", trim, SIDE(s), 0.0015, 0.0045, "trim")
+        trims += lay(bvh, f"side_trim_{tag}", dlo.difference(unary_union(panes)), SIDE(s), 0.0015, 0.0065, "trim")
         for i, p in enumerate(panes):
-            obs += lay(bvh, f"side_glass_{tag}{i}", p, SIDE(s), 0.002, 0.006, "glass")
+            slots += lay(bvh, "slot", p.buffer(0.005, join_style=1), SIDE(s), 0.0005, 0.0038, "trim")
+            glass += lay(bvh, f"side_glass_{tag}{i}", p.buffer(0.004, join_style=1), SIDE(s), 0.0015, 0.003, "glass")
     for key, frame in (("screen", TOP()), ("rear", REAR())):
         outer, panes = g[key]
-        obs += lay(bvh, f"{key}_trim", outer.difference(panes[0]), frame, 0.0015, 0.0045, "trim")
-        obs += lay(bvh, f"{key}_glass", panes[0], frame, 0.002, 0.006, "glass")
-    return obs + pillar_strip(bvh)
+        trims += lay(bvh, f"{key}_trim", outer.difference(panes[0]), frame, 0.0015, 0.0065, "trim")
+        slots += lay(bvh, "slot", panes[0].buffer(0.005, join_style=1), frame, 0.0005, 0.0038, "trim")
+        glass += lay(bvh, f"{key}_glass", panes[0].buffer(0.004, join_style=1), frame, 0.0015, 0.003, "glass")
+    trim = merge(trims + pillar_strip(bvh), "window_trim")
+    for sl in slots:
+        boolean(trim, sl, "DIFFERENCE")
+    return trim, glass
 
 
 def resample(poly, n):
@@ -476,34 +494,34 @@ def lamps(bvh):
     for s, tag in ((1, "l"), (-1, "r")):
         k = lambda g: g if s < 0 else Polygon([(-x, y) for x, y in g.exterior.coords])
         h = k(head)
-        obs += lay(bvh, f"head_housing_{tag}", h.buffer(-0.002), FRONT(), 0.0008, 0.004, "housing")
+        obs += lay(bvh, f"head_housing_{tag}", h.buffer(-0.002), FRONT(), 0.002, 0.0038, "housing", 0.006)
         cx, cz = h.centroid.x, h.centroid.y
         minx, miny, maxx, maxy = h.bounds
         # our own interior: a chrome reflector band and two projectors
         refl = h.buffer(-0.012).intersection(sbox(minx, cz - 0.03, maxx, maxy))
-        obs += lay(bvh, f"head_reflector_{tag}", refl, FRONT(), 0.004, 0.0055, "reflector")
+        obs += lay(bvh, f"head_reflector_{tag}", refl, FRONT(), 0.0046, 0.0056, "reflector", 0.006)
         inner = max(h.exterior.coords, key=lambda p: -p[1])  # lowest tip (inner end)
         for i, (fx, fz, r) in enumerate(((0.62, 0.30, 0.040), (0.30, 0.62, 0.034))):
             u = minx + (maxx - minx) * (fx if s < 0 else 1 - fx)
             v = miny + (maxy - miny) * fz
-            p, n = hit(bvh, FRONT(), u, v)
-            obs.append(make(f"lamp_head_{tag}{i}", *parts.disc(p + n * 0.007, n, r, 0.004), "lamp_head"))
-        obs += lay(bvh, f"head_glass_{tag}", h, FRONT(), 0.0095, 0.0115, "head_glass")
+            # laid on the panel so its face follows the lens curve
+            obs += lay(bvh, f"lamp_head_{tag}{i}", Point(u, v).buffer(r, 48), FRONT(), 0.0064, 0.0082, "lamp_head", 0.005)
+        obs += lay(bvh, f"head_glass_{tag}", h, FRONT(), 0.0095, 0.0115, "head_glass", 0.006)
         t = k(tail)
-        obs += lay(bvh, f"tail_housing_{tag}", t.buffer(-0.002), REAR(), 0.0008, 0.004, "housing")
+        obs += lay(bvh, f"tail_housing_{tag}", t.buffer(-0.002), REAR(), 0.002, 0.0038, "housing", 0.006)
         tminx, tminy, tmaxx, tmaxy = t.bounds
         mid = tminy + (tmaxy - tminy) * 0.55
         inner_t = t.buffer(-0.01)
-        obs += lay(bvh, f"lamp_tail_{tag}", inner_t.intersection(sbox(-5, mid + 0.004, 5, 5)), REAR(), 0.004, 0.0065, "lamp_tail")
-        obs += lay(bvh, f"lamp_brake_{tag}", inner_t.intersection(sbox(-5, -5, 5, mid - 0.004)), REAR(), 0.004, 0.0065, "lamp_brake")
-        obs += lay(bvh, f"tail_glass_{tag}", t, REAR(), 0.009, 0.011, "tail_glass")
+        obs += lay(bvh, f"lamp_tail_{tag}", inner_t.intersection(sbox(-5, mid + 0.004, 5, 5)), REAR(), 0.0046, 0.0068, "lamp_tail", 0.006)
+        obs += lay(bvh, f"lamp_brake_{tag}", inner_t.intersection(sbox(-5, -5, 5, mid - 0.004)), REAR(), 0.0046, 0.0068, "lamp_brake", 0.006)
+        obs += lay(bvh, f"tail_glass_{tag}", t, REAR(), 0.009, 0.011, "tail_glass", 0.006)
         # fog lamp with a chrome ring
         f = ROWS["fog"]
         p, n = hit(bvh, FRONT(), f["c"][0] * -s, f["c"][1])
         obs.append(make(f"fog_ring_{tag}", *parts.tube_ring(p + n * 0.006, n, f["r"] * 0.78, f["r"], 0.01), "chrome"))
         obs.append(make(f"lamp_fog_{tag}", *parts.disc(p + n * 0.006, n, f["r"] * 0.76, 0.008), "lamp_head"))
     b3 = Polygon(ROWS["brake3"])
-    obs += lay(bvh, "lamp_brake_3", b3, REAR(), 0.001, 0.004, "lamp_brake")
+    obs += lay(bvh, "lamp_brake_3", b3, REAR(), 0.002, 0.0045, "lamp_brake", 0.005)
     return obs
 
 
@@ -512,19 +530,22 @@ def grille(bvh):
     low = ROWS["wheel"]["r"] + ROWS["wheel"]["arch_r"] + 0.04
     mouth = fit(bvh, Polygon(smooth_poly(full(ROWS["mouth"]), 4)).buffer(0), FRONT(),
                 lambda p: p[0] > FRONT_LIMIT or p[2] > low)
-    obs += lay(bvh, "mouth", mouth, FRONT(), 0.0008, 0.0035, "grille")
+    f = ROWS["fog"]
+    for s in (1, -1):   # the fog lamps sit in holes in the mouth
+        mouth = mouth.difference(Point(f["c"][0] * s, f["c"][1]).buffer(f["r"] + 0.0015, 48))
+    obs += lay(bvh, "mouth", mouth, FRONT(), 0.002, 0.0036, "grille", 0.008)
     for i, (z, y0) in enumerate(ROWS["slats"]):
         bar = sbox(y0, z - 0.004, -y0, z + 0.004)
-        obs += lay(bvh, f"slat_{i}", bar, FRONT(), 0.0035 if i else 0.0008, 0.0065 if i else 0.0035, "chrome")
+        obs += lay(bvh, f"slat_{i}", bar, FRONT(), 0.0044 if i else 0.002, 0.0068 if i else 0.0045, "chrome", 0.008)
     chin = Polygon(smooth_poly(full(ROWS["chin"]), 4)).buffer(0)
-    obs += lay(bvh, "chin", chin, FRONT(), 0.0008, 0.004, "grille")
+    obs += lay(bvh, "chin", chin, FRONT(), 0.0025, 0.0045, "grille", 0.005)
     band = Polygon(smooth_poly(full(ROWS["rear_band"]), 4)).buffer(0)
-    obs += lay(bvh, "rear_band", band, REAR(), 0.0008, 0.004, "body")
+    obs += lay(bvh, "rear_band", band, REAR(), 0.002, 0.0045, "body", 0.008)
     for s, tag in ((1, "l"), (-1, "r")):
         strip = Polygon(ROWS["strip"]).buffer(0.002, join_style=1)
         # split at the door gap so the shut line runs through the strip
         strip = strip.difference(LineString(smooth_poly_open(ROWS["door_shut"])).buffer(0.0035))
-        obs += lay(bvh, f"side_strip_{tag}", strip, SIDE(s), 0.0008, 0.006, "body")
+        obs += lay(bvh, f"side_strip_{tag}", strip, SIDE(s), 0.0015, 0.006, "body")
     return obs
 
 
@@ -601,6 +622,28 @@ def options(bvh):
     return obs
 
 
+def tidy(ob):
+    """Weld the hairline seams the booleans leave and close any pinhole they open."""
+    bm = bmesh.new(); bm.from_mesh(ob.data)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=2e-5)
+    for _ in range(5):   # needle triangles with no area: collapse their shortest edge
+        bm.faces.ensure_lookup_table()
+        flat = [f for f in bm.faces if f.is_valid and f.calc_area() < 1e-10]
+        if not flat:
+            break
+        edges = {min(f.edges, key=lambda e: e.calc_length()) for f in flat}
+        bmesh.ops.collapse(bm, edges=[e for e in edges if e.is_valid])
+    bmesh.ops.holes_fill(bm, edges=[e for e in bm.edges if e.is_boundary], sides=0)
+    bmesh.ops.triangulate(bm, faces=bm.faces)
+    # a slit too thin to fill closes by collapsing its short side
+    bmesh.ops.collapse(bm, edges=[e for e in bm.edges if e.is_boundary and e.calc_length() < 5e-4])
+    bmesh.ops.holes_fill(bm, edges=[e for e in bm.edges if e.is_boundary], sides=0)
+    bmesh.ops.triangulate(bm, faces=bm.faces)
+    bmesh.ops.delete(bm, geom=[e for e in bm.edges if not e.link_faces], context="EDGES")
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
+    bm.to_mesh(ob.data); bm.free()
+
+
 def smooth(ob, angle=35):
     me = ob.data
     for p in me.polygons:
@@ -615,19 +658,21 @@ def main():
     bvh = BVHTree.FromObject(shell, bpy.context.evaluated_depsgraph_get())
     BVH.append(bvh)
     obs = [shell]
-    obs += windows(bvh)
+    trim, glass = windows(bvh)
+    obs += [trim] + glass
     obs += lamps(bvh)
     obs += grille(bvh)
-    obs += mirrors(bvh)
+    obs += mirrors(bvh, trim)
     obs += options(bvh)
     if "--fast" not in sys.argv:
         shut_lines(shell, bvh)
     if "--fast" not in sys.argv:
         cabin(shell)
     for name, (v, f, mat) in parts.exhaust_parts().items():
-        obs.append(make(name, v, f, mat))
+        boolean(shell, make(name, v, f, mat), "UNION")   # pipes run back into the bumper
     obs += wheels()
     for ob in obs:
+        tidy(ob)
         smooth(ob)
     OUT.mkdir(parents=True, exist_ok=True)
     tris = sum(sum(len(p.vertices) - 2 for p in ob.data.polygons) for ob in obs)

@@ -23,8 +23,10 @@ def badge_layers():
     bell += _quad((50, 140), (68, 134), (70, 116))
     a = np.linspace(0, 2 * np.pi, 20, endpoint=False)
     clapper = [(100 + 8 * np.cos(t), 157 + 8 * np.sin(t)) for t in a]
-    crown = [(92, 44), (108, 44), (108, 52), (92, 52)]
-    gold = [bell[:-1], clapper[::-1], crown]
+    crown = [(92, 44), (108, 44), (108, 54), (92, 54)]
+    from shapely.geometry import Polygon
+    top = Polygon(bell[:-1]).union(Polygon(crown)).buffer(0)   # crown and bell as one piece
+    gold = [[tuple(p) for p in top.exterior.coords[:-1]], clapper[::-1]]
     # Chrome outline ring and bell; the space between them is open, showing the body.
     ring = [red + navy]                  # one piece: outer hexagon with the inner one as a hole
     return [(ring, "chrome", 0), ([[g] for g in gold], "chrome", 0)]

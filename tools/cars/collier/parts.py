@@ -27,14 +27,13 @@ def lathe(profile_ry, n=64):
 def tyre():
     R, w, rim = W["r"], W["width"], W["rim_r"]
     sh = 0.035
-    prof = [(rim + 0.004, -w / 2 + 0.01)]
+    bead = rim + 0.013   # sits just clear of the rim flange
+    prof = [(bead, -w / 2 + 0.01)]
     for t in np.linspace(0, np.pi / 2, 6):
         prof.append((R - sh + sh * np.sin(t), -w / 2 + sh - sh * np.cos(t)))
     for t in np.linspace(np.pi / 2, np.pi, 6):
         prof.append((R - sh + sh * np.sin(t), w / 2 - sh - sh * np.cos(t)))
-    prof.append((rim + 0.004, w / 2 - 0.01))
-    prof.append((rim - 0.006, w / 2 - 0.016))
-    prof.append((rim - 0.006, -w / 2 + 0.016))
+    prof.append((bead, w / 2 - 0.01))
     return lathe(prof, 72)
 
 
@@ -180,7 +179,7 @@ def mirror_glass(sgn):
     m = ROWS["mirror"]
     q = mirror_profile(sgn, 0.86)
     a = np.column_stack([np.full(len(q), m["x_rear"] + 0.003), q])
-    b = np.column_stack([np.full(len(q), m["x_rear"] + 0.006), q])
+    b = np.column_stack([np.full(len(q), m["x_rear"] + 0.0052), q])
     return _close([a, b])
 
 
@@ -192,17 +191,20 @@ def mirror_recess(sgn):
     return _close([a, b])
 
 
-def mirror_stalk(sgn, y_body):
-    """Short black stalk from the sail plate out to the housing's inboard end."""
+def mirror_stalk(sgn, surface):
+    """Short black stalk from inside the window surround out to the housing's inboard end.
+    surface(x, z) gives the body's outward y there."""
     m = ROWS["mirror"]
-    x0 = m["x_rear"] + 0.03
+    x0 = m["x_rear"] + 0.06
     a = np.linspace(0, 2 * np.pi, 24, endpoint=False)
-    ring = lambda y: np.column_stack([x0 + 0.03 + 0.028 * np.cos(a), np.full(24, y * sgn),
-                                      m["z"] - 0.012 + 0.016 * np.sin(a)])
-    return _close([ring(y_body - 0.01), ring(m["y_in"] + 0.03)])
+    xz = np.column_stack([x0 + 0.028 * np.cos(a), m["z"] - 0.012 + 0.016 * np.sin(a)])
+    start = np.column_stack([xz[:, 0], [(surface(x, z) + 0.004) * sgn for x, z in xz], xz[:, 1]])
+    end = np.column_stack([xz[:, 0], np.full(24, (m["y_in"] + 0.03) * sgn), xz[:, 1]])
+    return _close([start, end])
 
 
-def exhaust_parts():
+def exhaust_parts(front_x=None):
+    """Tail pipes; each starts at front_x[i], just clear of the bumper."""
     e = ROWS["exhaust"]
     out = {}
     x0 = ROWS["stations"][0]["x"]
@@ -210,6 +212,6 @@ def exhaust_parts():
     for i, y in enumerate(e["y"]):
         a = np.linspace(0, 2 * np.pi, 32, endpoint=False)
         ring = np.column_stack([np.zeros(32), y + e["rw"] * np.cos(a), e["z"] + e["rz"] * np.sin(a)])
-        r0 = ring + np.array([xs + 0.12, 0, 0]); r1 = ring + np.array([xs - 0.025, 0, 0])
+        r0 = ring + np.array([front_x[i] if front_x else xs + 0.12, 0, 0]); r1 = ring + np.array([xs - 0.025, 0, 0])
         out[f"exhaust_{i}"] = (*_close([r0, r1]), "chrome")
     return out
