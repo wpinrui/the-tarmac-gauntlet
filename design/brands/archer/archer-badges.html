@@ -1,0 +1,233 @@
+<title>Archer Badge Studio</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,600;1,800&family=Big+Shoulders+Stencil+Display:wght@800&family=Cinzel:wght@600&family=Jost:wght@500&family=Michroma&family=Yellowtail&display=swap">
+<style>
+/* Layout: showroom wall. Each option is a card with its catalogue-colour tile beside its chrome tile. */
+:root {
+  --bg: #0c0e11;
+  --panel: #15181d;
+  --line: #262b33;
+  --fg: #dfe4ea;
+  --muted: #7d8794;
+  --paper: #eef0f2;
+  --chrome-ground: #101215;
+  --sel: #e9edf2;
+  --ui: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  color-scheme: dark;
+}
+html, body { background: var(--bg); color: var(--fg); }
+body {
+  font-family: var(--ui);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 48px;
+}
+main { max-width: 1280px; margin: 0 auto; display: flex; flex-direction: column; gap: 40px; }
+.bar { display: flex; justify-content: flex-end; gap: 10px; }
+.sw {
+  width: 34px; height: 34px; border-radius: 50%; border: 2px solid transparent; padding: 3px;
+  background-clip: content-box; cursor: pointer; display: grid; overflow: hidden;
+}
+.sw span { display: block; width: 100%; height: 100%; border-radius: 50%; }
+.sw[aria-pressed="true"] { border-color: var(--sel); }
+.sw:focus-visible, .card:focus-visible { outline: 2px solid var(--sel); outline-offset: 3px; }
+.grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+.grid.wide { grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr)); }
+.card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px;
+  display: flex; flex-direction: column; gap: 8px; cursor: pointer; text-align: left; color: inherit; font: inherit;
+}
+.card[aria-pressed="true"] { border-color: var(--sel); }
+.tag { font-weight: 600; font-size: 15px; letter-spacing: 1.5px; color: var(--muted); }
+.card[aria-pressed="true"] .tag { color: var(--sel); }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.wide .pair { grid-template-columns: 1fr; }
+.tile { border-radius: 4px; display: grid; place-items: center; padding: 14px; aspect-ratio: 1; }
+.wide .tile { aspect-ratio: auto; padding: 18px 14px; }
+.tile.c { background: var(--paper); }
+.tile.m { background: radial-gradient(circle at 50% 30%, #262a31, var(--chrome-ground) 70%); }
+.tile svg { width: 100%; height: auto; max-width: 100%; display: block; }
+.tile.m svg { filter: drop-shadow(0 2px 2px rgba(0,0,0,.7)); }
+.together { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); }
+.lock { border-radius: 6px; padding: 28px 20px; display: flex; flex-direction: column; gap: 28px; align-items: center; justify-content: center; }
+.lock.c { background: var(--paper); }
+.lock.m { background: radial-gradient(circle at 50% 30%, #262a31, var(--chrome-ground) 70%); }
+.lock.m svg { filter: drop-shadow(0 2px 2px rgba(0,0,0,.7)); }
+.h { display: flex; align-items: center; gap: 18px; width: 100%; max-width: 520px; }
+.h .b { width: 22%; flex: none; }
+.h .w { flex: 1; min-width: 0; }
+.v { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; max-width: 300px; }
+.v .b { width: 52%; }
+.v .w { width: 100%; }
+.lock svg { display: block; width: 100%; height: auto; }
+@media (prefers-reduced-motion: no-preference) { .card { transition: border-color .15s; } }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="chr" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#fbfcfd"/>
+      <stop offset="0.28" stop-color="#cfd5dc"/>
+      <stop offset="0.47" stop-color="#6c747f"/>
+      <stop offset="0.5" stop-color="#3b4048"/>
+      <stop offset="0.53" stop-color="#d9dee4"/>
+      <stop offset="0.78" stop-color="#9ea6b1"/>
+      <stop offset="1" stop-color="#f4f6f8"/>
+    </linearGradient>
+    <linearGradient id="chr2" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#b9c0c9"/>
+      <stop offset="0.45" stop-color="#4a5059"/>
+      <stop offset="0.5" stop-color="#22262c"/>
+      <stop offset="0.55" stop-color="#8b939d"/>
+      <stop offset="1" stop-color="#cdd3da"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5a616b"/>
+      <stop offset="1" stop-color="#ffffff"/>
+    </linearGradient>
+  </defs>
+</svg>
+
+<main>
+  <div class="bar" id="pal"></div>
+  <div class="grid" id="badges"></div>
+  <div class="grid wide" id="words"></div>
+  <div class="together" id="together"></div>
+</main>
+
+<script>
+const PALETTES = [
+  { P: '#0f4d32', A: '#c9a24a' },
+  { P: '#14284b', A: '#e4572e' },
+  { P: '#6e1423', A: '#a9b0b9' },
+  { P: '#23272e', A: '#1fa39a' },
+  { P: '#1d1d1f', A: '#d4202c' },
+];
+let pal = 0, selB = 0, selW = 0;
+
+const colourPaint = () => ({ ...PALETTES[pal], K: '#ffffff', S: 'none', sw: 0 });
+const chromePaint = { P: 'url(#chr)', A: 'url(#chr2)', K: '#0d0f12', S: 'url(#edge)', sw: 1.2 };
+const st = p => `stroke="${p.S}" stroke-width="${p.sw}"`;
+
+/* Badges: viewBox 0 0 200 200 unless noted */
+const BADGES = [
+  // B1 broad arrow roundel
+  p => `<circle cx="100" cy="100" r="92" fill="${p.P}" ${st(p)}/>
+    <circle cx="100" cy="100" r="80" fill="none" stroke="${p.A}" stroke-width="4"/>
+    <polygon points="100,44 111,152 89,152" fill="${p.K}"/>
+    <polygon points="100,44 66,128 52,116" fill="${p.K}"/>
+    <polygon points="100,44 148,116 134,128" fill="${p.K}"/>`,
+  // B2 fletching chevrons on shield-hex
+  p => `<polygon points="100,8 182,52 182,148 100,192 18,148 18,52" fill="${p.P}" ${st(p)}/>
+    <polygon points="100,40 150,78 150,98 100,60 50,98 50,78" fill="${p.K}"/>
+    <polygon points="100,76 150,114 150,134 100,96 50,134 50,114" fill="${p.K}"/>
+    <polygon points="100,112 150,150 150,166 100,130 50,166 50,150" fill="${p.A}"/>`,
+  // B3 drawn bow in a ring
+  p => `<circle cx="100" cy="100" r="92" fill="none" stroke="${p.P}" stroke-width="9"/>
+    <path d="M96 30 Q30 100 96 170 L96 160 Q48 100 96 40 Z" fill="${p.P}" ${st(p)}/>
+    <rect x="95" y="34" width="3" height="132" fill="${p.A}"/>
+    <rect x="74" y="96" width="92" height="8" fill="${p.P}" ${st(p)}/>
+    <polygon points="160,84 184,100 160,116" fill="${p.P}" ${st(p)}/>
+    <polygon points="66,80 84,80 94,96 76,96" fill="${p.A}"/>
+    <polygon points="66,120 84,120 94,104 76,104" fill="${p.A}"/>`,
+  // B4 arrowhead A
+  p => `<path d="M100 18 L176 180 L136 180 L100 100 L64 180 L24 180 Z" fill="${p.P}" ${st(p)}/>
+    <rect x="22" y="136" width="140" height="13" fill="${p.A}"/>
+    <polygon points="158,126 186,142.5 158,159" fill="${p.A}"/>
+    <polygon points="10,126 28,126 34,136 16,136" fill="${p.A}"/>
+    <polygon points="10,159 28,159 34,149 16,149" fill="${p.A}"/>`,
+  // B5 target with arrow
+  p => `<circle cx="100" cy="100" r="92" fill="${p.P}" ${st(p)}/>
+    <circle cx="100" cy="100" r="68" fill="${p.K}"/>
+    <circle cx="100" cy="100" r="46" fill="${p.P}"/>
+    <circle cx="100" cy="100" r="22" fill="${p.A}"/>
+    <g transform="rotate(-45 100 100)">
+      <rect x="100" y="96" width="98" height="8" fill="${p.K}"/>
+      <polygon points="178,84 200,84 192,100 170,100" fill="${p.A}"/>
+      <polygon points="178,116 200,116 192,100 170,100" fill="${p.A}"/>
+    </g>`,
+  // B6 shield with crossed arrows
+  p => `<path d="M30 20 H170 V96 Q170 160 100 188 Q30 160 30 96 Z" fill="${p.P}" ${st(p)}/>
+    <path d="M42 32 H158 V96 Q158 150 100 174 Q42 150 42 96 Z" fill="none" stroke="${p.A}" stroke-width="3"/>
+    <g transform="rotate(45 100 100)"><rect x="96" y="44" width="8" height="112" fill="${p.K}"/><polygon points="86,50 100,28 114,50" fill="${p.K}"/><polygon points="88,150 96,150 96,168 88,174" fill="${p.A}"/><polygon points="112,150 104,150 104,168 112,174" fill="${p.A}"/></g>
+    <g transform="rotate(-45 100 100)"><rect x="96" y="44" width="8" height="112" fill="${p.K}"/><polygon points="86,50 100,28 114,50" fill="${p.K}"/><polygon points="88,150 96,150 96,168 88,174" fill="${p.A}"/><polygon points="112,150 104,150 104,168 112,174" fill="${p.A}"/></g>`,
+  // B7 winged arrowhead
+  p => `<polygon points="100,30 126,96 100,170 74,96" fill="${p.P}" ${st(p)}/>
+    <polygon points="100,56 112,96 100,140 88,96" fill="${p.A}"/>
+    <polygon points="70,76 8,70 14,84 66,90" fill="${p.P}" ${st(p)}/>
+    <polygon points="68,96 18,96 26,108 70,108" fill="${p.P}" ${st(p)}/>
+    <polygon points="72,116 32,122 42,132 76,126" fill="${p.P}" ${st(p)}/>
+    <polygon points="130,76 192,70 186,84 134,90" fill="${p.P}" ${st(p)}/>
+    <polygon points="132,96 182,96 174,108 130,108" fill="${p.P}" ${st(p)}/>
+    <polygon points="128,116 168,122 158,132 124,126" fill="${p.P}" ${st(p)}/>`,
+  // B8 pheon breaking a ring
+  p => `<path d="M76 13 A88 88 0 1 0 124 13 L120 27 A74 74 0 1 1 80 27 Z" fill="${p.A}"/>
+    <path d="M100 6 L146 120 L118 104 L112 176 L88 176 L82 104 L54 120 Z" fill="${p.P}" ${st(p)}/>`,
+];
+
+/* Wordmarks: viewBox 0 0 600 140 */
+const WORDS = [
+  p => `<text x="300" y="80" text-anchor="middle" font-family="Michroma, sans-serif" font-size="58" letter-spacing="10" fill="${p.P}" ${st(p)}>ARCHER</text>
+    <rect x="58" y="104" width="470" height="4" fill="${p.A}"/>
+    <polygon points="524,96 552,106 524,116" fill="${p.A}"/>
+    <polygon points="40,96 56,96 66,104 50,104" fill="${p.A}"/>
+    <polygon points="40,116 56,116 66,108 50,108" fill="${p.A}"/>`,
+  p => `<rect x="28" y="66" width="74" height="3" fill="${p.A}"/>
+    <rect x="498" y="66" width="74" height="3" fill="${p.A}"/>
+    <text x="300" y="94" text-anchor="middle" font-family="Cinzel, serif" font-weight="600" font-size="72" letter-spacing="14" fill="${p.P}" ${st(p)}>ARCHER</text>`,
+  p => `<polygon points="86,40 120,40 96,112 62,112" fill="${p.A}"/>
+    <polygon points="44,56 70,56 54,112 28,112" fill="${p.A}"/>
+    <text x="340" y="112" text-anchor="middle" font-family="'Barlow Condensed', sans-serif" font-style="italic" font-weight="800" font-size="124" letter-spacing="2" fill="${p.P}" ${st(p)}>ARCHER</text>`,
+  p => `<text x="290" y="100" text-anchor="middle" font-family="Jost, sans-serif" font-weight="500" font-size="104" letter-spacing="-1" fill="${p.P}" ${st(p)}>archer</text>
+    <polygon points="452,84 474,98 452,112" fill="${p.A}"/>`,
+  p => `<text x="300" y="112" text-anchor="middle" font-family="'Big Shoulders Stencil Display', sans-serif" font-weight="800" font-size="118" letter-spacing="10" fill="${p.P}" ${st(p)}>ARCHER</text>
+    <rect x="96" y="122" width="408" height="5" fill="${p.A}"/>`,
+  p => `<text x="300" y="98" text-anchor="middle" font-family="Yellowtail, cursive" font-size="118" fill="${p.P}" ${st(p)}>Archer</text>
+    <path d="M150 116 Q320 100 486 108 Q320 110 150 124 Z" fill="${p.A}"/>`,
+];
+
+const svg = (inner, vb, label) => `<svg viewBox="${vb}" role="img" aria-label="${label}">${inner}</svg>`;
+const BV = '0 0 200 200', WV = '0 0 600 140';
+
+function card(kind, i, draw, vb) {
+  const id = (kind === 'b' ? 'B' : 'W') + (i + 1);
+  const on = (kind === 'b' ? selB : selW) === i;
+  return `<button class="card" data-k="${kind}" data-i="${i}" aria-pressed="${on}">
+    <span class="tag">${id}</span>
+    <span class="pair">
+      <span class="tile c">${svg(draw(colourPaint()), vb, id)}</span>
+      <span class="tile m">${svg(draw(chromePaint), vb, id + ' chrome')}</span>
+    </span></button>`;
+}
+
+function lock(cls, p) {
+  const b = svg(BADGES[selB](p), BV, 'badge'), w = svg(WORDS[selW](p), WV, 'wordmark');
+  return `<div class="lock ${cls}">
+    <div class="h"><div class="b">${b}</div><div class="w">${w}</div></div>
+    <div class="v"><div class="b">${b}</div><div class="w">${w}</div></div>
+  </div>`;
+}
+
+function render() {
+  document.getElementById('pal').innerHTML = PALETTES.map((c, i) =>
+    `<button class="sw" data-p="${i}" aria-pressed="${i === pal}" aria-label="Palette ${i + 1}"><span style="background:linear-gradient(135deg, ${c.P} 55%, ${c.A} 55%)"></span></button>`).join('');
+  document.getElementById('badges').innerHTML = BADGES.map((d, i) => card('b', i, d, BV)).join('');
+  document.getElementById('words').innerHTML = WORDS.map((d, i) => card('w', i, d, WV)).join('');
+  document.getElementById('together').innerHTML = lock('c', colourPaint()) + lock('m', chromePaint);
+}
+
+document.addEventListener('click', e => {
+  const s = e.target.closest('.sw');
+  if (s) { pal = +s.dataset.p; render(); return; }
+  const c = e.target.closest('.card');
+  if (c) {
+    if (c.dataset.k === 'b') selB = +c.dataset.i; else selW = +c.dataset.i;
+    render();
+    document.getElementById('together').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'nearest' });
+  }
+});
+
+render();
+if (document.fonts) document.fonts.ready.then(render);
+</script>
