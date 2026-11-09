@@ -15,7 +15,7 @@ def _quad(p0, p1, p2, n=6):
 
 
 def badge_layers():
-    """(loops in SVG units, material, layer) for the Liberty badge, bottom layer first."""
+    """(pieces, material, layer) for the Liberty badge; each piece is an outer loop then holes."""
     red = [[(100.0, 6.0), (181.4, 53.0), (181.4, 147.0), (100.0, 194.0), (18.6, 147.0), (18.6, 53.0)]]
     navy = [[(100.0, 20.0), (169.3, 60.0), (169.3, 140.0), (100.0, 180.0), (30.7, 140.0), (30.7, 60.0)]]
     bell = [(74, 70)] + _quad((74, 70), (74, 52), (100, 52)) + _quad((100, 52), (126, 52), (126, 70))
@@ -25,7 +25,9 @@ def badge_layers():
     clapper = [(100 + 8 * np.cos(t), 157 + 8 * np.sin(t)) for t in a]
     crown = [(92, 44), (108, 44), (108, 52), (92, 52)]
     gold = [bell[:-1], clapper[::-1], crown]
-    return [(red, "chrome", 0), (navy, "badge_navy", 1), (gold, "chrome", 2)]
+    # Chrome outline ring and bell; the space between them is open, showing the body.
+    ring = [red + navy]                  # one piece: outer hexagon with the inner one as a hole
+    return [(ring, "chrome", 0), ([[g] for g in gold], "chrome", 0)]
 
 
 def _densify(loop, max_edge):
@@ -128,8 +130,8 @@ def badge(bvh, centre, up, right, into, height):
     for loops, mat, layer in badge_layers():
         d0 = 0.0015 + 0.0025 * layer
         d1 = d0 + 0.0025
-        for loop in loops:
-            m = [[((x - 100) * s, (100 - y) * s) for x, y in loop]]
+        for piece in loops:
+            m = [[((x - 100) * s, (100 - y) * s) for x, y in loop] for loop in piece]
             r = raised(bvh, m, (centre, right, up, into), d0, d1, max_edge=0.005)
             if r:
                 out.append((r[0], r[1], mat))

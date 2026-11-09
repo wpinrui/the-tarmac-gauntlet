@@ -11,7 +11,7 @@ import bmesh
 import numpy as np
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
-from shapely.geometry import Polygon, box as sbox
+from shapely.geometry import LineString, Polygon, box as sbox
 from shapely.ops import unary_union
 
 import body
@@ -40,7 +40,6 @@ MATERIALS = {
     "hub": ((0.45, 0.45, 0.47), 0.8, 1.0, None),
     "mirror_glass": ((0.55, 0.6, 0.65), 1.0, 1.0, None),
     "interior": ((0.09, 0.09, 0.10), 0.2, 1.0, None),
-    "badge_navy": ((0.078, 0.157, 0.294), 0.6, 1.0, None),
     "name": ((0.80, 0.81, 0.83), 1.0, 1.0, None),
     "lamp_head": ((0.95, 0.95, 0.92), 0.9, 1.0, (1.0, 0.97, 0.9)),
     "lamp_tail": ((0.45, 0.03, 0.03), 0.6, 1.0, (0.55, 0.0, 0.0)),
@@ -523,6 +522,8 @@ def grille(bvh):
     obs += lay(bvh, "rear_band", band, REAR(), 0.0008, 0.004, "body")
     for s, tag in ((1, "l"), (-1, "r")):
         strip = Polygon(ROWS["strip"]).buffer(0.002, join_style=1)
+        # split at the door gap so the shut line runs through the strip
+        strip = strip.difference(LineString(smooth_poly_open(ROWS["door_shut"])).buffer(0.0035))
         obs += lay(bvh, f"side_strip_{tag}", strip, SIDE(s), 0.0008, 0.006, "body")
     return obs
 
@@ -558,6 +559,13 @@ def wheels():
     return obs
 
 
+def surface_frame(p, n, right):
+    """Badge frame lying flat on the surface at p, so a sloped panel doesn't stretch it."""
+    n = np.asarray(n, float); n /= np.linalg.norm(n)
+    up = np.array([0, 0, 1.0]) - n * n[2]; up /= np.linalg.norm(up)
+    return tuple(p + n * 0.3), tuple(up), tuple(right), tuple(-n)
+
+
 def options(bvh):
     """Badge and name placements for Ivan to toggle between in the viewer."""
     obs = []
@@ -573,13 +581,13 @@ def options(bvh):
     o = ROWS["opts"]
     # Front badge: 1 nose (the reference's spot), 2 bonnet front.
     z = o["nose_z"]; p, n = hit(bvh, FRONT(), 0.0, z)
-    add("frontbadge", 1, decals.badge(bvh, (p[0] + 0.3, 0, z), (0, 0, 1), (0, 1, 0), (-1, 0, 0), 0.075))
+    add("frontbadge", 1, decals.badge(bvh, *surface_frame(p, n, (0, 1, 0)), 0.075))
     x = o["bonnet_x"]
     add("frontbadge", 2, decals.badge(bvh, (x, 0, 2.5), (1, 0, 0), (0, 1, 0), (0, 0, -1), 0.075))
     # Rear badge: 1 tailgate top centre (reference), 2 tailgate middle.
     for n_, z in ((1, o["rear_z1"]), (2, o["rear_z2"])):
-        p, _n = hit(bvh, REAR(), 0.0, z)
-        add("rearbadge", n_, decals.badge(bvh, (p[0] - 0.3, 0, z), (0, 0, 1), (0, -1, 0), (1, 0, 0), 0.07))
+        p, n = hit(bvh, REAR(), 0.0, z)
+        add("rearbadge", n_, decals.badge(bvh, *surface_frame(p, n, (0, -1, 0)), 0.07))
     # Name: 1 tailgate lower left (reference), 2 tailgate lower right, 3 rear quarters.
     cap = 0.045
     _, length = decals.name(bvh, (0, 0, 0), (1, 0, 0), (0, 0, 1), (0, 0, -1), cap)
