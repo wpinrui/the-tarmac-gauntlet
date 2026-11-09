@@ -4,7 +4,7 @@ namespace TarmacGauntlet.Raceday
 {
     /// <summary>
     /// Builds the circuit, the sun, a grid of AI cars from every class and the cameras when the scene
-    /// starts, and the race begins. I hands the car on pole to you and back. V moves the cameras to
+    /// starts, and the race begins. I hands the quickest car, at the back of the grid, to you and back. V moves the cameras to
     /// the next car.
     /// </summary>
     public sealed class CircuitScene : MonoBehaviour
@@ -14,7 +14,8 @@ namespace TarmacGauntlet.Raceday
 
         private const string PlayerCar = "a-29";
         private const string PlayerModel = "Assets/Art/Vehicles/CheonmaCX24Si/CheonmaCX24Si.obj";
-        /// <summary>The grid, pole first: three of each of the top classes, two of the rest.</summary>
+        /// <summary>The field, quickest first: three of each of the top classes, two of the rest. The grid is
+        /// reversed, so the slowest car takes pole and the quickest starts last and has to carve through.</summary>
         private static readonly string[] Field =
         {
             "a-29", "a-27", "a-26", "b-24", "b-22", "b-21", "c-19", "c-18",
@@ -57,7 +58,7 @@ namespace TarmacGauntlet.Raceday
                 string id = Field[i];
                 Color paint = ClassPaint[Mathf.Clamp(id[0] - 'a', 0, ClassPaint.Length - 1)];
                 CarController car = CarBuilder.Spawn(id, player ? PlayerModel : null, circuit, player ? keys : null, paint);
-                GridSlot slot = circuit.Data.grid.slots[i];
+                GridSlot slot = circuit.Data.grid.slots[Field.Length - 1 - i];
                 car.PlaceAt(circuit.IndexOf(slot.d - 2.6f), slot.lateral);   // front wheels just behind the line
                 car.gameObject.AddComponent<RaceCar>();
                 AiDriver driver = car.gameObject.AddComponent<AiDriver>();
