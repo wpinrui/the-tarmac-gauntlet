@@ -28,13 +28,15 @@ Cheonma CX-24Si from pole. `I` hands the car to you, and pressing it again hands
 AI driver (`AiDriver` on the car): Pace, Consistency and Safety (0 to 100) can be changed in the
 inspector during Play. Pace sets how much of the car's grip and braking it uses (86% at 0, 98% at 100),
 Consistency how much its corner speeds wander from lap to lap, and Safety how often it overcooks a
-corner. It follows a racing line (`RacingLine.cs`, the smoothest path between the track edges) at a
+corner. It follows a racing line (`RacingLine.cs`: the minimum-curvature path using the full track width,
+outside, apex, outside, then tuned in the background for the car's shortest predicted lap) at a
 target speed for every 2 m sample (`SpeedProfile.cs`, from the car's grip, downforce, engine and
 brakes). After a hard crash, or when stuck or spun, it puts the car back on track itself. The console
 shows its predicted lap time and each lap it drives.
 
 After changing the AI or the car physics, run `bash tools/ai-check/run.sh` (needs the .NET 8 SDK). It
-drives the AI in a flat stand-in for `CarController` and checks that every car model laps without
+checks the line goes outside, apex, outside and that tuning shortens the lap, then drives the AI in a
+flat stand-in for `CarController` and checks that every car model laps without
 leaving the track and within 5% of its predicted time, that Pace, Consistency and Safety do what they
 say, and that overcooked corners cost time. `StandInCar.cs` copies `CarController`'s formulas, so keep
 it in step when those change.
