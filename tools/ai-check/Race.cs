@@ -34,6 +34,8 @@ sealed class Racer
     /// <summary>When and where the car first left the track, or -1.</summary>
     public float OffTime = -1f, OffWhere;
     public float Distance;
+    /// <summary>How far the car moved along the track in the last step.</summary>
+    public float Moved;
     public readonly List<float> LapTimes = new List<float>();
     public float LapStart = -1f;
     public Racecraft.Mode LastMode;
@@ -64,6 +66,15 @@ sealed class Race
     readonly Circuit circuit;
     readonly Dictionary<(int, int), int> order = new Dictionary<(int, int), int>();
     readonly HashSet<(int, int)> touching = new HashSet<(int, int)>();
+    readonly Dictionary<(int, int), int> stuckBehind = new Dictionary<(int, int), int>();
+    /// <summary>Most corners a car more than one class quicker started behind the same slower car, and when.</summary>
+    public int WorstStuck;
+    public string WorstStuckLine = "";
+    /// <summary>The same for the fastest car behind the slowest one.</summary>
+    public int FastestStuck;
+    public string FastestStuckLine = "";
+    Racer Fastest => Racers.OrderBy(r => r.Pilot.Profile.LapTime).First();
+    Racer Slowest => Racers.OrderBy(r => r.Pilot.Profile.LapTime).Last();
     readonly List<TrafficCar> field = new List<TrafficCar>();
     public Action<Race> Watch;
 
@@ -102,7 +113,7 @@ sealed class Race
             float pace = r.Pilot.Profile.LapTime;
             int k = Math.Max(r.Car.TrackIndex, 0);
             Vector3 f = circuit.Forward[k];
-            r.Distance = r.Laps * circuit.Lap + k * circuit.Step;
+            r.Distance = r.Laps * circuit.Lap + circuit.DistanceAt(k, r.Car.Position);
             field.Add(new TrafficCar
             {
                 Id = r.Id,
@@ -112,6 +123,7 @@ sealed class Race
                 LapPace = pace,
                 Braking = r.Car.Spec.BrakeDecel * 9.81f * AiPilot.LimitFor(r.Pilot.Pace),
                 GivingWay = r.Craft.State == Racecraft.Mode.GivingWay,
+                Craft = r.Craft,
             });
         }
     }
@@ -143,7 +155,9 @@ sealed class Race
             }
             else if (r.Last < 50 && k > circuit.Count - 50) r.Laps--;
             r.Last = k;
-            r.Distance = r.Laps * circuit.Lap + k * circuit.Step;
+            float before = r.Distance;
+            r.Distance = r.Laps * circuit.Lap + circuit.DistanceAt(k, r.Car.Position);
+            r.Moved = r.Distance - before;
 
             float off = Math.Abs(r.Car.Lateral) - circuit.HalfWidth(k);
             // A mistake lasts until the car has been back on the track for a couple of seconds.
@@ -182,6 +196,36 @@ sealed class Race
                 PassCount++;
                 if (Passes.Count < 400)
                     Passes.Add($"{Clock(Time)} {Name(by)} passes {Name(of)} at {Math.Max(by.Car.TrackIndex, 0) * circuit.Step:0} m{(by.Distance - of.Distance > circuit.Lap * 0.5f ? " (lapping)" : "")}");
+            }
+
+        // A car more than one class quicker held up behind a slower one: corners it starts while still behind.
+        foreach (Racer fast in Racers)
+            foreach (Racer slow in Racers)
+            {
+                if (Class(slow) - Class(fast) < 2) continue;
+                float gap = slow.Distance - fast.Distance;
+                gap -= circuit.Lap * (float)Math.Round(gap / circuit.Lap);
+                var key = (fast.Id, slow.Id);
+                if (gap <= 0f || gap > 40f) { stuckBehind.Remove(key); continue; }
+                float was = fast.Distance - fast.Moved, now = fast.Distance;
+                int corners = stuckBehind.TryGetValue(key, out int n) ? n : 0;
+                foreach (CornerData c in circuit.Data.corners)
+                {
+                    float at = c.s + circuit.Lap * (float)Math.Floor(now / circuit.Lap);
+                    if (at > now) at -= circuit.Lap;
+                    if (at > was && at <= now) corners++;
+                }
+                stuckBehind[key] = corners;
+                if (fast == Fastest && slow == Slowest && corners > FastestStuck)
+                {
+                    FastestStuck = corners;
+                    FastestStuckLine = $"{Name(fast)}, the fastest car, started {corners} corners behind {Name(slow)}, the slowest, the last at {Clock(Time)} at {Math.Max(fast.Car.TrackIndex, 0) * circuit.Step:0} m";
+                }
+                if (corners > WorstStuck)
+                {
+                    WorstStuck = corners;
+                    WorstStuckLine = $"{Name(fast)} started {corners} corners behind {Name(slow)}, the last at {Clock(Time)} at {Math.Max(fast.Car.TrackIndex, 0) * circuit.Step:0} m";
+                }
             }
 
         // Closest nose to tail gap behind a car in the same lane.
@@ -245,6 +289,8 @@ sealed class Race
     }
 
     static float Dot(Vector3 a, Vector3 b) => a.x * b.x + a.z * b.z;
+
+    static int Class(Racer r) => r.Entry.Model[0] - 'a';
 
     public string Name(Racer r) => $"{r.Entry.Model}#{r.Id}";
 

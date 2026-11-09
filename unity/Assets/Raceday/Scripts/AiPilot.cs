@@ -106,6 +106,16 @@ namespace TarmacGauntlet.Raceday
             for (int i = 0; i < corners.Length; i++) cornerScale[i] = 1f;
         }
 
+        /// <summary>Target speed at a line sample for a path that far from the racing line, m/s.</summary>
+        public float LaneSpeed(int k, float offset)
+        {
+            float lane = Mathf.Clamp(offset, LaneShifts[0], LaneShifts[LaneShifts.Length - 1]);
+            int a = 0;
+            while (a < LaneShifts.Length - 2 && lane > LaneShifts[a + 1]) a++;
+            float blend = (lane - LaneShifts[a]) / (LaneShifts[a + 1] - LaneShifts[a]);
+            return Mathf.Lerp(LaneProfiles[a].Speed[k], LaneProfiles[a + 1].Speed[k], blend);
+        }
+
         /// <summary>Share of the car's limit the driver uses: 86% at Pace 0, 98% at Pace 100.</summary>
         public static float LimitFor(float pace) => 0.86f + 0.12f * pace / 100f;
 
