@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
@@ -7,6 +8,8 @@ namespace TarmacGauntlet.Raceday
     /// position and motion and passes the pedals and steering back. After a hard crash, or when the
     /// car is stuck, it puts the car back on track as a player would with R. Lap times go to the console.
     /// Changing the stats in the inspector during Play takes effect straight away.
+    /// It starts on the minimum-curvature line and switches to the line tuned for this car's lap time
+    /// once that is worked out in the background, a couple of seconds in.
     /// </summary>
     [DefaultExecutionOrder(-10)]   // before the car's own physics step
     [RequireComponent(typeof(CarController))]
@@ -20,6 +23,7 @@ namespace TarmacGauntlet.Raceday
         [Range(0, 100)] public float Safety = 80f;
         public int Seed = 1;
 
+        /// <summary>The minimum-curvature line, shared by every car.</summary>
         public RacingLine Line;
         public AiPilot Pilot { get; private set; }
 
@@ -28,11 +32,18 @@ namespace TarmacGauntlet.Raceday
         private int lastIndex = -1;
         private float lapStart = -1f;
         private int lap;
+        private Task<RacingLine> tuning;
 
         private void Start()
         {
             car = GetComponent<CarController>();
             Build();
+            if (Line != null && car.Spec != null)
+            {
+                Circuit circuit = Line.Circuit;
+                CarSpec spec = car.Spec;
+                tuning = Task.Run(() => new RacingLine(circuit, spec));
+            }
         }
 
         private void OnEnable()
@@ -62,12 +73,23 @@ namespace TarmacGauntlet.Raceday
             if (Line == null || car == null || car.Spec == null) return;
             Pilot = new AiPilot(Line, car.Spec, Pace, Consistency, Safety, Seed);
             car.AiDriving = enabled;
-            Debug.Log($"{car.Spec.Name}: AI target lap {FormatTime(Pilot.Profile.LapTime)} at Pace {Pace:0}");
+            string which = Line.TunedLapTime > 0f ? "tuned line" : "minimum-curvature line";
+            Debug.Log($"{car.Spec.Name}: AI predicted lap {FormatTime(Pilot.Profile.LapTime)} at Pace {Pace:0} on the {which}");
         }
 
         private void FixedUpdate()
         {
             if (Pilot == null) return;
+            if (tuning != null && tuning.IsCompleted)
+            {
+                if (tuning.Status == TaskStatus.RanToCompletion)
+                {
+                    Line = tuning.Result;
+                    Build();
+                }
+                else Debug.LogException(tuning.Exception);
+                tuning = null;
+            }
             float dt = Time.fixedDeltaTime;
             Transform t = car.transform;
 

@@ -31,6 +31,9 @@ namespace TarmacGauntlet.Raceday
         private readonly float frontWeight, frontAero, rearWeight, rearAero;
         private readonly float frontShare;
 
+        private const float TableStep = 0.5f;
+        private float[] engineTable;   // full-throttle acceleration every half metre per second
+
         public SpeedProfile(RacingLine line, CarSpec spec, float limit)
         {
             Line = line;
@@ -161,7 +164,20 @@ namespace TarmacGauntlet.Raceday
         public float Resist(int k, float v) => drag * v * v + 0.012f * G + G * Line.Grade[k];
 
         /// <summary>Best acceleration from the engine, limited by what the driven rear tyres can put down.</summary>
-        public float DriveAccel(float v) => Mathf.Min(EngineAccel(v), Traction(v));
+        public float DriveAccel(float v) => Mathf.Min(EngineTable(v), Traction(v));
+
+        /// <summary><see cref="EngineAccel"/> looked up from a table, for the passes over every sample.</summary>
+        private float EngineTable(float v)
+        {
+            if (engineTable == null)
+            {
+                engineTable = new float[Mathf.CeilToInt(spec.TopSpeed * 1.3f / TableStep) + 2];
+                for (int i = 0; i < engineTable.Length; i++) engineTable[i] = EngineAccel(i * TableStep);
+            }
+            float f = Mathf.Clamp(v / TableStep, 0f, engineTable.Length - 1.001f);
+            int j = (int)f;
+            return Mathf.Lerp(engineTable[j], engineTable[j + 1], f - j);
+        }
 
         /// <summary>What the rear tyres can put down before they spin, as an acceleration.</summary>
         public float Traction(float v)

@@ -2,6 +2,11 @@
 // that it laps. Each check prints one line: ok, or FAIL with what went wrong. Exit code 1 if any fails.
 //
 // Checks:
+//   line uses the width  the minimum-curvature line sits on the inside half of the track at the middle of
+//                        every bend at least 20 m long, and, where no other bend ends in the 150 m before
+//                        it, within 1 m of the outside limit somewhere in that run-up, so it is outside,
+//                        apex, outside and never a shortest path
+//   tuning helps         the line tuned for a car predicts a faster lap than the minimum-curvature line
 //   clean laps       with Safety 100, every car model laps from a standing start without its centre
 //                    ever leaving the track and kerbs, and its flying lap lands within 5% of the
 //                    speed profile's prediction
@@ -27,6 +32,14 @@ static class Check
 
     static Circuit circuit;
     static RacingLine line;
+    static readonly Dictionary<string, RacingLine> tuned = new Dictionary<string, RacingLine>();
+
+    /// <summary>Each car's own line, as the game builds it: minimum curvature tuned to its lap time.</summary>
+    static RacingLine LineFor(string modelId)
+    {
+        if (!tuned.TryGetValue(modelId, out RacingLine l)) tuned[modelId] = l = new RacingLine(circuit, CarSpec.For(modelId));
+        return l;
+    }
     static bool failed;
 
     sealed class Run
@@ -47,12 +60,31 @@ static class Check
         circuit = new Circuit(data);
         line = new RacingLine(circuit);
 
+        if (args.Length > 2 && args[1] == "line")
+        {
+            if (args.Length > 3)
+            {
+                var watch = System.Diagnostics.Stopwatch.StartNew();
+                line = LineFor(args[3]);
+                Console.WriteLine($"tuned for {args[3]} in {watch.ElapsedMilliseconds} ms: {Time(new SpeedProfile(new RacingLine(circuit), CarSpec.For(args[3]), 1f).LapTime)} -> {Time(line.TunedLapTime)}");
+            }
+            // The racing line as CSV, for drawing: centre x, z, left x, z, half width, line x, z, lateral.
+            using var w = new StreamWriter(args[2]);
+            for (int k = 0; k < circuit.Count; k++)
+            {
+                UnityEngine.Vector3 c = circuit.Centre[k], l = circuit.Left[k], p = line.Point[k];
+                w.WriteLine($"{c.x},{c.z},{l.x},{l.z},{circuit.HalfWidth(k)},{p.x},{p.z},{line.Lateral[k]},{line.Curvature[k]}");
+            }
+            return 0;
+        }
         if (args.Length > 1)
         {
             Detail(args[1]);
             return 0;
         }
 
+        LineUsesWidth();
+        TuningHelps();
         CleanLaps();
         PaceOrders();
         ConsistencySpreads();
@@ -63,6 +95,7 @@ static class Check
     static Run Drive(string modelId, float pace, float consistency, float safety, int laps, int seed, Action<StandInCar, AiPilot, AiPilot.Controls> watch = null)
     {
         CarSpec spec = CarSpec.For(modelId);
+        RacingLine line = LineFor(modelId);
         var pilot = new AiPilot(line, spec, pace, consistency, safety, seed);
         var car = new StandInCar(spec, line);
         GridSlot pole = circuit.Data.grid.slots[0];
@@ -97,6 +130,44 @@ static class Check
         run.Mistakes = pilot.Mistakes;
         if (run.Laps.Count < laps) run.Stuck = true;
         return run;
+    }
+
+    static void LineUsesWidth()
+    {
+        var problems = new List<string>();
+        int bends = 0;
+        foreach (CornerData corner in circuit.Data.corners)
+            foreach (ArcData arc in corner.arcs)
+            {
+                if (arc.e - arc.s < 20f) continue;
+                bends++;
+                int mid = circuit.IndexOf((arc.s + arc.e) * 0.5f);
+                // Inside of a right-hander (dir +1) is to the right, negative lateral.
+                if (line.Lateral[mid] * arc.dir > 0f)
+                    problems.Add($"turn {corner.number}: line is {Math.Abs(line.Lateral[mid]):0.0} m to the outside at the middle of the bend at {(arc.s + arc.e) * 0.5f:0} m");
+                float widest = float.MinValue;
+                for (float d = arc.s - 150f; d <= arc.s; d += circuit.Step)
+                {
+                    int k = circuit.IndexOf(d);
+                    widest = Math.Max(widest, line.Lateral[k] * arc.dir - (circuit.HalfWidth(k) - RacingLine.EdgeMargin));
+                }
+                bool runUp = circuit.Data.corners.SelectMany(c => c.arcs).All(o => o == arc || circuit.Ahead(o.e, arc.s) > 150f);
+                if (runUp && widest < -1f) problems.Add($"turn {corner.number}: line never reaches the outside before the bend at {arc.s:0} m ({-widest:0.0} m short)");
+            }
+        Report($"line uses the width ({bends} bends)", problems);
+    }
+
+    static void TuningHelps()
+    {
+        var problems = new List<string>();
+        foreach (string id in new[] { "f-01", "c-20", "a-29" })
+        {
+            float plain = new SpeedProfile(line, CarSpec.For(id), 1f).LapTime;
+            float tunedTime = LineFor(id).TunedLapTime;
+            if (tunedTime >= plain) problems.Add($"{id}: tuned {Time(tunedTime)} is not faster than {Time(plain)}");
+            else Console.WriteLine($"      {id}: {Time(plain)} on the minimum-curvature line, {Time(tunedTime)} tuned");
+        }
+        Report("tuning helps", problems);
     }
 
     static void CleanLaps()
@@ -152,6 +223,7 @@ static class Check
     static void Detail(string modelId)
     {
         int step = 0;
+        RacingLine line = LineFor(modelId);
         float safety = Environment.GetEnvironmentVariable("AI_SAFETY") is string sv ? float.Parse(sv) : 100f;
         Run r = Drive(modelId, 90f, 80f, safety, 6, 7, (car, pilot, c) =>
         {
