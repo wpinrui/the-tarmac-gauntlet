@@ -2,7 +2,7 @@
 
 namespace TarmacGauntlet.Simulation
 {
-    /// <summary>TS <c>AiTeamEntry</c> from simulation/aiTeamNames.ts. The roster itself is ported later.</summary>
+    /// <summary>TS <c>AiTeamEntry</c> from simulation/aiTeamNames.ts. The roster is in Data/AiTeamRoster.cs.</summary>
     public sealed record AiTeamEntry
     {
         public string Name { get; init; } = "";
