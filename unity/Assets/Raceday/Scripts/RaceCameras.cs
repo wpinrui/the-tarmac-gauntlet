@@ -2,7 +2,10 @@ using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
 {
-    /// <summary>C cycles the chase, bonnet and bumper views of the car, then the free camera. V moves to the next car.</summary>
+    /// <summary>
+    /// C cycles the chase, bonnet and bumper views of the car, then the free camera. V moves to the
+    /// next car, and P to the next car making a pit stop.
+    /// </summary>
     [RequireComponent(typeof(Camera))]
     public sealed class RaceCameras : MonoBehaviour
     {
@@ -35,13 +38,26 @@ namespace TarmacGauntlet.Raceday
                 Apply();
             }
             if (Keys != null && Keys.Pressed(KeyCode.V) && Cars != null && Cars.Length > 1)
+                Watch(Cars[(System.Array.IndexOf(Cars, Car) + 1) % Cars.Length]);
+            if (Keys != null && Keys.Pressed(KeyCode.P) && Cars != null)
             {
-                // Only the car being watched shows its speed and takes the driving keys.
-                if (Car != null) Car.InputEnabled = false;
-                Car = Cars[(System.Array.IndexOf(Cars, Car) + 1) % Cars.Length];
-                if (Hud != null) Hud.Car = Car;
-                Apply();
+                int from = System.Array.IndexOf(Cars, Car);
+                for (int i = 1; i <= Cars.Length; i++)
+                {
+                    CarController next = Cars[(from + i + Cars.Length) % Cars.Length];
+                    AiDriver d = next.GetComponent<AiDriver>();
+                    if (d != null && d.enabled && d.Pitting) { Watch(next); break; }
+                }
             }
+        }
+
+        private void Watch(CarController next)
+        {
+            // Only the car being watched shows its speed and takes the driving keys.
+            if (Car != null) Car.InputEnabled = false;
+            Car = next;
+            if (Hud != null) Hud.Car = Car;
+            Apply();
         }
 
         private void Apply()

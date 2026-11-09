@@ -99,6 +99,55 @@ namespace TarmacGauntlet.Raceday
             TunedLapTime = from.TunedLapTime;
         }
 
+        /// <summary>
+        /// A line at a fixed offset from the track centre (positive left), kept within the track:
+        /// a column of the formation behind the pace car.
+        /// </summary>
+        public RacingLine(Circuit circuit, float lateral)
+        {
+            Circuit = circuit;
+            Count = circuit.Count;
+            Lateral = new float[Count];
+            Point = new Vector3[Count];
+            Tangent = new Vector3[Count];
+            Curvature = new float[Count];
+            VerticalCurvature = new float[Count];
+            Grade = new float[Count];
+            Segment = new float[Count];
+            rawCurvature = new float[Count];
+            for (int k = 0; k < Count; k++)
+            {
+                float lim = Limit(k);
+                Lateral[k] = Mathf.Clamp(lateral, -lim, lim);
+            }
+            Rebuild();
+        }
+
+        /// <summary>
+        /// A path given point by point, one per track sample, which may leave the track: a pit route.
+        /// <see cref="Lateral"/> is each point's offset from the track centre.
+        /// </summary>
+        public RacingLine(Circuit circuit, Vector3[] points)
+        {
+            Circuit = circuit;
+            Count = circuit.Count;
+            Lateral = new float[Count];
+            Point = new Vector3[Count];
+            Tangent = new Vector3[Count];
+            Curvature = new float[Count];
+            VerticalCurvature = new float[Count];
+            Grade = new float[Count];
+            Segment = new float[Count];
+            rawCurvature = new float[Count];
+            for (int k = 0; k < Count; k++)
+            {
+                Point[k] = points[k];
+                Vector3 d = points[k] - circuit.Centre[k];
+                Lateral[k] = d.x * circuit.Left[k].x + d.z * circuit.Left[k].z;
+            }
+            Rebuild(0, Count - 1, false);
+        }
+
         /// <summary>Works out the line's points and shape from <see cref="Lateral"/>.</summary>
         private void Rebuild() => Rebuild(0, Count - 1);
 
@@ -106,11 +155,11 @@ namespace TarmacGauntlet.Raceday
         /// Works out the points and shape after the offsets from sample <c>from</c> to <c>to</c>
         /// changed: only that stretch, plus the neighbours its shape reaches, is redone.
         /// </summary>
-        private void Rebuild(int from, int to)
+        private void Rebuild(int from, int to, bool place = true)
         {
             Circuit c = Circuit;
             bool all = to - from >= Count - 1;
-            for (int i = from; i <= to; i++) { int k = c.Wrap(i); Point[k] = c.Surface(k, Lateral[k]); }
+            if (place) for (int i = from; i <= to; i++) { int k = c.Wrap(i); Point[k] = c.Surface(k, Lateral[k]); }
             int reach = all ? 0 : 8;
             for (int i = from - reach; i <= to + reach; i++)
             {

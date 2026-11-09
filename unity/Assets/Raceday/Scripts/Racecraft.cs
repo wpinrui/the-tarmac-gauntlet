@@ -124,6 +124,16 @@ namespace TarmacGauntlet.Raceday
             random = new System.Random(seed);
         }
 
+        /// <summary>
+        /// For a car not racing right now (formation, pit lane): it has no plan, so the others expect
+        /// it to carry on as it is going.
+        /// </summary>
+        public void Forget()
+        {
+            planAge = float.PositiveInfinity;
+            plan = new Path { Kind = Kind.Line };
+        }
+
         private struct Near
         {
             public TrafficCar Car;

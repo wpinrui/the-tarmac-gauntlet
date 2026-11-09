@@ -25,7 +25,7 @@ using System.Text.Json;
 using TarmacGauntlet.Raceday;
 using TarmacGauntlet.Simulation;
 
-static class Check
+static partial class Check
 {
     const float Dt = 0.01f;
     const float KerbWidth = 1.5f;
@@ -93,6 +93,27 @@ static class Check
             LapsAtHairpin();
             return failed ? 1 : 0;
         }
+        if (args.Length > 1 && args[1] == "running")
+        {
+            RaceRunning(verbose: true);
+            return failed ? 1 : 0;
+        }
+        if (args.Length > 1 && args[1] == "start")
+        {
+            RollingStartCheck(args.Length > 2 ? int.Parse(args[2]) : 100, verbose: true);
+            return failed ? 1 : 0;
+        }
+        if (args.Length > 1 && args[1] == "pits")
+        {
+            PitStopsCheck("pit stops", i => i % 2 == 1, verbose: true);
+            PitStopsCheck("crowded pits", i => true, verbose: true);
+            return failed ? 1 : 0;
+        }
+        if (args.Length > 1 && args[1] == "supplies")
+        {
+            SuppliesCheck(verbose: true);
+            return failed ? 1 : 0;
+        }
         if (args.Length > 1 && args[1] == "race")
         {
             RacePack(args.Length > 2 ? int.Parse(args[2]) : 4, verbose: true, reversed: Environment.GetEnvironmentVariable("AI_REVERSED") != null);
@@ -115,10 +136,10 @@ static class Check
         LapsAtHairpin();
         RacePack(4, verbose: false);
         RacePack(4, verbose: false, reversed: true);
+        RaceRunning(verbose: false);
         return failed ? 1 : 0;
     }
 
-    /// <summary>The pack from the raceday scene: fastest class at the front, mixed drivers.</summary>
     /// <summary>The field, quickest first, on the grid in that order or, reversed, quickest at the back.</summary>
     static List<Entry> Pack(bool reversed)
     {

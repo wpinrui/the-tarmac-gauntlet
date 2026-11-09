@@ -23,6 +23,13 @@ sealed class StandInCar
     public SurfaceKind Surface;
     /// <summary>Share of the normal drag, below 1 in another car's slipstream.</summary>
     public float DragScale = 1f;
+    /// <summary>Fuel, tyres and engine map, as CarController's, or null for endless.</summary>
+    public Consumables Supplies;
+    /// <summary>The pit lane limiter's speed while in the limiter zone, as CarController's.</summary>
+    public float SpeedLimit = float.PositiveInfinity;
+    public bool Hold;
+    /// <summary>The pit lane, so its surface counts as tarmac.</summary>
+    public PitLane Pits;
 
     float steer, shiftTimer, ax, ay;
     readonly float inertia;
@@ -64,6 +71,7 @@ sealed class StandInCar
     public void Step(float dt, float throttle, float brake, float steerTarget)
     {
         UpdateTrackPosition();
+        if (Hold) { throttle = 0f; brake = 1f; }
         Vector3 F = Forward, R = Right;
         float vLongCar = Vx * F.x + Vz * F.z;
         float speed = Speed;
@@ -74,6 +82,9 @@ sealed class StandInCar
         steer = Mathf.MoveTowards(steer, target, rate * dt);
 
         float drive = Engine(dt, vLongCar, throttle);
+        Supplies?.Burn(drive * vLongCar, dt);
+        float gripUsed = 0f;
+        int gripCount = 0;
 
         // Loads: weight split by the centre of mass, dips and crests, aero 40/60, load transfer.
         int li = line.Nearest(new Vector3(X, line.Point[Math.Max(TrackIndex, 0)].y, Z), -1 < TrackIndex ? TrackIndex : -1);
@@ -109,6 +120,7 @@ sealed class StandInCar
             float corner = Spec.Mass / 4f;
             SurfaceKind kind = WheelSurface(a, b);
             float cap = Spec.Grip * TrackSurface.Grip(kind) * load * (front ? 0.97f : 1.06f);
+            if (Supplies != null) cap *= Supplies.GripScale;
 
             float fy;
             if (Math.Abs(vLong) < 4f && Math.Abs(vLat) < 4f) fy = Mathf.Clamp(-vLat * corner * 8f, -cap, cap);
@@ -141,6 +153,7 @@ sealed class StandInCar
                 float total = (float)Math.Sqrt(fl * fl + fy * fy);
                 if (total > cap) { fl *= cap / total; fy *= cap / total; }
             }
+            if (cap > 1f) { gripUsed += Math.Min((fl * fl + fy * fy) / (cap * cap), 1f); gripCount++; }
             float wx = wfx * fl + wrx * fy, wz = wfz * fl + wrz * fy;
             fx += wx; fz += wz;
             torque += wx * (-a * F.x + b * R.x) + wz * (-a * F.z + b * R.z);
@@ -151,6 +164,7 @@ sealed class StandInCar
         float hill = Spec.Mass * G * line.Grade[li];
         fx -= t.x * hill; fz -= t.z * hill;
 
+        if (Supplies != null && gripCount > 0) Supplies.Scrub(speed * dt, (float)Math.Sqrt(gripUsed / gripCount));
         float accX = fx / Spec.Mass, accZ = fz / Spec.Mass;
         ax = accX * F.x + accZ * F.z;
         ay = accX * R.x + accZ * R.z;
@@ -171,11 +185,12 @@ sealed class StandInCar
             else if (Gear > 1 && wheelSpeed * Spec.Gears[Gear - 2] / Spec.Redline < 0.8f) { Gear--; shiftTimer = ShiftTime; }
         }
         if (shiftTimer > 0f) { shiftTimer -= dt; return 0f; }
-        if (throttle > 0f && x < 1f)
+        bool cut = (Supplies != null && Supplies.Empty) || along > SpeedLimit;
+        if (throttle > 0f && x < 1f && !cut)
         {
             float xe = Math.Max(x, 0.2f);
             float torque = Spec.PowerAt(xe) / (xe * Spec.Redline);
-            return throttle * torque * ratio / Spec.WheelRadius;
+            return throttle * torque * (Supplies != null ? Supplies.PowerScale : 1f) * ratio / Spec.WheelRadius;
         }
         float drag = 0.08f * Spec.PeakPower / Spec.Redline * ratio / Spec.WheelRadius * Mathf.Clamp01(x);
         return -Math.Sign(along) * drag;
@@ -195,6 +210,7 @@ sealed class StandInCar
         Vector3 c = circuit.Centre[TrackIndex];
         Lateral = (X - c.x) * circuit.Left[TrackIndex].x + (Z - c.z) * circuit.Left[TrackIndex].z;
         Surface = SurfaceAt(Lateral);
+        if (Surface != SurfaceKind.Tarmac && OnPitLane(new Vector3(X, 0f, Z))) Surface = SurfaceKind.Tarmac;
     }
 
     SurfaceKind WheelSurface(float a, float b)
@@ -203,7 +219,14 @@ sealed class StandInCar
         float wx = X + R.x * a + F.x * b, wz = Z + R.z * a + F.z * b;
         Vector3 c = circuit.Centre[TrackIndex];
         float lat = (wx - c.x) * circuit.Left[TrackIndex].x + (wz - c.z) * circuit.Left[TrackIndex].z;
-        return SurfaceAt(lat);
+        SurfaceKind kind = SurfaceAt(lat);
+        return kind != SurfaceKind.Tarmac && OnPitLane(new Vector3(wx, 0f, wz)) ? SurfaceKind.Tarmac : kind;
+    }
+
+    /// <summary>True on the pit lane surface, entry and exit roads included.</summary>
+    public bool OnPitLane(Vector3 p)
+    {
+        return Pits != null && TrackIndex >= 0 && Pits.OnLane(p, TrackIndex);
     }
 
     SurfaceKind SurfaceAt(float lateral)

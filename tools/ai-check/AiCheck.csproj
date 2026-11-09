@@ -9,7 +9,7 @@
     <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)../../out/ai-check/obj/</BaseIntermediateOutputPath>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Check.cs;Race.cs;StandInCar.cs;MoreStubs.cs;../circuit/geometry-check/UnityStubs.cs" />
+    <Compile Include="Check.cs;Race.cs;StandInCar.cs;Session.cs;RaceRunning.cs;MoreStubs.cs;../circuit/geometry-check/UnityStubs.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/Circuit.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/CircuitData.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/CarSpec.cs" />
@@ -18,6 +18,11 @@
     <Compile Include="../../unity/Assets/Raceday/Scripts/SpeedProfile.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/AiPilot.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/Racecraft.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Consumables.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/PitLane.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/PitPlan.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/RollingStart.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/AiRacer.cs" />
     <Compile Include="../../unity/Assets/Simulation/**/*.cs" />
   </ItemGroup>
 </Project>

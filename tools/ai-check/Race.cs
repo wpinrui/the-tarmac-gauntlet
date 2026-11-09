@@ -270,7 +270,7 @@ sealed class Race
     }
 
     /// <summary>Separating axis test of the two car boxes: the shortest way to push b out of a.</summary>
-    static bool Overlap(StandInCar a, StandInCar b, out float nx, out float nz, out float depth)
+    internal static bool Overlap(StandInCar a, StandInCar b, out float nx, out float nz, out float depth)
     {
         nx = nz = 0f;
         depth = float.MaxValue;
