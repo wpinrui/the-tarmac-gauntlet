@@ -4,7 +4,14 @@ Every 3D car is built this way. It needs no 3D model of the real car.
 
 ## Priorities
 Smooth, recognisable lines come first. That often means simpler geometry.
+Tiny details are left out to keep geometry simple and safe from defects.
 There is no triangle budget.
+Otherwise follow the reference.
+
+## Out of scope
+Liveries, sponsor decals and race numbers are not the modeller's job.
+Cars carry no number plates.
+Race cars get no street-legal lighting: no indicators, side repeaters or reversing lamps.
 
 ## 1. Start
 Each car has one locked real-car reference, listed in `car_roster.md`.
@@ -40,21 +47,20 @@ The bonnet crown narrows with the nose, so no beak forms at the centre.
 Lamps, grille slats and badges are raised parts lying on the panel.
 Trace every headlight and tail light outline closely from the reference. Never approximate a lamp shape.
 Lamp interiors are our own, not copied from the real car.
-Lamp parts and materials are named so the game can light them: `lamp_head`, `lamp_tail`, `lamp_brake`, `lamp_indicator`, `lamp_reverse`, `lamp_rain`.
-Indicators, side repeaters and a reversing lamp are open calls for Ivan.
+Lamp parts and materials are named so the game can light them: `lamp_head`, `lamp_tail`, `lamp_brake`, `lamp_rain`.
 The interior gets a firewall, a dash meeting it, seats, door cards and a mirror.
 Door mirrors get a separate recessed glass part.
 Every inner face uses an interior material.
 
-## 6. Brand, name and numbers
+## 6. Badge and name
 The brand badge from `src/renderer/assets/brands/<brand>/` goes on the front and rear.
 The model name goes on the car in the brand font, as letter outlines (glyphs.py).
-Placement of the badge, name, plate and race number are open calls for Ivan.
+Badge and name placement are open calls for Ivan.
 No real brand or sponsor graphics.
 
 ## 7. Show Ivan the direction first
 export.py builds the pieces with Blender's Python module (`pip install bpy`) and exports OBJ and MTL. It prints the triangle count for information only.
-publish.py writes the orbitable viewer with a wireframe toggle.
+publish.py writes the orbitable viewer with a wireframe toggle and a toggle for each lamp group.
 Publish the viewer as an Artifact and show Ivan at once.
 Run no checks until Ivan confirms the direction.
 
