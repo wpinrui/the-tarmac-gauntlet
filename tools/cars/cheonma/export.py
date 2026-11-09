@@ -433,6 +433,7 @@ def main():
         axes = dict(forward_axis="NEGATIVE_Z", up_axis="Y")
     bpy.ops.wm.obj_export(filepath=str(OUT / f"{NAME}.obj"), export_selected_objects=False,
                           export_materials=True, export_normals=True, export_uv=False,
+                          export_triangulated_mesh=True,
                           path_mode="RELATIVE", **axes)
     write_mtl(OUT / f"{NAME}.mtl")
 
