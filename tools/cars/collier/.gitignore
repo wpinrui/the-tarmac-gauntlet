@@ -1,0 +1,5 @@
+__pycache__/
+cams.json
+cams_*.json
+!cams_f.json
+sizes.json
