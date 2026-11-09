@@ -41,6 +41,11 @@ The circuit is built at runtime from `Assets/Raceday/Resources/Tracks/circuit.js
 `tools/circuit/generate.py` writes (`python3 tools/circuit/generate.py`, needs numpy). Change the
 layout there, never by hand in the JSON.
 
+After changing the generator or `CircuitBuilder`, run `bash tools/circuit/geometry-check/run.sh`
+(needs the .NET 8 SDK). It builds the circuit as the game does and checks that every surface lies
+over the ground, no surface edge stands more than 0.4 m off what is beside it, and every barrier
+reaches the ground. Merge only when all three rules say ok.
+
 Markings follow FIA Appendix O and race-director practice: white edge lines (part of the track),
 red and white kerbs outside them, a 15 m wide start straight through turn 1, 30 grid slots (white
 outline open at the back, yellow front-wheel line sticking out sideways), safety car lines, and a

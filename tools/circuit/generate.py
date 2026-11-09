@@ -104,15 +104,12 @@ def smoothstep(t):
     return t * t * (3 - 2 * t)
 
 
-def build_terrain(np, P, E, W, lane, garages, spacing=8.0, margin=700.0):
+def build_terrain(np, P, E, W, cross, lane, lane_d, step, garages, spacing=8.0, margin=700.0):
     """Ground heights on a regular grid. Flat with the track out to the runoff,
     then easing into rolling hills further away."""
     import base64
     pts = np.concatenate([P, np.array([[p[0], p[1]] for p in lane]),
                           np.array([[g['x'], g['z']] for g in garages])])
-    hs = np.concatenate([E, np.array([p[2] for p in lane]), np.array([g['y'] for g in garages])])
-    sub = pts[::2]
-    hsub = hs[::2]
     x0, z0 = pts[:, 0].min() - margin, pts[:, 1].min() - margin
     nx = int((pts[:, 0].max() + margin - x0) / spacing) + 1
     nz = int((pts[:, 1].max() + margin - z0) / spacing) + 1
@@ -120,23 +117,65 @@ def build_terrain(np, P, E, W, lane, garages, spacing=8.0, margin=700.0):
     gz = z0 + np.arange(nz) * spacing
     GX, GZ = np.meshgrid(gx, gz)
     flat = np.stack([GX.ravel(), GZ.ravel()], axis=1)
+    # Surfaces the ground has to follow: the track, a second stretch of track where the lap
+    # doubles back on itself (hairpins, parallel straights), the pit lane and the garages.
+    # Each one's height at a ground node is its own surface extended outwards at the runoff's
+    # 1.5% fall, measured at its nearest point (so a steep road does not drag the ground down
+    # from further along its own length). Between surfaces the ground blends from one to the
+    # other, weighted heavily towards the nearest, so it slopes like an embankment.
+    T = np.asarray(P)[:, :2]
+    TH = np.asarray(E)
+    CF = np.asarray(cross)
+    HALF = np.asarray(W) / 2
+    tg = np.roll(T, -1, axis=0) - np.roll(T, 1, axis=0)
+    tg /= np.linalg.norm(tg, axis=1)[:, None]
+    LEFT = np.stack([-tg[:, 1], tg[:, 0]], axis=1)
+    n_track = len(T)
+    L = np.array([[p[0], p[1]] for p in lane])
+    lk = (np.round(np.asarray(lane_d) / step).astype(int)) % n_track
+    LH = TH[lk] + CF[lk] * HALF[lk]          # the lane is level with the track's left edge
+    lane_half = PIT_LANE / 2 + 1.2
+    G = np.array([[g['x'], g['z']] for g in garages])
+    GH = np.array([g['y'] for g in garages])
+    garage_half = 12.0     # reaches the garage corners
+    fall = 0.015
+
+    def track_plane(c, k):
+        lat = ((c - T[k]) * LEFT[k]).sum(axis=1)
+        half = HALF[k]
+        return (TH[k] + CF[k] * np.clip(lat, -half, half) - fall * np.clip(np.abs(lat) - half, 0, None),
+                np.sqrt(((c - T[k]) ** 2).sum(axis=1)) - half)
+
     near_d = np.empty(len(flat))
     near_h = np.empty(len(flat))
     far = np.empty(len(flat))
-    for i in range(0, len(flat), 4096):
-        c = flat[i:i + 4096]
-        d2 = ((c[:, None, :] - sub[None, :, :]) ** 2).sum(axis=2)
-        k = d2.argmin(axis=1)
-        near_d[i:i + 4096] = np.sqrt(d2[np.arange(len(c)), k])
-        # Blend the heights of nearby track, lane and garage points so the ground has no steps
-        # where surfaces at different heights sit side by side.
-        # A soft minimum, so the ground tucks under the lower of two surfaces side by side.
-        g = np.exp(-d2 / (2 * 12.0 ** 2))
-        lo_h = hsub.min()
-        soft = lo_h - 0.6 * np.log((g * np.exp(-(hsub[None, :] - lo_h) / 0.6)).sum(axis=1) / (g.sum(axis=1) + 1e-300) + 1e-300)
-        near_h[i:i + 4096] = np.where(g.sum(axis=1) > 1e-6, soft, hsub[k])
-        w = 1.0 / (d2 + 150.0 ** 2)
-        far[i:i + 4096] = (w * hsub[None, :]).sum(axis=1) / w.sum(axis=1)
+    for i in range(0, len(flat), 2048):
+        c = flat[i:i + 2048]
+        rows = np.arange(len(c))
+        cands = []
+        dt2 = ((c[:, None, :] - T[None, :, :]) ** 2).sum(axis=2)
+        k1 = dt2.argmin(axis=1)
+        cands.append(track_plane(c, k1))
+        gap = np.abs(np.arange(n_track)[None, :] - k1[:, None])
+        gap = np.minimum(gap, n_track - gap)
+        k2 = np.where(gap > 50, dt2, np.inf).argmin(axis=1)
+        cands.append(track_plane(c, k2))
+        for S, SH, half in ((L, LH, lane_half), (G, GH, garage_half)):
+            d2 = ((c[:, None, :] - S[None, :, :]) ** 2).sum(axis=2)
+            k = d2.argmin(axis=1)
+            beyond = np.sqrt(d2[rows, k]) - half
+            cands.append((SH[k] - fall * np.clip(beyond, 0, None), beyond))
+        H = np.stack([q[0] for q in cands], axis=1)
+        B = np.stack([q[1] for q in cands], axis=1)
+        near_d[i:i + 2048] = np.sqrt(dt2[rows, k1])
+        w = 1.0 / (np.clip(B, 0, None) + 1.0) ** 4
+        blend = (w * H).sum(axis=1) / w.sum(axis=1)
+        # Never above the edge of a road within a grid cell of it, so no ground shows through it
+        # or its verge.
+        close = np.where(B < 10.0, H + fall * np.clip(B, 0, None), np.inf).min(axis=1)
+        near_h[i:i + 2048] = np.minimum(blend, close)
+        wf = 1.0 / (dt2[:, ::2] + 150.0 ** 2)
+        far[i:i + 2048] = (wf * TH[None, ::2]).sum(axis=1) / wf.sum(axis=1)
     flat_zone = 60.0
     blend = np.clip((near_d - flat_zone) / 220.0, 0, 1)
     blend = blend * blend * (3 - 2 * blend)
@@ -144,9 +183,9 @@ def build_terrain(np, P, E, W, lane, garages, spacing=8.0, margin=700.0):
              + 5 * np.sin(flat[:, 0] / 97 - flat[:, 1] / 131 + 2.1)
              + 3 * np.cos(flat[:, 0] / 53 + flat[:, 1] / 71))
     reach = np.clip((near_d - flat_zone) / 600.0, 0, 1)
-    # Close to the track the ground sits just under the runoff, which falls 1.5% away from the edge,
-    # so any gap between surfaces shows as a shallow dip rather than a trench.
-    under = near_h - 0.5 - 0.015 * np.clip(near_d - 6.0, 0, None)
+    # Close to the track the ground sits just under the road and runoff planes. Runoff and
+    # barriers are laid on the ground itself, so they follow it wherever it blends.
+    under = near_h - 0.15
     h = under * (1 - blend) + (far + hills * (0.4 + 1.6 * reach)) * blend
     lo = float(h.min()) - 1.0
     q = np.clip(np.round((h - lo) * 100), 0, 65535).astype('<u2')
@@ -330,7 +369,10 @@ def main():
             i += 1
         p, q, r = line[i], line[min(i + 1, len(line) - 1)], line[max(i - 1, 0)]
         heading = math.degrees(math.atan2(q[0] - r[0], q[1] - r[1]))
-        garages.append({'x': round(p[0], 2), 'z': round(p[1], 2), 'y': round(p[2], 2), 'heading': round(heading, 2)})
+        # Garage floors are level with the pit lane, which is level with the track's left edge.
+        kg = int(round((garages_s + i * 1.0) / step)) % n
+        floor_y = E[kg] + cross[kg] * width[kg] / 2
+        garages.append({'x': round(p[0], 2), 'z': round(p[1], 2), 'y': round(floor_y, 2), 'heading': round(heading, 2)})
 
     # --- Clearance: how far each side can spread before meeting another part of
     # the circuit (another stretch of track, the pit lane or the garages).
@@ -370,7 +412,7 @@ def main():
     for side in ('left', 'right'):
         clear[side] = np.minimum(clear[side], 400.0)
 
-    terrain = build_terrain(np, P, np.array(E), W, lane, garages)
+    terrain = build_terrain(np, P, np.array(E), W, cross, lane, lane_d, step, garages)
 
     def r2(v):
         return round(v, 3)

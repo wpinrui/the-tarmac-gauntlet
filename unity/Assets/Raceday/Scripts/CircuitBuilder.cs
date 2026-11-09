@@ -99,6 +99,18 @@ namespace TarmacGauntlet.Raceday
 
         public List<CircuitPart> Build()
         {
+            // Lay everything, sink the ground wherever it pokes through, then lay it all again on the sunk
+            // ground so the cover's edges come down with it.
+            Lay();
+            SinkUnderCover();
+            parts.Clear();
+            Lay();
+            Ground();
+            return parts;
+        }
+
+        private void Lay()
+        {
             Road();
             EdgeLines();
             Kerbs();
@@ -109,8 +121,6 @@ namespace TarmacGauntlet.Raceday
             Garages();
             LinesAcross();
             Grid();
-            Ground();
-            return parts;
         }
 
         // ---------------------------------------------------------------- planning
@@ -283,15 +293,18 @@ namespace TarmacGauntlet.Raceday
                 foreach (List<int> run in Runs(k => !open[side][k]))
                 {
                     verge.Strip(Rows(run, k => Across(sign, c.HalfWidth(k), c.HalfWidth(k) + Verge), 0f, true), 2f, 2f);
-                    grass.Strip(Rows(run, k => Across(sign, c.HalfWidth(k) + Verge, c.HalfWidth(k) + barrier[side][k]), 0f, true), 6f, 6f);
+                    // Grass starts where any gravel ends, so the two never lie on top of each other.
+                    StripAny(grass, Rows(run, k => AcrossSteps(sign, c.HalfWidth(k) + (HasGravel(side, k) ? gravel[side][k] : Verge), c.HalfWidth(k) + barrier[side][k]), 0f, true), 6f);
                 }
-                foreach (List<int> run in Runs(k => !open[side][k] && gravel[side][k] > Verge + 1f))
-                    grav.Strip(Rows(run, k => Across(sign, c.HalfWidth(k) + Verge, c.HalfWidth(k) + gravel[side][k]), 0.03f, true), 3f, 3f);
+                foreach (List<int> run in Runs(k => !open[side][k] && HasGravel(side, k)))
+                    StripAny(grav, Rows(run, k => AcrossSteps(sign, c.HalfWidth(k) + Verge, c.HalfWidth(k) + gravel[side][k]), 0.03f, true), 3f);
             }
             Emit("Verges", verge, m?.Verge, true);
             Emit("Grass runoff", grass, m?.Grass, true);
             Emit("Gravel traps", grav, m?.Gravel, true);
         }
+
+        private bool HasGravel(int side, int k) => gravel[side][k] > Verge + 1f;
 
         private void Barriers()
         {
@@ -399,26 +412,26 @@ namespace TarmacGauntlet.Raceday
             Emit("Pit lane", surface, m?.PitAsphalt, true);
 
             // Grass between the pit wall and the track, laid from the lane's side so it never
-            // folds where the track bends hard. The track's own runoff sits just above it.
+            // folds where the track bends hard, on the ground just under the track's own runoff.
             var fill = new MeshKit();
             float wallOut = -laneHalf - LaneWiden - 0.6f;
             foreach (List<int> run in LaneRuns(i => !joining[LaneTrackIndex(i)] && laneToTrack[i] - Verge > 1.6f))
             {
                 var band = new List<Vector3[]>();
-                var edge = new List<Vector3[]>();
                 foreach (int i in run)
                 {
                     float w = Mathf.Min(laneToTrack[i] - Verge - 0.6f, 40f);
-                    Vector3 a = LanePoint(i, wallOut, -0.06f);
-                    // Ramp from the lane's level to the track's verge so the two grass areas meet.
-                    Vector3 b = LanePoint(i, wallOut - w, 0);
-                    int k = laneNearest[i];
-                    b.y = c.Surface(k, Mathf.Sign(Vector3.Dot(b - c.Centre[k], c.Left[k])) * c.HalfWidth(k)).y - Verge * RunoffFall - 0.06f;
-                    band.Add(new[] { a, b });
-                    edge.Add(new[] { b, b + Vector3.down * Skirt });
+                    int cols = Mathf.Max(2, Mathf.CeilToInt(w / 1f) + 1);
+                    var row = new Vector3[cols];
+                    for (int j = 0; j < cols; j++)
+                    {
+                        Vector3 q = LanePoint(i, wallOut - w * j / (cols - 1), 0);
+                        q.y = Drape(q.x, q.z) - 0.01f;
+                        row[j] = q;
+                    }
+                    band.Add(row);
                 }
-                fill.Strip(band, 6f, 6f);
-                fill.Strip(edge, 6f, 6f, true);
+                StripAny(fill, band, 6f);
             }
             Emit("Pit lane infield", fill, m?.Grass, true);
 
@@ -675,6 +688,7 @@ namespace TarmacGauntlet.Raceday
 
         private void Ground()
         {
+            SinkUnderCover();
             GroundData t = c.Data.terrain;
             var rows = new List<Vector3[]>(t.countZ);
             for (int z = 0; z < t.countZ; z++)
@@ -689,11 +703,104 @@ namespace TarmacGauntlet.Raceday
             Emit("Ground", kit, m?.Terrain, true);
         }
 
+        private static readonly HashSet<string> Standing = new HashSet<string> { "Armco", "Tyre walls", "Pit wall", "Pit entry bollard" };
+
+        /// <summary>
+        /// Lowers the ground wherever it would poke through something laid on it. Draped runoff follows the
+        /// ground only as finely as its own grid, so on a sharp fold the ground can rise between its points.
+        /// </summary>
+        private void SinkUnderCover()
+        {
+            GroundData t = c.Data.terrain;
+            const float clearance = 0.03f;
+            var samples = new List<Vector3>();
+            foreach (CircuitPart part in parts)
+            {
+                if (!part.Solid || Standing.Contains(part.Name)) continue;
+                IReadOnlyList<Vector3> v = part.Kit.Vertices;
+                IReadOnlyList<int> tri = part.Kit.Triangles;
+                for (int i = 0; i < tri.Count; i += 3)
+                {
+                    Vector3 a = v[tri[i]], b = v[tri[i + 1]], d = v[tri[i + 2]];
+                    Vector3 normal = Vector3.Cross(b - a, d - a);
+                    if (normal.sqrMagnitude < 1e-10f || normal.y < 0.5f * normal.magnitude) continue;
+                    samples.Add(a); samples.Add(b); samples.Add(d);
+                    samples.Add((a + b) * 0.5f); samples.Add((b + d) * 0.5f); samples.Add((d + a) * 0.5f);
+                    samples.Add((a + b + d) / 3f);
+                }
+            }
+            for (int pass = 0; pass < 6; pass++)
+            {
+                bool moved = false;
+                foreach (Vector3 p in samples)
+                {
+                    float fx = (p.x - t.originX) / t.spacing, fz = (p.z - t.originZ) / t.spacing;
+                    if (fx < 0 || fz < 0 || fx >= t.countX - 1 || fz >= t.countZ - 1) continue;
+                    int ix = (int)fx, iz = (int)fz;
+                    float over = c.TerrainHeight(p.x, p.z) - (p.y - clearance);
+                    if (over <= 0f) continue;
+                    // The cell's two triangles share the (x+1, z) to (x, z+1) diagonal.
+                    bool first = fx - ix + fz - iz <= 1f;
+                    c.LowerTerrainAt(ix + 1, iz, over);
+                    c.LowerTerrainAt(ix, iz + 1, over);
+                    c.LowerTerrainAt(first ? ix : ix + 1, first ? iz : iz + 1, over);
+                    moved = true;
+                }
+                if (!moved) break;
+            }
+        }
+
         // ---------------------------------------------------------------- helpers
 
         /// <summary>Lateral offsets for a band between two distances from the centre, ordered left to right.</summary>
         private static float[] Across(float sign, float a, float b) =>
             sign > 0 ? new[] { Mathf.Max(a, b), Mathf.Min(a, b) } : new[] { -Mathf.Min(a, b), -Mathf.Max(a, b) };
+
+        /// <summary>Like <see cref="Across"/>, with extra columns every 4 m or less so the band can follow the ground.</summary>
+        private static float[] AcrossSteps(float sign, float a, float b)
+        {
+            int cols = Mathf.Max(2, Mathf.CeilToInt(Mathf.Abs(b - a) / 1f) + 1);
+            var lats = new float[cols];
+            float lo = Mathf.Min(a, b), hi = Mathf.Max(a, b);
+            for (int j = 0; j < cols; j++)
+            {
+                float t = j / (float)(cols - 1);
+                // Ordered left to right: outermost first on the left side, innermost first on the right.
+                lats[j] = sign > 0 ? hi - (hi - lo) * t : -(lo + (hi - lo) * t);
+            }
+            return lats;
+        }
+
+        /// <summary>A strip whose rows may have different column counts: runs of equal rows go in whole,
+        /// and where the count changes the two rows are resampled to match.</summary>
+        private static void StripAny(MeshKit kit, List<Vector3[]> rows, float tile)
+        {
+            int from = 0;
+            for (int r = 1; r <= rows.Count; r++)
+            {
+                if (r < rows.Count && rows[r].Length == rows[from].Length) continue;
+                if (r - from > 1) kit.Strip(rows.GetRange(from, r - from), tile, tile);
+                if (r < rows.Count)
+                {
+                    int cols = Mathf.Max(rows[r - 1].Length, rows[r].Length);
+                    kit.Strip(new List<Vector3[]> { Spread(rows[r - 1], cols), Spread(rows[r], cols) }, tile, tile);
+                }
+                from = r;
+            }
+        }
+
+        private static Vector3[] Spread(Vector3[] row, int cols)
+        {
+            if (row.Length == cols) return row;
+            var o = new Vector3[cols];
+            for (int j = 0; j < cols; j++)
+            {
+                float f = j / (float)(cols - 1) * (row.Length - 1);
+                int i = Mathf.Min((int)f, row.Length - 2);
+                o[j] = Vector3.Lerp(row[i], row[i + 1], f - i);
+            }
+            return o;
+        }
 
         /// <summary>Rows of surface points at the given lateral offsets (left positive, ordered left to right).</summary>
         private List<Vector3[]> Rows(List<int> ks, Func<int, float[]> lats, float lift, bool runoff = false)
@@ -721,17 +828,25 @@ namespace TarmacGauntlet.Raceday
             return rows;
         }
 
-        /// <summary>The ground beside the road: level with the edge, then falling gently outwards.</summary>
+        /// <summary>
+        /// The ground beside the road: the verge carries on from the road edge, falling gently
+        /// outwards; past the verge, runoff and barriers lie on the ground itself.
+        /// </summary>
         private Vector3 Point(int k, float lateral, float lift, bool runoff)
         {
             Vector3 p = c.Surface(k, lateral);
             if (runoff)
             {
                 float beyond = Mathf.Abs(lateral) - c.HalfWidth(k);
-                if (beyond > 0) p.y -= beyond * RunoffFall;
+                if (beyond > Verge + 0.01f) p.y = Drape(p.x, p.z);
+                else if (beyond > 0) p.y -= beyond * RunoffFall;
             }
             return p + Vector3.up * lift;
         }
+
+        /// <summary>Height to lay runoff at: just over the ground. Where the ground folds up between
+        /// the runoff's points, <see cref="SinkUnderCover"/> lowers it afterwards.</summary>
+        private float Drape(float x, float z) => c.TerrainHeight(x, z) + 0.03f;
 
         /// <summary>Sample indices from one lap distance to another, going forwards.</summary>
         private IEnumerable<int> Span(float from, float to)
