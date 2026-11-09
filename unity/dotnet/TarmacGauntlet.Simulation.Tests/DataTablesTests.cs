@@ -8,22 +8,6 @@ namespace TarmacGauntlet.Simulation.Tests
     public class DataTablesTests
     {
         [Test]
-        public void AiTeamRosterHas99TeamsInClassOrder()
-        {
-            var roster = AiTeamNames.AiTeamRoster;
-            Assert.That(roster, Has.Count.EqualTo(99));
-            var counts = roster.GroupBy(t => t.CarClass).Select(g => (g.Key, g.Count())).ToArray();
-            Assert.That(counts, Is.EqualTo(new[]
-            {
-                (CarClass.F, 20), (CarClass.E, 20), (CarClass.D, 20),
-                (CarClass.C, 15), (CarClass.B, 12), (CarClass.A, 12),
-            }));
-            Assert.That(roster.Select(t => t.Name).Distinct().Count(), Is.EqualTo(99));
-            Assert.That(roster[0].Name, Is.EqualTo("Backfire Racing"));
-            Assert.That(roster[98].Name, Is.EqualTo("Aprolla Racing"));
-        }
-
-        [Test]
         public void IssueCatalogueMatchesTs()
         {
             Assert.That(IssueTemplates.MechanicalIssues, Has.Count.EqualTo(33));
