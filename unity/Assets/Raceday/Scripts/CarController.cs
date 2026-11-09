@@ -23,6 +23,9 @@ namespace TarmacGauntlet.Raceday
         /// <summary>When false (free camera), the driving keys are ignored.</summary>
         public bool InputEnabled = true;
 
+        /// <summary>When true, an AI driver sets the pedals and steering through <see cref="SetControls"/> and the driving keys are ignored.</summary>
+        public bool AiDriving;
+
         public bool Automatic { get; private set; } = true;
         public bool SteeringHelp { get; private set; } = true;
         public bool Crashed { get; private set; }
@@ -30,11 +33,15 @@ namespace TarmacGauntlet.Raceday
         public int Gear { get; private set; } = 1;
         public float Speed { get; private set; }
         public float EngineFraction { get; private set; }
+        public Vector3 Velocity => body.GetPointVelocity(body.worldCenterOfMass);
+        /// <summary>Turn rate about the car's up axis, rad/s, positive turning right.</summary>
+        public float YawRate => Vector3.Dot(body.angularVelocity, transform.up);
 
         private Rigidbody body;
         private readonly Wheel[] wheels = new Wheel[4];
         private readonly Dictionary<Collider, SurfaceKind> surfaces = new Dictionary<Collider, SurfaceKind>();
         private float throttle, brake, steerInput, steer;
+        private float aiThrottle, aiBrake, aiSteer;
         private float shiftTimer, reverseTimer;
 
         private sealed class Wheel
@@ -75,9 +82,20 @@ namespace TarmacGauntlet.Raceday
 
         // ---------------------------------------------------------------- input
 
+        /// <summary>
+        /// Pedals from 0 to 1 and a front wheel angle in radians, positive to the right. The wheels
+        /// turn towards that angle at the same rate as they do for a player.
+        /// </summary>
+        public void SetControls(float throttleIn, float brakeIn, float steerAngle)
+        {
+            aiThrottle = Mathf.Clamp01(throttleIn);
+            aiBrake = Mathf.Clamp01(brakeIn);
+            aiSteer = Mathf.Clamp(steerAngle, -Spec.SteerLock, Spec.SteerLock);
+        }
+
         private void Update()
         {
-            if (Spec == null || Keys == null) return;
+            if (Spec == null || Keys == null || AiDriving) return;
             bool on = InputEnabled && !Crashed;
             float left = on && Keys.Held(KeyCode.LeftArrow) ? 1f : 0f;
             float right = on && Keys.Held(KeyCode.RightArrow) ? 1f : 0f;
@@ -126,14 +144,20 @@ namespace TarmacGauntlet.Raceday
             Gear = next;
         }
 
-        private Vector3 Velocity => body.GetPointVelocity(body.worldCenterOfMass);
-
         // ---------------------------------------------------------------- physics
 
         private void FixedUpdate()
         {
             if (Spec == null) return;
             float dt = Time.fixedDeltaTime;
+            if (AiDriving)
+            {
+                // The AI drives forwards in automatic, with its pedals set this step.
+                if (Gear == 0) Gear = 1;
+                Automatic = true;
+                throttle = Crashed ? 0f : aiThrottle;
+                brake = Crashed ? 1f : aiBrake;
+            }
             Vector3 v = Velocity;
             float speed = v.magnitude;
             Speed = speed;
@@ -162,7 +186,7 @@ namespace TarmacGauntlet.Raceday
         private void UpdateSteering(float dt, float speed)
         {
             float limit = Spec.SteerLock;
-            if (SteeringHelp && speed > 5f)
+            if (SteeringHelp && !AiDriving && speed > 5f)
             {
                 // Limit lock to roughly what the tyres can use at this speed, plus the peak slip angle.
                 float down = 0.5f * CarSpec.AirDensity * Spec.LiftArea * speed * speed;
@@ -170,7 +194,7 @@ namespace TarmacGauntlet.Raceday
                 float radius = speed * speed / lateral;
                 limit = Mathf.Min(limit, Mathf.Atan(2f * Spec.HalfWheelbase / radius) + Spec.PeakSlip * 0.8f);
             }
-            float target = steerInput * limit;
+            float target = AiDriving ? Mathf.Clamp(aiSteer, -limit, limit) : steerInput * limit;
             float rate = (Mathf.Abs(target) < Mathf.Abs(steer) || target * steer < 0f ? 3f : 1.3f) * Spec.SteerLock;
             steer = Mathf.MoveTowards(steer, target, rate * dt);
         }

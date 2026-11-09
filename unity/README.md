@@ -22,8 +22,22 @@ compiles in Unity.
 
 ## Raceday scene
 
-`Assets/Raceday/Raceday.unity` opens when the editor starts. Press Play to drive the Seorak
-Cheonma CX-24Si from pole.
+`Assets/Raceday/Raceday.unity` opens when the editor starts. Press Play and the AI drives the Seorak
+Cheonma CX-24Si from pole. `I` hands the car to you, and pressing it again hands it back.
+
+AI driver (`AiDriver` on the car): Pace, Consistency and Safety (0 to 100) can be changed in the
+inspector during Play. Pace sets how much of the car's grip and braking it uses (86% at 0, 98% at 100),
+Consistency how much its corner speeds wander from lap to lap, and Safety how often it overcooks a
+corner. It follows a racing line (`RacingLine.cs`, the smoothest path between the track edges) at a
+target speed for every 2 m sample (`SpeedProfile.cs`, from the car's grip, downforce, engine and
+brakes). After a hard crash, or when stuck or spun, it puts the car back on track itself. The console
+shows its predicted lap time and each lap it drives.
+
+After changing the AI or the car physics, run `bash tools/ai-check/run.sh` (needs the .NET 8 SDK). It
+drives the AI in a flat stand-in for `CarController` and checks that every car model laps without
+leaving the track and within 5% of its predicted time, that Pace, Consistency and Safety do what they
+say, and that overcooked corners cost time. `StandInCar.cs` copies `CarController`'s formulas, so keep
+it in step when those change.
 
 Driving: left and right arrows steer, up accelerates, down brakes (hold it at a standstill to
 reverse). `M` toggles automatic and manual; `A` and `Z` shift up and down and also switch to manual. The

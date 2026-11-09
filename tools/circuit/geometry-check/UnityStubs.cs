@@ -48,6 +48,10 @@ namespace UnityEngine
         public static float Lerp(float a, float b, float t) => a + (b - a) * Clamp01(t);
         public static float Sin(float v) => (float)Math.Sin(v); public static float Asin(float v) => (float)Math.Asin(v); public static float Cos(float v) => (float)Math.Cos(v);
         public static float DeltaAngle(float a, float b) { float d = Repeat(b - a, 360); if (d > 180) d -= 360; return d; }
+        public const float Rad2Deg = (float)(180 / Math.PI);
+        public static float Atan(float v) => (float)Math.Atan(v); public static float Atan2(float y, float x) => (float)Math.Atan2(y, x);
+        public static float Pow(float a, float b) => (float)Math.Pow(a, b); public static float Exp(float v) => (float)Math.Exp(v);
+        public static float MoveTowards(float c, float t, float d) => Math.Abs(t - c) <= d ? t : c + Math.Sign(t - c) * d;
     }
     public class Material { }
     public class TextAsset { public string text; }
