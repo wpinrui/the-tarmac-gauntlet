@@ -7,7 +7,8 @@ namespace TarmacGauntlet.Raceday
     /// A car in the race as the others see it: how far it has gone, where it sits across the track
     /// and how fast it is going. Every car on track has one, the player's too, so AI drivers race
     /// all of them. Once per physics step the cars are brought up to date together, into
-    /// <see cref="Field"/>, and each gets the slipstream of the cars ahead of it.
+    /// <see cref="Field"/>, and each car on physics gets the slipstream of the cars ahead of it.
+    /// A gliding car is read from its pilot, which knows exactly where it is on its path.
     /// </summary>
     [DefaultExecutionOrder(-20)]   // before the AI drivers think
     [RequireComponent(typeof(CarController))]
@@ -15,8 +16,9 @@ namespace TarmacGauntlet.Raceday
     {
         private const float G = 9.81f;
 
-        /// <summary>Every car, as of this physics step.</summary>
-        public static readonly List<TrafficCar> Field = new List<TrafficCar>();
+        /// <summary>Every car, as of this physics step, in lap order.</summary>
+        public static readonly TrafficField Field = new TrafficField();
+        private static readonly List<TrafficCar> all = new List<TrafficCar>();
         private static readonly List<RaceCar> cars = new List<RaceCar>();
         private static float updated = -1f;
         private static int nextId;
@@ -48,10 +50,12 @@ namespace TarmacGauntlet.Raceday
         {
             if (updated == Time.fixedTime) return;
             updated = Time.fixedTime;
-            Field.Clear();
+            all.Clear();
             foreach (RaceCar r in cars) r.Measure();
-            foreach (RaceCar r in cars) Field.Add(r.Traffic);
-            foreach (RaceCar r in cars) r.car.DragScale = Racecraft.Slipstream(r.car.Circuit, r.Traffic, Field);
+            foreach (RaceCar r in cars) all.Add(r.Traffic);
+            if (cars.Count > 0) Field.Set(all, cars[0].car.Circuit.Lap);
+            foreach (RaceCar r in cars)
+                if (!r.car.Asleep) r.car.DragScale = Racecraft.Slipstream(r.car.Circuit, r.Traffic, all);
         }
 
         /// <summary>Finds the car on the lap, counts the laps, and fills in <see cref="Traffic"/>.</summary>
@@ -59,28 +63,45 @@ namespace TarmacGauntlet.Raceday
         {
             Circuit c = car.Circuit;
             if (driver == null) driver = GetComponent<AiDriver>();
+            AiPilot pilot = driver != null ? driver.Pilot : null;
+            if (pilot != null && pilot.Gliding)
+            {
+                int g = pilot.Index;
+                Count(c, g);
+                Traffic = Describe(pilot, Laps * c.Lap + pilot.GlideDistance, pilot.GlideLateral, pilot.GlideSpeed);
+                return;
+            }
             Vector3 p = transform.position;
             int k = Nearest(c, p);
-            if (index < 0) Laps = k * c.Step > c.Lap * 0.5f ? -1 : 0;   // on the grid, behind the line
-            else if (index > c.Count - 50 && k < 50) Laps++;
-            else if (index < 50 && k > c.Count - 50) Laps--;
-            index = k;
+            Count(c, k);
 
             Vector3 d = p - c.Centre[k];
             Vector3 f = c.Forward[k];
             Vector3 v = car.Velocity;
-            AiPilot pilot = driver != null ? driver.Pilot : null;
-            Traffic = new TrafficCar
-            {
-                Id = id,
-                Distance = Laps * c.Lap + k * c.Step,
-                Lateral = d.x * c.Left[k].x + d.z * c.Left[k].z,
-                Speed = v.x * f.x + v.z * f.z,
-                LapPace = pilot != null ? pilot.Profile.LapTime : 0f,
-                Braking = car.Spec.BrakeDecel * G * AiPilot.LimitFor(pilot != null ? pilot.Pace : 100f),
-                GivingWay = driver != null && driver.enabled && driver.Craft != null && driver.Craft.State == Racecraft.Mode.GivingWay,
-            };
+            // Between samples too, so gaps don't jump in 2 m steps.
+            Traffic = Describe(pilot, Laps * c.Lap + k * c.Step + d.x * f.x + d.z * f.z,
+                d.x * c.Left[k].x + d.z * c.Left[k].z, v.x * f.x + v.z * f.z);
         }
+
+        /// <summary>Counts the laps as the car moves to sample k.</summary>
+        private void Count(Circuit c, int k)
+        {
+            if (index < 0) Laps = k * c.Step > c.Lap * 0.5f ? -1 : 0;   // on the grid, behind the line
+            else if (index > c.Count - 50 && k < 50) Laps++;
+            else if (index < 50 && k > c.Count - 50) Laps--;
+            index = k;
+        }
+
+        private TrafficCar Describe(AiPilot pilot, float distance, float lateral, float speed) => new TrafficCar
+        {
+            Id = id,
+            Distance = distance,
+            Lateral = lateral,
+            Speed = speed,
+            LapPace = pilot != null ? pilot.Profile.LapTime : 0f,
+            Braking = car.Spec.BrakeDecel * G * AiPilot.LimitFor(pilot != null ? pilot.Pace : 100f),
+            GivingWay = driver != null && driver.enabled && driver.Craft != null && driver.Craft.State == Racecraft.Mode.GivingWay,
+        };
 
         /// <summary>The centre line sample nearest the car, searching near the last one, or the whole lap after a reset.</summary>
         private int Nearest(Circuit c, Vector3 p)

@@ -5,12 +5,15 @@ namespace TarmacGauntlet.Raceday
     /// <summary>
     /// Builds the circuit, the sun, a grid of AI cars from every class and the cameras when the scene
     /// starts, and the race begins. I hands the car on pole to you and back. V moves the cameras to
-    /// the next car.
+    /// the next car. F steps the race through normal speed, 4x and 16x while the AI drives your car.
+    /// Cars away from the camera glide without physics (<see cref="PhysicsRange"/>).
     /// </summary>
     public sealed class CircuitScene : MonoBehaviour
     {
         private KeyboardState keys;
         private AiDriver ai;
+        private static readonly float[] Speeds = { 1f, 4f, 16f };
+        private int speed;
 
         private const string PlayerCar = "a-29";
         private const string PlayerModel = "Assets/Art/Vehicles/CheonmaCX24Si/CheonmaCX24Si.obj";
@@ -51,6 +54,7 @@ namespace TarmacGauntlet.Raceday
             var line = new RacingLine(circuit);
             var rng = new System.Random(11);
             var cars = new CarController[Field.Length];
+            var drivers = new AiDriver[Field.Length];
             for (int i = 0; i < Field.Length; i++)
             {
                 bool player = i == 0;
@@ -69,13 +73,27 @@ namespace TarmacGauntlet.Raceday
                 driver.Safety = 80f + 20f * (float)rng.NextDouble();
                 if (player) ai = driver;
                 cars[i] = car;
+                drivers[i] = driver;
             }
+            PhysicsRange range = new GameObject("Physics range").AddComponent<PhysicsRange>();
+            range.Drivers = drivers;
+            range.Player = cars[0];
             Camera(circuit, cars, keys);
         }
 
         private void Update()
         {
-            if (keys != null && ai != null && keys.Pressed(KeyCode.I)) ai.enabled = !ai.enabled;
+            if (keys == null || ai == null) return;
+            if (keys.Pressed(KeyCode.I)) ai.enabled = !ai.enabled;
+            if (keys.Pressed(KeyCode.F)) speed = (speed + 1) % Speeds.Length;
+            // Fast forward is for watching: taking the wheel drops back to normal speed.
+            if (!ai.enabled) speed = 0;
+            if (Time.timeScale != Speeds[speed])
+            {
+                Time.timeScale = Speeds[speed];
+                // Let a slow frame catch up with all its physics steps rather than fall behind the clock.
+                Time.maximumDeltaTime = Mathf.Max(1f / 3f, Speeds[speed] / 30f);
+            }
         }
 
         private static void Sun()

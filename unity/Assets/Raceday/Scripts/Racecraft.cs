@@ -22,6 +22,60 @@ namespace TarmacGauntlet.Raceday
     }
 
     /// <summary>
+    /// Every car on track, sorted by where it is on the lap, so each car finds the ones near it
+    /// without looking at the whole field. Fill it once per step with <see cref="Set"/>.
+    /// </summary>
+    public sealed class TrafficField : IReadOnlyList<TrafficCar>
+    {
+        private TrafficCar[] cars = new TrafficCar[0];
+        private float[] at = new float[0];
+        private float lap = 1f;
+
+        public int Count { get; private set; }
+        public TrafficCar this[int i] => cars[i];
+        /// <summary>The i-th car's distance from the start line, on this lap.</summary>
+        public float At(int i) => at[i];
+
+        public void Set(IReadOnlyList<TrafficCar> field, float lapLength)
+        {
+            lap = lapLength;
+            Count = field.Count;
+            if (cars.Length < Count)
+            {
+                cars = new TrafficCar[Count];
+                at = new float[Count];
+            }
+            for (int i = 0; i < Count; i++)
+            {
+                cars[i] = field[i];
+                at[i] = Mathf.Repeat(field[i].Distance, lap);
+            }
+            System.Array.Sort(at, cars, 0, Count);
+        }
+
+        /// <summary>The first car at or after a lap distance, wrapping round to the first car on the lap.</summary>
+        public int From(float distance)
+        {
+            distance = Mathf.Repeat(distance, lap);
+            int lo = 0, hi = Count;
+            while (lo < hi)
+            {
+                int mid = (lo + hi) / 2;
+                if (at[mid] < distance) lo = mid + 1;
+                else hi = mid;
+            }
+            return lo == Count ? 0 : lo;
+        }
+
+        public IEnumerator<TrafficCar> GetEnumerator()
+        {
+            for (int i = 0; i < Count; i++) yield return cars[i];
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
+    /// <summary>
     /// The race brain on top of an <see cref="AiPilot"/>, with no Unity objects so it can be tested
     /// outside Unity. Each physics step it looks at the cars around and tells the pilot where to run
     /// relative to its racing line (<see cref="AiPilot.Offset"/>) and how fast it may go
@@ -47,6 +101,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Lap pace ratio that makes another car a different class.</summary>
         private const float ClassGap = 0.05f;
         private const float G = 9.81f;
+        private const float PhysicsStep = 0.01f;
         private const float WakeLength = 80f;
         private const float WakeDrag = 0.45f;
         /// <summary>Seconds of trying to pass a rival before dropping back in behind it.</summary>
@@ -112,26 +167,18 @@ namespace TarmacGauntlet.Raceday
 
             // Who is around, and how they relate to this car.
             near.Clear();
-            for (int i = 0; i < field.Count; i++)
+            if (field is TrafficField sorted)
             {
-                TrafficCar o = field[i];
-                if (o.Id == me.Id) continue;
-                float there = Mathf.Repeat(o.Distance, lap);
-                float gap = Mathf.Repeat(there - here + lap * 0.5f, lap) - lap * 0.5f;
-                if (gap < -LookBehind || gap > LookAhead) continue;
-                float race = o.Distance - me.Distance;
-                near.Add(new Near
+                // Only the cars from LookBehind behind to LookAhead ahead, in lap order.
+                int start = sorted.From(here - LookBehind);
+                for (int j = 0; j < sorted.Count; j++)
                 {
-                    Car = o,
-                    Gap = gap,
-                    Shift = o.Lateral - line.Lateral[c.IndexOf(there)],
-                    Index = c.IndexOf(there),
-                    LapsMe = gap < 0f && race > lap * 0.5f,
-                    BeingLapped = gap > 0f && race < -lap * 0.5f,
-                    Faster = o.LapPace < me.LapPace * (1f - ClassGap),
-                    Slower = o.LapPace > me.LapPace * (1f + ClassGap),
-                });
+                    int i = (start + j) % sorted.Count;
+                    if (!Consider(sorted[i], sorted.At(i), me, line, here) && sorted[i].Id != me.Id) break;
+                }
             }
+            else
+                for (int i = 0; i < field.Count; i++) Consider(field[i], Mathf.Repeat(field[i].Distance, lap), me, line, here);
 
             // Cars alongside fence off their side, in offsets from the line. The car follows its
             // offset a moment late, and the line can sweep across the track towards an apex, so the
@@ -165,7 +212,7 @@ namespace TarmacGauntlet.Raceday
             {
                 Near n = near[i];
                 if (n.Gap <= 0f) continue;
-                bool inPath = Apart(line, n, shift) < SideBySide || Apart(line, n, pilot.Offset) < SideBySide;
+                bool inPath = Within(line, n, shift, SideBySide) || Within(line, n, pilot.Offset, SideBySide);
                 if (inPath && (blocker < 0 || n.Gap < near[blocker].Gap)) blocker = i;
             }
 
@@ -353,14 +400,16 @@ namespace TarmacGauntlet.Raceday
                 if (n.Gap <= 0f) continue;
                 // Overlapping side by side: the other car has to leave room, so only the space now counts.
                 bool alongside = n.Gap < CarLength + 1f && Mathf.Abs(n.Car.Lateral - mine) > SideBySide - 0.6f;
-                bool inPath = !alongside && (Apart(line, n, shift) < SideBySide - 0.2f
-                    || (n.Gap < 30f && Apart(line, n, pilot.Offset) < SideBySide - 0.2f));
+                bool inPath = !alongside && (Within(line, n, shift, SideBySide - 0.2f)
+                    || (n.Gap < 30f && Within(line, n, pilot.Offset, SideBySide - 0.2f)));
                 if (!inPath) continue;
                 // Closer when attacking: tucked right in on a straight, in its slipstream, ready to pull out.
                 bool attacking = mode == Mode.Passing || me.LapPace < n.Car.LapPace * 0.995f || n.BeingLapped || n.Slower;
                 bool straight = !inCorner && (corner < 0 || toCorner > 2f * me.Speed);
                 float wanted = CarLength + 1f + (attacking ? (straight ? 0.03f : 0.08f) : 0.2f) * me.Speed;
-                float room = n.Gap - wanted;
+                // A gliding car looks only every few physics steps, so it keeps back the extra ground it
+                // could close before it looks again, with the same again to spare.
+                float room = n.Gap - wanted - 2f * Mathf.Max(dt - PhysicsStep, 0f) * Mathf.Max(me.Speed - n.Car.Speed, 0f);
                 float ratio = Mathf.Min(brake / Mathf.Max(n.Car.Braking, 1f), 1f);
                 float cap = room > 0f
                     ? Mathf.Sqrt(n.Car.Speed * n.Car.Speed * ratio + 2f * brake * room)
@@ -387,6 +436,32 @@ namespace TarmacGauntlet.Raceday
                 scale = Mathf.Min(scale, 1f - WakeDrag * (1f - gap / WakeLength) * (1f - side / 2f));
             }
             return scale;
+        }
+
+        /// <summary>Adds another car to <see cref="near"/> if it is within sight. False when it is not.</summary>
+        private bool Consider(TrafficCar o, float there, TrafficCar me, RacingLine line, float here)
+        {
+            if (o.Id == me.Id) return false;
+            Circuit c = line.Circuit;
+            float lap = c.Lap;
+            float gap = there - here;
+            if (gap > lap * 0.5f) gap -= lap;
+            else if (gap < -lap * 0.5f) gap += lap;
+            if (gap < -LookBehind || gap > LookAhead) return false;
+            float race = o.Distance - me.Distance;
+            int k = (int)(there / c.Step + 0.5f) % c.Count;
+            near.Add(new Near
+            {
+                Car = o,
+                Gap = gap,
+                Shift = o.Lateral - line.Lateral[k],
+                Index = k,
+                LapsMe = gap < 0f && race > lap * 0.5f,
+                BeingLapped = gap > 0f && race < -lap * 0.5f,
+                Faster = o.LapPace < me.LapPace * (1f - ClassGap),
+                Slower = o.LapPace > me.LapPace * (1f + ClassGap),
+            });
+            return true;
         }
 
         private int Find(int id)
@@ -427,21 +502,21 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>
-        /// Least sideways space between another car and this car's path at an offset, from where the
-        /// other car is to where this car would reach it in a second and a half: lines that look
-        /// apart can meet at an apex.
+        /// Whether another car comes within <c>space</c> sideways of this car's path at an offset, from
+        /// where the other car is to where this car would reach it in a second and a half: lines that
+        /// look apart can meet at an apex.
         /// </summary>
-        private float Apart(RacingLine line, Near n, float offset)
+        private bool Within(RacingLine line, Near n, float offset, float space)
         {
             Circuit c = line.Circuit;
-            float least = Mathf.Abs(LateralAt(line, n.Index, offset) - n.Car.Lateral);
+            if (Mathf.Abs(LateralAt(line, n.Index, offset) - n.Car.Lateral) < space) return true;
             int reach = Mathf.Max(25, Mathf.CeilToInt(1.5f * speed / c.Step));
             for (int d = 5; d <= reach; d += 5)
             {
                 int k = c.Wrap(n.Index + d);
-                least = Mathf.Min(least, Mathf.Abs(LateralAt(line, k, offset) - LateralAt(line, k, n.Shift)));
+                if (Mathf.Abs(LateralAt(line, k, offset) - LateralAt(line, k, n.Shift)) < space) return true;
             }
-            return least;
+            return false;
         }
 
         /// <summary>No other car sits in that lane between just behind this car and 40 m past the one being passed.</summary>
@@ -450,7 +525,7 @@ namespace TarmacGauntlet.Raceday
             foreach (Near n in near)
             {
                 if (n.Car.Id == passing || n.Gap < -(CarLength + 2f) || n.Gap > upTo + 40f) continue;
-                if (Apart(line, n, shift) < SideBySide) return false;
+                if (Within(line, n, shift, SideBySide)) return false;
             }
             return true;
         }

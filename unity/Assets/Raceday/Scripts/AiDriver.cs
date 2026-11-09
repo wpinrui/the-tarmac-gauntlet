@@ -11,6 +11,10 @@ namespace TarmacGauntlet.Raceday
     /// It starts on the minimum-curvature line and switches to the line tuned for this car's lap time
     /// once that is worked out in the background, a couple of seconds in.
     /// With a <see cref="RaceCar"/> on the car, <see cref="Racecraft"/> races the cars around it first.
+    ///
+    /// Far from the camera the car glides instead (<see cref="Glide"/>): no physics, it moves along its
+    /// path at its driver's pace, still raced by racecraft, and <see cref="PhysicsRange"/> wakes it
+    /// back into physics as the camera or the player's car comes near.
     /// </summary>
     [DefaultExecutionOrder(-10)]   // before the car's own physics step
     [RequireComponent(typeof(CarController))]
@@ -28,6 +32,13 @@ namespace TarmacGauntlet.Raceday
         public RacingLine Line;
         public AiPilot Pilot { get; private set; }
         public Racecraft Craft { get; private set; }
+        public CarController Car => car;
+        /// <summary>True while the car glides without physics.</summary>
+        public bool Gliding => Pilot != null && Pilot.Gliding;
+        /// <summary>How often a gliding car looks around and moves on, seconds: finer near the camera.</summary>
+        [System.NonSerialized] public float GlideStep = 0.05f;
+
+        private float glideClock;
 
         private CarController car;
         private float stuckTimer, crashTimer;
@@ -68,6 +79,7 @@ namespace TarmacGauntlet.Raceday
 
         private void OnDisable()
         {
+            if (Gliding) Wake();   // someone else drives it now, so it needs its physics
             if (car != null)
             {
                 car.SetControls(0f, 0f, 0f);
@@ -89,6 +101,12 @@ namespace TarmacGauntlet.Raceday
         private void Use(AiPilot pilot)
         {
             if (Pilot != null) pilot.Offset = Pilot.Offset;   // carry on where it was across the track
+            if (Gliding)
+            {
+                // Keep gliding on the new line from where the car is.
+                Pilot.GlidePose(0f, out Vector3 at, out _, out _);
+                pilot.StartGlide(at, Pilot.GlideSpeed);
+            }
             Pilot = pilot;
             Line = pilot.Line;
             car.AiDriving = enabled;
@@ -114,6 +132,18 @@ namespace TarmacGauntlet.Raceday
             float dt = Time.fixedDeltaTime;
             Transform t = car.transform;
 
+            if (Gliding)
+            {
+                glideClock += dt;
+                if (glideClock < GlideStep - 1e-5f) return;
+                if (race != null) Craft.Think(Pilot, race.Traffic, RaceCar.Field, glideClock);
+                Pilot.Glide(glideClock);
+                glideClock = 0f;
+                car.Coast(Pilot.GlideSpeed, Pilot.GlideSteer);
+                CountLaps();
+                return;
+            }
+
             if (car.Crashed)
             {
                 crashTimer += dt;
@@ -137,6 +167,43 @@ namespace TarmacGauntlet.Raceday
             if (stuckTimer > StuckTime) Recover();
 
             CountLaps();
+        }
+
+        /// <summary>Draws a gliding car where it is now, between its steps.</summary>
+        private void Update()
+        {
+            if (!Gliding) return;
+            float since = glideClock + Mathf.Max(Time.time - Time.fixedTime, 0f);
+            Pilot.GlidePose(Pilot.GlideSpeed * since, out Vector3 at, out Vector3 forward, out Vector3 up);
+            car.transform.SetPositionAndRotation(at, Quaternion.LookRotation(forward, up));
+        }
+
+        /// <summary>Whether the car can leave physics now: driven by the AI and not waiting to be put back after a crash.</summary>
+        public bool CanGlide => enabled && Pilot != null && !Gliding && !car.Crashed && !car.Asleep;
+
+        /// <summary>Takes the car off physics. It glides on from where it is, at its speed along the track.</summary>
+        public void Glide()
+        {
+            if (!CanGlide) return;
+            Transform t = car.transform;
+            int k = Line.Nearest(t.position, Pilot.Index);
+            Pilot.StartGlide(t.position, Vector3.Dot(car.Velocity, Line.Tangent[k]));
+            car.Sleep();
+            car.Coast(Pilot.GlideSpeed, Pilot.GlideSteer);
+            // Spread the gliding cars' steps over the physics steps, so they don't all land on one.
+            glideClock = (Seed % 5) * Time.fixedDeltaTime;
+            stuckTimer = crashTimer = 0f;
+        }
+
+        /// <summary>Back to physics where the gliding car is, moving along its path, so it carries on unbroken.</summary>
+        public void Wake()
+        {
+            if (!Gliding) return;
+            float since = glideClock + Mathf.Max(Time.time - Time.fixedTime, 0f);
+            Pilot.GlidePose(Pilot.GlideSpeed * since, out Vector3 at, out Vector3 forward, out Vector3 up);
+            car.Wake(at, Quaternion.LookRotation(forward, up), Pilot.GlideSpeed, Pilot.GlideSpeed * Pilot.GlideCurvature, Pilot.GlideSteer);
+            Pilot.StopGlide();
+            stuckTimer = crashTimer = 0f;
         }
 
         private void Recover()

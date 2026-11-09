@@ -37,12 +37,22 @@ sealed class Racer
     public readonly List<float> LapTimes = new List<float>();
     public float LapStart = -1f;
     public Racecraft.Mode LastMode;
+    /// <summary>Time since the gliding car last stepped.</summary>
+    public float GlideClock;
+    /// <summary>Switches between physics and gliding.</summary>
+    public int Handovers;
+    /// <summary>Time since the car last woke from a glide, and how far it strayed from its path in the 2 s after.</summary>
+    public float SinceWake = float.MaxValue;
+    public float WorstAfterWake;
+    public float WorstSpeedJump;
     public readonly Dictionary<Racecraft.Mode, float> ModeTime = new Dictionary<Racecraft.Mode, float>();
 }
 
 sealed class Contact
 {
     public float Time, Speed, Where;
+    /// <summary>Within sight of the camera: under 500 m from the watched car.</summary>
+    public bool Seen;
     public string A, B;
 }
 
@@ -65,7 +75,21 @@ sealed class Race
     readonly Dictionary<(int, int), int> order = new Dictionary<(int, int), int>();
     readonly HashSet<(int, int)> touching = new HashSet<(int, int)>();
     readonly List<TrafficCar> field = new List<TrafficCar>();
+    readonly TrafficField sorted = new TrafficField();
     public Action<Race> Watch;
+    /// <summary>Gliding cars step this often, seconds. The game uses 0.01 at normal speed and 0.05 in fast forward.</summary>
+    public float GlideStep = Dt;
+    /// <summary>Each gliding car's step instead of <see cref="GlideStep"/>, if set.</summary>
+    public Func<Racer, float> GlideStepFor;
+    /// <summary>The car the camera is on, for which overlaps are in sight.</summary>
+    public Racer Camera;
+    /// <summary>Which cars run physics, checked four times a second as the game does. Null: all of them.</summary>
+    public Func<Racer, bool> Physics;
+    /// <summary>Gliding cars overlapping another car: in the game they pass through it.</summary>
+    public readonly List<Contact> GhostOverlaps = new List<Contact>();
+    float lodClock = 1f;
+    /// <summary>Stopwatch ticks spent in racecraft and gliding for gliding cars.</summary>
+    public long GlideTicks, ThinkTicks;
 
     public Race(Circuit circuit, IEnumerable<Entry> entries, Func<string, RacingLine> lineFor)
     {
@@ -102,7 +126,9 @@ sealed class Race
             float pace = r.Pilot.Profile.LapTime;
             int k = Math.Max(r.Car.TrackIndex, 0);
             Vector3 f = circuit.Forward[k];
-            r.Distance = r.Laps * circuit.Lap + k * circuit.Step;
+            // Between samples too, as RaceCar does, so gaps don't jump in 2 m steps.
+            float along = (r.Car.X - circuit.Centre[k].x) * f.x + (r.Car.Z - circuit.Centre[k].z) * f.z;
+            r.Distance = r.Laps * circuit.Lap + k * circuit.Step + along;
             field.Add(new TrafficCar
             {
                 Id = r.Id,
@@ -114,15 +140,44 @@ sealed class Race
                 GivingWay = r.Craft.State == Racecraft.Mode.GivingWay,
             });
         }
+        sorted.Set(field, circuit.Lap);
     }
 
     public void Step()
     {
         Snapshot();
+        lodClock += Dt;
+        if (Physics != null && lodClock >= 0.25f)
+        {
+            lodClock = 0f;
+            foreach (Racer r in Racers)
+            {
+                bool want = Physics(r);
+                if (want && r.Pilot.Gliding) Wake(r);
+                else if (!want && !r.Pilot.Gliding) Sleep(r);
+            }
+        }
         for (int i = 0; i < Racers.Count; i++)
         {
             Racer r = Racers[i];
-            r.Craft.Think(r.Pilot, field[i], field, Dt);
+            if (r.Pilot.Gliding)
+            {
+                r.GlideClock += Dt;
+                if (r.GlideClock >= (GlideStepFor != null ? GlideStepFor(r) : GlideStep) - 1e-5f)
+                {
+                    long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+                    r.Craft.Think(r.Pilot, field[i], sorted, r.GlideClock);
+                    long t1 = System.Diagnostics.Stopwatch.GetTimestamp();
+                    r.Pilot.Glide(r.GlideClock);
+                    GlideTicks += System.Diagnostics.Stopwatch.GetTimestamp() - t0;
+                    ThinkTicks += t1 - t0;
+                    r.GlideClock = 0f;
+                }
+                PoseGlider(r);
+                r.ModeTime[r.Craft.State] = (r.ModeTime.TryGetValue(r.Craft.State, out float g) ? g : 0f) + Dt;
+                continue;
+            }
+            r.Craft.Think(r.Pilot, field[i], sorted, Dt);
             r.Car.DragScale = Racecraft.Slipstream(circuit, field[i], field);
             r.Pilot.Towed = r.Car.DragScale < 0.97f;
             AiPilot.Controls c = r.Pilot.Drive(r.Car.Position, r.Car.Forward, r.Car.Velocity, r.Car.YawRate);
@@ -145,6 +200,12 @@ sealed class Race
             r.Last = k;
             r.Distance = r.Laps * circuit.Lap + k * circuit.Step;
 
+            if (r.Pilot.Gliding) continue;
+            if (r.SinceWake < 2f)
+            {
+                r.SinceWake += Dt;
+                r.WorstAfterWake = Math.Max(r.WorstAfterWake, Math.Abs(r.Pilot.LateralError));
+            }
             float off = Math.Abs(r.Car.Lateral) - circuit.HalfWidth(k);
             // A mistake lasts until the car has been back on the track for a couple of seconds.
             r.SinceMistake = r.Pilot.Overcooking ? 0f : off > KerbWidth && r.SinceMistake < 2f ? 0f : r.SinceMistake + Dt;
@@ -197,6 +258,36 @@ sealed class Race
         Watch?.Invoke(this);
     }
 
+    /// <summary>The game's PhysicsRange taking a car off physics: it glides on from where it is.</summary>
+    void Sleep(Racer r)
+    {
+        int k = Math.Max(r.Car.TrackIndex, 0);
+        Vector3 f = circuit.Forward[k];
+        r.Pilot.StartGlide(r.Car.Position, r.Car.Vx * f.x + r.Car.Vz * f.z);
+        r.GlideClock = (r.Id % Math.Max(1, (int)Math.Round(GlideStep / Dt))) * Dt;   // spread the cars' steps out, as the game does
+        r.Handovers++;
+    }
+
+    /// <summary>Back to physics where the gliding car is drawn, moving along its path.</summary>
+    void Wake(Racer r)
+    {
+        AiPilot p = r.Pilot;
+        float before = p.GlideSpeed;
+        p.GlidePose(p.GlideSpeed * r.GlideClock, out Vector3 at, out Vector3 forward, out _);
+        r.Car.Wake(at, forward, p.GlideSpeed, p.GlideSpeed * p.GlideCurvature, p.GlideSteer);
+        p.StopGlide();
+        r.Handovers++;
+        r.SinceWake = 0f;
+        r.WorstSpeedJump = Math.Max(r.WorstSpeedJump, Math.Abs(r.Car.Speed - before));
+    }
+
+    void PoseGlider(Racer r)
+    {
+        AiPilot p = r.Pilot;
+        p.GlidePose(p.GlideSpeed * r.GlideClock, out Vector3 at, out Vector3 forward, out _);
+        r.Car.Pose(at, forward, p.GlideSpeed, p.GlideSpeed * p.GlideCurvature);
+    }
+
     /// <summary>Pushes overlapping cars apart and trades the speed they hit with, counting each new contact.</summary>
     void Collide()
     {
@@ -209,6 +300,14 @@ sealed class Race
                 bool hit = dx * dx + dz * dz < 30f && Overlap(a, b, out nx, out nz, out depth);
                 var key = (i, j);
                 if (!hit) { touching.Remove(key); continue; }
+                if (Racers[i].Pilot.Gliding || Racers[j].Pilot.Gliding)
+                {
+                    // No bodies to bump: in the game a gliding car has no collider.
+                    float closing = Math.Max(-((b.Vx - a.Vx) * nx + (b.Vz - a.Vz) * nz), 0f);
+                    if (touching.Add(key))
+                        GhostOverlaps.Add(new Contact { Time = Time, Speed = closing, Seen = Camera != null && Apart(a, Camera.Car) < 500f, Where = Math.Max(a.TrackIndex, 0) * circuit.Step, A = Name(Racers[i]), B = Name(Racers[j]) });
+                    continue;
+                }
                 // n points from a to b.
                 a.X -= nx * depth * 0.5f; a.Z -= nz * depth * 0.5f;
                 b.X += nx * depth * 0.5f; b.Z += nz * depth * 0.5f;
@@ -243,6 +342,8 @@ sealed class Race
         }
         return true;
     }
+
+    static float Apart(StandInCar a, StandInCar b) => (float)Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Z - b.Z) * (a.Z - b.Z));
 
     static float Dot(Vector3 a, Vector3 b) => a.x * b.x + a.z * b.z;
 
