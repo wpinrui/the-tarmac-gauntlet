@@ -22,9 +22,18 @@ compiles in Unity.
 
 ## Raceday scene
 
-`Assets/Raceday/Raceday.unity` opens when the editor starts. Press Play to fly round the circuit.
+`Assets/Raceday/Raceday.unity` opens when the editor starts. Press Play to drive the Seorak
+Cheonma CX-24Si from pole.
 
-Camera: move the mouse to look, `W` `A` `S` `D` move along the ground, `Q` and `E` go down and up,
+Driving: left and right arrows steer, up accelerates, down brakes (hold it at a standstill to
+reverse). `A` and `Z` shift up and down and switch to manual; `M` goes back to automatic. `H`
+toggles steering help. Anti-lock brakes are always on. `R` puts the car back on track, which you
+need after a hard hit on a barrier. `C` cycles the chase, bonnet and bumper views and the free camera.
+
+The car's physics come from its game stats (`Raceday/Scripts/CarSpec.cs`): Power sets the engine,
+Handling sets tyre grip and downforce. Grass and gravel have less grip and slow the car.
+
+Free camera: move the mouse to look, `W` `A` `S` `D` move along the ground, `Q` and `E` go down and up,
 `Shift` is 5x faster and the scroll wheel changes speed. Click to capture the mouse, `Esc` frees it.
 
 The circuit is built at runtime from `Assets/Raceday/Resources/Tracks/circuit.json`, which

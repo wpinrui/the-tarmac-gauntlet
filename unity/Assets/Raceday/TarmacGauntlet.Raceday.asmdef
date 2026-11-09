@@ -1,7 +1,9 @@
 {
     "name": "TarmacGauntlet.Raceday",
     "rootNamespace": "TarmacGauntlet.Raceday",
-    "references": [],
+    "references": [
+        "TarmacGauntlet.Simulation"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
