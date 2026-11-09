@@ -71,19 +71,23 @@ namespace TarmacGauntlet.Raceday
             return Centre[k] + Left[k] * lateral + Vector3.up * (cross * banked);
         }
 
+        /// <summary>Height of the ground mesh as drawn: each cell split from (x+1, z) to (x, z+1).</summary>
         public float TerrainHeight(float x, float z)
         {
             GroundData t = Data.terrain;
             float fx = Mathf.Clamp((x - t.originX) / t.spacing, 0, t.countX - 1.001f);
             float fz = Mathf.Clamp((z - t.originZ) / t.spacing, 0, t.countZ - 1.001f);
             int ix = (int)fx, iz = (int)fz;
-            float ux = fx - ix, uz = fz - iz;
-            float h00 = heights[iz * t.countX + ix], h10 = heights[iz * t.countX + ix + 1];
-            float h01 = heights[(iz + 1) * t.countX + ix], h11 = heights[(iz + 1) * t.countX + ix + 1];
-            return Mathf.Lerp(Mathf.Lerp(h00, h10, ux), Mathf.Lerp(h01, h11, ux), uz);
+            float u = fx - ix, v = fz - iz;
+            float a = heights[iz * t.countX + ix], b = heights[iz * t.countX + ix + 1];
+            float d = heights[(iz + 1) * t.countX + ix], e = heights[(iz + 1) * t.countX + ix + 1];
+            return u + v <= 1f ? a + (b - a) * u + (d - a) * v : e + (d - e) * (1f - u) + (b - e) * (1f - v);
         }
 
         public float TerrainHeightAt(int ix, int iz) => heights[iz * Data.terrain.countX + ix];
+
+        /// <summary>Lowers one ground node by an amount, so the ground stays under what is laid on it.</summary>
+        public void LowerTerrainAt(int ix, int iz, float amount) => heights[iz * Data.terrain.countX + ix] -= amount;
 
         private static Vector3[] ToPoints(float[] xyz)
         {
