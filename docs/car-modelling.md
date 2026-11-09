@@ -74,7 +74,7 @@ Fix every hit, then show Ivan the fixed version. He must say ok before it goes i
 
 ## 9. Put it in the game
 Record Ivan's viewer picks in rows.py, then `export.py <dir> --game` writes only the picked options with Unity axes (forward +Z, up +Y, metres).
-Export into `unity/Assets/Art/Vehicles/<Name>/` with the OBJ, MTL, textures and CREDITS.md.
+Export into `unity/Assets/Art/Vehicles/<Name>/` with the OBJ, MTL and textures.
 Every file and folder gets a committed `.meta` with its own random guid.
 The build scripts live in `tools/cars/<name>/`: rows.py, rows.json, body.py, parts.py, glyphs.py, glyphs.json, export.py, publish.py, check.py.
 Copy them from the last car built and change the numbers.
