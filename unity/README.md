@@ -5,6 +5,8 @@ Unity 6000.6.7f1. Open this `unity/` folder in the Unity Hub.
 `Assets/Simulation/` is the headless C# port of the TypeScript simulation. It has its own
 assembly (`TarmacGauntlet.Simulation.asmdef`) with no UnityEngine references.
 
+Every new file and folder under `Assets/` needs a committed `.meta` file with its own random guid.
+
 ## Running the simulation tests
 
 The same `.cs` files also build as a plain .NET library, so the tests run without Unity.
