@@ -2,9 +2,15 @@ using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
 {
-    /// <summary>Builds the circuit, the sun, the player's car on pole and the cameras when the scene starts.</summary>
+    /// <summary>
+    /// Builds the circuit, the sun, the car on pole and the cameras when the scene starts. The AI
+    /// drives the car from the start; I hands it to you and back.
+    /// </summary>
     public sealed class CircuitScene : MonoBehaviour
     {
+        private KeyboardState keys;
+        private AiDriver ai;
+
         private const string PlayerCar = "a-29";
         private const string PlayerModel = "Assets/Art/Vehicles/CheonmaCX24Si/CheonmaCX24Si.obj";
 
@@ -28,11 +34,18 @@ namespace TarmacGauntlet.Raceday
             }
             Sun();
 
-            var keys = new GameObject("Keyboard").AddComponent<KeyboardState>();
+            keys = new GameObject("Keyboard").AddComponent<KeyboardState>();
             CarController car = CarBuilder.Spawn(PlayerCar, PlayerModel, circuit, keys);
             GridSlot pole = circuit.Data.grid.slots[0];
             car.PlaceAt(circuit.IndexOf(pole.d - 2.6f), pole.lateral);   // front wheels just behind the line
+            ai = car.gameObject.AddComponent<AiDriver>();
+            ai.Line = new RacingLine(circuit);
             Camera(circuit, car, keys);
+        }
+
+        private void Update()
+        {
+            if (keys != null && ai != null && keys.Pressed(KeyCode.I)) ai.enabled = !ai.enabled;
         }
 
         private static void Sun()

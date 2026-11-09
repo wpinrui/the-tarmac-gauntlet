@@ -1,0 +1,211 @@
+using UnityEngine;
+
+namespace TarmacGauntlet.Raceday
+{
+    /// <summary>
+    /// The thinking half of an AI driver, with no Unity objects so it can be tested outside Unity.
+    /// Each physics step it reads where the car is and returns throttle, brake and steering to
+    /// follow the racing line at the speed profile's target.
+    ///
+    /// Driver stats, 0 to 100:
+    /// Pace sets how much of the car's grip and braking the target speeds use.
+    /// Consistency sets how much the corner speeds wander from lap to lap.
+    /// Safety sets how often a corner is overcooked: braking too late and running wide.
+    /// </summary>
+    public sealed class AiPilot
+    {
+        public struct Controls
+        {
+            public float Throttle, Brake;
+            /// <summary>Front wheel angle, radians, positive to the right.</summary>
+            public float Steer;
+        }
+
+        private const float G = 9.81f;
+        private const float Reaction = 0.1f;        // how far ahead the speed target is read, seconds
+        private const float SpeedGain = 2.5f;       // extra acceleration per m/s off target
+        private const float HeadingGain = 1.0f;
+        private const float LateralGain = 1.6f;     // Stanley gain on lateral error
+        private const float YawGain = 0.12f;        // steering per rad/s of yaw rate off what the line needs
+        private const float SlideGain = 0.7f;       // counter-steer per radian of slide
+        private const float WindowIn = 350f;        // a corner's speed change starts this far before it
+        private const float RampLength = 100f;
+        private const float WindowOut = 60f;
+
+        public readonly RacingLine Line;
+        public readonly SpeedProfile Profile;
+        public readonly CarSpec Spec;
+        public readonly float Pace, Consistency, Safety;
+
+        /// <summary>Line sample nearest the car's centre.</summary>
+        public int Index { get; private set; } = -1;
+        /// <summary>Front axle's distance from the line, positive to the left.</summary>
+        public float LateralError { get; private set; }
+        public float TargetSpeed { get; private set; }
+        /// <summary>True while the driver is in an overcooked corner.</summary>
+        public bool Overcooking => committed;
+        /// <summary>How many corners this driver has overcooked so far.</summary>
+        public int Mistakes { get; private set; }
+
+        private int frontIndex = -1;
+        private readonly System.Random random;
+        private readonly CornerData[] corners;
+        private readonly float[] cornerScale;
+        private readonly bool[] overcooked;
+        private bool committed;   // inside an overcooked corner: braking only to the wrong plan
+        private readonly bool[] rolled;
+
+        public AiPilot(RacingLine line, CarSpec spec, float pace, float consistency, float safety, int seed)
+        {
+            Line = line;
+            Spec = spec;
+            Pace = Mathf.Clamp(pace, 0f, 100f);
+            Consistency = Mathf.Clamp(consistency, 0f, 100f);
+            Safety = Mathf.Clamp(safety, 0f, 100f);
+            Profile = new SpeedProfile(line, spec, LimitFor(Pace));
+            random = new System.Random(seed);
+            corners = line.Circuit.Data.corners;
+            cornerScale = new float[corners.Length];
+            overcooked = new bool[corners.Length];
+            rolled = new bool[corners.Length];
+            for (int i = 0; i < corners.Length; i++) cornerScale[i] = 1f;
+        }
+
+        /// <summary>Share of the car's limit the driver uses: 86% at Pace 0, 98% at Pace 100.</summary>
+        public static float LimitFor(float pace) => 0.86f + 0.12f * pace / 100f;
+
+        /// <summary>Forget where the car was, after it is moved (a reset).</summary>
+        public void Lost()
+        {
+            Index = -1;
+            frontIndex = -1;
+        }
+
+        public Controls Drive(Vector3 position, Vector3 forward, Vector3 velocity, float yawRate)
+        {
+            Circuit c = Line.Circuit;
+            Vector3 flatForward = new Vector3(forward.x, 0f, forward.z).normalized;
+            Vector3 flatVelocity = new Vector3(velocity.x, 0f, velocity.z);
+            float speed = flatVelocity.magnitude;
+
+            Index = Line.Nearest(position, Index);
+            Vector3 front = position + flatForward * Spec.HalfWheelbase;
+            frontIndex = Line.Nearest(front, frontIndex);
+            RollCorners();
+
+            // Lateral error and heading error at the front axle, against the line's tangent.
+            int k = frontIndex;
+            Vector3 tangent = Line.Tangent[k];
+            Vector3 left = new Vector3(-tangent.z, 0f, tangent.x);
+            Vector3 offset = front - Line.Point[k];
+            LateralError = Vector3.Dot(new Vector3(offset.x, 0f, offset.z), left);
+            // Heading of travel, not of the body: at the limit the body is yawed into the corner.
+            Vector3 heading = speed > 3f ? flatVelocity / speed : flatForward;
+            float headingError = Mathf.Atan2(heading.z * tangent.x - heading.x * tangent.z, Vector3.Dot(heading, tangent));
+
+            // Steering: the line's own curvature, plus Stanley corrections for heading and offset.
+            float ahead = k + speed * 0.1f / c.Step;
+            float kappa = Line.Curvature[c.Wrap(Mathf.RoundToInt(ahead))];
+            float wheelbase = 2f * Spec.HalfWheelbase;
+            float steer = Mathf.Atan(wheelbase * kappa)
+                + HeadingGain * headingError
+                + Mathf.Atan(LateralGain * LateralError / (speed + 4f));
+            // Damp the yaw towards what the line needs, so the car doesn't weave or spin, and
+            // steer into a slide: the body's angle to its path, positive when the tail steps out left.
+            Vector3 right = new Vector3(flatForward.z, 0f, -flatForward.x);
+            float slide = speed > 5f ? Mathf.Atan2(Vector3.Dot(flatVelocity, right), Vector3.Dot(flatVelocity, flatForward)) : 0f;
+            steer += YawGain * (speed * kappa - yawRate) + SlideGain * slide;
+            steer = Mathf.Clamp(steer, -Spec.SteerLock, Spec.SteerLock);
+
+            // Speed: read the target a reaction time ahead, follow its acceleration, and close the gap.
+            float lookahead = Index + Mathf.Max(speed, 5f) * Reaction / c.Step;
+            int la = c.Wrap(Mathf.RoundToInt(lookahead));
+            float scale = ScaleAt(la);
+            float target = Profile.SpeedAt(lookahead) * scale;
+            float offLine = Mathf.Abs(LateralError);
+            if (offLine > 4f) target = Mathf.Min(target, Mathf.Lerp(40f, 15f, (offLine - 4f) / 10f));
+            if (Mathf.Abs(headingError) > 0.5f) target = Mathf.Min(target, 12f);
+            TargetSpeed = target;
+
+            // When overcooking a corner the driver believes the faster plan: no extra braking when the
+            // car turns out to be too fast, so it runs wide or off.
+            float correction = SpeedGain * (target - speed);
+            if (committed && correction < 0f) correction = 0f;
+            float want = Profile.Accel[la] * scale * scale + correction;
+            float needed = want + Profile.Resist(Index, speed);
+            var controls = new Controls { Steer = steer };
+            if (needed >= 0f)
+            {
+                // Only as much throttle as the rear tyres can take on top of the corner, and less
+                // again once the tail is stepping out.
+                float force = Mathf.Min(needed, Mathf.Min(Profile.Traction(speed), Profile.RearGripLeft(Index, speed, speed * yawRate)));
+                float grip = Mathf.Clamp01(2f - Mathf.Abs(slide) / (0.5f * Spec.PeakSlip));
+                controls.Throttle = Mathf.Clamp01(force / Mathf.Max(Profile.EngineAccel(speed), 0.5f)) * grip;
+            }
+            else
+                controls.Brake = Mathf.Clamp01(-needed / (Spec.BrakeDecel * G));
+            return controls;
+        }
+
+        /// <summary>
+        /// As the car nears each corner, picks how fast this driver takes it this lap: a small
+        /// wander from Consistency, and now and then an overcooked entry from Safety.
+        /// </summary>
+        private void RollCorners()
+        {
+            Circuit c = Line.Circuit;
+            float here = Index * c.Step;
+            for (int i = 0; i < corners.Length; i++)
+            {
+                float toCorner = c.Ahead(here, corners[i].s);
+                bool near = toCorner < WindowIn + RampLength + 50f;
+                bool inside = c.Ahead(corners[i].s, here) < corners[i].e - corners[i].s + WindowOut;
+                if (near && !inside && !rolled[i])
+                {
+                    rolled[i] = true;
+                    float spread = 0.035f * (1f - Consistency / 100f);
+                    float scale = 1f + spread * Mathf.Clamp(Gaussian(), -2f, 1f);
+                    float risk = 0.12f * (1f - Safety / 100f) * (1f - Safety / 100f);
+                    overcooked[i] = random.NextDouble() < risk;
+                    if (overcooked[i])
+                    {
+                        scale += 0.15f + 0.15f * (float)random.NextDouble();
+                        Mistakes++;
+                    }
+                    cornerScale[i] = scale;
+                }
+                else if (!near && !inside) rolled[i] = false;
+            }
+        }
+
+        /// <summary>Speed multiplier at a line sample, ramping in before each corner and out after it.</summary>
+        private float ScaleAt(int k)
+        {
+            Circuit c = Line.Circuit;
+            float d = k * c.Step;
+            float scale = 1f;
+            committed = false;
+            for (int i = 0; i < corners.Length; i++)
+            {
+                float length = corners[i].e - corners[i].s;
+                float before = c.Ahead(d, corners[i].s);
+                float into = c.Ahead(corners[i].s, d);
+                float weight;
+                if (into <= length) weight = 1f;
+                else if (into <= length + WindowOut) weight = 1f - (into - length) / WindowOut;
+                else if (before <= WindowIn) weight = 1f;
+                else if (before <= WindowIn + RampLength) weight = 1f - (before - WindowIn) / RampLength;
+                else continue;
+                scale *= 1f + (cornerScale[i] - 1f) * weight;
+                if (overcooked[i] && weight > 0f) committed = true;
+            }
+            return scale;
+        }
+
+        private float Gaussian()
+        {
+            double u = 1.0 - random.NextDouble(), v = random.NextDouble();
+            return (float)(System.Math.Sqrt(-2.0 * System.Math.Log(u)) * System.Math.Cos(2.0 * System.Math.PI * v));
+        }
+    }
+}
