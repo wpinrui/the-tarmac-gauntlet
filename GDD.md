@@ -334,11 +334,11 @@ Condition is a **percentage scale** representing the car's current mechanical he
 
 **Second-hand dealer:**
 - Rotating inventory that changes each year:
-  - **1 guaranteed shitbox** — the Neutrino Sago (cheapest Class F car), aged 15–25 years, 30% condition, no upgrades. Always available. This is the economy's entry point.
+  - **1 guaranteed shitbox** — the Nusa Carrier (cheapest Class F car), aged 15–25 years, 30% condition, no upgrades. Always available. This is the economy's entry point.
   - **2 cars per class** (F through A) — randomly selected models with randomised age (1–10 years), condition (30–90%), and upgrades (33% chance per pack)
   - **F1 conditional** — an F1 car may appear if the player meets eligibility criteria (see §3: F1 Class Rules)
 - Total inventory: **13–14 listings per year**
-- The Neutrino Sago only appears as the guaranteed shitbox — it is excluded from random Class F generation
+- The Nusa Carrier only appears as the guaranteed shitbox — it is excluded from random Class F generation
 
 **Selling:**
 - The player can sell any car from the garage between races
@@ -485,7 +485,7 @@ Prize money is distributed from a **hardcoded static table** — not a formula. 
 
 ### Beg Mechanic
 
-If the player has **no cars** and cannot afford the cheapest listing on the second-hand market, the **guaranteed shitbox** (Neutrino Sago) becomes purchasable for **whatever the player currently has** — even $0. The player pays their entire remaining budget and receives the shitbox.
+If the player has **no cars** and cannot afford the cheapest listing on the second-hand market, the **guaranteed shitbox** (Nusa Carrier) becomes purchasable for **whatever the player currently has** — even $0. The player pays their entire remaining budget and receives the shitbox.
 
 This applies in **any year**, not just year 1. It is the economy's permanent safety net: the player can never be locked out of racing.
 
@@ -495,7 +495,7 @@ The beg mechanic provides the **car only**. It does not provide spare parts, tyr
 
 ### Starting Budget
 
-The player begins year 1 with **$1,000** in cash and **no car**. Their first action is to visit the second-hand dealer and buy the guaranteed shitbox (a heavily aged Neutrino Sago, typically costing under $1,000). The remaining budget covers initial spare parts, tyre sets, and fuel — barely.
+The player begins year 1 with **$1,000** in cash and **no car**. Their first action is to visit the second-hand dealer and buy the guaranteed shitbox (a heavily aged Nusa Carrier, typically costing under $1,000). The remaining budget covers initial spare parts, tyre sets, and fuel — barely.
 
 ### Spare Parts
 
