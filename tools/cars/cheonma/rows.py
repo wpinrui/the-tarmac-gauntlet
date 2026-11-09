@@ -143,9 +143,9 @@ data = {
     "mirror": {"x": X(1290), "y": 0.58, "z": Z(236), "rx": 0.06, "ry": 0.045, "rz": 0.032,
                "stalk_r": 0.012, "stalk_z0": Z(285)},
     # Headlights, left pod, as front view pixels mapped onto the pod's front face.
-    "head": {"frame_px": [[125, 240], [290, 240], [295, 400], [215, 480], [128, 470]],
-             "lamps_px": [[205, 285, 37], [165, 400, 37]], "led_px": [243, 355, 25],
-             "face_top": [X(1795), Z(300)], "face_bot": [X(1875), Z(450)],
+    "head": {"frame_px": [[135, 245], [288, 240], [295, 400], [215, 480], [128, 470]],
+             "lamps_px": [[205, 290, 35], [175, 398, 34]], "led_px": [243, 355, 25],
+             "face_top": [X(1805), Z(312)], "face_bot": [X(1875), Z(450)],
              "py_top": 235, "py_bot": 480},
     # Windscreen in plan (side px, y metres) and side windows in side px.
     "glass": {"screen_plan": [(1195, 0.25), (1300, 0.26), (1400, 0.23), (1455, 0.19),
@@ -153,6 +153,9 @@ data = {
               "side_px": [(995, 222), (1170, 222), (1182, 240), (1182, 296), (995, 296), (988, 280)]},
     "rear_lamps": {"y0": 0.55, "y1": 0.75, "z0": Z(512), "z1": Z(465), "rain_hw": 0.06},
 }
+
+# Ivan's picks from the viewer.
+data["picks"] = {"frontbadge": 1, "rearbadge": 2, "name": 1}
 
 data["head"]["yf"] = {"scale": S_FRONT, "centre": 569}
 
