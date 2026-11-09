@@ -46,6 +46,14 @@ namespace TarmacGauntlet.Simulation
         /// Has no effect when the car pits: a pit stop always resets mode to Normal.
         /// </summary>
         public Func<int, CarLapSnapshot, InstructionMode>? ModeDecider { get; init; }
+        /// <summary>
+        /// Not in the TS. Replaces the computed lap time, for a lap a person drives live.
+        /// Gets the lap, the driver at the wheel and the computed time; returns the time to use.
+        /// The computed time is still rolled first, so the random sequence does not change.
+        /// </summary>
+        public Func<int, string, double, double>? LapTimeOverride { get; init; }
+        /// <summary>Not in the TS. Called after each pit stop with the lap and the stop's duration.</summary>
+        public Action<int, double>? OnPitStop { get; init; }
     }
 
     /// <summary>Options for the race simulation.</summary>
@@ -345,6 +353,7 @@ namespace TarmacGauntlet.Simulation
                         state.TyreWear,
                         state.FuelRemaining,
                         random);
+                    if (entry.LapTimeOverride != null) lapTime = entry.LapTimeOverride(lap, state.CurrentDriverId, lapTime);
 
                     // 4.5. Time budget gate: freeze the car and skip a lap it never ran.
                     if (state.TotalTime + lapTime > raceDurationSec)
@@ -501,6 +510,7 @@ namespace TarmacGauntlet.Simulation
                             },
                             pitConfig);
                         state.TotalTime += pitResult.Duration;
+                        entry.OnPitStop?.Invoke(lap, pitResult.Duration);
                         state.FuelRemaining = pitResult.FuelLevel;
                         state.TyreWear = pitResult.TyreWear;
                         state.TyreSetsAvailable = pitResult.TyreSetsRemaining;
