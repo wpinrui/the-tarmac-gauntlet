@@ -43,8 +43,9 @@ layout there, never by hand in the JSON.
 
 After changing the generator or `CircuitBuilder`, run `bash tools/circuit/geometry-check/run.sh`
 (needs the .NET 8 SDK). It builds the circuit as the game does and checks that every surface lies
-over the ground, no surface edge stands more than 0.4 m off what is beside it, and every barrier
-reaches the ground. Merge only when all three rules say ok.
+over the ground, no surface edge stands more than 0.4 m off what is beside it, every barrier
+reaches the ground, no fence crosses another, and no fence kinks or stands as a stray stub. Merge
+only when every rule says ok.
 
 Markings follow FIA Appendix O and race-director practice: white edge lines (part of the track),
 red and white kerbs outside them, a 15 m wide start straight through turn 1, 30 grid slots (white
