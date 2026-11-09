@@ -2,8 +2,9 @@
 //
 //   rolling start   100 cars, as in the raceday scene, follow the pace car round a formation lap two by
 //                   two without touching, stay within 200 m of their places, and go green at the line
-//                   once the pace car has gone into the pit lane; the first 45 s of racing after it have
-//                   no hard hits
+//                   once the pace car has gone into the pit lane; from the green until the last car
+//                   crosses the line and starts racing, there are no hard hits. The racing after that,
+//                   with the quickest cars carving through from the back, is the pack race's to check
 //   supplies        one car of each class laps on a full tank: each lap's fuel and tyre wear land within
 //                   40% of what the race maths says a lap uses
 //   pit stops       in a 16-car race, the cars short of fuel pit on the first lap: each keeps to the
@@ -41,8 +42,10 @@ static partial class Check
         float worstSlip = 0f;
         string worstCar = "";
         int contactsAtGreen = -1;
-        while (s.Time < 12f * 60f && (s.GreenTime < 0f || s.Time < s.GreenTime + 45f))
+        float allRacing = -1f;
+        while (s.Time < 12f * 60f && allRacing < 0f)
         {
+            if (allRacing < 0f && s.GreenTime >= 0f && !s.Cars.Any(c => s.Start.Holds(c.Laps))) allRacing = s.Time;
             bool before = s.GreenTime < 0f;
             s.Step();
             if (before && s.GreenTime >= 0f)
@@ -75,7 +78,7 @@ static partial class Check
             if (c.OffTime >= 0f) problems.Add($"{s.Name(c)} left the track at {Session.Clock(c.OffTime)} at {c.OffWhere:0} m");
         }
         float lastBack = s.Cars[0].Distance - s.Cars.Min(c => c.Distance);
-        Report($"rolling start ({cars} cars: green at {Session.Clock(Math.Max(s.GreenTime, 0f))}, worst place {worstSlip:0} m out, {s.Contacts.Count - Math.Max(contactsAtGreen, 0)} contacts in the first 45 s, {s.Contacts.Count(c => c.Speed > 1f)} over 1 m/s, field {lastBack:0} m long, {watch.Elapsed.TotalSeconds:0} s to run)", problems);
+        Report($"rolling start ({cars} cars: green at {Session.Clock(Math.Max(s.GreenTime, 0f))}, worst place {worstSlip:0} m out, {s.Contacts.Count - Math.Max(contactsAtGreen, 0)} contacts from the green to {Session.Clock(Math.Max(s.Time, 0f))}, {s.Contacts.Count(c => c.Speed > 1f)} over 1 m/s, field {lastBack:0} m long, {watch.Elapsed.TotalSeconds:0} s to run)", problems);
         if (verbose) foreach (Contact c in s.Contacts) Console.WriteLine("  contact " + Describe(c));
     }
 
