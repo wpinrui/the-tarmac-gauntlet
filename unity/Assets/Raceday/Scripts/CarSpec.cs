@@ -60,7 +60,7 @@ namespace TarmacGauntlet.Raceday
                 PeakPower = 45000f * Mathf.Pow(17f, power),
                 Redline = (racer ? 9000f : 6800f) * Mathf.PI / 30f,
                 Grip = 1.0f + 0.6f * handling,
-                PeakSlip = racer ? 0.11f : 0.14f,
+                PeakSlip = racer ? 0.14f : 0.17f,
                 LiftArea = 4.5f * handling * handling * handling,
                 DragArea = 0.62f + 0.55f * handling * handling * handling,
                 BrakeDecel = 1.1f + 0.6f * handling,
@@ -70,7 +70,7 @@ namespace TarmacGauntlet.Raceday
                 HalfWheelbase = 1.505f,
                 StaticCompression = racer ? 0.025f : model.CarClass == CarClass.C ? 0.04f : 0.06f,
                 SteerLock = racer ? 0.3f : 0.55f,
-                CentreOfMass = new Vector3(0f, racer ? 0.3f : 0.45f, -0.1f),
+                CentreOfMass = new Vector3(0f, racer ? 0.28f : 0.42f, 0.05f),
             };
             float corner = spec.Mass * 9.81f / 4f;
             spec.SpringRate = corner / spec.StaticCompression;

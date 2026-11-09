@@ -142,12 +142,12 @@ namespace TarmacGauntlet.Raceday
             UpdateSteering(dt, speed);
             float driveForce = Engine(dt, along);
 
-            // Aerodynamics: drag at the centre of mass, downforce split 45/55 front to rear.
+            // Aerodynamics: drag at the centre of mass, downforce split 40/60 front to rear for stability.
             float q = 0.5f * CarSpec.AirDensity * speed * speed;
             if (speed > 0.1f) body.AddForce(-v / speed * (q * Spec.DragArea));
             Vector3 down = -transform.up * (q * Spec.LiftArea);
-            body.AddForceAtPosition(down * 0.45f, transform.TransformPoint(new Vector3(0, 0, Spec.HalfWheelbase)));
-            body.AddForceAtPosition(down * 0.55f, transform.TransformPoint(new Vector3(0, 0, -Spec.HalfWheelbase)));
+            body.AddForceAtPosition(down * 0.4f, transform.TransformPoint(new Vector3(0, 0, Spec.HalfWheelbase)));
+            body.AddForceAtPosition(down * 0.6f, transform.TransformPoint(new Vector3(0, 0, -Spec.HalfWheelbase)));
 
             float brakeTotal = brake * Spec.BrakeDecel * Spec.Mass * Gravity;
             for (int i = 0; i < 4; i++)
@@ -168,10 +168,10 @@ namespace TarmacGauntlet.Raceday
                 float down = 0.5f * CarSpec.AirDensity * Spec.LiftArea * speed * speed;
                 float lateral = Spec.Grip * (Spec.Mass * Gravity + down) / Spec.Mass;
                 float radius = speed * speed / lateral;
-                limit = Mathf.Min(limit, Mathf.Atan(2f * Spec.HalfWheelbase / radius) + Spec.PeakSlip * 1.1f);
+                limit = Mathf.Min(limit, Mathf.Atan(2f * Spec.HalfWheelbase / radius) + Spec.PeakSlip * 0.8f);
             }
             float target = steerInput * limit;
-            float rate = (Mathf.Abs(target) < Mathf.Abs(steer) || target * steer < 0f ? 4f : 2.2f) * Spec.SteerLock;
+            float rate = (Mathf.Abs(target) < Mathf.Abs(steer) || target * steer < 0f ? 3f : 1.3f) * Spec.SteerLock;
             steer = Mathf.MoveTowards(steer, target, rate * dt);
         }
 
@@ -232,7 +232,8 @@ namespace TarmacGauntlet.Raceday
                 float vLong = Vector3.Dot(pv, forward);
                 float vLat = Vector3.Dot(pv, side);
                 float corner = Spec.Mass / 4f;
-                float cap = Spec.Grip * TrackSurface.Grip(kind) * load;
+                // Rear tyres grip a little more than the fronts, so the car leans towards understeer.
+                float cap = Spec.Grip * TrackSurface.Grip(kind) * load * (w.Front ? 0.97f : 1.06f);
 
                 // Lateral: slip-angle curve at speed, plain damping when nearly stopped.
                 float fy;
@@ -241,8 +242,9 @@ namespace TarmacGauntlet.Raceday
                 else
                 {
                     float slip = Mathf.Atan2(vLat, Mathf.Abs(vLong));
-                    float b = 1.732f / Spec.PeakSlip;
-                    fy = -cap * Mathf.Sin(1.5f * Mathf.Atan(b * slip));
+                    // Peaks at PeakSlip and falls away gently past it.
+                    float b = 2.64f / Spec.PeakSlip;
+                    fy = -cap * Mathf.Sin(1.3f * Mathf.Atan(b * slip));
                 }
 
                 // Longitudinal: drive, brakes (holding the car still when nearly stopped), rolling resistance.
