@@ -1,0 +1,355 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace TarmacGauntlet.Raceday
+{
+    /// <summary>
+    /// A drivable car: raycast suspension, a simple tyre model with a friction circle, engine and
+    /// gearbox, brakes with anti-lock, downforce and drag. Arrows steer, accelerate and brake,
+    /// A and Z shift up and down, M goes back to the automatic gearbox, H toggles steering help
+    /// and R puts the car back on track.
+    /// </summary>
+    [RequireComponent(typeof(Rigidbody))]
+    public sealed class CarController : MonoBehaviour
+    {
+        private const float Gravity = 9.81f;
+        private const float HardHit = 18f;        // m/s into a barrier that ends your run until you reset
+        private const float ShiftTime = 0.08f;
+
+        public CarSpec Spec { get; private set; }
+        public KeyboardState Keys;
+        public Circuit Circuit;
+
+        /// <summary>When false (free camera), the driving keys are ignored.</summary>
+        public bool InputEnabled = true;
+
+        public bool Automatic { get; private set; } = true;
+        public bool SteeringHelp { get; private set; } = true;
+        public bool Crashed { get; private set; }
+        /// <summary>0 is reverse, 1 and up are forward gears.</summary>
+        public int Gear { get; private set; } = 1;
+        public float Speed { get; private set; }
+        public float EngineFraction { get; private set; }
+
+        private Rigidbody body;
+        private readonly Wheel[] wheels = new Wheel[4];
+        private readonly Dictionary<Collider, SurfaceKind> surfaces = new Dictionary<Collider, SurfaceKind>();
+        private float throttle, brake, steerInput, steer;
+        private float shiftTimer, reverseTimer;
+
+        private sealed class Wheel
+        {
+            public Vector3 Mount;         // top of suspension travel, car space
+            public bool Front, Left;
+            public Transform Visual;
+            public Vector3 VisualRest;
+            public float Compression, Spin;
+            public bool Grounded;
+        }
+
+        public void Setup(CarSpec spec, Transform[] wheelVisuals)
+        {
+            Spec = spec;
+            body = GetComponent<Rigidbody>();
+            body.mass = spec.Mass;
+            body.centerOfMass = spec.CentreOfMass;
+            body.interpolation = RigidbodyInterpolation.Interpolate;
+            body.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+            body.maxAngularVelocity = 20f;
+
+            float mountY = spec.WheelRadius + spec.Travel - spec.StaticCompression;
+            for (int i = 0; i < 4; i++)
+            {
+                bool front = i < 2, left = i % 2 == 0;
+                var w = new Wheel
+                {
+                    Front = front,
+                    Left = left,
+                    Mount = new Vector3(left ? -spec.HalfTrack : spec.HalfTrack, mountY, front ? spec.HalfWheelbase : -spec.HalfWheelbase),
+                    Visual = wheelVisuals[i],
+                };
+                if (w.Visual != null) w.VisualRest = w.Visual.localPosition;
+                wheels[i] = w;
+            }
+        }
+
+        // ---------------------------------------------------------------- input
+
+        private void Update()
+        {
+            if (Spec == null || Keys == null) return;
+            bool on = InputEnabled && !Crashed;
+            float left = on && Keys.Held(KeyCode.LeftArrow) ? 1f : 0f;
+            float right = on && Keys.Held(KeyCode.RightArrow) ? 1f : 0f;
+            bool up = on && Keys.Held(KeyCode.UpArrow);
+            bool down = on && Keys.Held(KeyCode.DownArrow);
+            steerInput = right - left;
+
+            if (InputEnabled)
+            {
+                if (Keys.Pressed(KeyCode.R)) ResetToTrack();
+                if (Keys.Pressed(KeyCode.H)) SteeringHelp = !SteeringHelp;
+                if (Keys.Pressed(KeyCode.M)) Automatic = true;
+                if (Keys.Pressed(KeyCode.A)) Shift(+1);
+                if (Keys.Pressed(KeyCode.Z)) Shift(-1);
+            }
+
+            // Reverse: hold brake at a standstill to engage it, press accelerate to leave it.
+            float along = Vector3.Dot(Velocity, transform.forward);
+            // Keys are all or nothing, so pedals move over a fraction of a second, like a foot would.
+            float dt = Time.deltaTime;
+            bool gas, stop;
+            if (Gear == 0)
+            {
+                gas = down;
+                stop = up;
+                if (up && along > -0.5f) Gear = 1;
+            }
+            else
+            {
+                gas = up;
+                stop = down;
+                reverseTimer = down && !up && along < 0.5f ? reverseTimer + Time.deltaTime : 0f;
+                if (reverseTimer > 0.4f) Gear = 0;
+            }
+            throttle = Mathf.MoveTowards(throttle, gas ? 1f : 0f, (gas ? 3f : 8f) * dt);
+            brake = Mathf.MoveTowards(brake, stop ? 1f : 0f, (stop ? 6f : 10f) * dt);
+            if (Crashed) brake = 1f;
+        }
+
+        private void Shift(int direction)
+        {
+            Automatic = false;
+            int next = Mathf.Clamp(Gear + direction, 0, Spec.Gears.Length);
+            if (next == 0 && Vector3.Dot(Velocity, transform.forward) > 1f) return;
+            if (next != Gear) shiftTimer = ShiftTime;
+            Gear = next;
+        }
+
+        private Vector3 Velocity => body.GetPointVelocity(body.worldCenterOfMass);
+
+        // ---------------------------------------------------------------- physics
+
+        private void FixedUpdate()
+        {
+            if (Spec == null) return;
+            float dt = Time.fixedDeltaTime;
+            Vector3 v = Velocity;
+            float speed = v.magnitude;
+            Speed = speed;
+            float along = Vector3.Dot(v, transform.forward);
+
+            UpdateSteering(dt, speed);
+            float driveForce = Engine(dt, along);
+
+            // Aerodynamics: drag at the centre of mass, downforce split 45/55 front to rear.
+            float q = 0.5f * CarSpec.AirDensity * speed * speed;
+            if (speed > 0.1f) body.AddForce(-v / speed * (q * Spec.DragArea));
+            Vector3 down = -transform.up * (q * Spec.LiftArea);
+            body.AddForceAtPosition(down * 0.45f, transform.TransformPoint(new Vector3(0, 0, Spec.HalfWheelbase)));
+            body.AddForceAtPosition(down * 0.55f, transform.TransformPoint(new Vector3(0, 0, -Spec.HalfWheelbase)));
+
+            float brakeTotal = brake * Spec.BrakeDecel * Spec.Mass * Gravity;
+            for (int i = 0; i < 4; i++)
+            {
+                Wheel w = wheels[i];
+                float drive = w.Front ? 0f : driveForce * 0.5f;
+                float wheelBrake = brakeTotal * (w.Front ? Spec.FrontBrakeShare : 1f - Spec.FrontBrakeShare) * 0.5f;
+                TyreAndSpring(w, dt, drive, wheelBrake);
+            }
+        }
+
+        private void UpdateSteering(float dt, float speed)
+        {
+            float limit = Spec.SteerLock;
+            if (SteeringHelp && speed > 5f)
+            {
+                // Limit lock to roughly what the tyres can use at this speed, plus the peak slip angle.
+                float down = 0.5f * CarSpec.AirDensity * Spec.LiftArea * speed * speed;
+                float lateral = Spec.Grip * (Spec.Mass * Gravity + down) / Spec.Mass;
+                float radius = speed * speed / lateral;
+                limit = Mathf.Min(limit, Mathf.Atan(2f * Spec.HalfWheelbase / radius) + Spec.PeakSlip * 1.1f);
+            }
+            float target = steerInput * limit;
+            float rate = (Mathf.Abs(target) < Mathf.Abs(steer) || target * steer < 0f ? 4f : 2.2f) * Spec.SteerLock;
+            steer = Mathf.MoveTowards(steer, target, rate * dt);
+        }
+
+        /// <summary>Drive force at the rear wheels, and automatic gear changes.</summary>
+        private float Engine(float dt, float along)
+        {
+            float wheelSpeed = Mathf.Abs(along) / Spec.WheelRadius;
+            int g = Mathf.Max(Gear, 1);
+            float ratio = Gear == 0 ? Spec.Gears[0] : Spec.Gears[g - 1];
+            float x = wheelSpeed * ratio / Spec.Redline;
+            EngineFraction = Mathf.Clamp01(x);
+
+            if (Automatic && Gear > 0 && shiftTimer <= 0f)
+            {
+                if (x > 0.97f && Gear < Spec.Gears.Length && throttle > 0f) { Gear++; shiftTimer = ShiftTime; }
+                else if (Gear > 1 && wheelSpeed * Spec.Gears[Gear - 2] / Spec.Redline < 0.8f) { Gear--; shiftTimer = ShiftTime; }
+            }
+            if (shiftTimer > 0f)
+            {
+                shiftTimer -= dt;
+                return 0f;
+            }
+
+            float direction = Gear == 0 ? -1f : 1f;
+            if (throttle > 0f && x < 1f)
+            {
+                // Below a fifth of the redline the clutch slips, so the car still pulls away.
+                float xe = Mathf.Max(x, 0.2f);
+                float torque = Spec.PowerAt(xe) / (xe * Spec.Redline);
+                return direction * throttle * torque * ratio / Spec.WheelRadius;
+            }
+            // Engine braking off the throttle.
+            float drag = 0.08f * Spec.PeakPower / Spec.Redline * ratio / Spec.WheelRadius * Mathf.Clamp01(x);
+            return -Mathf.Sign(along) * drag;
+        }
+
+        private void TyreAndSpring(Wheel w, float dt, float drive, float wheelBrake)
+        {
+            Vector3 origin = transform.TransformPoint(w.Mount);
+            Vector3 up = transform.up;
+            float reach = Spec.Travel + Spec.WheelRadius;
+            float previous = w.Compression;
+            w.Grounded = Physics.Raycast(origin, -up, out RaycastHit hit, reach, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+            w.Compression = w.Grounded ? reach - hit.distance : 0f;
+
+            if (w.Grounded)
+            {
+                float load = Spec.SpringRate * w.Compression + Spec.Damping * (w.Compression - previous) / dt;
+                load = Mathf.Max(0f, load);
+                body.AddForceAtPosition(up * load, origin);
+
+                SurfaceKind kind = SurfaceOf(hit.collider);
+                float angle = w.Front ? steer : 0f;
+                Vector3 n = hit.normal;
+                Vector3 forward = Vector3.ProjectOnPlane(Quaternion.AngleAxis(angle * Mathf.Rad2Deg, up) * transform.forward, n).normalized;
+                Vector3 side = Vector3.Cross(n, forward);
+                Vector3 pv = body.GetPointVelocity(hit.point);
+                float vLong = Vector3.Dot(pv, forward);
+                float vLat = Vector3.Dot(pv, side);
+                float corner = Spec.Mass / 4f;
+                float cap = Spec.Grip * TrackSurface.Grip(kind) * load;
+
+                // Lateral: slip-angle curve at speed, plain damping when nearly stopped.
+                float fy;
+                if (Mathf.Abs(vLong) < 4f && Mathf.Abs(vLat) < 4f)
+                    fy = Mathf.Clamp(-vLat * corner * 8f, -cap, cap);
+                else
+                {
+                    float slip = Mathf.Atan2(vLat, Mathf.Abs(vLong));
+                    float b = 1.732f / Spec.PeakSlip;
+                    fy = -cap * Mathf.Sin(1.5f * Mathf.Atan(b * slip));
+                }
+
+                // Longitudinal: drive, brakes (holding the car still when nearly stopped), rolling resistance.
+                float fx = drive;
+                bool braking = wheelBrake > 0f;
+                if (braking)
+                    fx += Mathf.Abs(vLong) < 0.5f ? Mathf.Clamp(-vLong * corner * 10f, -wheelBrake, wheelBrake) : -Mathf.Sign(vLong) * wheelBrake;
+                fx -= Mathf.Clamp(vLong * 4f, -1f, 1f) * TrackSurface.Rolling(kind) * load;
+
+                // Friction circle. Anti-lock keeps steering under braking; wheelspin costs side grip.
+                if (fx * fx + fy * fy > cap * cap)
+                {
+                    if (braking && drive == 0f)
+                        fx = Mathf.Sign(fx) * Mathf.Sqrt(Mathf.Max(cap * cap - fy * fy, 0.09f * cap * cap));
+                    else if (Mathf.Abs(fx) > cap * 0.95f)
+                    {
+                        fx = Mathf.Sign(fx) * cap * 0.9f;
+                        fy *= 0.6f;
+                    }
+                    float total = Mathf.Sqrt(fx * fx + fy * fy);
+                    if (total > cap)
+                    {
+                        fx *= cap / total;
+                        fy *= cap / total;
+                    }
+                }
+                body.AddForceAtPosition(forward * fx + side * fy, hit.point);
+                w.Spin += vLong / Spec.WheelRadius * dt;
+            }
+            else if (!w.Front && drive != 0f)
+                w.Spin += Mathf.Sign(drive) * 30f * dt;
+        }
+
+        private SurfaceKind SurfaceOf(Collider c)
+        {
+            if (!surfaces.TryGetValue(c, out SurfaceKind kind))
+            {
+                TrackSurface s = c.GetComponent<TrackSurface>();
+                kind = s != null ? s.Kind : SurfaceKind.Tarmac;
+                surfaces[c] = kind;
+            }
+            return kind;
+        }
+
+        // ---------------------------------------------------------------- visuals
+
+        private void LateUpdate()
+        {
+            if (Spec == null) return;
+            foreach (Wheel w in wheels)
+            {
+                if (w.Visual == null) continue;
+                float drop = Spec.StaticCompression - w.Compression;
+                if (!w.Grounded) drop = Spec.StaticCompression - 0f;
+                w.Visual.localPosition = w.VisualRest + Vector3.down * Mathf.Min(drop, Spec.Travel);
+                float yaw = w.Front ? steer * Mathf.Rad2Deg : 0f;
+                w.Visual.localRotation = Quaternion.Euler(0f, yaw, 0f) * Quaternion.Euler(w.Spin * Mathf.Rad2Deg, 0f, 0f);
+            }
+        }
+
+        // ---------------------------------------------------------------- crashes and resets
+
+        private void OnCollisionEnter(Collision collision)
+        {
+            if (Crashed || SurfaceOf(collision.collider) != SurfaceKind.Barrier) return;
+            float into = 0f;
+            for (int i = 0; i < collision.contactCount; i++)
+                into = Mathf.Max(into, Mathf.Abs(Vector3.Dot(collision.relativeVelocity, collision.GetContact(i).normal)));
+            if (into < HardHit) return;
+            Crashed = true;
+            Stop();
+        }
+
+        private void Stop()
+        {
+            body.AddForce(-Velocity, ForceMode.VelocityChange);
+            body.AddTorque(-body.angularVelocity, ForceMode.VelocityChange);
+        }
+
+        /// <summary>Puts the car back on the centre line at the nearest point of the track, at rest.</summary>
+        public void ResetToTrack()
+        {
+            if (Circuit == null) return;
+            Vector3 p = transform.position;
+            int best = 0;
+            float bestDistance = float.MaxValue;
+            for (int k = 0; k < Circuit.Count; k++)
+            {
+                float d = (Circuit.Centre[k] - p).sqrMagnitude;
+                if (d < bestDistance) { bestDistance = d; best = k; }
+            }
+            PlaceAt(best, 0f);
+        }
+
+        /// <summary>Puts the car at rest on the track at a sample and lateral offset, facing forwards.</summary>
+        public void PlaceAt(int k, float lateral)
+        {
+            Vector3 p = Circuit.Surface(k, lateral) + Vector3.up * 0.05f;
+            Quaternion r = Quaternion.LookRotation(Circuit.Forward[k], Vector3.up);
+            body.position = p;
+            body.rotation = r;
+            transform.SetPositionAndRotation(p, r);
+            Stop();
+            Crashed = false;
+            Gear = 1;
+            steer = 0f;
+            foreach (Wheel w in wheels) w.Compression = Spec.StaticCompression;
+        }
+    }
+}

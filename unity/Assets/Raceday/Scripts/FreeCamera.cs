@@ -19,13 +19,16 @@ namespace TarmacGauntlet.Raceday
         private Vector2 guiLook;
         private bool legacyMouse = true;
 
-        private void Start()
+        private void OnEnable()
         {
             Vector3 e = transform.eulerAngles;
             yaw = e.y;
             pitch = e.x > 180 ? e.x - 360 : e.x;
+            held.Clear();
             Capture(true);
         }
+
+        private void OnDisable() => Capture(false);
 
         private static void Capture(bool on)
         {

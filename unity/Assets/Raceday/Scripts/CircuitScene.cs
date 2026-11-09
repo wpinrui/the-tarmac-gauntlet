@@ -2,11 +2,15 @@ using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
 {
-    /// <summary>Builds the circuit, the sun and a free camera when the scene starts.</summary>
+    /// <summary>Builds the circuit, the sun, the player's car on pole and the cameras when the scene starts.</summary>
     public sealed class CircuitScene : MonoBehaviour
     {
+        private const string PlayerCar = "a-29";
+        private const string PlayerModel = "Assets/Art/Vehicles/CheonmaCX24Si/CheonmaCX24Si.obj";
+
         private void Awake()
         {
+            Time.fixedDeltaTime = 0.01f;
             var circuit = new Circuit(CircuitData.Load());
             var track = new GameObject("Circuit");
             foreach (CircuitPart part in new CircuitBuilder(circuit, new CircuitMaterials()).Build())
@@ -16,10 +20,19 @@ namespace TarmacGauntlet.Raceday
                 Mesh mesh = part.Kit.ToMesh(part.Name);
                 go.AddComponent<MeshFilter>().sharedMesh = mesh;
                 go.AddComponent<MeshRenderer>().sharedMaterial = part.Material;
-                if (part.Solid) go.AddComponent<MeshCollider>().sharedMesh = mesh;
+                if (part.Solid)
+                {
+                    go.AddComponent<MeshCollider>().sharedMesh = mesh;
+                    go.AddComponent<TrackSurface>().Kind = TrackSurface.ForPart(part.Name);
+                }
             }
             Sun();
-            Camera(circuit);
+
+            var keys = new GameObject("Keyboard").AddComponent<KeyboardState>();
+            CarController car = CarBuilder.Spawn(PlayerCar, PlayerModel, circuit, keys);
+            GridSlot pole = circuit.Data.grid.slots[0];
+            car.PlaceAt(circuit.IndexOf(pole.d - 2.6f), pole.lateral);   // front wheels just behind the line
+            Camera(circuit, car, keys);
         }
 
         private static void Sun()
@@ -44,7 +57,7 @@ namespace TarmacGauntlet.Raceday
             QualitySettings.shadowDistance = 400f;
         }
 
-        private static void Camera(Circuit circuit)
+        private static void Camera(Circuit circuit, CarController car, KeyboardState keys)
         {
             Camera cam = UnityEngine.Camera.main;
             if (cam == null)
@@ -63,6 +76,9 @@ namespace TarmacGauntlet.Raceday
             cam.transform.position = p;
             cam.transform.rotation = Quaternion.LookRotation(circuit.Centre[circuit.IndexOf(40f)] - p);
             cam.gameObject.AddComponent<FreeCamera>();
+            RaceCameras views = cam.gameObject.AddComponent<RaceCameras>();
+            views.Car = car;
+            views.Keys = keys;
         }
     }
 }

@@ -248,7 +248,7 @@ namespace TarmacGauntlet.Raceday
                     KerbRun(kit, -outside, mid - half, mid + half);
                     KerbRun(kit, outside, arc.s + len * 0.6f, arc.e + 25f);
                 }
-            Emit("Kerbs", kit, m?.Kerb);
+            Emit("Kerbs", kit, m?.Kerb, true);
         }
 
         private void KerbRun(MeshKit kit, float sign, float from, float to)
@@ -288,9 +288,9 @@ namespace TarmacGauntlet.Raceday
                 foreach (List<int> run in Runs(k => !open[side][k] && gravel[side][k] > Verge + 1f))
                     grav.Strip(Rows(run, k => Across(sign, c.HalfWidth(k) + Verge, c.HalfWidth(k) + gravel[side][k]), 0.03f, true), 3f, 3f);
             }
-            Emit("Verges", verge, m?.Verge);
-            Emit("Grass runoff", grass, m?.Grass);
-            Emit("Gravel traps", grav, m?.Gravel);
+            Emit("Verges", verge, m?.Verge, true);
+            Emit("Grass runoff", grass, m?.Grass, true);
+            Emit("Gravel traps", grav, m?.Gravel, true);
         }
 
         private void Barriers()
@@ -420,7 +420,7 @@ namespace TarmacGauntlet.Raceday
                 fill.Strip(band, 6f, 6f);
                 fill.Strip(edge, 6f, 6f, true);
             }
-            Emit("Pit lane infield", fill, m?.Grass);
+            Emit("Pit lane infield", fill, m?.Grass, true);
 
             var paint = new MeshKit();
             // Edge lines: garage side all along; track side wherever the lane is clear of the track.
@@ -505,7 +505,7 @@ namespace TarmacGauntlet.Raceday
             var fill = new MeshKit();
             foreach (List<int> run in Runs(Joining))
                 fill.Strip(Rows(run, k => new[] { c.HalfWidth(k) + laneGap[k] + 0.5f, c.HalfWidth(k) }, 0.004f), 4f, 4f);
-            Emit("Pit road joins", fill, m?.PitAsphalt);
+            Emit("Pit road joins", fill, m?.PitAsphalt, true);
 
             // Entry: red and white painted area between the track and the pit road, bollard at its nose.
             foreach (List<int> run in Runs(k => Joining(k) && NearEntry(k)))
@@ -526,7 +526,7 @@ namespace TarmacGauntlet.Raceday
 
             Emit("Pit entry hatching", hatch, m?.Hatch);
             Emit("Pit exit line", white, m?.White);
-            Emit("Pit entry bollard", bollard, m?.Bollard);
+            Emit("Pit entry bollard", bollard, m?.Bollard, true);
         }
 
         private void Garages()
@@ -686,7 +686,7 @@ namespace TarmacGauntlet.Raceday
             }
             var kit = new MeshKit();
             kit.Strip(rows, 8f, 8f);
-            Emit("Ground", kit, m?.Terrain);
+            Emit("Ground", kit, m?.Terrain, true);
         }
 
         // ---------------------------------------------------------------- helpers
