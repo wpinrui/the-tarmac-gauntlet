@@ -271,15 +271,106 @@ def shut_lines(shell, bvh):
 BAND = 0.028   # black surround around every window
 
 
+PILLAR = []   # cached A-pillar line: x, y, z where the greenhouse turns through 45 degrees
+
+
+def pillar_line():
+    """The A-pillar runs where the greenhouse surface faces 45 degrees between up and out.
+    The windscreen stops there from above and the side glass stops there from the side."""
+    if not PILLAR:
+        sc = ROWS["screen"]
+        for x in np.linspace(sc["x_top"] - 0.25, sc["x_side"] + 0.02, 48):
+            for y in np.linspace(0.3, 0.86, 600):
+                loc, n = hit(BVH[0], TOP(), x, y)
+                if n[1] >= n[2]:
+                    PILLAR.append(loc)
+                    break
+    return np.array(PILLAR)
+
+
+def screen_outline():
+    """Windscreen surround in plan. Its sides stop on the A-pillar line."""
+    sc = ROWS["screen"]
+    x_top, x_base, x_side = sc["x_top"], sc["x_base"], sc["x_side"]
+    pl = pillar_line()
+    edge = lambda x: float(np.interp(x, pl[:, 0], pl[:, 1])) - 0.004
+    xs = np.linspace(x_side, x_top, 30)
+    left = [(x, edge(x)) for x in xs]
+    hb = edge(x_side)
+    base = [(x_base + (x_side - x_base) * (y / hb) ** 2, y) for y in np.linspace(-hb, hb, 25)]
+    right = [(x, -y) for x, y in left[::-1]]
+    return Polygon(base + left[1:] + right[:-1]).buffer(0)
+
+
+def side_outline():
+    """Side glass surround in side view. Its front top edge rises to the A-pillar line, then
+    blends into the drawn roof line behind the windscreen."""
+    dlo = Polygon(smooth_poly(ROWS["dlo"], 6)).buffer(0)
+    sc = ROWS["screen"]
+    pl = pillar_line()
+    top = ROWS["dlo"][1:10]   # front corner up over the roof line
+    tx = np.array([p[0] for p in top])[::-1]
+    tz = np.array([p[1] for p in top])[::-1]
+    xs = np.linspace(sc["x_top"] - 0.2, sc["x_side"], 50)
+    w = np.clip((xs - (sc["x_top"] - 0.2)) / 0.3, 0, 1)
+    w = w * w * (3 - 2 * w)
+    t = w * (np.interp(xs, pl[:, 0], pl[:, 2]) - 0.004) + (1 - w) * np.interp(xs, tx, tz)
+    fill = Polygon(list(zip(xs, t)) + [(xs[-1], 0.94), (xs[0], 0.94)]).buffer(0)
+    out = unary_union([dlo, fill]).buffer(0.01, join_style=1).buffer(-0.01, join_style=1)
+    return out
+
+
+def pillar_strip(bvh):
+    """Black strip over the A-pillar corner, joining the windscreen and side glass surrounds."""
+    sc = ROWS["screen"]
+    pl = pillar_line()
+    xs = np.linspace(sc["x_side"], sc["x_top"], 40)
+    out = []
+    for s, tag in ((1, "l"), (-1, "r")):
+        grid = []
+        for x in xs:
+            y = float(np.interp(x, pl[:, 0], pl[:, 1]))
+            z = float(np.interp(x, pl[:, 0], pl[:, 2]))
+            a, _n = hit(bvh, TOP(), x, y - 0.014)
+            b, _n = hit(bvh, SIDE(1), x, z - 0.014)
+            row = []
+            for k in np.linspace(0, 1, 9):
+                q = a + (b - a) * k
+                loc, nrm, _i, _d = bvh.find_nearest(Vector(q))
+                row.append((np.array(loc), np.array(nrm)))
+            grid.append(row)
+        ni, nj = len(grid), len(grid[0])
+        verts = []
+        for d in (0.004, 0.0005):
+            for row in grid:
+                for loc, nrm in row:
+                    p = loc + nrm * d
+                    verts.append((p[0], p[1] * s, p[2]))
+        idx = lambda layer, i, j: layer * ni * nj + i * nj + j
+        faces = []
+        for i in range(ni - 1):
+            for j in range(nj - 1):
+                faces.append((idx(0, i, j), idx(0, i + 1, j), idx(0, i + 1, j + 1), idx(0, i, j + 1)))
+                faces.append((idx(1, i, j + 1), idx(1, i + 1, j + 1), idx(1, i + 1, j), idx(1, i, j)))
+        for i in range(ni - 1):
+            for j in (0, nj - 1):
+                faces.append((idx(0, i, j), idx(1, i, j), idx(1, i + 1, j), idx(0, i + 1, j)))
+        for j in range(nj - 1):
+            for i in (0, ni - 1):
+                faces.append((idx(0, i, j), idx(0, i, j + 1), idx(1, i, j + 1), idx(1, i, j)))
+        out.append(make(f"a_pillar_{tag}", verts, faces, "trim"))
+    return out
+
+
 def glass_shapes():
     """Shapely outlines: surround, glass panes, per window, in their frame's 2D space."""
-    dlo = Polygon(smooth_poly(ROWS["dlo"], 6)).buffer(0)
+    dlo = side_outline()
     inner = dlo.buffer(-BAND, join_style=1)
     bp = ROWS["b_pillar"]
     xa, xb = min(p[0] for p in bp), max(p[0] for p in bp)
     door = inner.intersection(sbox(xb, -1, 5, 3))
     quarter = inner.intersection(sbox(-5, -1, xa, 3))
-    screen = Polygon(smooth_poly(ROWS["screen"], 6)).buffer(0)
+    screen = screen_outline()
     rear = Polygon(smooth_poly(ROWS["rear_glass"], 6)).buffer(0)
     if BVH:
         rear = fit(BVH[0], rear, REAR(), lambda p: p[0] < -1.15)
@@ -303,7 +394,7 @@ def windows(bvh):
         outer, panes = g[key]
         obs += lay(bvh, f"{key}_trim", outer.difference(panes[0]), frame, 0.0015, 0.0045, "trim")
         obs += lay(bvh, f"{key}_glass", panes[0], frame, 0.002, 0.006, "glass")
-    return obs
+    return obs + pillar_strip(bvh)
 
 
 def resample(poly, n):
@@ -420,10 +511,10 @@ def grille(bvh):
     chin = Polygon(smooth_poly(full(ROWS["chin"]), 4)).buffer(0)
     obs += lay(bvh, "chin", chin, FRONT(), 0.0008, 0.004, "grille")
     band = Polygon(smooth_poly(full(ROWS["rear_band"]), 4)).buffer(0)
-    obs += lay(bvh, "rear_band", band, REAR(), 0.0008, 0.004, "grille")
+    obs += lay(bvh, "rear_band", band, REAR(), 0.0008, 0.004, "body")
     for s, tag in ((1, "l"), (-1, "r")):
         strip = Polygon(ROWS["strip"]).buffer(0.002, join_style=1)
-        obs += lay(bvh, f"side_strip_{tag}", strip, SIDE(s), 0.0008, 0.006, "trim")
+        obs += lay(bvh, f"side_strip_{tag}", strip, SIDE(s), 0.0008, 0.006, "body")
     return obs
 
 
