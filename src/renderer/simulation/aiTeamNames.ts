@@ -20,7 +20,7 @@ export const AI_TEAM_ROSTER: AiTeamEntry[] = [
   { name: "Backfire Racing",              descriptor: "three mates and a trailer", carClass: "F" },
   { name: "Shed Speed Co.",               descriptor: "built in an actual garden shed", carClass: "F" },
   { name: "Clutch & Pray",                descriptor: "optimistic underdogs", carClass: "F" },
-  { name: "Spare Parts Racing",            descriptor: "the car is mostly replacement bits", carClass: "F" },
+  { name: "Spare Parts Racing",           descriptor: "the car is mostly replacement bits", carClass: "F" },
   { name: "Gravel Trap Racing",           descriptor: "frequent visitors to the run-off area", carClass: "F" },
   { name: "Duct Tape Dynamics",           descriptor: "structural integrity is a suggestion", carClass: "F" },
   { name: "Flatbed Legends",              descriptor: "arrive on a flatbed, leave on a flatbed", carClass: "F" },
@@ -89,15 +89,15 @@ export const AI_TEAM_ROSTER: AiTeamEntry[] = [
   // -----------------------------------------------------------------------
   // CLASS C — 15 teams
   // -----------------------------------------------------------------------
-  { name: "Team Hando Racing",            descriptor: "Hando's official touring/GT squad", carClass: "C" },
-  { name: "Ichisan Racing",               descriptor: "Ichisan's factory GT programme", carClass: "C" },
-  { name: "Greystone Maecides OMG",       descriptor: "Maecides-supported independent squad", carClass: "C" },
-  { name: "Vosper Fuud Racing",           descriptor: "Fuud-backed privateer with works engines", carClass: "C" },
-  { name: "KNS Tonata",                   descriptor: "Tonata's Southeast Asian satellite programme", carClass: "C" },
+  { name: "Team Motoda Racing",           descriptor: "Motoda's official touring/GT squad", carClass: "C" },
+  { name: "Hinode Racing",                descriptor: "Hinode's factory GT programme", carClass: "C" },
+  { name: "Greystone Sternwerk",          descriptor: "Sternwerk-supported independent squad", carClass: "C" },
+  { name: "Vosper Wade Racing",           descriptor: "Wade-backed privateer with works engines", carClass: "C" },
+  { name: "KNS Inada",                    descriptor: "Inada's Southeast Asian satellite programme", carClass: "C" },
   { name: "Premier Racing",               descriptor: "feeder-series talent factory gone GT", carClass: "C" },
   { name: "CRAFT Grand Prix",             descriptor: "elite junior formula team stepping up", carClass: "C" },
   { name: "Agile 1 Motorsport",           descriptor: "technical sponsor turned team owner", carClass: "C" },
-  { name: "Complete Energy Racing",        descriptor: "fuel company's professional GT outfit", carClass: "C" },
+  { name: "Complete Energy Racing",       descriptor: "fuel company's professional GT outfit", carClass: "C" },
   { name: "High Tech Racing",             descriptor: "engineering-first operation with junior pedigree", carClass: "C" },
   { name: "Virtuoso Racing",              descriptor: "polished operation punching into the pro ranks", carClass: "C" },
   { name: "Carline Racing",               descriptor: "top-tier feeder series outfit stepping into GT", carClass: "C" },
@@ -108,12 +108,12 @@ export const AI_TEAM_ROSTER: AiTeamEntry[] = [
   // -----------------------------------------------------------------------
   // CLASS B — 12 teams
   // -----------------------------------------------------------------------
-  { name: "Scuderia Feretti",             descriptor: "Feretti's official works racing team", carClass: "B" },
-  { name: "Maecides-OMG Team",            descriptor: "Maecides' performance division works entry", carClass: "B" },
-  { name: "Fuud Performance Racing",      descriptor: "Fuud's factory GT programme", carClass: "B" },
-  { name: "Molteni Corse",                descriptor: "Feretti customer team, Italian privateer", carClass: "B" },
-  { name: "Apex McRaven",                 descriptor: "McRaven satellite with factory parts supply", carClass: "B" },
-  { name: "Stonebridge Rocher",           descriptor: "British-run Rocher customer racing outfit", carClass: "B" },
+  { name: "Scuderia Fabbrini",            descriptor: "Fabbrini's official works racing team", carClass: "B" },
+  { name: "Sternwerk Works Team",         descriptor: "Sternwerk's performance division works entry", carClass: "B" },
+  { name: "Wade Performance Racing",      descriptor: "Wade's factory GT programme", carClass: "B" },
+  { name: "Molteni Corse",                descriptor: "Fabbrini customer team, Italian privateer", carClass: "B" },
+  { name: "Apex Kiwa",                    descriptor: "Kiwa satellite with factory parts supply", carClass: "B" },
+  { name: "Stonebridge Rossler",          descriptor: "British-run Rossler customer racing outfit", carClass: "B" },
   { name: "Sip Vanessa Racing",           descriptor: "veteran-run multi-series operation", carClass: "B" },
   { name: "BG Corsa",                     descriptor: "Italian GT privateer powerhouse", carClass: "B" },
   { name: "Blue Cow Racing",              descriptor: "energy drink empire's factory racing arm", carClass: "B" },
@@ -124,11 +124,11 @@ export const AI_TEAM_ROSTER: AiTeamEntry[] = [
   // -----------------------------------------------------------------------
   // CLASS A — 12 teams
   // -----------------------------------------------------------------------
-  { name: "McRaven Racing",               descriptor: "McRaven's factory endurance programme", carClass: "A" },
-  { name: "Rocher Motorsport",            descriptor: "Rocher's flagship prototype operation", carClass: "A" },
+  { name: "Kiwa Racing",                  descriptor: "Kiwa's factory endurance programme", carClass: "A" },
+  { name: "Rossler Motorsport",           descriptor: "Rossler's flagship prototype operation", carClass: "A" },
   { name: "Nodi Sport Team",              descriptor: "Nodi's factory LMP effort", carClass: "A" },
-  { name: "Team Tonata",                  descriptor: "Tonata's global endurance works team", carClass: "A" },
-  { name: "Bureau Sport",                 descriptor: "Bureau's works prototype team", carClass: "A" },
+  { name: "Team Inada",                   descriptor: "Inada's global endurance works team", carClass: "A" },
+  { name: "Leonce Sport",                 descriptor: "Leonce's works prototype team", carClass: "A" },
   { name: "Panski Autosport",             descriptor: "multi-discipline racing dynasty", carClass: "A" },
   { name: "Avetti Motorsport",            descriptor: "expanding privateer empire", carClass: "A" },
   { name: "Revolution Racing",            descriptor: "Swiss-bankrolled endurance privateer", carClass: "A" },
