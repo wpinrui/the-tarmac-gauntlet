@@ -183,13 +183,13 @@ data = {
     "spoiler": {"outline": side([(1120, 74), (1170, 74), (1215, 76), (1238, 81), (1234, 90),
                                  (1205, 106), (1170, 98), (1125, 86)]), "half": 0.60},
     "strip": side([(437, 378), (1100, 352), (1100, 360), (437, 387)]),
-    "mirror": {"x": X(545), "y": 0.875, "z": Z(212), "rx": 0.10, "ry": 0.085, "rz": 0.062,
-               "arm_z0": Z(250),
-               "base": side([(470, 240), (520, 240), (520, 262), (470, 262)])},
+    # Door mirror: housing from its flat glass face forward, sail plate on the door in side px.
+    "mirror": {"x_rear": X(560), "depth": 0.11, "y_in": 0.75, "y_out": 0.94, "z": Z(212),
+               "h_in": 0.075, "h_out": 0.115,
+               "sail": side([(452, 240), (447, 224), (470, 206), (560, 206), (566, 240)])},
     # Shut lines in side px (door) and plan (bonnet), rear view (tailgate).
     "door_shut": side([(925, 226), (921, 300), (918, 400), (912, 470), (880, 474), (470, 474),
-                       (448, 468), (430, 420), (416, 340), (405, 260), (398, 208)]),
-    "bonnet_shut": [[X(px), y] for px, y in [(392, -0.66), (392, 0.66)]],
+                       (448, 468), (430, 420), (418, 340), (424, 280), (440, 240)]),
     "bonnet_front": front([(196, 336), (300, 331), (413, 333), (526, 331), (630, 336)]),
     "tailgate_shut": rear([(166, 214), (196, 300), (222, 400), (236, 444), (744, 444),
                            (758, 400), (784, 300), (814, 214)]),
@@ -198,10 +198,11 @@ data = {
 data["head_back"] = X(232)    # rear tip of the headlight in the side view
 data["tail_front"] = X(1288)  # front tip of the tail light in the side view
 data["opts"] = {"nose_z": FZ(372), "bonnet_x": X(170), "rear_z1": RZ(262), "rear_z2": RZ(350),
-                "name_y": RY(262), "name_z": RZ(393), "quarter_x": X(1060), "quarter_z": Z(300)}
+                "name_y": round(RY(262) - 0.06, 4),  # clear of the tailgate gap
+                "name_z": RZ(393), "quarter_x": X(1060), "quarter_z": Z(300)}
 
-# Ivan's picks from the viewer (filled in once he chooses).
-data["picks"] = {"frontbadge": 1, "rearbadge": 1, "name": 1}
+# Ivan's picks from the viewer.
+data["picks"] = {"frontbadge": 1, "rearbadge": 1, "name": 2}
 
 if __name__ == "__main__":
     out = Path(__file__).with_name("rows.json")

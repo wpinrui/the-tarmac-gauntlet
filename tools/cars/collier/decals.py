@@ -25,7 +25,7 @@ def badge_layers():
     clapper = [(100 + 8 * np.cos(t), 157 + 8 * np.sin(t)) for t in a]
     crown = [(92, 44), (108, 44), (108, 52), (92, 52)]
     gold = [bell[:-1], clapper[::-1], crown]
-    return [(red, "badge_red", 0), (navy, "badge_navy", 1), (gold, "badge_gold", 2)]
+    return [(red, "chrome", 0), (navy, "badge_navy", 1), (gold, "chrome", 2)]
 
 
 def _densify(loop, max_edge):

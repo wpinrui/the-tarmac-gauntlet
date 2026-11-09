@@ -148,13 +148,58 @@ def spoiler():
     return _close(rings)
 
 
-def mirror_parts():
+def mirror_profile(sgn, scale=1.0, n=48, p=4.0):
+    """Back face of the mirror in (y, z): a rounded trapezoid, taller at the outboard end."""
     m = ROWS["mirror"]
-    out = {}
-    for side, sgn in (("l", 1), ("r", -1)):
-        y = m["y"] * sgn
-        out[f"mirror_{side}"] = (*ellipsoid(m["x"], y, m["z"], m["rx"], m["ry"], m["rz"]), "body")
-    return out
+    cy = (m["y_in"] + m["y_out"]) / 2
+    hw = (m["y_out"] - m["y_in"]) / 2
+    out = []
+    for a in np.linspace(0, 2 * np.pi, n, endpoint=False):
+        c, s = np.cos(a), np.sin(a)
+        u = np.sign(c) * abs(c) ** (2 / p)
+        v = np.sign(s) * abs(s) ** (2 / p)
+        hh = (m["h_in"] + (m["h_out"] - m["h_in"]) * (u + 1) / 2) / 2
+        out.append(((cy + hw * u * scale) * sgn, m["z"] + hh * v * scale))
+    return np.array(out)
+
+
+def mirror_housing(sgn):
+    """Housing lofted forward from the flat back to a rounded nose."""
+    m = ROWS["mirror"]
+    prof = mirror_profile(sgn)
+    c = prof.mean(0)
+    rings = []
+    for x, k in [(0.0, 0.95), (0.006, 1.0)] + [(t * m["depth"], (1 - t ** 2.2) ** (1 / 2.2))
+                                                for t in np.linspace(0.08, 0.98, 14)]:
+        q = c + (prof - c) * k
+        rings.append(np.column_stack([np.full(len(q), m["x_rear"] + x), q]))
+    return _close(rings)
+
+
+def mirror_glass(sgn):
+    m = ROWS["mirror"]
+    q = mirror_profile(sgn, 0.86)
+    a = np.column_stack([np.full(len(q), m["x_rear"] + 0.003), q])
+    b = np.column_stack([np.full(len(q), m["x_rear"] + 0.006), q])
+    return _close([a, b])
+
+
+def mirror_recess(sgn):
+    m = ROWS["mirror"]
+    q = mirror_profile(sgn, 0.88)
+    a = np.column_stack([np.full(len(q), m["x_rear"] - 0.01), q])
+    b = np.column_stack([np.full(len(q), m["x_rear"] + 0.006), q])
+    return _close([a, b])
+
+
+def mirror_stalk(sgn, y_body):
+    """Short black stalk from the sail plate out to the housing's inboard end."""
+    m = ROWS["mirror"]
+    x0 = m["x_rear"] + 0.03
+    a = np.linspace(0, 2 * np.pi, 24, endpoint=False)
+    ring = lambda y: np.column_stack([x0 + 0.03 + 0.028 * np.cos(a), np.full(24, y * sgn),
+                                      m["z"] - 0.012 + 0.016 * np.sin(a)])
+    return _close([ring(y_body - 0.01), ring(m["y_in"] + 0.03)])
 
 
 def exhaust_parts():

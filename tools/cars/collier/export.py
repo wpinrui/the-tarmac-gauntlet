@@ -40,9 +40,7 @@ MATERIALS = {
     "hub": ((0.45, 0.45, 0.47), 0.8, 1.0, None),
     "mirror_glass": ((0.55, 0.6, 0.65), 1.0, 1.0, None),
     "interior": ((0.09, 0.09, 0.10), 0.2, 1.0, None),
-    "badge_red": ((0.749, 0.165, 0.184), 0.6, 1.0, None),
     "badge_navy": ((0.078, 0.157, 0.294), 0.6, 1.0, None),
-    "badge_gold": ((0.780, 0.604, 0.243), 0.9, 1.0, None),
     "name": ((0.80, 0.81, 0.83), 1.0, 1.0, None),
     "lamp_head": ((0.95, 0.95, 0.92), 0.9, 1.0, (1.0, 0.97, 0.9)),
     "lamp_tail": ((0.45, 0.03, 0.03), 0.6, 1.0, (0.55, 0.0, 0.0)),
@@ -54,7 +52,7 @@ REAR_LIMIT = ROWS["wheel"]["rear_x"] - ROWS["wheel"]["arch_r"] - 0.03
 HEAD_BACK = ROWS["head_back"]
 TAIL_FRONT = ROWS["tail_front"]
 BVH = []
-SIDE_CUT = ROWS["mirror"]["y"] - ROWS["mirror"]["ry"] - 0.006
+SIDE_CUT = ROWS["mirror"]["y_in"] - 0.016
 FRONT = lambda: ((6.0, 0, 0), (0, 1, 0), (0, 0, 1), (-1, 0, 0))
 REAR = lambda: ((-6.0, 0, 0), (0, 1, 0), (0, 0, 1), (1, 0, 0))
 TOP = lambda: ((0, 0, 6.0), (1, 0, 0), (0, 1, 0), (0, 0, -1))
@@ -200,31 +198,19 @@ def cut_arches(shell):
             boolean(shell, cylinder_y("arch", x, w["r"], w["arch_r"], y0, y1, "trim"), "DIFFERENCE")
 
 
-def mirrors(shell):
-    m = ROWS["mirror"]
-    for sgn in (1, -1):
-        y = m["y"] * sgn
-        boolean(shell, make("mirror", *parts.ellipsoid(m["x"], y, m["z"], m["rx"], m["ry"], m["rz"]), "body"), "UNION")
-        y0, y1 = sorted((0.62 * sgn, (m["y"] - 0.02) * sgn))
-        boolean(shell, make("mirror_arm", *parts.box(m["x"] - 0.065, m["x"] - 0.005, y0, y1, m["arm_z0"], m["z"] - 0.03), "trim"), "UNION")
-        # recess for the glass on the flat back
-        xb = m["x"] - m["rx"] * 0.35
-        k = np.sqrt(1 - 0.35 ** 2) * 0.80
-        a = np.linspace(0, 2 * np.pi, 32, endpoint=False)
-        ring = np.column_stack([np.zeros(32), y + m["ry"] * k * np.cos(a), m["z"] + m["rz"] * k * np.sin(a)])
-        boolean(shell, prism("recess", ring + [xb - 0.01, 0, 0], ring + [xb + 0.006, 0, 0], "trim"), "DIFFERENCE")
-
-
-def mirror_glass():
+def mirrors(bvh):
+    """Body-coloured housing with glass in its flat back, on a black stalk and sail plate."""
     m = ROWS["mirror"]
     obs = []
     for sgn, tag in ((1, "l"), (-1, "r")):
-        y = m["y"] * sgn
-        xb = m["x"] - m["rx"] * 0.35 + 0.006
-        k = np.sqrt(1 - 0.35 ** 2) * 0.78
-        a = np.linspace(0, 2 * np.pi, 32, endpoint=False)
-        ring = np.column_stack([np.zeros(32), y + m["ry"] * k * np.cos(a), m["z"] + m["rz"] * k * np.sin(a)])
-        obs.append(prism(f"mirror_glass_{tag}", ring + [xb - 0.0045, 0, 0], ring + [xb - 0.0005, 0, 0], "mirror_glass"))
+        house = make(f"mirror_{tag}", *parts.mirror_housing(sgn), "body")
+        boolean(house, make("recess", *parts.mirror_recess(sgn), "trim"), "DIFFERENCE")
+        obs.append(house)
+        obs.append(make(f"mirror_glass_{tag}", *parts.mirror_glass(sgn), "mirror_glass"))
+        p, _n = hit(bvh, SIDE(sgn), m["x_rear"] + 0.06, m["z"] - 0.012)
+        obs.append(make(f"mirror_stalk_{tag}", *parts.mirror_stalk(sgn, abs(p[1])), "trim"))
+        sail = Polygon(smooth_poly(m["sail"], 6)).buffer(0).difference(side_outline())
+        obs += lay(bvh, f"mirror_sail_{tag}", sail, SIDE(sgn), 0.0015, 0.0045, "trim")
     return obs
 
 
@@ -254,14 +240,17 @@ def smooth_poly_open(pts, step=0.01):
 def shut_lines(shell, bvh):
     for s in (1, -1):
         boolean(shell, groove(bvh, "door_shut", ROWS["door_shut"], SIDE(s)), "DIFFERENCE")
-    # bonnet: across the cowl, back from each headlight, across the nose
-    head = ROWS["head"]
-    for s in (1, -1):
-        tip = head[0]
-        o, n = hit(bvh, FRONT(), tip[0] * s, tip[1])
-        cowl = ROWS["bonnet_shut"][1 if s > 0 else 0]
-        boolean(shell, groove(bvh, "bonnet_side", [[o[0] - 0.02, o[1] - 0.012 * s], [cowl[0] + 0.02, cowl[1]]], TOP()), "DIFFERENCE")
-    boolean(shell, groove(bvh, "bonnet_rear", ROWS["bonnet_shut"], TOP()), "DIFFERENCE")
+    # bonnet: one line from each headlight back to the cowl, then across just ahead of the
+    # windscreen base, so no two grooves overlap
+    sc = ROWS["screen"]
+    hb = 0.66
+    across = [(sc["x_base"] + (sc["x_side"] - sc["x_base"]) * (y / 0.69) ** 2 + 0.04, y)
+              for y in np.linspace(hb, -hb, 40)]
+    # sides start at the inner rear corner of each headlight, where the front line ends
+    tips = [(HEAD_BACK + 0.02, 0.645 * s) for s in (1, -1)]
+    boolean(shell, groove(bvh, "bonnet_rear", across, TOP()), "DIFFERENCE")
+    for tip, end in ((tips[0], across[0]), (tips[1], across[-1])):
+        boolean(shell, groove(bvh, "bonnet_side", [tip, end], TOP()), "DIFFERENCE")
     boolean(shell, groove(bvh, "bonnet_front", ROWS["bonnet_front"], FRONT()), "DIFFERENCE")
     boolean(shell, groove(bvh, "tailgate", ROWS["tailgate_shut"], REAR()), "DIFFERENCE")
 
@@ -362,18 +351,38 @@ def pillar_strip(bvh):
     return out
 
 
+def rear_outline():
+    """Rear glass surround in rear view. Its sides follow a smooth fit of the line where the
+    tailgate turns 45 degrees round the corner, so they run straight and even."""
+    pts = np.array(ROWS["rear_glass"])
+    z0, z1 = pts[:, 1].min(), pts[:, 1].max()
+    zs = np.linspace(z0 + 0.01, z1 - 0.01, 24)
+    line = []
+    for z in zs:
+        for y in np.linspace(0.2, 0.86, 400):
+            loc, n = hit(BVH[0], REAR(), y, z)
+            if n[1] >= -n[0]:
+                line.append(y)
+                break
+    side = np.poly1d(np.polyfit(zs, line, 1))
+    zz = np.linspace(z0, z1, 30)
+    right = [(min(side(z) - 0.02, 0.59), z) for z in zz]
+    left = [(-y, z) for y, z in right[::-1]]
+    poly = Polygon(right + left).buffer(0)
+    return poly.buffer(-0.045, join_style=1).buffer(0.045, join_style=1)
+
+
 def glass_shapes():
     """Shapely outlines: surround, glass panes, per window, in their frame's 2D space."""
     dlo = side_outline()
     inner = dlo.buffer(-BAND, join_style=1)
     bp = ROWS["b_pillar"]
     xa, xb = min(p[0] for p in bp), max(p[0] for p in bp)
-    door = inner.intersection(sbox(xb, -1, 5, 3))
+    sail = Polygon(smooth_poly(ROWS["mirror"]["sail"], 6)).buffer(0)
+    door = inner.intersection(sbox(xb, -1, 5, 3)).difference(sail.buffer(0.008, join_style=1))
     quarter = inner.intersection(sbox(-5, -1, xa, 3))
     screen = screen_outline()
-    rear = Polygon(smooth_poly(ROWS["rear_glass"], 6)).buffer(0)
-    if BVH:
-        rear = fit(BVH[0], rear, REAR(), lambda p: p[0] < -1.15)
+    rear = rear_outline()
     return {
         "side": (dlo, [door, quarter]),
         "screen": (screen, [screen.buffer(-BAND * 1.4, join_style=1)]),
@@ -594,7 +603,6 @@ def smooth(ob, angle=35):
 def main():
     reset()
     shell = build_shell()
-    mirrors(shell)
     cut_arches(shell)
     bvh = BVHTree.FromObject(shell, bpy.context.evaluated_depsgraph_get())
     BVH.append(bvh)
@@ -602,7 +610,7 @@ def main():
     obs += windows(bvh)
     obs += lamps(bvh)
     obs += grille(bvh)
-    obs += mirror_glass()
+    obs += mirrors(bvh)
     obs += options(bvh)
     if "--fast" not in sys.argv:
         shut_lines(shell, bvh)
