@@ -23,6 +23,9 @@ namespace TarmacGauntlet.Raceday
         /// <summary>When false (free camera), the driving keys are ignored.</summary>
         public bool InputEnabled = true;
 
+        /// <summary>Share of the normal drag, below 1 in another car's slipstream.</summary>
+        public float DragScale = 1f;
+
         /// <summary>When true, an AI driver sets the pedals and steering through <see cref="SetControls"/> and the driving keys are ignored.</summary>
         public bool AiDriving;
 
@@ -168,7 +171,7 @@ namespace TarmacGauntlet.Raceday
 
             // Aerodynamics: drag at the centre of mass, downforce split 40/60 front to rear for stability.
             float q = 0.5f * CarSpec.AirDensity * speed * speed;
-            if (speed > 0.1f) body.AddForce(-v / speed * (q * Spec.DragArea));
+            if (speed > 0.1f) body.AddForce(-v / speed * (q * Spec.DragArea * DragScale));
             Vector3 down = -transform.up * (q * Spec.LiftArea);
             body.AddForceAtPosition(down * 0.4f, transform.TransformPoint(new Vector3(0, 0, Spec.HalfWheelbase)));
             body.AddForceAtPosition(down * 0.6f, transform.TransformPoint(new Vector3(0, 0, -Spec.HalfWheelbase)));

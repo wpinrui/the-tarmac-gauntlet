@@ -11,6 +11,11 @@ namespace TarmacGauntlet.Raceday
     /// Pace sets how much of the car's grip and braking the target speeds use.
     /// Consistency sets how much the corner speeds wander from lap to lap.
     /// Safety sets how often a corner is overcooked: braking too late and running wide.
+    ///
+    /// Besides the racing line it has lanes either side of it, each with its own target speeds.
+    /// <see cref="Offset"/> picks a point between them, so the car can run beside the line to
+    /// pass, defend or make room, at a speed that suits the path it is really on.
+    /// <see cref="Racecraft"/> sets the offset and <see cref="SpeedCap"/> from the cars around it.
     /// </summary>
     public sealed class AiPilot
     {
@@ -32,8 +37,30 @@ namespace TarmacGauntlet.Raceday
         private const float RampLength = 100f;
         private const float WindowOut = 60f;
 
+        /// <summary>How far each lane sits from the racing line, metres, positive left. The middle one is the line itself.</summary>
+        public static readonly float[] LaneShifts = { -6f, -3f, 0f, 3f, 6f };
+        private const int MiddleLane = 2;
+
         public readonly RacingLine Line;
         public readonly SpeedProfile Profile;
+        public readonly RacingLine[] Lanes;
+        public readonly SpeedProfile[] LaneProfiles;
+
+        /// <summary>Where to drive relative to the racing line, metres, positive left. Set by racecraft.</summary>
+        public float Offset;
+        /// <summary>Fastest the car may go right now, m/s, to keep its gap to the car ahead. Set by racecraft.</summary>
+        public float SpeedCap = float.PositiveInfinity;
+        /// <summary>Share of the target speed to drive at, below 1 to lift and let a faster car by.</summary>
+        public float SpeedScale = 1f;
+        /// <summary>
+        /// True while the car is in another's slipstream: with less drag it outruns the target speeds
+        /// on the straights, so it keeps its foot down instead of lifting back to them.
+        /// </summary>
+        public bool Towed;
+        /// <summary>How much slower than it wants the car ahead made it go last step, m/s.</summary>
+        public float HeldBy { get; private set; }
+        /// <summary>Where the car's centre really is relative to the racing line, metres, positive left.</summary>
+        public float Shift { get; private set; }
         public readonly CarSpec Spec;
         public readonly float Pace, Consistency, Safety;
 
@@ -62,7 +89,15 @@ namespace TarmacGauntlet.Raceday
             Pace = Mathf.Clamp(pace, 0f, 100f);
             Consistency = Mathf.Clamp(consistency, 0f, 100f);
             Safety = Mathf.Clamp(safety, 0f, 100f);
-            Profile = new SpeedProfile(line, spec, LimitFor(Pace));
+            float limit = LimitFor(Pace);
+            Lanes = new RacingLine[LaneShifts.Length];
+            LaneProfiles = new SpeedProfile[LaneShifts.Length];
+            for (int i = 0; i < LaneShifts.Length; i++)
+            {
+                Lanes[i] = i == MiddleLane ? line : new RacingLine(line, LaneShifts[i]);
+                LaneProfiles[i] = new SpeedProfile(Lanes[i], spec, limit);
+            }
+            Profile = LaneProfiles[MiddleLane];
             random = new System.Random(seed);
             corners = line.Circuit.Data.corners;
             cornerScale = new float[corners.Length];
@@ -88,16 +123,27 @@ namespace TarmacGauntlet.Raceday
             Vector3 flatVelocity = new Vector3(velocity.x, 0f, velocity.z);
             float speed = flatVelocity.magnitude;
 
-            Index = Line.Nearest(position, Index);
-            Vector3 front = position + flatForward * Spec.HalfWheelbase;
-            frontIndex = Line.Nearest(front, frontIndex);
-            RollCorners();
+            // The path is a blend of the two lanes either side of the offset.
+            float lane = Mathf.Clamp(Offset, LaneShifts[0], LaneShifts[LaneShifts.Length - 1]);
+            int a = 0;
+            while (a < LaneShifts.Length - 2 && lane > LaneShifts[a + 1]) a++;
+            int b = a + 1;
+            float blend = (lane - LaneShifts[a]) / (LaneShifts[b] - LaneShifts[a]);
+            RacingLine nearLane = Lanes[blend < 0.5f ? a : b];
 
-            // Lateral error and heading error at the front axle, against the line's tangent.
+            Index = nearLane.Nearest(position, Index);
+            Vector3 front = position + flatForward * Spec.HalfWheelbase;
+            frontIndex = nearLane.Nearest(front, frontIndex);
+            RollCorners();
+            Vector3 lineLeft = new Vector3(-Line.Tangent[Index].z, 0f, Line.Tangent[Index].x);
+            Vector3 fromLine = position - Line.Point[Index];
+            Shift = fromLine.x * lineLeft.x + fromLine.z * lineLeft.z;
+
+            // Lateral error and heading error at the front axle, against the path's tangent.
             int k = frontIndex;
-            Vector3 tangent = Line.Tangent[k];
+            Vector3 tangent = Vector3.Lerp(Lanes[a].Tangent[k], Lanes[b].Tangent[k], blend).normalized;
             Vector3 left = new Vector3(-tangent.z, 0f, tangent.x);
-            Vector3 offset = front - Line.Point[k];
+            Vector3 offset = front - Vector3.Lerp(Lanes[a].Point[k], Lanes[b].Point[k], blend);
             LateralError = Vector3.Dot(new Vector3(offset.x, 0f, offset.z), left);
             // Heading of travel, not of the body: at the limit the body is yawed into the corner.
             Vector3 heading = speed > 3f ? flatVelocity / speed : flatForward;
@@ -105,7 +151,8 @@ namespace TarmacGauntlet.Raceday
 
             // Steering: the line's own curvature, plus Stanley corrections for heading and offset.
             float ahead = k + speed * 0.1f / c.Step;
-            float kappa = Line.Curvature[c.Wrap(Mathf.RoundToInt(ahead))];
+            int ka = c.Wrap(Mathf.RoundToInt(ahead));
+            float kappa = Mathf.Lerp(Lanes[a].Curvature[ka], Lanes[b].Curvature[ka], blend);
             float wheelbase = 2f * Spec.HalfWheelbase;
             float steer = Mathf.Atan(wheelbase * kappa)
                 + HeadingGain * headingError
@@ -121,7 +168,14 @@ namespace TarmacGauntlet.Raceday
             float lookahead = Index + Mathf.Max(speed, 5f) * Reaction / c.Step;
             int la = c.Wrap(Mathf.RoundToInt(lookahead));
             float scale = ScaleAt(la);
-            float target = Profile.SpeedAt(lookahead) * scale;
+            float laneSpeed = Mathf.Lerp(LaneProfiles[a].SpeedAt(lookahead), LaneProfiles[b].SpeedAt(lookahead), blend);
+            float target = laneSpeed * scale * SpeedScale;
+            // Held back by the car ahead: match the cap and drop the profile's own acceleration.
+            float laneAccel = Mathf.Lerp(LaneProfiles[a].Accel[la], LaneProfiles[b].Accel[la], blend);
+            if (Towed && laneAccel > 0f && scale >= 1f) target = Mathf.Max(target, speed);
+            bool held = SpeedCap < target;
+            HeldBy = held ? target - SpeedCap : 0f;
+            if (held) target = SpeedCap;
             float offLine = Mathf.Abs(LateralError);
             if (offLine > 4f) target = Mathf.Min(target, Mathf.Lerp(40f, 15f, (offLine - 4f) / 10f));
             if (Mathf.Abs(headingError) > 0.5f) target = Mathf.Min(target, 12f);
@@ -130,8 +184,8 @@ namespace TarmacGauntlet.Raceday
             // When overcooking a corner the driver believes the faster plan: no extra braking when the
             // car turns out to be too fast, so it runs wide or off.
             float correction = SpeedGain * (target - speed);
-            if (committed && correction < 0f) correction = 0f;
-            float want = Profile.Accel[la] * scale * scale + correction;
+            if (committed && !held && correction < 0f) correction = 0f;
+            float want = (held ? 0f : laneAccel * scale * scale * SpeedScale * SpeedScale) + correction;
             float needed = want + Profile.Resist(Index, speed);
             var controls = new Controls { Steer = steer };
             if (needed >= 0f)
@@ -144,6 +198,12 @@ namespace TarmacGauntlet.Raceday
             }
             else
                 controls.Brake = Mathf.Clamp01(-needed / (Spec.BrakeDecel * G));
+            // Faster than the car ahead allows: the gap is closing, so brake as hard as the car can.
+            if (held && speed > target + 1f)
+            {
+                controls.Throttle = 0f;
+                controls.Brake = 1f;
+            }
             return controls;
         }
 

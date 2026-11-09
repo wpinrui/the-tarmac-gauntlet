@@ -2,13 +2,16 @@ using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
 {
-    /// <summary>C cycles the chase, bonnet and bumper views of the car, then the free camera.</summary>
+    /// <summary>C cycles the chase, bonnet and bumper views of the car, then the free camera. V moves to the next car.</summary>
     [RequireComponent(typeof(Camera))]
     public sealed class RaceCameras : MonoBehaviour
     {
         private enum View { Chase, Bonnet, Bumper, Free }
 
         public CarController Car;
+        /// <summary>The cars V steps through, if more than one.</summary>
+        public CarController[] Cars;
+        public DriveHud Hud;
         public KeyboardState Keys;
 
         private View view = View.Chase;
@@ -29,6 +32,14 @@ namespace TarmacGauntlet.Raceday
             if (Keys != null && Keys.Pressed(KeyCode.C))
             {
                 view = (View)(((int)view + 1) % 4);
+                Apply();
+            }
+            if (Keys != null && Keys.Pressed(KeyCode.V) && Cars != null && Cars.Length > 1)
+            {
+                // Only the car being watched shows its speed and takes the driving keys.
+                if (Car != null) Car.InputEnabled = false;
+                Car = Cars[(System.Array.IndexOf(Cars, Car) + 1) % Cars.Length];
+                if (Hud != null) Hud.Car = Car;
                 Apply();
             }
         }

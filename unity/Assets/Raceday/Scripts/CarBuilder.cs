@@ -7,14 +7,18 @@ namespace TarmacGauntlet.Raceday
     {
         private const int IgnoreRaycastLayer = 2;   // so the car's own suspension rays skip it
 
-        public static CarController Spawn(string modelId, string modelPath, Circuit circuit, KeyboardState keys)
+        /// <summary>
+        /// A car of the given model. With no model path, or none found, it is a plain box in the given
+        /// paint. With no keys it can only be driven by the AI.
+        /// </summary>
+        public static CarController Spawn(string modelId, string modelPath, Circuit circuit, KeyboardState keys, Color? paint = null)
         {
             CarSpec spec = CarSpec.For(modelId);
             var root = new GameObject(spec.Name);
             root.layer = IgnoreRaycastLayer;
 
-            GameObject model = LoadModel(modelPath);
-            Transform[] wheels = model != null ? AttachModel(root, model) : BuildBox(root, spec);
+            GameObject model = string.IsNullOrEmpty(modelPath) ? null : LoadModel(modelPath);
+            Transform[] wheels = model != null ? AttachModel(root, model) : BuildBox(root, spec, paint ?? new Color(0.8f, 0.81f, 0.83f));
 
             BoxCollider box = root.AddComponent<BoxCollider>();
             box.center = new Vector3(0f, 0.62f, 0.06f);
@@ -82,9 +86,9 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>A plain stand-in when the model is not available.</summary>
-        private static Transform[] BuildBox(GameObject root, CarSpec spec)
+        private static Transform[] BuildBox(GameObject root, CarSpec spec, Color colour)
         {
-            var paint = new Material(Shader.Find("Standard")) { color = new Color(0.8f, 0.81f, 0.83f) };
+            var paint = new Material(Shader.Find("Standard")) { color = colour };
             var rubber = new Material(Shader.Find("Standard")) { color = new Color(0.08f, 0.08f, 0.08f) };
             GameObject shell = Primitive(PrimitiveType.Cube, root.transform, paint);
             shell.transform.localPosition = new Vector3(0f, 0.65f, 0f);
