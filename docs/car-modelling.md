@@ -17,13 +17,13 @@ Race cars get no street-legal lighting: no indicators, side repeaters or reversi
 Each car has one locked real-car reference, listed in `car_roster.md`.
 Never offer an alternative reference.
 Every request to Ivan names the real car the model is based on.
-List every open call before building: counts, options, names, placement, colours. Ivan answers first.
+List every open call before building: counts, options, names, placement. Ivan answers first.
 Every option set for a feature includes the reference car's own design.
 Ask every placement or visual choice (badge, name and the like) inside the viewer: show each option on the model and let Ivan toggle between them. Never ask in text alone.
 
 ## 2. Reference
-Ivan gathers all reference. Never search for it.
-Ask him for: a four-view drawing (side, front, rear, top), detail photos, and the wheelbase, length, width and tyre size.
+Ivan provides the photos: a four-view drawing (side, front, rear, top) and detail photos.
+Look up the published wheelbase, length, width and tyre size yourself.
 Renders and measurements of a 3D model or scan he supplies replace the drawing.
 Reference images stay out of the repo.
 
