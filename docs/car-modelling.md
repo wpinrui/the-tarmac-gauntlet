@@ -19,6 +19,7 @@ Never offer an alternative reference.
 Every request to Ivan names the real car the model is based on.
 List every open call before building: counts, options, names, placement, colours. Ivan answers first.
 Every option set for a feature includes the reference car's own design.
+Ask every placement or visual choice (badge, name and the like) inside the viewer: show each option on the model and let Ivan toggle between them. Never ask in text alone.
 
 ## 2. Reference
 Ivan gathers all reference. Never search for it.
@@ -55,7 +56,7 @@ Every inner face uses an interior material.
 ## 6. Badge and name
 The brand badge from `src/renderer/assets/brands/<brand>/` goes on the front and rear.
 The model name goes on the car in the brand font, as letter outlines (glyphs.py).
-Badge and name placement are open calls for Ivan.
+Badge and name placement are open calls for Ivan, asked in the viewer.
 No real brand or sponsor graphics.
 
 ## 7. Show Ivan the direction first
