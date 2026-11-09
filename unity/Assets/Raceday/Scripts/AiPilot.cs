@@ -57,6 +57,11 @@ namespace TarmacGauntlet.Raceday
         /// on the straights, so it keeps its foot down instead of lifting back to them.
         /// </summary>
         public bool Towed;
+        /// <summary>
+        /// Share of fresh tyres' grip the car has, below 1 as they wear: target speeds come down by
+        /// its square root, so the driver brakes earlier and corners slower on old tyres.
+        /// </summary>
+        public float Grip = 1f;
         /// <summary>How much slower than it wants the car ahead made it go last step, m/s.</summary>
         public float HeldBy { get; private set; }
         /// <summary>Where the car's centre really is relative to the racing line, metres, positive left.</summary>
@@ -82,7 +87,12 @@ namespace TarmacGauntlet.Raceday
         private bool committed;   // inside an overcooked corner: braking only to the wrong plan
         private readonly bool[] rolled;
 
-        public AiPilot(RacingLine line, CarSpec spec, float pace, float consistency, float safety, int seed)
+        /// <summary>
+        /// A driver for one line. With <c>lanes</c> false it only ever drives the line itself (a
+        /// formation column or a pit route), so no lanes are built beside it. <c>maxSpeed</c>, if
+        /// given, caps the target speed at each sample, as the pit lane limiter does.
+        /// </summary>
+        public AiPilot(RacingLine line, CarSpec spec, float pace, float consistency, float safety, int seed, bool lanes = true, float[] maxSpeed = null)
         {
             Line = line;
             Spec = spec;
@@ -92,10 +102,17 @@ namespace TarmacGauntlet.Raceday
             float limit = LimitFor(Pace);
             Lanes = new RacingLine[LaneShifts.Length];
             LaneProfiles = new SpeedProfile[LaneShifts.Length];
+            SpeedProfile only = lanes ? null : new SpeedProfile(line, spec, limit, maxSpeed);
             for (int i = 0; i < LaneShifts.Length; i++)
             {
+                if (!lanes)
+                {
+                    Lanes[i] = line;
+                    LaneProfiles[i] = only;
+                    continue;
+                }
                 Lanes[i] = i == MiddleLane ? line : new RacingLine(line, LaneShifts[i]);
-                LaneProfiles[i] = new SpeedProfile(Lanes[i], spec, limit);
+                LaneProfiles[i] = new SpeedProfile(Lanes[i], spec, limit, maxSpeed);
             }
             Profile = LaneProfiles[MiddleLane];
             random = new System.Random(seed);
@@ -114,6 +131,16 @@ namespace TarmacGauntlet.Raceday
         {
             Index = -1;
             frontIndex = -1;
+        }
+
+        /// <summary>
+        /// Starts the search for the car from a track sample, when it takes over from another
+        /// pilot on the same stretch: every line has one sample per track sample.
+        /// </summary>
+        public void Relocate(int k)
+        {
+            Index = k;
+            frontIndex = k;
         }
 
         public Controls Drive(Vector3 position, Vector3 forward, Vector3 velocity, float yawRate)
@@ -169,7 +196,8 @@ namespace TarmacGauntlet.Raceday
             int la = c.Wrap(Mathf.RoundToInt(lookahead));
             float scale = ScaleAt(la);
             float laneSpeed = Mathf.Lerp(LaneProfiles[a].SpeedAt(lookahead), LaneProfiles[b].SpeedAt(lookahead), blend);
-            float target = laneSpeed * scale * SpeedScale;
+            float worn = Mathf.Sqrt(Mathf.Clamp(Grip, 0.3f, 1f));
+            float target = laneSpeed * scale * SpeedScale * worn;
             // Held back by the car ahead: match the cap and drop the profile's own acceleration.
             float laneAccel = Mathf.Lerp(LaneProfiles[a].Accel[la], LaneProfiles[b].Accel[la], blend);
             if (Towed && laneAccel > 0f && scale >= 1f) target = Mathf.Max(target, speed);
@@ -185,7 +213,7 @@ namespace TarmacGauntlet.Raceday
             // car turns out to be too fast, so it runs wide or off.
             float correction = SpeedGain * (target - speed);
             if (committed && !held && correction < 0f) correction = 0f;
-            float want = (held ? 0f : laneAccel * scale * scale * SpeedScale * SpeedScale) + correction;
+            float want = (held ? 0f : laneAccel * scale * scale * SpeedScale * SpeedScale * worn * worn) + correction;
             float needed = want + Profile.Resist(Index, speed);
             var controls = new Controls { Steer = steer };
             if (needed >= 0f)

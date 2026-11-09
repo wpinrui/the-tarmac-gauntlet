@@ -7,7 +7,9 @@ namespace TarmacGauntlet.Raceday
     /// A drivable car: raycast suspension, a simple tyre model with a friction circle, engine and
     /// gearbox, brakes with anti-lock, downforce and drag. Arrows steer, accelerate and brake,
     /// A and Z shift up and down (and switch to manual), M toggles automatic and manual, H toggles steering help
-    /// and R puts the car back on track.
+    /// and R puts the car back on track. 1, 2 and 3 pick the Conserve, Normal and Push engine maps.
+    /// It burns fuel and wears its tyres through <see cref="Supplies"/>, and the pit lane limiter cuts its
+    /// power above <see cref="SpeedLimit"/>.
     /// </summary>
     [RequireComponent(typeof(Rigidbody))]
     public sealed class CarController : MonoBehaviour
@@ -29,6 +31,14 @@ namespace TarmacGauntlet.Raceday
         /// <summary>When true, an AI driver sets the pedals and steering through <see cref="SetControls"/> and the driving keys are ignored.</summary>
         public bool AiDriving;
 
+        /// <summary>Fuel, tyres and engine map, or null to run on an endless tank and tyres.</summary>
+        public Consumables Supplies;
+        /// <summary>The limiter's speed while in the pit lane, m/s, otherwise infinity. Set each step.</summary>
+        public float SpeedLimit = float.PositiveInfinity;
+        /// <summary>True while the car is held on its brakes, stopped in its box.</summary>
+        public bool Hold;
+        public bool Limiting => !float.IsPositiveInfinity(SpeedLimit);
+
         public bool Automatic { get; private set; } = true;
         public bool SteeringHelp { get; private set; } = true;
         public bool Crashed { get; private set; }
@@ -46,6 +56,8 @@ namespace TarmacGauntlet.Raceday
         private float throttle, brake, steerInput, steer;
         private float aiThrottle, aiBrake, aiSteer;
         private float shiftTimer, reverseTimer;
+        private float gripUsed;   // sum of each grounded tyre's share of its grip used, squared, this step
+        private int gripCount;
 
         private sealed class Wheel
         {
@@ -113,6 +125,12 @@ namespace TarmacGauntlet.Raceday
                 if (Keys.Pressed(KeyCode.M)) Automatic = !Automatic;
                 if (Keys.Pressed(KeyCode.A)) Shift(+1);
                 if (Keys.Pressed(KeyCode.Z)) Shift(-1);
+                if (Supplies != null)
+                {
+                    if (Keys.Pressed(KeyCode.Alpha1)) Supplies.Map = EngineMap.Conserve;
+                    if (Keys.Pressed(KeyCode.Alpha2)) Supplies.Map = EngineMap.Normal;
+                    if (Keys.Pressed(KeyCode.Alpha3)) Supplies.Map = EngineMap.Push;
+                }
             }
 
             // Reverse: hold brake at a standstill to engage it, press accelerate to leave it.
@@ -161,6 +179,12 @@ namespace TarmacGauntlet.Raceday
                 throttle = Crashed ? 0f : aiThrottle;
                 brake = Crashed ? 1f : aiBrake;
             }
+            if (Hold)
+            {
+                throttle = 0f;
+                brake = 1f;
+            }
+            if (Supplies != null) body.mass = Spec.Mass + Supplies.FuelMass;
             Vector3 v = Velocity;
             float speed = v.magnitude;
             Speed = speed;
@@ -168,6 +192,7 @@ namespace TarmacGauntlet.Raceday
 
             UpdateSteering(dt, speed);
             float driveForce = Engine(dt, along);
+            if (Supplies != null) Supplies.Burn(driveForce * along, dt);
 
             // Aerodynamics: drag at the centre of mass, downforce split 40/60 front to rear for stability.
             float q = 0.5f * CarSpec.AirDensity * speed * speed;
@@ -177,6 +202,8 @@ namespace TarmacGauntlet.Raceday
             body.AddForceAtPosition(down * 0.6f, transform.TransformPoint(new Vector3(0, 0, -Spec.HalfWheelbase)));
 
             float brakeTotal = brake * Spec.BrakeDecel * Spec.Mass * Gravity;
+            gripUsed = 0f;
+            gripCount = 0;
             for (int i = 0; i < 4; i++)
             {
                 Wheel w = wheels[i];
@@ -184,6 +211,7 @@ namespace TarmacGauntlet.Raceday
                 float wheelBrake = brakeTotal * (w.Front ? Spec.FrontBrakeShare : 1f - Spec.FrontBrakeShare) * 0.5f;
                 TyreAndSpring(w, dt, drive, wheelBrake);
             }
+            if (Supplies != null && gripCount > 0) Supplies.Scrub(speed * dt, Mathf.Sqrt(gripUsed / gripCount));
         }
 
         private void UpdateSteering(float dt, float speed)
@@ -223,12 +251,15 @@ namespace TarmacGauntlet.Raceday
             }
 
             float direction = Gear == 0 ? -1f : 1f;
-            if (throttle > 0f && x < 1f)
+            // The limiter cuts the power at the pit lane speed, and an empty tank cuts it for good.
+            bool cut = (Supplies != null && Supplies.Empty) || along > SpeedLimit;
+            if (throttle > 0f && x < 1f && !cut)
             {
                 // Below a fifth of the redline the clutch slips, so the car still pulls away.
                 float xe = Mathf.Max(x, 0.2f);
                 float torque = Spec.PowerAt(xe) / (xe * Spec.Redline);
-                return direction * throttle * torque * ratio / Spec.WheelRadius;
+                float map = Supplies != null ? Supplies.PowerScale : 1f;
+                return direction * throttle * torque * map * ratio / Spec.WheelRadius;
             }
             // Engine braking off the throttle.
             float drag = 0.08f * Spec.PeakPower / Spec.Redline * ratio / Spec.WheelRadius * Mathf.Clamp01(x);
@@ -261,6 +292,7 @@ namespace TarmacGauntlet.Raceday
                 float corner = Spec.Mass / 4f;
                 // Rear tyres grip a little more than the fronts, so the car leans towards understeer.
                 float cap = Spec.Grip * TrackSurface.Grip(kind) * load * (w.Front ? 0.97f : 1.06f);
+                if (Supplies != null) cap *= Supplies.GripScale;
 
                 // Static grip: when nearly stopped the tyre holds against the slope it stands on,
                 // up to its grip limit, instead of creeping down it.
@@ -310,6 +342,11 @@ namespace TarmacGauntlet.Raceday
                     }
                 }
                 body.AddForceAtPosition(forward * fx + side * fy, hit.point);
+                if (cap > 1f)
+                {
+                    gripUsed += Mathf.Min((fx * fx + fy * fy) / (cap * cap), 1f);
+                    gripCount++;
+                }
                 w.Spin += vLong / Spec.WheelRadius * dt;
             }
             else if (!w.Front && drive != 0f)
