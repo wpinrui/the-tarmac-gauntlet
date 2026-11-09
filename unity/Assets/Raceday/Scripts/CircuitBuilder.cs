@@ -24,6 +24,7 @@ namespace TarmacGauntlet.Raceday
         private const float PitWallGap = 6f;       // the pit wall starts once the lane is this far off the track
         private const float LineAcross = 0.3f;     // thickness of lines painted across a surface
         private const float LaneWiden = 1.2f;      // pit lane surface runs this far past its track-side line
+        private const float FenceTurn = 20f;       // most a fence turns from one track sample to the next, degrees
 
         private readonly Circuit c;
         private readonly CircuitMaterials m;
@@ -33,6 +34,7 @@ namespace TarmacGauntlet.Raceday
 
         // Per side (0 = left, 1 = right), per sample, measured outwards from the road edge.
         private readonly float[][] barrier = { null, null };
+        private readonly bool[][] fenced = { null, null };
         private readonly float[][] gravel = { null, null };
         private readonly bool[][] pitWall = { null, null };
         private readonly bool[][] open = { null, null };   // no verge, runoff or barrier (pit road joins here)
@@ -99,10 +101,14 @@ namespace TarmacGauntlet.Raceday
 
         public List<CircuitPart> Build()
         {
-            // Lay everything, sink the ground wherever it pokes through, then lay it all again on the sunk
-            // ground so the cover's edges come down with it.
-            Lay();
-            SinkUnderCover();
+            // Lay everything and sink the ground wherever it pokes through, twice, then lay it all again on
+            // the sunk ground so the cover's edges come down with it.
+            for (int pass = 0; pass < 2; pass++)
+            {
+                parts.Clear();
+                Lay();
+                SinkUnderCover();
+            }
             parts.Clear();
             Lay();
             Ground();
@@ -173,13 +179,59 @@ namespace TarmacGauntlet.Raceday
                         }
                     }
                     if (!wall[k] && bar[k] < Verge + 0.5f) shut[k] = true;
-                    grav[k] = Mathf.Min(grav[k], bar[k] - 1.5f);
                 }
+                Unkink(bar, room, wall, sign);
+                for (int k = 0; k < n; k++) grav[k] = Mathf.Min(grav[k], bar[k] - 1.5f);
                 barrier[s] = bar;
+                fenced[s] = Fences(bar, want, shut);
                 gravel[s] = grav;
                 pitWall[s] = wall;
                 open[s] = shut;
             }
+        }
+
+        /// <summary>
+        /// Rounds off the barrier line wherever it would turn more than <see cref="FenceTurn"/> degrees
+        /// from one sample to the next. A fence far out on the inside of a bend moves only a little
+        /// per sample, so the corner where the runoff starts to narrow shows up there as a sharp kink.
+        /// </summary>
+        private void Unkink(float[] bar, float[] room, bool[] wall, float sign)
+        {
+            float most = Mathf.Cos(FenceTurn * Mathf.PI / 180f);
+            for (int round = 0; round < 200; round++)
+            {
+                bool moved = false;
+                for (int k = 0; k < n; k++)
+                {
+                    int a = c.Wrap(k - 1), b = c.Wrap(k + 1);
+                    if (wall[k] || wall[a] || wall[b]) continue;
+                    Vector3 p = Fence(k, bar, sign), d1 = p - Fence(a, bar, sign), d2 = Fence(b, bar, sign) - p;
+                    d1.y = 0; d2.y = 0;
+                    if (Vector3.Dot(d1.normalized, d2.normalized) >= most) continue;
+                    float mid = (bar[a] + bar[b]) * 0.5f;
+                    bar[k] = Mathf.Max(0f, Mathf.Min(mid, room[k]));
+                    moved = true;
+                }
+                if (!moved) break;
+            }
+        }
+
+        private Vector3 Fence(int k, float[] bar, float sign) => c.Surface(k, sign * (c.HalfWidth(k) + bar[k]));
+
+        /// <summary>
+        /// Armco only where the runoff reached its full width. Where another leg of the track or the inside
+        /// of a bend cut it short, the runoff just meets the ground, as in a hairpin's infield. Pieces
+        /// shorter than 40 m are dropped so no stray bits of fence stand on their own.
+        /// </summary>
+        private bool[] Fences(float[] bar, float[] want, bool[] shut)
+        {
+            var f = new bool[n];
+            for (int k = 0; k < n; k++) f[k] = !shut[k] && bar[k] >= want[k] - 0.5f;
+            int minRun = Mathf.CeilToInt(40f / c.Step);
+            var keep = new bool[n];
+            foreach (List<int> run in Runs(k => f[k]))
+                if (run.Count >= minRun) foreach (int k in run) keep[k] = true;
+            return keep;
         }
 
         /// <summary>
@@ -315,11 +367,11 @@ namespace TarmacGauntlet.Raceday
             {
                 float sign = s == 0 ? 1 : -1;
                 int side = s;
-                foreach (List<int> run in Runs(k => !open[side][k] && !pitWall[side][k]))
+                foreach (List<int> run in Runs(k => fenced[side][k] && !pitWall[side][k]))
                     armco.Strip(Vertical(run, k => c.HalfWidth(k) + barrier[side][k], sign, -Skirt, 0.8f), 4f, 4f, true);
 
                 // Tyre walls in front of the armco where a gravel trap catches cars.
-                foreach (List<int> run in Runs(k => !open[side][k] && !pitWall[side][k] && gravel[side][k] > Verge + 1f))
+                foreach (List<int> run in Runs(k => fenced[side][k] && !pitWall[side][k] && HasGravel(side, k)))
                 {
                     tyres.Strip(Rows(run, k => Across(sign, c.HalfWidth(k) + barrier[side][k] - 1.2f, c.HalfWidth(k) + barrier[side][k] - 0.05f), 1.0f, true), 1f, 1f);
                     tyres.Strip(Vertical(run, k => c.HalfWidth(k) + barrier[side][k] - 1.2f, sign, -0.2f, 1.0f), 1f, 1f, true);
@@ -739,11 +791,16 @@ namespace TarmacGauntlet.Raceday
                     int ix = (int)fx, iz = (int)fz;
                     float over = c.TerrainHeight(p.x, p.z) - (p.y - clearance);
                     if (over <= 0f) continue;
-                    // The cell's two triangles share the (x+1, z) to (x, z+1) diagonal.
-                    bool first = fx - ix + fz - iz <= 1f;
-                    c.LowerTerrainAt(ix + 1, iz, over);
-                    c.LowerTerrainAt(ix, iz + 1, over);
-                    c.LowerTerrainAt(first ? ix : ix + 1, first ? iz : iz + 1, over);
+                    // The cell's two triangles share the (x+1, z) to (x, z+1) diagonal. Each corner goes
+                    // down in proportion to its weight at p, so the corner nearest p moves most and the
+                    // ground past the cover's edge moves least.
+                    float u = fx - ix, v = fz - iz;
+                    bool first = u + v <= 1f;
+                    float wb = first ? u : 1f - v, wd = first ? v : 1f - u, wc = first ? 1f - u - v : u + v - 1f;
+                    float k = over / (wb * wb + wd * wd + wc * wc);
+                    c.LowerTerrainAt(ix + 1, iz, k * wb);
+                    c.LowerTerrainAt(ix, iz + 1, k * wd);
+                    c.LowerTerrainAt(first ? ix : ix + 1, first ? iz : iz + 1, k * wc);
                     moved = true;
                 }
                 if (!moved) break;

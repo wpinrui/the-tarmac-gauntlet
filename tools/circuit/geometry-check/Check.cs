@@ -5,9 +5,13 @@
 // Rules:
 //   surfaces over ground  every flat surface (road, pit lane, kerbs, verges, runoff, gravel, infield) lies over
 //                         the ground mesh, never under it, so no ground pokes through
-//   no cliffs             where a flat surface ends, the next thing outside it (another surface or the ground)
-//                         is at most 0.4 m lower, so no road or runoff edge stands up off the ground
+//   no cliffs             where a flat surface ends, the next thing outside it (another surface or the ground,
+//                         carried back to the edge along its slope) is at most 0.4 m lower, so no road or
+//                         runoff edge stands up off the ground
 //   barriers grounded     every armco, tyre wall and pit wall reaches down into what it stands on, so no gap shows under it
+//   fences never cross    no armco or pit wall line crosses another, or itself, seen from above
+//   fences run smooth     along each armco or pit wall line no joint turns more than 30 degrees, and no piece
+//                         is shorter than 30 m, so no fence zigzags or stands as a stray stub
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -49,6 +53,7 @@ static class Check
         SurfacesOverGround(parts);
         NoCliffs(parts);
         BarriersGrounded(parts);
+        FenceRules(parts);
         return failed ? 1 : 0;
     }
 
@@ -104,11 +109,16 @@ static class Check
                     // Ground above the edge is the other rule's fault, not a cliff; a barrier standing
                     // along the edge hides any drop behind it.
                     if (Ground(probe.x, probe.z) > p.y || NearBarrier(p)) continue;
+                    // The step is measured against what lies beyond, carried back to the edge along its
+                    // own slope, so an edge on a steep bank isn't blamed for the bank.
                     float below = Below(probe.x, probe.z, p.y + 0.05f);
-                    float drop = p.y - below;
+                    Vector3 further = p + outward * 0.5f;
+                    float next = Below(further.x, further.z, below + 0.05f);
+                    float atEdge = float.IsNegativeInfinity(next) ? below : below + Math.Max(0f, below - next);
+                    float drop = p.y - atEdge;
                     if (drop > Cliff) bad.Add((drop, p, part.Name));
                     if (drop > Cliff && Environment.GetEnvironmentVariable("GC_DEBUG") != null)
-                        Console.WriteLine($"  {part.Name} edge {p.x:0.0},{p.y:0.00},{p.z:0.0} out {outward.x:0.00},{outward.z:0.00} below {below:0.00} ground {Ground(probe.x, probe.z):0.00}");
+                        Console.WriteLine($"  {part.Name} edge {p.x:0.0},{p.y:0.00},{p.z:0.0} out {outward.x:0.00},{outward.z:0.00} below {below:0.00} atEdge {atEdge:0.00} ground {Ground(probe.x, probe.z):0.00} at edge {Ground(p.x, p.z):0.00}");
                 }
             }
         }
@@ -180,6 +190,119 @@ static class Check
             }
         }
         Report("barriers grounded", bad, n, "barrier feet", "m gap underneath");
+    }
+
+    static readonly HashSet<string> Fences = new HashSet<string> { "Armco", "Pit wall" };
+    const float MaxTurn = 30f;
+    const float MinPiece = 30f;
+
+    static void FenceRules(List<CircuitPart> parts)
+    {
+        // The top edge of each upright face, seen from above.
+        var segs = new List<(Vector3 a, Vector3 b, long ka, long kb, string part)>();
+        var seen = new HashSet<(long, long)>();
+        foreach (CircuitPart part in parts.Where(p => Fences.Contains(p.Name)))
+        {
+            var v = part.Kit.Vertices;
+            var t = part.Kit.Triangles;
+            for (int i = 0; i < t.Count; i += 3)
+            {
+                var tri = new[] { v[t[i]], v[t[i + 1]], v[t[i + 2]] }.OrderByDescending(p => p.y).ToArray();
+                Vector3 nrm = Vector3.Cross(tri[1] - tri[0], tri[2] - tri[0]);
+                if (nrm.sqrMagnitude < 1e-10f || Math.Abs(nrm.y) / nrm.magnitude > 0.5f) continue;
+                if (tri[1].y - tri[2].y < 0.3f) continue;
+                long ka = FlatKey(tri[0]), kb = FlatKey(tri[1]);
+                if (ka == kb) continue;
+                var k = ka < kb ? (ka, kb) : (kb, ka);
+                if (seen.Add(k)) segs.Add((tri[0], tri[1], ka, kb, part.Name));
+            }
+        }
+
+        // Crossings.
+        var cells = new Dictionary<long, List<int>>();
+        for (int i = 0; i < segs.Count; i++)
+        {
+            var (a, b, _, _, _) = segs[i];
+            for (int x = (int)Math.Floor(Math.Min(a.x, b.x) / 4); x <= (int)Math.Floor(Math.Max(a.x, b.x) / 4); x++)
+                for (int z = (int)Math.Floor(Math.Min(a.z, b.z) / 4); z <= (int)Math.Floor(Math.Max(a.z, b.z) / 4); z++)
+                {
+                    long ck = CellKey(x, z);
+                    if (!cells.TryGetValue(ck, out var list)) cells[ck] = list = new List<int>();
+                    list.Add(i);
+                }
+        }
+        var crossings = new List<(float, Vector3, string)>();
+        var tested = new HashSet<(int, int)>();
+        foreach (var list in cells.Values)
+            for (int x = 0; x < list.Count; x++)
+                for (int y = x + 1; y < list.Count; y++)
+                {
+                    int i = Math.Min(list[x], list[y]), j = Math.Max(list[x], list[y]);
+                    if (!tested.Add((i, j))) continue;
+                    var s1 = segs[i];
+                    var s2 = segs[j];
+                    if (s1.ka == s2.ka || s1.ka == s2.kb || s1.kb == s2.ka || s1.kb == s2.kb) continue;
+                    if (Crosses(s1.a, s1.b, s2.a, s2.b, out Vector3 at)) crossings.Add((1f, at, s1.part));
+                }
+        Report("fences never cross", crossings, segs.Count, "fence segments", "crossings");
+
+        // Joints and pieces.
+        var ends = new Dictionary<long, List<int>>();
+        for (int i = 0; i < segs.Count; i++)
+        {
+            foreach (long k in new[] { segs[i].ka, segs[i].kb })
+            {
+                if (!ends.TryGetValue(k, out var list)) ends[k] = list = new List<int>();
+                list.Add(i);
+            }
+        }
+        var rough = new List<(float, Vector3, string)>();
+        int joints = 0;
+        foreach (var (key, list) in ends)
+        {
+            if (list.Count != 2) continue;
+            joints++;
+            var s1 = segs[list[0]];
+            var s2 = segs[list[1]];
+            Vector3 at = s1.ka == key ? s1.a : s1.b;
+            Vector3 d1 = (s1.ka == key ? s1.b : s1.a) - at, d2 = (s2.ka == key ? s2.b : s2.a) - at;
+            d1.y = 0; d2.y = 0;
+            // Straight on is 180 degrees between the two directions out of the joint.
+            float cos = Vector3.Dot(d1, d2) / (d1.magnitude * d2.magnitude);
+            float turn = 180f - (float)(Math.Acos(Math.Clamp(cos, -1f, 1f)) * 180 / Math.PI);
+            if (turn > MaxTurn) rough.Add((turn, at, s1.part));
+            if (turn > MaxTurn && Environment.GetEnvironmentVariable("GC_DEBUG") != null)
+                Console.WriteLine($"  {s1.part} joint {at.x:0.0},{at.y:0.0},{at.z:0.0} turns {turn:0}");
+        }
+        var parent = Enumerable.Range(0, segs.Count).ToArray();
+        int Find(int i) { while (parent[i] != i) i = parent[i] = parent[parent[i]]; return i; }
+        foreach (var list in ends.Values)
+            for (int i = 1; i < list.Count; i++) parent[Find(list[i])] = Find(list[0]);
+        var length = new Dictionary<int, float>();
+        for (int i = 0; i < segs.Count; i++)
+        {
+            Vector3 d = segs[i].b - segs[i].a;
+            d.y = 0;
+            length[Find(i)] = length.GetValueOrDefault(Find(i)) + d.magnitude;
+        }
+        foreach (var (root, len) in length)
+            if (len < MinPiece) rough.Add((MinPiece - len, segs[root].a, segs[root].part));
+        Report("fences run smooth", rough, joints, "fence joints", "degrees too sharp or m too short");
+    }
+
+    static long FlatKey(Vector3 p) => ((long)Math.Round(p.x * 100) << 32) ^ (uint)(int)Math.Round(p.z * 100);
+
+    static bool Crosses(Vector3 a, Vector3 b, Vector3 c, Vector3 d, out Vector3 at)
+    {
+        at = default;
+        float rx = b.x - a.x, rz = b.z - a.z, sx = d.x - c.x, sz = d.z - c.z;
+        float den = rx * sz - rz * sx;
+        if (Math.Abs(den) < 1e-9f) return false;
+        float t = ((c.x - a.x) * sz - (c.z - a.z) * sx) / den;
+        float u = ((c.x - a.x) * rz - (c.z - a.z) * rx) / den;
+        if (t <= 1e-4f || t >= 1 - 1e-4f || u <= 1e-4f || u >= 1 - 1e-4f) return false;
+        at = Vector3.Lerp(a, b, t);
+        return true;
     }
 
     // ------------------------------------------------------------------ geometry
