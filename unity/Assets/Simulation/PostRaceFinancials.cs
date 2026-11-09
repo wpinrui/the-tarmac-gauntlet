@@ -68,7 +68,7 @@ namespace TarmacGauntlet.Simulation
                 schedule);
 
             // Fuel cost
-            double playerFuelCost = JsRound(input.PlayerFuelConsumed * input.FuelCostPerLitre);
+            double playerFuelCost = JsMath.Round(input.PlayerFuelConsumed * input.FuelCostPerLitre);
 
             // Race history entry
             var raceHistoryEntry = new RaceHistoryEntry
@@ -93,13 +93,6 @@ namespace TarmacGauntlet.Simulation
                 PlayerFuelCost = playerFuelCost,
                 RaceHistoryEntry = raceHistoryEntry,
             };
-        }
-
-        /// <summary>JS <c>Math.round</c>: halves round toward +infinity (C# Math.Round defaults to banker's rounding).</summary>
-        private static double JsRound(double x)
-        {
-            double r = Math.Floor(x);
-            return x - r >= 0.5 ? r + 1 : r;
         }
     }
 }
