@@ -2,3 +2,5 @@ ref/
 __pycache__/
 cams_*.json
 !cams_f.json
+out/
+viewer.html
