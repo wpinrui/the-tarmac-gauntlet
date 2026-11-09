@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="10.32 0.32 179.36 199.36" width="179.36" height="199.36"><defs><linearGradient id="ch" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset=".36" stop-color="#c3c9d0"/><stop offset=".5" stop-color="#58616b"/>
+      <stop offset=".54" stop-color="#8e97a1"/><stop offset=".78" stop-color="#eef1f3"/><stop offset="1" stop-color="#a3acb5"/>
+    </linearGradient><linearGradient id="chL" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset=".44" stop-color="#e6eaee"/><stop offset=".5" stop-color="#98a1aa"/>
+      <stop offset=".6" stop-color="#dde2e7"/><stop offset="1" stop-color="#ffffff"/>
+    </linearGradient></defs><g><g class="c"><polygon points="100,8 182,54 182,146 100,192 18,146 18,54" fill="none" stroke="none" stroke-width="8" stroke-linejoin="round"/><polygon points="100,19.959999999999994 171.34,59.98 171.34,140.02 100,180.04000000000002 28.659999999999997,140.02 28.659999999999997,59.98" fill="none" stroke="url(#ch)" stroke-width="8" stroke-linejoin="round"/><polygon points="100,46 162,146 134,146 100,92 66,146 38,146" fill="url(#ch)"/><polygon points="100,108 124,146 76,146" fill="url(#chL)"/></g></g></svg>
