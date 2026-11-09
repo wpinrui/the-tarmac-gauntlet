@@ -22,8 +22,8 @@ Every option set for a feature includes the reference car's own design.
 Ask every placement or visual choice (badge, name and the like) inside the viewer: show each option on the model and let Ivan toggle between them. Never ask in text alone.
 
 ## 2. Reference
-Ivan gathers all reference. Never search for it.
-Ask him for: a four-view drawing (side, front, rear, top), detail photos, and the wheelbase, length, width and tyre size.
+Ivan provides the photos: a four-view drawing (side, front, rear, top) and detail photos.
+Look up the published wheelbase, length, width and tyre size yourself.
 Renders and measurements of a 3D model or scan he supplies replace the drawing.
 Reference images stay out of the repo.
 
