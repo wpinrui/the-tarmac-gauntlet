@@ -24,8 +24,8 @@ compiles in Unity.
 
 `Assets/Raceday/Raceday.unity` opens when the editor starts. Press Play to fly round the circuit.
 
-Camera: `W` `A` `S` `D` move, `Q` and `E` go down and up, `Shift` is 5x faster, hold the right mouse
-button to look around, and the scroll wheel changes speed.
+Camera: move the mouse to look, `W` `A` `S` `D` move along the ground, `Q` and `E` go down and up,
+`Shift` is 5x faster and the scroll wheel changes speed. Click to capture the mouse, `Esc` frees it.
 
 The circuit is built at runtime from `Assets/Raceday/Resources/Tracks/circuit.json`, which
 `tools/circuit/generate.py` writes (`python3 tools/circuit/generate.py`, needs numpy). Change the
