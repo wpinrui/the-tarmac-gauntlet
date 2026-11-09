@@ -41,7 +41,7 @@ def tyre():
 
 def rim_barrel():
     rim, w = W["rim_r"], W["width"]
-    prof = [(0.07, -w / 2 + 0.04), (rim + 0.004, -w / 2 + 0.01), (rim + 0.004, w / 2 - 0.01),
+    prof = [(0.07, -w / 2 + 0.04), (rim - 0.001, -w / 2 + 0.01), (rim - 0.001, w / 2 - 0.01),
             (rim - 0.012, w / 2 - 0.02), (rim - 0.012, -w / 2 + 0.06), (0.07, -w / 2 + 0.06)]
     return lathe(prof)
 
@@ -136,10 +136,10 @@ def mirror_parts():
         y = m["y"] * sgn
         out[f"mirror_{side}"] = (*ellipsoid_shell(m["x"], y, m["z"], m["rx"], m["ry"], m["rz"]), "body")
         # recessed glass on the flat back
-        xb = m["x"] - m["rx"] * 0.45 + 0.004
-        s = np.sqrt(1 - 0.45 ** 2) * 0.82
+        xb = m["x"] - m["rx"] * 0.45 + 0.005
+        s = np.sqrt(1 - 0.45 ** 2) * 0.80
         a = np.linspace(0, 2 * np.pi, 24, endpoint=False)
-        ring0 = np.column_stack([np.full(24, xb - 0.006), y + m["ry"] * s * np.cos(a), m["z"] + m["rz"] * s * np.sin(a)])
+        ring0 = np.column_stack([np.full(24, xb - 0.0045), y + m["ry"] * s * np.cos(a), m["z"] + m["rz"] * s * np.sin(a)])
         ring1 = ring0 + np.array([0.004, 0, 0])
         out[f"mirror_glass_{side}"] = (*_close([ring0, ring1]), "mirror_glass")
         # stalk
@@ -177,9 +177,9 @@ def rear_lamp_parts():
         y0, y1 = sorted((r["y0"] * s, r["y1"] * s))
         out[f"rear_housing_{side}"] = (*box(x_back - 0.012, x_back + 0.01, y0, y1, r["z0"], r["z1"]), "housing")
         yc = (y0 + y1) / 2
-        out[f"lamp_tail_{side}"] = (*disc(np.array([x_back - 0.014, yc + 0.05 * s, zm]), (-1, 0, 0), 0.026, 0.008), "lamp_tail")
-        out[f"lamp_brake_{side}"] = (*disc(np.array([x_back - 0.014, yc - 0.05 * s, zm]), (-1, 0, 0), 0.026, 0.008), "lamp_brake")
+        out[f"lamp_tail_{side}"] = (*disc(np.array([x_back - 0.0165, yc + 0.05 * s, zm]), (-1, 0, 0), 0.026, 0.008), "lamp_tail")
+        out[f"lamp_brake_{side}"] = (*disc(np.array([x_back - 0.0165, yc - 0.05 * s, zm]), (-1, 0, 0), 0.026, 0.008), "lamp_brake")
     hw = r["rain_hw"]
     out["rain_housing"] = (*box(x_back - 0.012, x_back + 0.01, -hw, hw, r["z0"] + 0.01, r["z1"] - 0.005), "housing")
-    out["lamp_rain"] = (*box(x_back - 0.016, x_back - 0.010, -hw + 0.012, hw - 0.012, r["z0"] + 0.02, r["z1"] - 0.015), "lamp_rain")
+    out["lamp_rain"] = (*box(x_back - 0.0185, x_back - 0.0125, -hw + 0.012, hw - 0.012, r["z0"] + 0.02, r["z1"] - 0.015), "lamp_rain")
     return out
