@@ -19,6 +19,8 @@ namespace TarmacGauntlet.Raceday
         public float Braking;
         /// <summary>True while the car is making room for a faster car behind it.</summary>
         public bool GivingWay;
+        /// <summary>The car's race brain, for where it plans to be over the next few seconds. Null for a player.</summary>
+        public Racecraft Craft;
     }
 
     /// <summary>
@@ -77,24 +79,37 @@ namespace TarmacGauntlet.Raceday
 
     /// <summary>
     /// The race brain on top of an <see cref="AiPilot"/>, with no Unity objects so it can be tested
-    /// outside Unity. Each physics step it looks at the cars around and tells the pilot where to run
-    /// relative to its racing line (<see cref="AiPilot.Offset"/>) and how fast it may go
-    /// (<see cref="AiPilot.SpeedCap"/>, <see cref="AiPilot.SpeedScale"/>).
+    /// outside Unity. Each physics step it tells the pilot where to run relative to its racing line
+    /// (<see cref="AiPilot.Offset"/>) and how fast it may go (<see cref="AiPilot.SpeedCap"/>,
+    /// <see cref="AiPilot.SpeedScale"/>).
     ///
-    /// It never runs into a car beside it: a car alongside fences off that side. It holds a gap to the
-    /// car ahead in its path. When it is quicker, or the car ahead is a lap down, a slower class or
-    /// making room, it picks the side with room (the inside of the next corner if it can) and goes
-    /// past. A rival close behind before a corner gets one move to the inside. A car being lapped,
-    /// or caught by a faster class, moves aside on the straights and holds its line into corners,
-    /// so the faster car knows where it will be.
+    /// It plans rather than reacts. A few times a second, when a car ahead would hold it up, it lays
+    /// out candidate paths over the next corners: the racing line, a dive up the inside, the same with
+    /// later braking, round the outside (keeping the inside for the next corner when it bends the
+    /// other way), a switchback that runs wide in and cuts back under on the exit, and a pass on the
+    /// straight. Each is driven forward in time at the speeds its path allows, against where every
+    /// other car plans to be at each moment, not where it is now. A path is only blocked by a car
+    /// that will be in the way when this car gets there. The path that gets furthest wins. A pass
+    /// that stops paying off for a while is dropped, which frees the space for the car behind.
+    ///
+    /// Underneath, it never runs into a car beside it (a car alongside fences off that side) and
+    /// holds a safe gap to the car ahead in its path. A car being lapped holds its racing line, so the
+    /// faster car can plan round it. A rival close behind before a corner at the end of a long
+    /// straight sometimes gets a move to the inside.
     /// </summary>
     public sealed class Racecraft
     {
         public enum Mode { Racing, Following, Passing, Defending, GivingWay }
 
+        private enum Kind { Line, Inside, LateBrake, Outside, Switchback, Straight }
+
         private const float CarLength = 4.8f;
         /// <summary>Centre to centre when side by side: a car's width plus a safe space.</summary>
         private const float SideBySide = 3f;
+        /// <summary>Centre to centre at which two paths pass without touching: a car's width and a little.</summary>
+        private const float Clearance = 2.4f;
+        /// <summary>Offset that puts a car beside another.</summary>
+        private const float Beside = SideBySide + 0.4f;
         private const float MaxShift = 5f;
         private const float LookAhead = 150f;
         private const float LookBehind = 90f;
@@ -104,12 +119,20 @@ namespace TarmacGauntlet.Raceday
         private const float PhysicsStep = 0.01f;
         private const float WakeLength = 80f;
         private const float WakeDrag = 0.45f;
-        /// <summary>Seconds of trying to pass a rival before dropping back in behind it.</summary>
-        private const float GiveUp = 12f;
-        /// <summary>Extra speed an attacker carries into the braking zone when side by side.</summary>
+        /// <summary>Extra speed an attacker carries into the braking zone on a late-braking dive.</summary>
         private const float Lunge = 1.04f;
         /// <summary>Chance a driver covers the inside when a rival is on its tail into a corner.</summary>
         private const float DefendChance = 0.5f;
+
+        /// <summary>How often the paths are planned again, seconds.</summary>
+        private const float PlanEvery = 0.2f;
+        /// <summary>Planning looks this far ahead in time, in steps of <see cref="Tick"/>.</summary>
+        private const int Steps = 40;
+        private const float Tick = 0.1f;
+        /// <summary>Metres further on, over the planning time, that make a path worth leaving the line for.</summary>
+        private const float WorthIt = 1f;
+        /// <summary>Distance a pass may go on losing to the line before it is dropped, metres.</summary>
+        private const float GiveUpAfter = 60f;
 
         public Mode State { get; private set; }
         /// <summary>The offset racecraft is steering towards, before it is eased in.</summary>
@@ -117,17 +140,34 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Completed passes, and moves made to defend.</summary>
         public int Passes { get; private set; }
         public int Defences { get; private set; }
+        /// <summary>The kind of path being followed, for traces.</summary>
+        public string Plan => plan.Kind.ToString();
 
-        private int passing = -1;     // id of the car being passed
-        private float passSide;
-        private float passBlocked;
-        private float passTime;
-        private int waitFor = -1;
-        private float waitTime;
-        private float holdTime;
-        private int holdFor = -1;
-        private float heldUp;
-        private float speed;      // this car's, this step
+        // Where this car plans to be, each Tick from when the plan was made: race distance and lateral.
+        private readonly float[] planDistance = new float[Steps + 1];
+        private readonly float[] planLateral = new float[Steps + 1];
+        private float planAge = float.PositiveInfinity;
+
+        private sealed class Path
+        {
+            public Kind Kind;
+            public int Corner = -1;
+            public int Start;              // line sample the path starts at
+            public float[] Offset;         // per sample from Start
+            public float[] Speed;          // per sample from Start, braking in time for what is ahead
+            public float Score;            // metres covered over the planning time
+            public bool Blocked;           // held up by a car ahead in the planning
+            public bool Rejected;          // runs into a car beside it
+            public readonly List<int> HeldBy = new List<int>();   // cars that hold it up in the planning
+            public readonly float[] Distance = new float[Steps + 1];
+            public readonly float[] Lateral = new float[Steps + 1];
+        }
+        private Path plan = new Path { Kind = Kind.Line };
+        private readonly List<Path> candidates = new List<Path>();
+        private int passTarget = -1;
+        private float losing;              // metres the pass has been losing to the line for
+        private int bannedCorner = -1;     // corner a pass was given up at: no new pass into it
+        private float speed;               // this car's, this step
         private int defendCorner = -1;
         private int rolledCorner = -1;
         private readonly System.Random random;
@@ -139,6 +179,16 @@ namespace TarmacGauntlet.Raceday
             random = new System.Random(seed);
         }
 
+        /// <summary>
+        /// For a car not racing right now (formation, pit lane): it has no plan, so the others expect
+        /// it to carry on as it is going.
+        /// </summary>
+        public void Forget()
+        {
+            planAge = float.PositiveInfinity;
+            plan = new Path { Kind = Kind.Line };
+        }
+
         private struct Near
         {
             public TrafficCar Car;
@@ -148,6 +198,12 @@ namespace TarmacGauntlet.Raceday
             public bool LapsMe, BeingLapped, Faster, Slower;
         }
         private readonly List<Near> near = new List<Near>();
+        // Where each near car will be at each Tick of the planning, the same for every candidate path.
+        private float[] predGap = new float[0], predLat = new float[0];
+        // The near cars that get ahead of this car's nose at some point in the planning: the rest stay
+        // behind it whatever path it takes, so they can't hold it up, tow it or be run into.
+        private readonly List<int> inReach = new List<int>();
+        private float[] gapAt = new float[0], latAt = new float[0];
 
         /// <summary>
         /// Decides this step's offset and speed limits and writes them into the pilot. Call before
@@ -157,7 +213,8 @@ namespace TarmacGauntlet.Raceday
         {
             pilot.SpeedCap = float.PositiveInfinity;
             pilot.SpeedScale = 1f;
-            if (pilot.Index < 0) return;
+            planAge += dt;
+            if (pilot.Index < 0) { planAge = float.PositiveInfinity; plan = new Path { Kind = Kind.Line }; return; }
             RacingLine line = pilot.Line;
             Circuit c = line.Circuit;
             float lap = c.Lap;
@@ -206,133 +263,18 @@ namespace TarmacGauntlet.Raceday
 
             int corner = NextCorner(c, here, out float toCorner, out bool inCorner, out float inside, out float cornerLeft);
 
-            // The nearest car ahead in this car's path.
-            int blocker = -1;
-            for (int i = 0; i < near.Count; i++)
-            {
-                Near n = near[i];
-                if (n.Gap <= 0f) continue;
-                bool inPath = Within(line, n, shift, SideBySide) || Within(line, n, pilot.Offset, SideBySide);
-                if (inPath && (blocker < 0 || n.Gap < near[blocker].Gap)) blocker = i;
-            }
-
-            // A faster car behind that this car should let by.
-            int letBy = -1;
-            for (int i = 0; i < near.Count; i++)
-            {
-                Near n = near[i];
-                if (n.Gap >= 0f || !(n.LapsMe || n.Faster)) continue;
-                bool coming = n.Gap > -40f || n.Car.Speed > me.Speed - 1f;
-                if (coming && n.Gap > -70f && (letBy < 0 || n.Gap > near[letBy].Gap)) letBy = i;
-            }
-
-            heldUp = pilot.HeldBy > 1f ? heldUp + dt : 0f;
-            Mode mode = Mode.Racing;
-            float target = 0f;
-            waitTime -= dt;
-            holdTime -= dt;
-
-            // Passing: keep going on the chosen side until clear, or pick a side when there is reason to go.
-            if (passing >= 0)
-            {
-                int p = Find(passing);
-                passTime += dt;
-                if (p < 0) passing = -1;
-                else if (near[p].Gap < -(CarLength + 2f)) { Passes++; passing = -1; }
-                else if (near[p].Gap > 25f && !(near[p].BeingLapped || near[p].Slower)) passing = -1;   // fell back: tuck in again
-                else if (near[p].Gap > CarLength + 2f && corner >= 0 && (inCorner || toCorner < 1.2f * me.Speed))
-                    passing = -1;   // not alongside by the turn-in: tuck in behind
-                else if (near[p].Gap > CarLength * 0.5f && corner >= 0 && (inCorner || toCorner < 0.5f * me.Speed))
-                {
-                    // Less than half alongside at the turn-in: the corner is the other car's. Stay on
-                    // this side, out of its way, until it has gone.
-                    holdFor = passing;
-                    holdTime = 3f;
-                    passing = -1;
-                }
-                else if (passTime > GiveUp && !(near[p].BeingLapped || near[p].Slower))
-                {
-                    // Not getting by: drop back in behind and wait a while before trying again.
-                    waitFor = passing;
-                    holdFor = passing;
-                    holdTime = 1.5f;
-                    waitTime = 5f;
-                    passing = -1;
-                }
-                // Once alongside, the car being passed has to leave room, so only a car in the way stops it.
-                else if ((near[p].Gap > CarLength && !Room(pilot, near[p], passSide)) || !Clear(line, Shift(near[p], passSide), passing, near[p].Gap))
-                {
-                    passBlocked += dt;
-                    if (passBlocked > 0.6f) { holdFor = passing; holdTime = 1.5f; passing = -1; }
-                    else { mode = Mode.Passing; target = Shift(near[p], passSide); }
-                }
-                else { passBlocked = 0f; mode = Mode.Passing; target = Shift(near[p], passSide); }
-            }
-            if (passing < 0 && blocker >= 0)
-            {
-                Near b = near[blocker];
-                // Worth a go when catching it fast (into a braking zone), or sitting on its tail in a quicker car.
-                float closing = me.Speed - b.Car.Speed;
-                bool catching = closing > 1f && b.Gap < 40f && b.Gap < 2f * closing;
-                // Moving over takes a second or two, so there must be that much straight left.
-                float needed = b.Gap + 40f + 1.5f * me.Speed;
-                bool space = inCorner ? cornerLeft < 40f : corner < 0 || toCorner > needed;
-                // Or held up: it would go faster than the car ahead lets it. A rival is attacked at the
-                // end of a straight, out of its slipstream, rather than as soon as the corner opens out.
-                bool towing = pilot.Towed && b.Gap < 12f && me.LapPace < b.Car.LapPace * 1.002f;
-                bool quicker = b.Gap < 12f && (heldUp > 0.5f || towing) && !inCorner && (corner < 0 || toCorner < needed + 2f * me.Speed);
-                bool reason = space && (b.BeingLapped || b.Slower || b.Car.GivingWay || catching || quicker);
-                if (waitTime > 0f && waitFor == b.Car.Id && !(b.BeingLapped || b.Slower)) reason = false;
-                if (reason && b.Gap < 80f)
-                {
-                    float best = float.NegativeInfinity;
-                    foreach (float side in new[] { -1f, 1f })
-                    {
-                        if (!Room(pilot, b, side)) continue;
-                        float cand = Shift(b, side);
-                        if (!Clear(line, cand, b.Car.Id, b.Gap)) continue;
-                        float score = -0.3f * Mathf.Abs(cand);
-                        if (corner >= 0 && toCorner < 300f && side == inside) score += 2f;
-                        // Round the outside of a corner is slow and rarely sticks, unless the car ahead
-                        // has left the racing line to cover the inside.
-                        bool covering = corner >= 0 && b.Shift * inside > 1f;
-                        if (corner >= 0 && (inCorner || toCorner < 150f) && side != inside && !covering) continue;
-                        if (covering && side == inside) continue;   // the door is shut
-                        if (b.Car.GivingWay && side * b.Shift < 0f) score += 2f;
-                        if (score > best) { best = score; passSide = side; }
-                    }
-                    if (best > float.NegativeInfinity)
-                    {
-                        passing = b.Car.Id;
-                        passBlocked = 0f;
-                        passTime = 0f;
-                        mode = Mode.Passing;
-                        target = Shift(b, passSide);
-                    }
-                }
-                if (mode != Mode.Passing) mode = Mode.Following;
-            }
-
-            // Letting a faster car by: aside on the straights, on the line into corners.
-            if (letBy >= 0 && mode != Mode.Passing)
-            {
-                Near f = near[letBy];
-                mode = Mode.GivingWay;
-                bool straight = !inCorner && (corner < 0 || toCorner > 150f);
-                if (straight)
-                {
-                    float away = f.Shift > 0.5f ? -1f : f.Shift < -0.5f ? 1f : (corner >= 0 ? -inside : 1f);
-                    target = away * 3f;
-                    if (f.Gap > -25f) pilot.SpeedScale = 0.96f;
-                }
-                else target = 0f;
-            }
+            // A much faster car behind, or one lapping this car: hold the racing line, so it knows
+            // where this car will be and can pick its own way past.
+            bool givingWay = false;
+            foreach (Near n in near)
+                if (n.Gap < 0f && n.Gap > -70f && (n.LapsMe || n.Faster)) givingWay = true;
 
             // Defending: one move to the inside before a corner at the end of a straight, against a
             // rival close behind. Not every time: covering costs time, and a driver who always does
             // it can never be passed.
+            bool defending = false;
             if (corner != rolledCorner) { defendCorner = -1; defended = false; rolledCorner = corner; }
-            if (mode == Mode.Racing && corner >= 0 && !inCorner && toCorner < 250f && toCorner > 40f
+            if (!givingWay && corner >= 0 && !inCorner && toCorner < 250f && toCorner > 40f
                 && StraightBefore(c, corner) > 300f)
             {
                 foreach (Near n in near)
@@ -341,7 +283,7 @@ namespace TarmacGauntlet.Raceday
                     if (n.Gap >= -(CarLength + 1f) || n.Gap < -15f || n.LapsMe || n.Faster || n.BeingLapped || n.Slower) continue;
                     if (n.Car.Speed < me.Speed + 0.5f && n.Gap < -10f) continue;
                     // Too late once it has committed to the inside: no moving into it.
-                    if ((n.Car.Lateral - (line.Lateral[pilot.Index] + shift)) * inside > 1f) continue;
+                    if ((n.Car.Lateral - mine) * inside > 1f) continue;
                     if (!defended)
                     {
                         defended = true;
@@ -354,27 +296,28 @@ namespace TarmacGauntlet.Raceday
                     }
                     break;
                 }
-                if (defendCorner == corner)
-                {
-                    mode = Mode.Defending;
-                    target = defendSide * 2.5f;
-                }
+                defending = defendCorner == corner;
             }
 
-            if (holdTime > 0f && mode != Mode.Passing)
+            // Plan: a few times a second, or straight away when there is no plan or it has run out.
+            int along = c.Wrap(pilot.Index - plan.Start);
+            if (planAge >= PlanEvery || plan.Offset == null || along >= plan.Offset.Length - 10)
             {
-                // In a corner only while the other car is still beside or just ahead.
-                int h = Find(holdFor);
-                bool overlapping = h >= 0 && near[h].Gap > -2f && near[h].Gap < CarLength + 3f;
-                if (!inCorner || overlapping) target = pilot.Offset;
-                else holdTime = 0f;
+                Replan(pilot, me, c, here, corner, toCorner, inCorner, inside, givingWay, defending);
+                along = c.Wrap(pilot.Index - plan.Start);
             }
 
-            // Lunge: side by side or nearly into a braking zone, the attacker brakes a little later.
-            if (mode == Mode.Passing && !inCorner && corner >= 0 && toCorner < 200f)
+            Mode mode = plan.Kind != Kind.Line ? Mode.Passing
+                : defending ? Mode.Defending
+                : givingWay ? Mode.GivingWay
+                : plan.Blocked ? Mode.Following
+                : Mode.Racing;
+            float target = along < plan.Offset.Length ? plan.Offset[along] : 0f;
+            // Off the line, the path's own speeds where it brakes for its corners: an inside line is slower.
+            if (plan.Kind != Kind.Line && along < plan.Speed.Length)
             {
-                int p = Find(passing);
-                if (p >= 0 && near[p].Gap < CarLength + 4f && !near[p].BeingLapped && !near[p].Slower) pilot.SpeedScale = Lunge;
+                int ahead = Mathf.Min(along + Mathf.CeilToInt(Mathf.Max(speed, 5f) * 0.1f / c.Step), plan.Speed.Length - 1);
+                if (plan.Speed[ahead] < plan.Speed[along]) pilot.SpeedCap = plan.Speed[ahead];
             }
 
             // Ease the offset towards the target, more gently while cornering hard, never into a car alongside.
@@ -382,9 +325,10 @@ namespace TarmacGauntlet.Raceday
             float goal = lo <= hi ? Mathf.Clamp(target, lo, hi) : pilot.Offset;
             float load = Mathf.Abs(me.Speed * me.Speed * line.Curvature[pilot.Index]) / (pilot.Spec.Grip * G);
             float spare = 1f - Mathf.Clamp01(load);
-            float rate = 0.3f + 2.2f * spare * spare;
-            // Back towards the line is always worth doing at a fair pace: off it, corners are slower.
-            if (Mathf.Abs(goal) < Mathf.Abs(pilot.Offset)) rate = Mathf.Max(rate, 2f);
+            // Keeping up with the plan, but only as fast as the grip left over from cornering allows.
+            float rate = Mathf.Max(0.3f + 2.2f * spare * spare, PlanRate(c, along) * spare * spare);
+            // Back towards the line is worth doing at a fair pace on the straights: off it, corners are slower.
+            if (Mathf.Abs(goal) < Mathf.Abs(pilot.Offset)) rate = Mathf.Max(rate, 2f * spare);
             pilot.Offset = Mathf.MoveTowards(pilot.Offset, goal, rate * dt);
             // A car alongside is a firm limit: the offset is pushed off it quickly, though not in one
             // jump, which would throw the car sideways.
@@ -400,8 +344,15 @@ namespace TarmacGauntlet.Raceday
                 if (n.Gap <= 0f) continue;
                 // Overlapping side by side: the other car has to leave room, so only the space now counts.
                 bool alongside = n.Gap < CarLength + 1f && Mathf.Abs(n.Car.Lateral - mine) > SideBySide - 0.6f;
-                bool inPath = !alongside && (Within(line, n, shift, SideBySide - 0.2f)
-                    || (n.Gap < 30f && Within(line, n, pilot.Offset, SideBySide - 0.2f)));
+                // In the path now, where the car is heading, or where the plan says the two will meet.
+                // A car committed to a pass only needs its paths to clear the other car.
+                float margin = mode == Mode.Passing ? Clearance : SideBySide - 0.2f;
+                // A car crawling after a spin goes anywhere: give it a wide berth.
+                bool crawling = n.Car.Speed < 20f && n.Car.Speed < 0.5f * me.Speed;
+                if (crawling) margin = SideBySide + 1f;
+                bool inPath = !alongside && (Apart(line, n, shift) < margin
+                    || (n.Gap < 30f && Apart(line, n, pilot.Offset) < margin)
+                    || plan.HeldBy.Contains(n.Car.Id));
                 if (!inPath) continue;
                 // Closer when attacking: tucked right in on a straight, in its slipstream, ready to pull out.
                 bool attacking = mode == Mode.Passing || me.LapPace < n.Car.LapPace * 0.995f || n.BeingLapped || n.Slower;
@@ -416,7 +367,347 @@ namespace TarmacGauntlet.Raceday
                     : Mathf.Max(n.Car.Speed * Mathf.Sqrt(ratio) + 2f * room, 0f);
                 pilot.SpeedCap = Mathf.Min(pilot.SpeedCap, cap);
             }
+
+            // A late-braking dive carries a little more speed into the braking zone.
+            if (plan.Kind == Kind.LateBrake && !inCorner && corner == plan.Corner && toCorner < 150f) pilot.SpeedScale = Lunge;
+
+            // A pass that has got by.
+            if (passTarget >= 0)
+            {
+                int p = Find(passTarget);
+                if (p < 0) passTarget = -1;
+                else if (near[p].Gap < -(CarLength + 2f)) { Passes++; passTarget = -1; }
+            }
             State = mode;
+        }
+
+        /// <summary>
+        /// Lays out the candidate paths, drives each forward against where the other cars will be, and
+        /// takes the one that gets furthest. Then publishes where this car will be.
+        /// </summary>
+        private void Replan(AiPilot pilot, TrafficCar me, Circuit c, float here, int corner, float toCorner,
+            bool inCorner, float inside, bool givingWay, bool defending)
+        {
+            planAge = 0f;
+            plans++;
+            RacingLine line = pilot.Line;
+            float ramp = Mathf.Clamp(1.2f * speed, 25f, 60f);
+            float horizon = Mathf.Max(250f, speed * Steps * Tick + 100f);
+            int start = pilot.Index;
+            int samples = Mathf.CeilToInt(horizon / c.Step);
+
+            // The corner ahead (or this one), from here: where it starts and ends, and the one after.
+            float a = 0f, b = 0f, a2 = 0f, b2 = 0f, inside2 = 0f;
+            if (corner >= 0)
+            {
+                CornerData k = c.Data.corners[corner];
+                a = inCorner ? -c.Ahead(k.s, here) : toCorner;
+                b = a + (k.e - k.s);
+                CornerData k2 = c.Data.corners[(corner + 1) % c.Data.corners.Length];
+                a2 = b + c.Ahead(k.e, k2.s);
+                b2 = a2 + (k2.e - k2.s);
+                inside2 = -k2.arcs[0].dir;
+            }
+
+            // Where the near cars will be at each Tick, worked out once for all the candidate paths.
+            int cells = near.Count * (Steps + 1);
+            if (predGap.Length < cells) { predGap = new float[cells]; predLat = new float[cells]; }
+            for (int i = 0; i < near.Count; i++)
+            {
+                Near o = near[i];
+                Racecraft r = o.Car.Craft;
+                if (r == null || float.IsInfinity(r.planAge))
+                {
+                    for (int step = 0; step <= Steps; step++)
+                    {
+                        predGap[i * (Steps + 1) + step] = o.Gap + Mathf.Max(o.Car.Speed, 0f) * step * Tick;
+                        predLat[i * (Steps + 1) + step] = o.Car.Lateral;
+                    }
+                    continue;
+                }
+                r.Foresee(o.Car);
+                for (int step = 0; step <= Steps; step++)
+                {
+                    predGap[i * (Steps + 1) + step] = o.Gap + r.seenGain[step];
+                    predLat[i * (Steps + 1) + step] = r.seenLat[step];
+                }
+            }
+            inReach.Clear();
+            for (int i = 0; i < near.Count; i++)
+                for (int step = 0; step <= Steps; step++)
+                    if (predGap[i * (Steps + 1) + step] > -CarLength * 0.6f) { inReach.Add(i); break; }
+            // Step by step, side by side in memory, for the passes over every candidate path.
+            int count = inReach.Count;
+            if (gapAt.Length < count * (Steps + 1)) { gapAt = new float[count * (Steps + 1)]; latAt = new float[count * (Steps + 1)]; }
+            for (int x = 0; x < count; x++)
+                for (int step = 0; step <= Steps; step++)
+                {
+                    gapAt[step * count + x] = predGap[inReach[x] * (Steps + 1) + step];
+                    latAt[step * count + x] = predLat[inReach[x] * (Steps + 1) + step];
+                }
+
+            candidates.Clear();
+            float now = pilot.Offset;
+            Path baseline = defending
+                ? Make(Kind.Line, start, samples, c, now, ramp, defendSide * 2.5f, Mathf.Max(a - 20f, ramp), a + 10f)
+                : Make(Kind.Line, start, samples, c, now, ramp, 0f);
+            candidates.Add(baseline);
+            Drive(baseline, pilot, me, c, -1f);
+
+            // Only worth looking for a way past when the line is going to be held up, and never while
+            // covering a move. A car making room for one behind may still pass a slower one ahead:
+            // the car behind plans round where it is going.
+            int target = baseline.Blocked ? BlockerAhead(line, c, pilot.Shift) : -1;
+            if (target >= 0 && !defending && corner >= 0 && corner != bannedCorner)
+            {
+                Near t = near[target];
+                float inner = Mathf.Clamp(t.Shift + inside * Beside, -MaxShift, MaxShift);
+                float outer = Mathf.Clamp(t.Shift - inside * Beside, -MaxShift, MaxShift);
+                // The inside of this corner, held to its exit.
+                candidates.Add(Make(Kind.Inside, start, samples, c, now, ramp, inner, 0f, b + 20f, corner));
+                // The same with later braking, while there is a braking zone still to come.
+                if (a > ramp) candidates.Add(Make(Kind.LateBrake, start, samples, c, now, ramp, inner, 0f, b + 20f, corner));
+                // Round the outside: through the next corner too when it bends the other way, which
+                // makes the outside of this one the inside of that.
+                bool flip = inside2 == -inside && a2 - b < 150f;
+                candidates.Add(Make(Kind.Outside, start, samples, c, now, ramp, outer, 0f, flip ? b2 + 20f : b + 20f, corner));
+                // Switchback: wide on the way in, then cut back under on the way out.
+                if (a > ramp)
+                {
+                    float apex = a + 0.4f * (b - a);
+                    Path s = Make(Kind.Switchback, start, samples, c, now, ramp, outer, 0f, apex, corner);
+                    Shape(s, c, apex, outer, b + 10f, inner, b + 60f, inner, b + 60f + ramp, 0f);
+                    candidates.Add(s);
+                }
+                // Past on the straight, back in before the corner.
+                if (a > ramp + 80f)
+                {
+                    foreach (float side in new[] { -1f, 1f })
+                    {
+                        float off = Mathf.Clamp(t.Shift + side * Beside, -MaxShift, MaxShift);
+                        candidates.Add(Make(Kind.Straight, start, samples, c, now, ramp, off, 0f, a - 30f, corner));
+                    }
+                }
+                for (int i = 1; i < candidates.Count; i++) Drive(candidates[i], pilot, me, c, a);
+            }
+
+            // The furthest path wins. Leaving the line has to be worth it, but a pass already under
+            // way only has to keep up with the line.
+            Path best = baseline;
+            bool going = plan.Kind != Kind.Line && plan.Corner == corner;
+            foreach (Path p in candidates)
+            {
+                if (p == baseline || p.Rejected) continue;
+                float need = going && p.Kind == plan.Kind ? -WorthIt : WorthIt;
+                if (p.Score > best.Score + need) best = p;
+            }
+
+            // Give up a pass that has been losing to the line for a while: back in line, which frees
+            // the space beside the car ahead for whoever is behind.
+            if (best.Kind != Kind.Line && going)
+            {
+                losing = best.Score < baseline.Score ? losing + speed * PlanEvery : 0f;
+                if (losing > GiveUpAfter) { bannedCorner = corner; best = baseline; }
+            }
+            else losing = 0f;
+            if (bannedCorner != corner) bannedCorner = -1;
+
+            if (best.Kind != Kind.Line && plan.Kind == Kind.Line) passTarget = target >= 0 ? near[target].Car.Id : -1;
+            plan = best;
+            System.Array.Copy(best.Distance, planDistance, Steps + 1);
+            System.Array.Copy(best.Lateral, planLateral, Steps + 1);
+        }
+
+        /// <summary>
+        /// A path that eases from the current offset to <c>off</c> (by <c>from</c> metres ahead, or
+        /// over a ramp), holds it to <c>to</c> metres ahead, then eases back to the line.
+        /// </summary>
+        private static Path Make(Kind kind, int start, int samples, Circuit c, float now, float ramp, float off,
+            float from = 0f, float to = float.MaxValue, int corner = -1)
+        {
+            var p = new Path { Kind = kind, Start = start, Corner = kind == Kind.Line ? -1 : corner, Offset = new float[samples], Speed = new float[samples] };
+            float reach = Mathf.Max(from, ramp);
+            for (int m = 0; m < samples; m++)
+            {
+                float d = m * c.Step;
+                if (d < reach) p.Offset[m] = Mathf.Lerp(now, off, EaseOut(d / reach));
+                else if (d < to) p.Offset[m] = off;
+                else p.Offset[m] = Mathf.Lerp(off, 0f, Smooth((d - to) / ramp));
+            }
+            return p;
+        }
+
+        /// <summary>Overwrites a path from the first knot on, easing between (distance, offset) knots.</summary>
+        private static void Shape(Path p, Circuit c, params float[] knots)
+        {
+            for (int m = 0; m < p.Offset.Length; m++)
+            {
+                float d = m * c.Step;
+                if (d < knots[0]) continue;
+                float v = knots[knots.Length - 1];
+                for (int i = 0; i + 3 < knots.Length; i += 2)
+                    if (d >= knots[i] && d < knots[i + 2])
+                    {
+                        v = Mathf.Lerp(knots[i + 1], knots[i + 3], Smooth((d - knots[i]) / Mathf.Max(knots[i + 2] - knots[i], 1f)));
+                        break;
+                    }
+                p.Offset[m] = v;
+            }
+        }
+
+        /// <summary>Moves off at once and settles gently, so a plan made again and again still gets somewhere.</summary>
+        private static float EaseOut(float t)
+        {
+            t = Mathf.Clamp01(t);
+            return t * (2f - t);
+        }
+
+        private static float Smooth(float t)
+        {
+            t = Mathf.Clamp01(t);
+            return t * t * (3f - 2f * t);
+        }
+
+        /// <summary>
+        /// Drives a path forward in time: at the speeds it allows (braking in time for what is ahead),
+        /// as fast as the car accelerates, and behind any car that will be in its way. Scores how far
+        /// it gets. A path that moves into a car beside it is rejected.
+        /// </summary>
+        private void Drive(Path p, AiPilot pilot, TrafficCar me, Circuit c, float corner)
+        {
+            RacingLine line = pilot.Line;
+            int n = p.Offset.Length;
+            for (int m = 0; m < n; m++)
+            {
+                int k = c.Wrap(p.Start + m);
+                float v = pilot.LaneSpeed(k, p.Offset[m]);
+                float d = m * c.Step;
+                if (p.Kind == Kind.LateBrake && d > corner - 150f && d < corner) v *= Lunge;
+                p.Speed[m] = v;
+            }
+            float brake = me.Braking;
+            for (int m = n - 2; m >= 0; m--)
+                p.Speed[m] = Mathf.Min(p.Speed[m], Mathf.Sqrt(p.Speed[m + 1] * p.Speed[m + 1] + 2f * brake * c.Step));
+
+            // Where the car is now, measured from the start of the path.
+            float s = Mathf.Repeat(me.Distance, c.Lap) - p.Start * c.Step;
+            s = Mathf.Repeat(s + c.Lap * 0.5f, c.Lap) - c.Lap * 0.5f;
+            float startS = s;
+            float vel = Mathf.Max(me.Speed, 0f);
+            p.Blocked = false;
+            p.Rejected = false;
+            p.HeldBy.Clear();
+            p.Distance[0] = me.Distance;
+            p.Lateral[0] = me.Lateral;
+            for (int step = 1; step <= Steps; step++)
+            {
+                int m = Mathf.Clamp(Mathf.FloorToInt(s / c.Step), 0, n - 1);
+                int k = c.Wrap(p.Start + m);
+                float lat = LateralAt(line, k, p.Offset[m]);
+                // In another car's wake there is less drag, so the car outruns the target speeds on the
+                // straights, and keeps that speed after pulling out until it has to brake.
+                float wake = 1f;
+                int count = inReach.Count;
+                for (int x = 0, at = (step - 1) * count; x < count; x++)
+                {
+                    float behind = gapAt[at + x] - (s - startS);
+                    if (behind <= CarLength || behind >= WakeLength) continue;
+                    float side = Mathf.Abs(lat - latAt[at + x]);
+                    if (side < 2f)
+                        wake = Mathf.Min(wake, 1f - WakeDrag * (1f - behind / WakeLength) * (1f - side / 2f));
+                }
+                float resist = pilot.Profile.Resist(k, vel);
+                float drag = resist - pilot.Profile.Resist(k, 0f);
+                float accel = Mathf.Max(pilot.Profile.DriveAccel(vel) - resist + (1f - wake) * drag, 0.5f);
+                bool braking = m + 1 < n && p.Speed[m + 1] < p.Speed[m];
+                vel = Mathf.Min(braking ? p.Speed[m] : Mathf.Max(p.Speed[m], vel), vel + accel * Tick);
+                float next = s + vel * Tick;
+                for (int x = 0, at = step * count; x < count; x++)
+                {
+                    float og = gapAt[at + x];
+                    if (Mathf.Abs(lat - latAt[at + x]) >= SideBySide - 0.3f) continue;
+                    Near o = near[inReach[x]];
+                    float gap = og - (next - startS);     // its place relative to this car's, then
+                    float follow = CarLength + 1f + 0.03f * vel;   // tucked in, as close as an attacker sits
+                    if (gap >= CarLength * 0.6f)
+                    {
+                        // Ahead in the path: follow it.
+                        if (gap < follow)
+                        {
+                            float held = Mathf.Max(startS + og - follow, s);
+                            if (held < next)
+                            {
+                                next = held;
+                                vel = (next - s) / Tick;
+                                p.Blocked = true;
+                                if (!p.HeldBy.Contains(o.Car.Id)) p.HeldBy.Add(o.Car.Id);
+                            }
+                        }
+                    }
+                    else if (gap > -CarLength * 0.6f && o.Gap > -(CarLength + 1f) && p.Kind != Kind.Line)
+                        p.Rejected = true;   // into a car beside it
+                }
+                s = next;
+                p.Distance[step] = me.Distance + (s - startS);
+                p.Lateral[step] = lat;
+            }
+            p.Score = s - startS;
+        }
+
+        // Where this car will be as the others see it, each Tick from now: ground gained and lateral.
+        // The same for every car looking at it this step, so it is worked out once.
+        private readonly float[] seenGain = new float[Steps + 1], seenLat = new float[Steps + 1];
+        private float seenAge = float.NaN, seenSpeed, seenLateral;
+        private int seenPlan = -1, plans;
+
+        /// <summary>Fills <see cref="seenGain"/> and <see cref="seenLat"/> for this car as it is now.</summary>
+        private void Foresee(in TrafficCar me)
+        {
+            if (seenAge == planAge && seenPlan == plans && seenSpeed == me.Speed && seenLateral == me.Lateral) return;
+            seenAge = planAge;
+            seenPlan = plans;
+            seenSpeed = me.Speed;
+            seenLateral = me.Lateral;
+            float j0 = planAge / Tick;
+            float d0 = Sample(planDistance, j0);
+            // Its plan, eased in from where it really is now.
+            float drift = me.Lateral - Sample(planLateral, j0);
+            for (int step = 0; step <= Steps; step++)
+            {
+                float t = step * Tick, j = j0 + t / Tick;
+                float d = Sample(planDistance, j);
+                if (j > Steps) d += (j - Steps) * Tick * Mathf.Max(me.Speed, 0f);
+                seenGain[step] = d - d0;
+                seenLat[step] = Sample(planLateral, j) + drift * Mathf.Max(0f, 1f - t);
+            }
+        }
+
+        private static float Sample(float[] a, float j)
+        {
+            if (j >= a.Length - 1) return a[a.Length - 1];
+            int i = (int)j;
+            return Mathf.Lerp(a[i], a[i + 1], j - i);
+        }
+
+        /// <summary>The nearest car ahead in this car's path, or else the nearest ahead, as an index into <see cref="near"/>.</summary>
+        private int BlockerAhead(RacingLine line, Circuit c, float shift)
+        {
+            int best = -1, any = -1;
+            for (int i = 0; i < near.Count; i++)
+            {
+                Near n = near[i];
+                if (n.Gap <= 0f) continue;
+                if (any < 0 || n.Gap < near[any].Gap) any = i;
+                if (Apart(line, n, shift) < SideBySide && (best < 0 || n.Gap < near[best].Gap)) best = i;
+            }
+            return best >= 0 ? best : any;
+        }
+
+        /// <summary>How fast the plan moves sideways here, m/s, so the easing keeps up with it.</summary>
+        private float PlanRate(Circuit c, int along)
+        {
+            if (plan.Offset == null || along + 1 >= plan.Offset.Length) return 0f;
+            return Mathf.Abs(plan.Offset[along + 1] - plan.Offset[along]) / c.Step * speed * 1.2f;
         }
 
         /// <summary>
@@ -449,7 +740,7 @@ namespace TarmacGauntlet.Raceday
             else if (gap < -lap * 0.5f) gap += lap;
             if (gap < -LookBehind || gap > LookAhead) return false;
             float race = o.Distance - me.Distance;
-            int k = (int)(there / c.Step + 0.5f) % c.Count;
+            int k = c.IndexOf(there);
             near.Add(new Near
             {
                 Car = o,
@@ -470,30 +761,6 @@ namespace TarmacGauntlet.Raceday
             return -1;
         }
 
-        /// <summary>Offset that puts this car beside another, on one side.</summary>
-        private static float Shift(Near n, float side) => Mathf.Clamp(n.Shift + side * (SideBySide + 0.4f), -MaxShift, MaxShift);
-
-        /// <summary>
-        /// Whether there is a car's width of track beside another car on one side, from just behind it
-        /// to 30 m past it, assuming it holds its offset from the line. Further on, a car that gets
-        /// alongside makes its own room: the other car may not turn in on it.
-        /// </summary>
-        private static bool Room(AiPilot pilot, Near n, float side)
-        {
-            RacingLine line = pilot.Line;
-            Circuit c = line.Circuit;
-            float there = Mathf.Repeat(n.Car.Distance, c.Lap);
-            for (float d = -10f; d <= 30f; d += 10f)
-            {
-                int k = c.IndexOf(there + d);
-                float edge = c.HalfWidth(k) - RacingLine.EdgeMargin + 0.2f;
-                float other = d <= 0f ? n.Car.Lateral : LateralAt(line, k, n.Shift);
-                float mine = Mathf.Clamp(other + side * SideBySide, -edge, edge);
-                if ((mine - other) * side < SideBySide - 0.3f) return false;
-            }
-            return true;
-        }
-
         /// <summary>Where a car holding an offset from the line sits at a track sample, kept on the track.</summary>
         private static float LateralAt(RacingLine line, int k, float offset)
         {
@@ -502,32 +769,21 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>
-        /// Whether another car comes within <c>space</c> sideways of this car's path at an offset, from
-        /// where the other car is to where this car would reach it in a second and a half: lines that
-        /// look apart can meet at an apex.
+        /// Least sideways space between another car and this car's path at an offset, from where the
+        /// other car is to where this car would reach it in a second and a half: lines that look
+        /// apart can meet at an apex.
         /// </summary>
-        private bool Within(RacingLine line, Near n, float offset, float space)
+        private float Apart(RacingLine line, Near n, float offset)
         {
             Circuit c = line.Circuit;
-            if (Mathf.Abs(LateralAt(line, n.Index, offset) - n.Car.Lateral) < space) return true;
+            float least = Mathf.Abs(LateralAt(line, n.Index, offset) - n.Car.Lateral);
             int reach = Mathf.Max(25, Mathf.CeilToInt(1.5f * speed / c.Step));
             for (int d = 5; d <= reach; d += 5)
             {
                 int k = c.Wrap(n.Index + d);
-                if (Mathf.Abs(LateralAt(line, k, offset) - LateralAt(line, k, n.Shift)) < space) return true;
+                least = Mathf.Min(least, Mathf.Abs(LateralAt(line, k, offset) - LateralAt(line, k, n.Shift)));
             }
-            return false;
-        }
-
-        /// <summary>No other car sits in that lane between just behind this car and 40 m past the one being passed.</summary>
-        private bool Clear(RacingLine line, float shift, int passing, float upTo)
-        {
-            foreach (Near n in near)
-            {
-                if (n.Car.Id == passing || n.Gap < -(CarLength + 2f) || n.Gap > upTo + 40f) continue;
-                if (Within(line, n, shift, SideBySide)) return false;
-            }
-            return true;
+            return least;
         }
 
         /// <summary>Length of the straight leading into a corner, from the end of the one before it.</summary>

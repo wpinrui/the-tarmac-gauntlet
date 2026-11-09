@@ -105,8 +105,7 @@ namespace TarmacGauntlet.Raceday
             float lateral = d.x * c.Left[k].x + d.z * c.Left[k].z;
             InPitLane = Pits != null && Pits.OffTrackInLane(k, lateral);
             car.SpeedLimit = Pits != null && Pits.InLimitZone(p, k) ? Pits.LimitSpeed : float.PositiveInfinity;
-            // Between samples too, so gaps don't jump in 2 m steps.
-            Traffic = Describe(pilot, Laps * c.Lap + k * c.Step + d.x * f.x + d.z * f.z, lateral, v.x * f.x + v.z * f.z);
+            Traffic = Describe(pilot, Laps * c.Lap + c.DistanceAt(k, p), lateral, v.x * f.x + v.z * f.z);
         }
 
         /// <summary>Counts the laps as the car moves to sample k.</summary>
@@ -127,6 +126,8 @@ namespace TarmacGauntlet.Raceday
             LapPace = pilot != null ? pilot.Profile.LapTime : 0f,
             Braking = car.Spec.BrakeDecel * G * AiPilot.LimitFor(pilot != null ? pilot.Pace : 100f),
             GivingWay = driver != null && driver.enabled && driver.Craft != null && !driver.Pitting && driver.Craft.State == Racecraft.Mode.GivingWay,
+            // A player's car has no plan: the AI expects it to carry on as it is going.
+            Craft = driver != null && driver.enabled ? driver.Craft : null,
         };
 
         /// <summary>Takes one lap off every car's count, at the green: the formation lap doesn't count.</summary>

@@ -59,6 +59,16 @@ namespace TarmacGauntlet.Raceday
 
         public int IndexOf(float d) => Wrap(Mathf.RoundToInt(d / Step));
 
+        /// <summary>
+        /// Lap distance of a point near sample k: the sample's distance plus how far along the track
+        /// the point is from it, so it is not rounded to the sample spacing.
+        /// </summary>
+        public float DistanceAt(int k, Vector3 p)
+        {
+            float along = (p.x - Centre[k].x) * Forward[k].x + (p.z - Centre[k].z) * Forward[k].z;
+            return k * Step + Mathf.Clamp(along, -Step, Step);
+        }
+
         /// <summary>Lap distance from a to b going forwards.</summary>
         public float Ahead(float a, float b) => Mathf.Repeat(b - a, Lap);
 

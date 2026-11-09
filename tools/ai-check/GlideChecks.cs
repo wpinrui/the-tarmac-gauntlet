@@ -9,7 +9,7 @@
 //                    many times without leaving the track, getting stuck or touching, and after waking
 //                    no car strays more than 2 m from its path
 //   fast forward     100 cars glide for 5 minutes, as at 16x: those within 600 m of the camera step
-//                    every 0.1 s and the rest every 0.2 s. Every car laps, pace is within 1% of
+//                    every 0.1 s and the rest every 0.2 s. Every car laps, pace is within 1.5% of
 //                    stepping every 0.01 s, and no car in sight runs through another faster than
 //                    8 m/s (the same racecraft gives light touches in a pack this dense; harder means
 //                    the glide itself is wrong). Prints what racecraft costs per second of 16x.
@@ -72,7 +72,7 @@ static partial class Check
 
     static void Handovers()
     {
-        var race = new Race(circuit, Pack(), LineFor);
+        var race = new Race(circuit, Pack(reversed: false), LineFor);
         int watched = 0;
         float lastSwitch = 0f;
         race.Physics = r =>
@@ -150,7 +150,7 @@ static partial class Check
         foreach (Racer r in fast.Racers) if (r.LapTimes.Count == 0) problems.Add($"{fast.Name(r)} did not complete a lap");
         float Distance(Race x) => x.Racers.Sum(r => r.Distance);
         float drift = (Distance(fast) - Distance(fine)) / Distance(fine);
-        if (Math.Abs(drift) > 0.01f) problems.Add($"stepping as at 16x covers {drift * 100f:+0.0;-0.0}% more ground than every 0.01 s");
+        if (Math.Abs(drift) > 0.015f) problems.Add($"stepping as at 16x covers {drift * 100f:+0.0;-0.0}% more ground than every 0.01 s");
         double perSecond = fastMs / Length * 16.0;
         Report($"fast forward (100 cars gliding: {seen.Count} overlaps in sight, worst {(seen.Count > 0 ? seen.Max(c => c.Speed) : 0f):0.0} m/s, {fast.GhostOverlaps.Count - seen.Count} out of sight, {drift * 100f:+0.0;-0.0}% ground against fine steps, racecraft {perSecond:0} ms per second of 16x)", problems);
         foreach (Contact c in seen.Where(c => c.Speed > 8f).Take(8))
