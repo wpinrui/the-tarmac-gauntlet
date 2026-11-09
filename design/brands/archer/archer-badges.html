@@ -106,15 +106,16 @@ const PALETTES = [
 ];
 let pal = 0, selB = 0, selW = 0;
 
-const colourPaint = () => ({ ...PALETTES[pal], K: '#ffffff', S: 'none', sw: 0 });
-const chromePaint = { P: 'url(#chr)', A: 'url(#chr2)', K: '#0d0f12', S: 'url(#edge)', sw: 1.2 };
+const colourPaint = () => ({ ...PALETTES[pal], K: '#ffffff', S: 'none', sw: 0, T: 1, tx: '' });
+const chromePaint = { P: 'url(#chr)', A: 'url(#chr2)', K: '#0d0f12', S: 'url(#edge)', sw: 1.6, T: 2.2, tx: 'stroke="url(#chr)" stroke-width="7" stroke-linejoin="round" paint-order="stroke"' };
+const chromeBadge = { ...chromePaint, sw: 1.2, T: 1 };
 const st = p => `stroke="${p.S}" stroke-width="${p.sw}"`;
 
 /* Badges: viewBox 0 0 200 200 unless noted */
 const BADGES = [
   // B1 broad arrow roundel
   p => `<circle cx="100" cy="100" r="92" fill="${p.P}" ${st(p)}/>
-    <circle cx="100" cy="100" r="80" fill="none" stroke="${p.A}" stroke-width="4"/>
+    <circle cx="100" cy="100" r="${82-2*p.T}" fill="none" stroke="${p.A}" stroke-width="${4*p.T}"/>
     <polygon points="100,44 111,152 89,152" fill="${p.K}"/>
     <polygon points="100,44 66,128 52,116" fill="${p.K}"/>
     <polygon points="100,44 148,116 134,128" fill="${p.K}"/>`,
@@ -124,10 +125,10 @@ const BADGES = [
     <polygon points="100,76 150,114 150,134 100,96 50,134 50,114" fill="${p.K}"/>
     <polygon points="100,112 150,150 150,166 100,130 50,166 50,150" fill="${p.A}"/>`,
   // B3 drawn bow in a ring
-  p => `<circle cx="100" cy="100" r="92" fill="none" stroke="${p.P}" stroke-width="9"/>
+  p => `<circle cx="100" cy="100" r="${95.5-4.5*p.T}" fill="none" stroke="${p.P}" stroke-width="${9*p.T}"/>
     <path d="M96 30 Q30 100 96 170 L96 160 Q48 100 96 40 Z" fill="${p.P}" ${st(p)}/>
-    <rect x="95" y="34" width="3" height="132" fill="${p.A}"/>
-    <rect x="74" y="96" width="92" height="8" fill="${p.P}" ${st(p)}/>
+    <rect x="${96.5-1.5*p.T}" y="34" width="${3*p.T}" height="132" fill="${p.A}"/>
+    <rect x="74" y="${100-4*Math.min(p.T,1.6)}" width="92" height="${8*Math.min(p.T,1.6)}" fill="${p.P}" ${st(p)}/>
     <polygon points="160,84 184,100 160,116" fill="${p.P}" ${st(p)}/>
     <polygon points="66,80 84,80 94,96 76,96" fill="${p.A}"/>
     <polygon points="66,120 84,120 94,104 76,104" fill="${p.A}"/>`,
@@ -149,9 +150,9 @@ const BADGES = [
     </g>`,
   // B6 shield with crossed arrows
   p => `<path d="M30 20 H170 V96 Q170 160 100 188 Q30 160 30 96 Z" fill="${p.P}" ${st(p)}/>
-    <path d="M42 32 H158 V96 Q158 150 100 174 Q42 150 42 96 Z" fill="none" stroke="${p.A}" stroke-width="3"/>
-    <g transform="rotate(45 100 100)"><rect x="96" y="44" width="8" height="112" fill="${p.K}"/><polygon points="86,50 100,28 114,50" fill="${p.K}"/><polygon points="88,150 96,150 96,168 88,174" fill="${p.A}"/><polygon points="112,150 104,150 104,168 112,174" fill="${p.A}"/></g>
-    <g transform="rotate(-45 100 100)"><rect x="96" y="44" width="8" height="112" fill="${p.K}"/><polygon points="86,50 100,28 114,50" fill="${p.K}"/><polygon points="88,150 96,150 96,168 88,174" fill="${p.A}"/><polygon points="112,150 104,150 104,168 112,174" fill="${p.A}"/></g>`,
+    <path d="M42 32 H158 V96 Q158 150 100 174 Q42 150 42 96 Z" fill="none" stroke="${p.A}" stroke-width="${3*p.T}"/>
+    <g transform="rotate(45 100 100)"><rect x="${100-4*Math.min(p.T,1.6)}" y="44" width="${8*Math.min(p.T,1.6)}" height="112" fill="${p.K}"/><polygon points="86,50 100,28 114,50" fill="${p.K}"/><polygon points="88,150 96,150 96,168 88,174" fill="${p.A}"/><polygon points="112,150 104,150 104,168 112,174" fill="${p.A}"/></g>
+    <g transform="rotate(-45 100 100)"><rect x="${100-4*Math.min(p.T,1.6)}" y="44" width="${8*Math.min(p.T,1.6)}" height="112" fill="${p.K}"/><polygon points="86,50 100,28 114,50" fill="${p.K}"/><polygon points="88,150 96,150 96,168 88,174" fill="${p.A}"/><polygon points="112,150 104,150 104,168 112,174" fill="${p.A}"/></g>`,
   // B7 winged arrowhead
   p => `<polygon points="100,30 126,96 100,170 74,96" fill="${p.P}" ${st(p)}/>
     <polygon points="100,56 112,96 100,140 88,96" fill="${p.A}"/>
@@ -168,22 +169,22 @@ const BADGES = [
 
 /* Wordmarks: viewBox 0 0 600 140 */
 const WORDS = [
-  p => `<text x="300" y="80" text-anchor="middle" font-family="Michroma, sans-serif" font-size="58" letter-spacing="10" fill="${p.P}" ${st(p)}>ARCHER</text>
-    <rect x="58" y="104" width="470" height="4" fill="${p.A}"/>
+  p => `<text x="300" y="80" text-anchor="middle" font-family="Michroma, sans-serif" font-size="58" letter-spacing="10" fill="${p.P}" ${p.tx}>ARCHER</text>
+    <rect x="58" y="${106-2*p.T}" width="470" height="${4*p.T}" fill="${p.A}"/>
     <polygon points="524,96 552,106 524,116" fill="${p.A}"/>
     <polygon points="40,96 56,96 66,104 50,104" fill="${p.A}"/>
     <polygon points="40,116 56,116 66,108 50,108" fill="${p.A}"/>`,
-  p => `<rect x="28" y="66" width="74" height="3" fill="${p.A}"/>
-    <rect x="498" y="66" width="74" height="3" fill="${p.A}"/>
-    <text x="300" y="94" text-anchor="middle" font-family="Cinzel, serif" font-weight="600" font-size="72" letter-spacing="14" fill="${p.P}" ${st(p)}>ARCHER</text>`,
+  p => `<rect x="28" y="${67.5-1.5*p.T}" width="74" height="${3*p.T}" fill="${p.A}"/>
+    <rect x="498" y="${67.5-1.5*p.T}" width="74" height="${3*p.T}" fill="${p.A}"/>
+    <text x="300" y="94" text-anchor="middle" font-family="Cinzel, serif" font-weight="600" font-size="72" letter-spacing="14" fill="${p.P}" ${p.tx}>ARCHER</text>`,
   p => `<polygon points="86,40 120,40 96,112 62,112" fill="${p.A}"/>
     <polygon points="44,56 70,56 54,112 28,112" fill="${p.A}"/>
-    <text x="340" y="112" text-anchor="middle" font-family="'Barlow Condensed', sans-serif" font-style="italic" font-weight="800" font-size="124" letter-spacing="2" fill="${p.P}" ${st(p)}>ARCHER</text>`,
-  p => `<text x="290" y="100" text-anchor="middle" font-family="Jost, sans-serif" font-weight="500" font-size="104" letter-spacing="-1" fill="${p.P}" ${st(p)}>archer</text>
+    <text x="340" y="112" text-anchor="middle" font-family="'Barlow Condensed', sans-serif" font-style="italic" font-weight="800" font-size="124" letter-spacing="2" fill="${p.P}" ${p.tx}>ARCHER</text>`,
+  p => `<text x="290" y="100" text-anchor="middle" font-family="Jost, sans-serif" font-weight="500" font-size="104" letter-spacing="-1" fill="${p.P}" ${p.tx}>archer</text>
     <polygon points="452,84 474,98 452,112" fill="${p.A}"/>`,
-  p => `<text x="300" y="112" text-anchor="middle" font-family="'Big Shoulders Stencil Display', sans-serif" font-weight="800" font-size="118" letter-spacing="10" fill="${p.P}" ${st(p)}>ARCHER</text>
-    <rect x="96" y="122" width="408" height="5" fill="${p.A}"/>`,
-  p => `<text x="300" y="98" text-anchor="middle" font-family="Yellowtail, cursive" font-size="118" fill="${p.P}" ${st(p)}>Archer</text>
+  p => `<text x="300" y="112" text-anchor="middle" font-family="'Big Shoulders Stencil Display', sans-serif" font-weight="800" font-size="118" letter-spacing="10" fill="${p.P}" ${p.tx}>ARCHER</text>
+    <rect x="96" y="${124.5-2.5*Math.min(p.T,1.6)}" width="408" height="${5*Math.min(p.T,1.6)}" fill="${p.A}"/>`,
+  p => `<text x="300" y="98" text-anchor="middle" font-family="Yellowtail, cursive" font-size="118" fill="${p.P}" ${p.tx}>Archer</text>
     <path d="M150 116 Q320 100 486 108 Q320 110 150 124 Z" fill="${p.A}"/>`,
 ];
 
@@ -197,12 +198,12 @@ function card(kind, i, draw, vb) {
     <span class="tag">${id}</span>
     <span class="pair">
       <span class="tile c">${svg(draw(colourPaint()), vb, id)}</span>
-      <span class="tile m">${svg(draw(chromePaint), vb, id + ' chrome')}</span>
+      <span class="tile m">${svg(draw(kind === 'b' ? chromeBadge : chromePaint), vb, id + ' chrome')}</span>
     </span></button>`;
 }
 
 function lock(cls, p) {
-  const b = svg(BADGES[selB](p), BV, 'badge'), w = svg(WORDS[selW](p), WV, 'wordmark');
+  const b = svg(BADGES[selB](p === chromePaint ? chromeBadge : p), BV, 'badge'), w = svg(WORDS[selW](p), WV, 'wordmark');
   return `<div class="lock ${cls}">
     <div class="h"><div class="b">${b}</div><div class="w">${w}</div></div>
     <div class="v"><div class="b">${b}</div><div class="w">${w}</div></div>
