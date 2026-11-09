@@ -17,7 +17,7 @@ Race cars get no street-legal lighting: no indicators, side repeaters or reversi
 Each car has one locked real-car reference, listed in `car_roster.md`.
 Never offer an alternative reference.
 Every request to Ivan names the real car the model is based on.
-List every open call before building: counts, options, names, placement, colours. Ivan answers first.
+List every open call before building: counts, options, names, placement. Ivan answers first.
 Every option set for a feature includes the reference car's own design.
 Ask every placement or visual choice (badge, name and the like) inside the viewer: show each option on the model and let Ivan toggle between them. Never ask in text alone.
 
