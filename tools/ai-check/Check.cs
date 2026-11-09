@@ -77,6 +77,27 @@ static class Check
             }
             return 0;
         }
+        if (args.Length > 1 && args[1] == "solo")
+        {
+            foreach (float pace in new[] { 75f, 100f })
+            {
+                Run r = Drive(args[2], pace, 100f, 100f, 3, 1);
+                Console.WriteLine($"{args[2]} pace {pace}: {string.Join(" ", r.Laps.Select(Time))}");
+            }
+            return 0;
+        }
+        if (args.Length > 1 && args[1] == "racecraft")
+        {
+            HoldsGap();
+            Defends();
+            LapsAtHairpin();
+            return failed ? 1 : 0;
+        }
+        if (args.Length > 1 && args[1] == "race")
+        {
+            RacePack(args.Length > 2 ? int.Parse(args[2]) : 4, verbose: true);
+            return 0;
+        }
         if (args.Length > 1)
         {
             Detail(args[1]);
@@ -89,7 +110,149 @@ static class Check
         PaceOrders();
         ConsistencySpreads();
         Mistakes();
+        HoldsGap();
+        Defends();
+        LapsAtHairpin();
+        RacePack(4, verbose: false);
         return failed ? 1 : 0;
+    }
+
+    /// <summary>The pack from the raceday scene: fastest class at the front, mixed drivers.</summary>
+    static List<Entry> Pack()
+    {
+        string[] models = { "a-29", "a-27", "a-26", "b-24", "b-22", "b-21", "c-19", "c-18", "c-16", "d-15", "d-13", "e-09", "e-07", "f-06", "f-03", "f-01" };
+        var rng = new Random(int.TryParse(Environment.GetEnvironmentVariable("AI_PACK_SEED"), out int packSeed) ? packSeed : 11);
+        var entries = new List<Entry>();
+        for (int i = 0; i < models.Length; i++)
+        {
+            GridSlot slot = circuit.Data.grid.slots[i];
+            entries.Add(new Entry
+            {
+                Model = models[i],
+                Start = slot.d - 2.6f,
+                Lateral = slot.lateral,
+                Pace = 70f + 30f * (float)rng.NextDouble(),
+                Consistency = 60f + 40f * (float)rng.NextDouble(),
+                Safety = 80f + 20f * (float)rng.NextDouble(),
+                Seed = i + 1,
+            });
+        }
+        return entries;
+    }
+
+    static Race RunRace(IEnumerable<Entry> entries, Func<Race, bool> done, float limit)
+    {
+        var race = new Race(circuit, entries, LineFor);
+        while (!done(race) && race.Time < limit) race.Step();
+        return race;
+    }
+
+    /// <summary>
+    /// The pack races from a standing start until the leader has done some laps. It must pass, lap the
+    /// slower classes, and stay off each other: no hard hits, no car stuck, no car off the track.
+    /// </summary>
+    static void RacePack(int laps, bool verbose)
+    {
+        int[] pair = Environment.GetEnvironmentVariable("AI_WATCH")?.Split(',').Select(int.Parse).ToArray();
+        int tick = 0;
+        Race race = RunRace(Pack(), r =>
+        {
+            if (pair != null && tick++ % 10 == 0)
+            {
+                Racer x = r.Racers[pair[0]], y = r.Racers[pair[1]];
+                float road = x.Distance - y.Distance;
+                road -= circuit.Lap * (float)Math.Round(road / circuit.Lap);
+                if (Math.Abs(road) < 40f)
+                    Console.WriteLine($"{Race.Clock(r.Time)} {x.Car.TrackIndex * circuit.Step,5:0} m gap {road,6:0.0}  #{x.Id} {x.Car.Speed * 3.6f,4:0} {x.Craft.State,-10} off {x.Pilot.Offset,5:0.0} tgt {x.Craft.Target,5:0.0} cap {Math.Min(x.Pilot.SpeedCap, 999f) * 3.6f,4:0} lat {x.Car.Lateral,5:0.0}   #{y.Id} {y.Car.Speed * 3.6f,4:0} {y.Craft.State,-10} off {y.Pilot.Offset,5:0.0} tgt {y.Craft.Target,5:0.0} cap {Math.Min(y.Pilot.SpeedCap, 999f) * 3.6f,4:0} lat {y.Car.Lateral,5:0.0}");
+            }
+            return r.Racers.Max(c => c.Laps) >= laps;
+        }, 60f * 20f);
+        var problems = new List<string>();
+        int hard = race.Contacts.Count(c => c.Speed > 3f);
+        int lapping = race.Passes.Count(p => p.EndsWith("(lapping)"));
+        int classes = race.Passes.Count(p => !p.EndsWith("(lapping)") && p.Split(' ')[1][0] != p.Split(' ')[3][0]);
+        foreach (Racer r in race.Racers)
+        {
+            if (r.Recoveries > 0) problems.Add($"{race.Name(r)} got stuck {r.Recoveries} times");
+            if (r.OffSteps > 0) problems.Add($"{race.Name(r)} left the track for {r.OffSteps * Race.Dt:0.0} s, first at {Race.Clock(r.OffTime)} at {r.OffWhere:0} m");
+        }
+        if (hard > 0) problems.Add($"{hard} contacts harder than 3 m/s, worst {race.Contacts.Max(c => c.Speed):0.0} m/s");
+        if (race.Contacts.Count > race.Racers.Count) problems.Add($"{race.Contacts.Count} contacts");
+        if (lapping == 0) problems.Add("nobody was lapped");
+        if (race.PassCount - lapping - classes < 1) problems.Add("no passes within a class");
+        Report($"pack race ({race.Racers.Count} cars, {laps} laps: {race.PassCount - lapping - classes} passes within a class, {classes} between classes, {lapping} lappings, {race.Contacts.Count} contacts, closest following {race.ClosestFollow:0.0} m, {race.Racers.Sum(r => r.Pilot.Mistakes)} mistakes, {race.Racers.Sum(r => r.MistakeOffSteps) * Race.Dt:0} s off after them)", problems);
+        if (!verbose) return;
+        foreach (string p in race.Passes) Console.WriteLine("  " + p);
+        foreach (Contact c in race.Contacts) Console.WriteLine($"  contact {Race.Clock(c.Time)} {c.A} and {c.B} at {c.Where:0} m, {c.Speed:0.0} m/s");
+        foreach (Racer r in race.Racers.OrderByDescending(r => r.Distance))
+            Console.WriteLine($"  {race.Name(r),-8} lap {r.Laps} pace {r.Entry.Pace:0} laps {string.Join(" ", r.LapTimes.Select(Time))}  passes {r.Craft.Passes} defences {r.Craft.Defences}  {string.Join(" ", r.ModeTime.Select(m => $"{m.Key} {m.Value:0}s"))}");
+    }
+
+    /// <summary>Two identical cars, the second close behind: it can't pass, so it must hold a gap without touching.</summary>
+    static void HoldsGap()
+    {
+        var entries = new List<Entry>
+        {
+            new Entry { Model = "c-19", Start = 300f, Speed = 40f, Pace = 90f, Consistency = 100f, Seed = 1 },
+            new Entry { Model = "c-19", Start = 285f, Speed = 40f, Pace = 90f, Consistency = 100f, Seed = 2 },
+        };
+        Race race = RunRace(entries, r => r.Time > 160f, 200f);
+        var problems = new List<string>();
+        if (race.Contacts.Count > 0) problems.Add($"{race.Contacts.Count} contacts");
+        if (race.ClosestFollow < 1f) problems.Add($"followed {race.ClosestFollow:0.0} m from the gearbox ahead");
+        Report($"holds gap (closest {race.ClosestFollow:0.0} m nose to tail)", problems);
+    }
+
+    /// <summary>A quicker driver behind an equal car: the leader defends the inside, and the pass still comes, cleanly.</summary>
+    static void Defends()
+    {
+        var entries = new List<Entry>
+        {
+            new Entry { Model = "b-24", Start = 200f, Speed = 45f, Pace = 75f, Consistency = 100f, Seed = 1 },
+            new Entry { Model = "b-24", Start = 180f, Speed = 45f, Pace = 100f, Consistency = 100f, Seed = 2 },
+        };
+        int tick = 0;
+        bool trace = Environment.GetEnvironmentVariable("AI_RACE_TRACE") != null;
+        Race race = RunRace(entries, r =>
+        {
+            if (trace && (tick++ % 50 == 0 || (r.Time > 71.0f && r.Time < 73.2f && tick % 5 == 0)))
+            {
+                Racer x = r.Racers[0], y = r.Racers[1];
+                Console.WriteLine($"{Race.Clock(r.Time)} {x.Car.TrackIndex * circuit.Step,5:0} m gap {x.Distance - y.Distance,6:0.0}  lead {x.Car.Speed * 3.6f,4:0} {x.Craft.State,-10} off {x.Pilot.Offset,5:0.0}  chase {y.Car.Speed * 3.6f,4:0} {y.Craft.State,-10} off {y.Pilot.Offset,5:0.0} tgt {y.Craft.Target,5:0.0} cap {Math.Min(y.Pilot.SpeedCap, 999f) * 3.6f,4:0} sh {y.Pilot.Shift,5:0.0}/{x.Pilot.Shift,5:0.0} lat {y.Car.Lateral,5:0.0}/{x.Car.Lateral,5:0.0} brk {x.Car.Spec.Name.Length}");
+            }
+            return r.Racers[1].Distance > r.Racers[0].Distance + 60f;
+        }, 400f);
+        var problems = new List<string>();
+        Racer leader = race.Racers[0], quick = race.Racers[1];
+        if (leader.Craft.Defences == 0) problems.Add("the leader never defended");
+        if (quick.Distance <= leader.Distance) problems.Add("the quicker driver never got by");
+        if (race.Contacts.Any(c => c.Speed > 3f)) problems.Add($"hard contact {race.Contacts.Max(c => c.Speed):0.0} m/s");
+        if (trace) foreach (Contact c in race.Contacts) Console.WriteLine($"  contact {Race.Clock(c.Time)} at {c.Where:0} m, {c.Speed:0.0} m/s");
+        Report($"defends ({leader.Craft.Defences} defences, passed after {Race.Clock(race.Time)}, {race.Contacts.Count} contacts)", problems);
+    }
+
+    /// <summary>
+    /// A prototype catches an F-class car just before the hairpin (turn 3): the slower car holds its
+    /// line, the prototype goes by without touching it and without being held up for long.
+    /// </summary>
+    static void LapsAtHairpin()
+    {
+        var entries = new List<Entry>
+        {
+            new Entry { Model = "f-01", Start = 1150f, Speed = 25f, Pace = 80f, Consistency = 100f, Seed = 1 },
+            new Entry { Model = "a-29", Start = 1000f, Speed = 40f, Pace = 95f, Consistency = 100f, Seed = 2 },
+        };
+        float where = -1f;
+        Race race = RunRace(entries, r =>
+        {
+            if (where < 0f && r.Racers[1].Distance > r.Racers[0].Distance) where = Math.Max(r.Racers[1].Car.TrackIndex, 0) * circuit.Step;
+            return r.Racers[1].Distance > r.Racers[0].Distance + 100f;
+        }, 120f);
+        var problems = new List<string>();
+        if (race.Racers[1].Distance <= race.Racers[0].Distance) problems.Add("the prototype never got by");
+        if (race.Contacts.Count > 0) problems.Add($"{race.Contacts.Count} contacts, worst {race.Contacts.Max(c => c.Speed):0.0} m/s");
+        if (where > 2200f) problems.Add($"held up until {where:0} m");
+        Report($"laps at the hairpin (by at {where:0} m, hairpin 1442 to 1489 m)", problems);
     }
 
     static Run Drive(string modelId, float pace, float consistency, float safety, int laps, int seed, Action<StandInCar, AiPilot, AiPilot.Controls> watch = null)

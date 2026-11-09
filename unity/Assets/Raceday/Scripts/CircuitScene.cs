@@ -3,8 +3,9 @@ using UnityEngine;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// Builds the circuit, the sun, the car on pole and the cameras when the scene starts. The AI
-    /// drives the car from the start; I hands it to you and back.
+    /// Builds the circuit, the sun, a grid of AI cars from every class and the cameras when the scene
+    /// starts, and the race begins. I hands the quickest car, at the back of the grid, to you and back. V moves the cameras to
+    /// the next car.
     /// </summary>
     public sealed class CircuitScene : MonoBehaviour
     {
@@ -13,6 +14,19 @@ namespace TarmacGauntlet.Raceday
 
         private const string PlayerCar = "a-29";
         private const string PlayerModel = "Assets/Art/Vehicles/CheonmaCX24Si/CheonmaCX24Si.obj";
+        /// <summary>The field, quickest first: three of each of the top classes, two of the rest. The grid is
+        /// reversed, so the slowest car takes pole and the quickest starts last and has to carve through.</summary>
+        private static readonly string[] Field =
+        {
+            "a-29", "a-27", "a-26", "b-24", "b-22", "b-21", "c-19", "c-18",
+            "c-16", "d-15", "d-13", "e-09", "e-07", "f-06", "f-03", "f-01",
+        };
+        /// <summary>Paint for the stand-in boxes, by class, so the classes can be told apart on track.</summary>
+        private static readonly Color[] ClassPaint =
+        {
+            new Color(0.85f, 0.15f, 0.12f), new Color(0.95f, 0.55f, 0.1f), new Color(0.95f, 0.85f, 0.2f),
+            new Color(0.25f, 0.7f, 0.3f), new Color(0.2f, 0.45f, 0.9f), new Color(0.6f, 0.3f, 0.8f),
+        };
 
         private void Awake()
         {
@@ -35,12 +49,29 @@ namespace TarmacGauntlet.Raceday
             Sun();
 
             keys = new GameObject("Keyboard").AddComponent<KeyboardState>();
-            CarController car = CarBuilder.Spawn(PlayerCar, PlayerModel, circuit, keys);
-            GridSlot pole = circuit.Data.grid.slots[0];
-            car.PlaceAt(circuit.IndexOf(pole.d - 2.6f), pole.lateral);   // front wheels just behind the line
-            ai = car.gameObject.AddComponent<AiDriver>();
-            ai.Line = new RacingLine(circuit);
-            Camera(circuit, car, keys);
+            var line = new RacingLine(circuit);
+            var rng = new System.Random(11);
+            var cars = new CarController[Field.Length];
+            for (int i = 0; i < Field.Length; i++)
+            {
+                bool player = i == 0;
+                string id = Field[i];
+                Color paint = ClassPaint[Mathf.Clamp(id[0] - 'a', 0, ClassPaint.Length - 1)];
+                CarController car = CarBuilder.Spawn(id, player ? PlayerModel : null, circuit, player ? keys : null, paint);
+                GridSlot slot = circuit.Data.grid.slots[Field.Length - 1 - i];
+                car.PlaceAt(circuit.IndexOf(slot.d - 2.6f), slot.lateral);   // front wheels just behind the line
+                car.gameObject.AddComponent<RaceCar>();
+                AiDriver driver = car.gameObject.AddComponent<AiDriver>();
+                driver.Line = line;
+                driver.Seed = i + 1;
+                // Drivers differ: some quicker, some steadier, some more prone to overcooking a corner.
+                driver.Pace = 70f + 30f * (float)rng.NextDouble();
+                driver.Consistency = 60f + 40f * (float)rng.NextDouble();
+                driver.Safety = 80f + 20f * (float)rng.NextDouble();
+                if (player) ai = driver;
+                cars[i] = car;
+            }
+            Camera(circuit, cars, keys);
         }
 
         private void Update()
@@ -70,7 +101,7 @@ namespace TarmacGauntlet.Raceday
             QualitySettings.shadowDistance = 400f;
         }
 
-        private static void Camera(Circuit circuit, CarController car, KeyboardState keys)
+        private static void Camera(Circuit circuit, CarController[] cars, KeyboardState keys)
         {
             Camera cam = UnityEngine.Camera.main;
             if (cam == null)
@@ -90,9 +121,11 @@ namespace TarmacGauntlet.Raceday
             cam.transform.rotation = Quaternion.LookRotation(circuit.Centre[circuit.IndexOf(40f)] - p);
             cam.gameObject.AddComponent<FreeCamera>();
             RaceCameras views = cam.gameObject.AddComponent<RaceCameras>();
-            views.Car = car;
+            views.Cars = cars;
+            views.Car = cars[0];
             views.Keys = keys;
-            cam.gameObject.AddComponent<DriveHud>().Car = car;
+            views.Hud = cam.gameObject.AddComponent<DriveHud>();
+            views.Hud.Car = cars[0];
         }
     }
 }

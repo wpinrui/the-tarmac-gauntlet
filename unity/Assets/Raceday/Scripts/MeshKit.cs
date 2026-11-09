@@ -100,7 +100,38 @@ namespace TarmacGauntlet.Raceday
             triangles.Add(s + 1); triangles.Add(s + 2); triangles.Add(s + 3);
         }
 
+        /// <summary>
+        /// Joins two rows with different numbers of points, ordered left to right as in <see cref="Strip"/>,
+        /// stepping along whichever row is further behind so every point of both rows is used and the two
+        /// rows' edges match the strips either side exactly. UVs are metres in plan over the tile size.
+        /// </summary>
+        public void Zip(Vector3[] back, Vector3[] front, float tile)
+        {
+            int i = 0, j = 0;
+            while (i < back.Length - 1 || j < front.Length - 1)
+            {
+                bool stepBack = j >= front.Length - 1 || (i < back.Length - 1 && (i + 1) / (float)(back.Length - 1) <= (j + 1) / (float)(front.Length - 1));
+                Vector3 a = back[i], d = front[j], b = stepBack ? back[i + 1] : front[j + 1];
+                Vector3 n = Vector3.Cross(d - a, b - a).normalized;
+                Vector2 U(Vector3 p) => new Vector2(p.x / tile, p.z / tile);
+                Triangle(a, d, b, n, n, n, U(a), U(d), U(b));
+                if (stepBack) i++; else j++;
+            }
+        }
+
+        /// <summary>One triangle with its own corners, normals and UVs, wound as given.</summary>
+        public void Triangle(Vector3 a, Vector3 b, Vector3 c, Vector3 na, Vector3 nb, Vector3 nc, Vector2 ua, Vector2 ub, Vector2 uc)
+        {
+            int s = vertices.Count;
+            vertices.Add(a); vertices.Add(b); vertices.Add(c);
+            normals.Add(na); normals.Add(nb); normals.Add(nc);
+            uvs.Add(ua); uvs.Add(ub); uvs.Add(uc);
+            triangles.Add(s); triangles.Add(s + 1); triangles.Add(s + 2);
+        }
+
         public IReadOnlyList<Vector3> Vertices => vertices;
+        public IReadOnlyList<Vector3> Normals => normals;
+        public IReadOnlyList<Vector2> UVs => uvs;
         public IReadOnlyList<int> Triangles => triangles;
 
         public Mesh ToMesh(string name)

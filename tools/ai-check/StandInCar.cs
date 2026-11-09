@@ -21,6 +21,8 @@ sealed class StandInCar
     public int TrackIndex = -1;
     public float Lateral;            // car centre from the track centre, positive left
     public SurfaceKind Surface;
+    /// <summary>Share of the normal drag, below 1 in another car's slipstream.</summary>
+    public float DragScale = 1f;
 
     float steer, shiftTimer, ax, ay;
     readonly float inertia;
@@ -48,6 +50,15 @@ sealed class StandInCar
         Vx = Vz = YawRate = 0f;
         Gear = 1; steer = 0f;
         TrackIndex = k;
+    }
+
+    /// <summary>Sets the car rolling straight ahead at a speed, for a flying start.</summary>
+    public void Launch(float speed)
+    {
+        Vector3 f = Forward;
+        Vx = f.x * speed; Vz = f.z * speed;
+        float wheel = speed / Spec.WheelRadius;
+        while (Gear < Spec.Gears.Length && wheel * Spec.Gears[Gear - 1] / Spec.Redline > 0.9f) Gear++;
     }
 
     public void Step(float dt, float throttle, float brake, float steerTarget)
@@ -135,7 +146,7 @@ sealed class StandInCar
             torque += wx * (-a * F.x + b * R.x) + wz * (-a * F.z + b * R.z);
         }
 
-        if (speed > 0.1f) { fx -= Vx / speed * q * Spec.DragArea; fz -= Vz / speed * q * Spec.DragArea; }
+        if (speed > 0.1f) { fx -= Vx / speed * q * Spec.DragArea * DragScale; fz -= Vz / speed * q * Spec.DragArea * DragScale; }
         Vector3 t = line.Tangent[li];
         float hill = Spec.Mass * G * line.Grade[li];
         fx -= t.x * hill; fz -= t.z * hill;

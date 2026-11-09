@@ -58,6 +58,47 @@ namespace TarmacGauntlet.Raceday
             TuneFor(spec);
         }
 
+        /// <summary>
+        /// A lane beside another line: that line moved sideways by <c>shift</c> metres (positive
+        /// left), kept within the track. Where the move would cross the edge the lane runs along the
+        /// edge instead, and the bend where it meets the edge is smoothed out. Used for passing,
+        /// defending and making room.
+        /// </summary>
+        public RacingLine(RacingLine from, float shift)
+        {
+            Circuit = from.Circuit;
+            Count = from.Count;
+            Lateral = new float[Count];
+            Point = new Vector3[Count];
+            Tangent = new Vector3[Count];
+            Curvature = new float[Count];
+            VerticalCurvature = new float[Count];
+            Grade = new float[Count];
+            Segment = new float[Count];
+            rawCurvature = new float[Count];
+
+            var lim = new float[Count];
+            for (int k = 0; k < Count; k++)
+            {
+                lim[k] = Limit(k);
+                Lateral[k] = Mathf.Clamp(from.Lateral[k] + shift, -lim[k], lim[k]);
+            }
+            // Ease the corners where the lane meets the edge: a few passes of averaging over 10 m.
+            var next = new float[Count];
+            for (int pass = 0; pass < 12; pass++)
+            {
+                for (int k = 0; k < Count; k++)
+                {
+                    float sum = 0f;
+                    for (int j = -5; j <= 5; j++) sum += Lateral[Circuit.Wrap(k + j)];
+                    next[k] = Mathf.Clamp(sum / 11f, -lim[k], lim[k]);
+                }
+                System.Array.Copy(next, Lateral, Count);
+            }
+            Rebuild();
+            TunedLapTime = from.TunedLapTime;
+        }
+
         /// <summary>Works out the line's points and shape from <see cref="Lateral"/>.</summary>
         private void Rebuild() => Rebuild(0, Count - 1);
 
