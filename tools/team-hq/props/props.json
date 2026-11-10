@@ -1,0 +1,111 @@
+{
+ "trophy_cups": {
+  "split": true,
+  "heights": [
+   0.36,
+   0.3,
+   0.42
+  ],
+  "keep": 0.3,
+  "name": "trophy"
+ },
+ "crew_suit": {
+  "height": 1.78,
+  "pose": [
+   [
+    "LeftArm",
+    [
+     0,
+     0,
+     1
+    ],
+    -28
+   ],
+   [
+    "RightArm",
+    [
+     0,
+     0,
+     1
+    ],
+    28
+   ],
+   [
+    "LeftForeArm",
+    [
+     1,
+     0,
+     0
+    ],
+    18
+   ],
+   [
+    "RightForeArm",
+    [
+     1,
+     0,
+     0
+    ],
+    18
+   ]
+  ]
+ },
+ "crew_overalls": {
+  "height": 1.8,
+  "turn": 180
+ },
+ "crew_vest": {
+  "height": 1.76,
+  "pose": [
+   [
+    "mixamorig:LeftArm",
+    [
+     0,
+     0,
+     1
+    ],
+    -75
+   ],
+   [
+    "mixamorig:RightArm",
+    [
+     0,
+     0,
+     1
+    ],
+    75
+   ],
+   [
+    "mixamorig:LeftForeArm",
+    [
+     1,
+     0,
+     0
+    ],
+    -15
+   ],
+   [
+    "mixamorig:RightForeArm",
+    [
+     1,
+     0,
+     0
+    ],
+    -15
+   ]
+  ]
+ },
+ "potted_plant_01": {
+  "keep": 0.12
+ },
+ "office_chair": {
+  "height": 1.12
+ },
+ "old_military_compressor": {
+  "height": 1.18,
+  "keep": 0.3
+ },
+ "drill_press_01": {
+  "keep": 0.35
+ }
+}

@@ -16,7 +16,7 @@ namespace TarmacGauntlet.TeamHq
             "Assets/Art/Vehicles/LibertyCollier/LibertyCollier.obj",
             "Assets/Art/Vehicles/CheonmaCX24Si/CheonmaCX24Si.obj",
             "",
-            "",
+            "Assets/Art/Vehicles/LibertyCollier/LibertyCollier.obj",
         };
 
         private HqCamera cam;
@@ -28,7 +28,10 @@ namespace TarmacGauntlet.TeamHq
             var building = new GameObject("Building").transform;
             building.SetParent(transform, false);
             foreach (KeyValuePair<string, HqPart> part in geometry.Parts) AddPart(building, part.Key, part.Value);
-            for (int i = 0; i < geometry.Bays.Count; i++) AddCar(geometry.Bays[i], i < BayModels.Length ? BayModels[i] : "");
+            var props = new GameObject("Props").transform;
+            props.SetParent(transform, false);
+            foreach (HqProp prop in geometry.Props) HqProps.Place(props, prop);
+            for (int i = 0; i < geometry.Bays.Count; i++) AddCar(geometry.Bays[i], i < BayModels.Length ? BayModels[i] : "", i == 3);
             AddLights(geometry);
 
             var camObject = new GameObject("Menu Camera") { tag = "MainCamera" };
@@ -59,8 +62,9 @@ namespace TarmacGauntlet.TeamHq
             r.shadowCastingMode = HqMaterials.NoShadow.Contains(key) ? ShadowCastingMode.Off : ShadowCastingMode.TwoSided;
         }
 
-        private void AddCar(HqBay bay, string modelPath)
+        private void AddCar(HqBay bay, string modelPath, bool repaint)
         {
+            if (string.IsNullOrEmpty(bay.Paint)) return;
             GameObject prefab = null;
 #if UNITY_EDITOR
             if (!string.IsNullOrEmpty(modelPath)) prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(modelPath);
@@ -71,6 +75,16 @@ namespace TarmacGauntlet.TeamHq
             {
                 GameObject car = Instantiate(prefab, bay.Position, facing, transform);
                 car.name = "Car " + prefab.name;
+                if (repaint)
+                {
+                    Material paint = HqMaterials.For(bay.Paint);
+                    foreach (Renderer r in car.GetComponentsInChildren<Renderer>())
+                    {
+                        Material[] mats = r.sharedMaterials;
+                        for (int k = 0; k < mats.Length; k++) if (mats[k] != null && mats[k].name.StartsWith("body")) mats[k] = paint;
+                        r.sharedMaterials = mats;
+                    }
+                }
                 return;
             }
             var stand = new GameObject("Car stand-in");
