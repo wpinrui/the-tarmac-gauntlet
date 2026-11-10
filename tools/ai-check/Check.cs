@@ -154,6 +154,7 @@ static partial class Check
             RollingStartCheck(args.Length > 2 ? int.Parse(args[2]) : 100, verbose: true);
             return failed ? 1 : 0;
         }
+        if (args.Length > 1 && args[1] == "suite") return Suite(args.Length > 2 && args[2] == "full");
         if (args.Length > 1 && args[1] == "situations") { RunSituations(args.Length > 2 ? args[2] : null); return 0; }
         if (args.Length > 1 && args[1] == "bvsa")
         {
