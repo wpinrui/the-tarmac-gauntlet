@@ -129,6 +129,14 @@ namespace TarmacGauntlet.Raceday
         private const float OvertakeOffsetRate = 0.1f / 0.02f;
         private const float G = 9.81f;
 
+        // Racing etiquette, not in the tutorial: the F1 rule of one move when defending, and room for a car alongside.
+        /// <summary>A car defends when a car behind closing on it is this close in time, s.</summary>
+        private const float DefendTime = 1f;
+        /// <summary>SPEED_PASS_MARGIN from bt's OPP_BACK: a car behind counts unless this much slower, m/s.</summary>
+        private const float SpeedPassMargin = 5f;
+        /// <summary>A defender with a slower car this close ahead in time is overtaking, and may move freely, s.</summary>
+        private const float ExemptTime = 1f;
+
         /// <summary>The car's size, from its box collider: the tutorial's _dimension_x and _dimension_y.</summary>
         public const float CarLength = 4.6f, CarWidth = 1.9f;
 
@@ -145,6 +153,17 @@ namespace TarmacGauntlet.Raceday
         public bool Braking { get; private set; }
         /// <summary>True on a step the side collision filter changed the steering.</summary>
         public bool SideSteering { get; private set; }
+        /// <summary>True while a car behind is closing on this one: it may make one move.</summary>
+        public bool Defending { get; private set; }
+        /// <summary>True while defending with a slower car close ahead: it is overtaking, so moves freely.</summary>
+        public bool Exempt { get; private set; }
+        /// <summary>Where the car is told to run across the track this step, from the middle, positive left.</summary>
+        public float Place { get; private set; }
+
+        // The defending move: 0 none yet, 1 moving in moveDir, 2 coming back to the line.
+        private int movePhase;
+        public int MovePhase => movePhase;
+        private float moveDir;
 
         /// <summary>
         /// Sets this step's overtake offset, braking and side steering in the pilot. Call before
@@ -160,7 +179,9 @@ namespace TarmacGauntlet.Raceday
             State = Mode.Racing;
             Braking = false;
             SideSteering = false;
-            if (pilot.Index < 0) return;
+            Defending = false;
+            Exempt = false;
+            if (pilot.Index < 0) { movePhase = 0; return; }
             RacingLine line = pilot.Line;
             Circuit c = line.Circuit;
             float lap = c.Lap;
@@ -183,6 +204,8 @@ namespace TarmacGauntlet.Raceday
             const float sideCollDist = CarLength;   // MIN of the two cars' lengths
             float minCatch = float.MaxValue, minSide = float.MaxValue;
             bool hasFront = false, hasSide = false;
+            bool behind = false, closeAhead = false, roomLeft = false, roomRight = false;
+            float axles = 2f * pilot.Spec.HalfWheelbase;
             TrafficCar front = default, side = default;
             int from = 0, count = field.Count;
             TrafficField sorted = field as TrafficField;
@@ -199,6 +222,18 @@ namespace TarmacGauntlet.Raceday
                 {
                     if (sorted != null && j > 0 && distance >= FrontCollDist) break;   // past the window, in lap order
                     continue;
+                }
+
+                // Not in the tutorial: who makes this a defence, and who is alongside.
+                if (distance < -sideCollDist && -distance < mySpeed * DefendTime && o.Speed > mySpeed - SpeedPassMargin) behind = true;
+                if (distance > sideCollDist && distance < mySpeed * ExemptTime && o.Speed < wantSpeed) closeAhead = true;
+                // Room: a car alongside with its front axle past my rear axle is owed a car's width. A car
+                // alongside ahead of me always is; one behind once it is more than its axles' length up.
+                // A car off the track is owed nothing.
+                if (distance > -axles && distance < CarLength && Mathf.Abs(o.Lateral) < c.Data.width[c.IndexOf(Mathf.Repeat(o.Distance, lap))] / 2f)
+                {
+                    if (o.Lateral > me.Lateral) roomLeft = true;
+                    else roomRight = true;
                 }
 
                 if (distance > sideCollDist && o.Speed < wantSpeed)
@@ -276,7 +311,16 @@ namespace TarmacGauntlet.Raceday
                 else if (myOffset < lineHere - step) myOffset += step;
                 else myOffset = lineHere;
             }
-            pilot.Offset = Mathf.Clamp(myOffset - lineHere, AiPilot.LaneShifts[0], AiPilot.LaneShifts[AiPilot.LaneShifts.Length - 1]);
+            float newOffset = Mathf.Clamp(myOffset - lineHere, AiPilot.LaneShifts[0], AiPilot.LaneShifts[AiPilot.LaneShifts.Length - 1]);
+
+            // Not in the tutorial: racing etiquette. A defending car makes one move off its line, in one
+            // direction, then may only come back towards the line. Overtaking a car close ahead, it may
+            // move freely.
+            Defending = behind;
+            Exempt = behind && closeAhead;
+            if (!Defending) movePhase = 0;
+            else if (!Exempt) newOffset = OneMove(pilot.Offset, newOffset, true);
+            pilot.Offset = newOffset;
             Target = pilot.Offset;
 
             // filterBColl's full brakes: nothing it may go faster than.
@@ -296,6 +340,7 @@ namespace TarmacGauntlet.Raceday
                     int ks = c.IndexOf(Mathf.Repeat(side.Distance, lap));
                     float w = c.Data.width[ks] / WidthDiv - BorderOvertakeMargin;
                     float myToMiddle = Mathf.Clamp(me.Lateral, -w, w);
+                    float was = pilot.Offset;
                     pilot.Offset = Mathf.Clamp(myToMiddle - line.Lateral[pilot.Index], AiPilot.LaneShifts[0], AiPilot.LaneShifts[AiPilot.LaneShifts.Length - 1]);
                     Target = pilot.Offset;
                     pilot.SideWeight = d / cc;
@@ -315,8 +360,48 @@ namespace TarmacGauntlet.Raceday
                     }
                     pilot.SideFilter = true;
                     SideSteering = true;
+                    // The filter's new offset is where the car is: it counts towards the one move.
+                    if (Defending && !Exempt) OneMove(was, pilot.Offset, false);
                 }
             }
+
+            // Not in the tutorial: room. Leave a car's width between this car and the track edge on the
+            // side of a car that is owed room. The racing line and the overtake offset give way, and the
+            // pilot's speed follows the lane it is then on, so it lifts or brakes as that lane needs.
+            if (roomLeft || roomRight)
+            {
+                float edge = c.Data.width[c.IndexOf(here)] / 2f - CarWidth / 2f - CarWidth;
+                float place = line.Lateral[pilot.Index] + pilot.Offset;
+                if (roomLeft) place = Mathf.Min(place, edge);
+                if (roomRight) place = Mathf.Max(place, -edge);
+                pilot.Offset = Mathf.Clamp(place - line.Lateral[pilot.Index], AiPilot.LaneShifts[0], AiPilot.LaneShifts[AiPilot.LaneShifts.Length - 1]);
+                Target = pilot.Offset;
+            }
+            Place = line.Lateral[pilot.Index] + pilot.Offset;
+        }
+
+        /// <summary>
+        /// The F1 one-move rule on the offset from the racing line: the first move away from the line
+        /// may carry on in its direction; once it turns back, the offset may only come back to the line,
+        /// never past it. Without <c>hold</c> it only notes the change.
+        /// </summary>
+        private float OneMove(float was, float now, bool hold)
+        {
+            float change = now - was;
+            if (Mathf.Abs(change) < 1e-5f) return now;
+            bool crosses = was != 0f && now * was < 0f;
+            bool toLine = Mathf.Abs(now) < Mathf.Abs(was) && !crosses;
+            float dir = Mathf.Sign(change);
+            if (movePhase == 0)
+            {
+                if (!toLine) { movePhase = 1; moveDir = dir; }
+                return now;
+            }
+            if (movePhase == 1 && dir == moveDir) return now;
+            if (toLine) { movePhase = 2; return now; }
+            if (!hold) return now;
+            if (crosses) { movePhase = 2; return 0f; }
+            return was;
         }
 
         /// <summary>The bend at a lap distance: +1 a right-hander, -1 a left-hander, 0 on a straight.</summary>
