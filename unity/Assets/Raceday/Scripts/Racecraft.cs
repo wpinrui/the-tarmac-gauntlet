@@ -113,29 +113,20 @@ namespace TarmacGauntlet.Raceday
         // The tutorial's constants (opponent.h and driver.h).
         private const float FrontCollDist = 200f;          // FRONT_COLLDIST, m
         private const float BackCollDist = 50f;            // BACK_COLLDIST, m
-        private const float LengthMargin = 2f;             // LENGTH_MARGIN, m
-        private const float WidthMargin = 1f;              // WIDTH_MARGIN, m
-        private const float SideCollisionMargin = 2f;      // SIDE_COLLISION_MARGIN, m
+        // LENGTH_MARGIN, WIDTH_MARGIN and SIDE_COLLISION_MARGIN are in Endurance, scaled per driver.
         private const float BorderOvertakeMargin = 0.5f;   // BORDER_OVERTAKE_MARGIN, m
         private const float WidthDiv = 3f;                 // WIDTH_DIV
         /// <summary>Not in the tutorial: how far ahead the braking check follows a car drifting across the track, s.</summary>
         private const float PredictFor = 1f;
         /// <summary>Not in the tutorial: how far ahead picking the overtaking side follows the car ahead's drift, s.</summary>
         private const float CatchPredictFor = 2f;
-        /// <summary>
-        /// Not in the tutorial: overtaking uses width / 2.5 either side of the middle, not width / 3.
-        /// At width / 3 three slow cars side by side fill the room, and a lap-1 pack queues behind them.
-        /// </summary>
-        private const float OvertakeWidthDiv = 2.5f;
-        /// <summary>OVERTAKE_OFFSET_INCREMENT, 0.1 m per robot step, TORCS calling robots every 0.02 s: m/s.</summary>
-        private const float OvertakeOffsetRate = 0.1f / 0.02f;
+        // The overtaking width and OVERTAKE_OFFSET_INCREMENT are in Endurance.
         private const float G = 9.81f;
 
         // Racing etiquette, not in the tutorial: the F1 rule of one move when defending, and room for a car alongside.
         /// <summary>A car defends when a car behind closing on it is this close in time, s.</summary>
         private const float DefendTime = 1f;
-        /// <summary>A car closing faster than this is not defended against: the car ahead holds its line, m/s.</summary>
-        private const float NoDefendClosing = 10f;
+        // A car closing faster than Endurance.NoDefendClosing is not defended against: the car ahead holds its line...
         /// <summary>...once that car is this close in time, s.</summary>
         private const float NoDefendTime = 2f;
         /// <summary>SPEED_PASS_MARGIN from bt's OPP_BACK: a car behind counts unless this much slower, m/s.</summary>
@@ -184,6 +175,7 @@ namespace TarmacGauntlet.Raceday
             pilot.SideFilter = false;
             pilot.SideWeight = 1f;
             pilot.SideSteer = 0f;
+            float margin = Endurance.MarginScale(pilot.Safety);
             State = Mode.Racing;
             Braking = false;
             SideSteering = false;
@@ -237,7 +229,7 @@ namespace TarmacGauntlet.Raceday
                 // Not in the tutorial: who makes this a defence, and who is alongside.
                 if (distance < -sideCollDist && -distance < mySpeed * DefendTime && o.Speed > mySpeed - SpeedPassMargin) behind = true;
                 float closing = o.Speed - mySpeed;
-                if (distance < -sideCollDist && closing > NoDefendClosing && -distance < closing * NoDefendTime) fastBehind = true;
+                if (distance < -sideCollDist && closing > Endurance.NoDefendClosing && -distance < closing * NoDefendTime) fastBehind = true;
                 if (distance > sideCollDist && distance < mySpeed * ExemptTime && o.Speed < wantSpeed) closeAhead = true;
                 // Room: a car alongside with its front axle past my rear axle is owed a car's width. A car
                 // alongside ahead of me always is; one behind once it is more than its axles' length up.
@@ -253,7 +245,7 @@ namespace TarmacGauntlet.Raceday
                     // OPP_FRONT
                     float catchDist = wantSpeed * distance / (wantSpeed - o.Speed);
                     distance -= CarLength;   // MAX of the two cars' lengths
-                    distance -= LengthMargin;
+                    distance -= Endurance.LengthMargin * margin;
                     // Not in the tutorial: the car ahead is taken where it will be across the track when
                     // I reach it, at the speed it moves across, as well as where it is now.
                     float reachIn = mySpeed > o.Speed ? Mathf.Min(distance / (mySpeed - o.Speed), PredictFor) : 0f;
@@ -266,7 +258,7 @@ namespace TarmacGauntlet.Raceday
                         front = o;
                         hasFront = true;
                     }
-                    if (carDist < WidthMargin)
+                    if (carDist < Endurance.WidthMargin * margin)
                     {
                         // OPP_COLL: filterBColl.
                         float allowedSpeedSqr = o.Speed * o.Speed;
@@ -296,7 +288,7 @@ namespace TarmacGauntlet.Raceday
             // in front it steps back to the racing line where the tutorial's steps back to the middle.
             float lineHere = line.Lateral[pilot.Index];
             float myOffset = lineHere + pilot.Offset;   // from the track middle
-            float step = OvertakeOffsetRate * dt;
+            float step = Endurance.OvertakeOffsetRate * dt;
             // Not in the tutorial: while braking for a car ahead, the offset steps only as fast as the
             // grip the brakes leave over.
             if (Braking)
@@ -309,7 +301,7 @@ namespace TarmacGauntlet.Raceday
             {
                 State = Mode.Overtaking;
                 int ko = c.IndexOf(Mathf.Repeat(front.Distance, lap));
-                float w = c.Data.width[ko] / OvertakeWidthDiv - BorderOvertakeMargin;
+                float w = c.Data.width[ko] / Endurance.OvertakeWidthDiv - BorderOvertakeMargin;
                 // Not in the tutorial: the side is picked from where the car ahead will be across the
                 // track when I catch it, at the speed it moves across.
                 float catchIn = Mathf.Min(minCatch / Mathf.Max(wantSpeed, 1f), CatchPredictFor);
@@ -352,9 +344,9 @@ namespace TarmacGauntlet.Raceday
             {
                 float d = minSide - Width(side);
                 float diffAngle = Mathf.DeltaAngle(me.Yaw * Mathf.Rad2Deg, side.Yaw * Mathf.Rad2Deg) * Mathf.Deg2Rad;
-                if (d < SideCollisionMargin && diffAngle * (side.Lateral - me.Lateral) < 0f)
+                if (d < Endurance.SideCollisionMargin * margin && diffAngle * (side.Lateral - me.Lateral) < 0f)
                 {
-                    const float cc = SideCollisionMargin / 2f;
+                    float cc = Endurance.SideCollisionMargin * margin / 2f;
                     d -= cc;
                     if (d < 0f) d = 0f;
                     int ks = c.IndexOf(Mathf.Repeat(side.Distance, lap));
