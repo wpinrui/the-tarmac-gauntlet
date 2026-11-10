@@ -796,6 +796,7 @@ static partial class Check
             piles.PileUps.Count,
             race.FastestStuck >= 3 ? 1f : 0f,
         };
+        if (Environment.GetEnvironmentVariable("PILE_LOG") == "1") foreach (string p in piles.PileUps) Console.WriteLine("PILE " + p);
         if (lapped) m.Add(loss.LappedLost / carHours);
         return new RaceResult { Measures = m.ToArray(), Line = $"A place {race.Racers.Count(x => x.Distance > a.Distance) + 1}, A laps {a.Laps}, {race.PassCount} passes" };
     }
