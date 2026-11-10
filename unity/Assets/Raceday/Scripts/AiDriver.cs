@@ -5,8 +5,10 @@ namespace TarmacGauntlet.Raceday
 {
     /// <summary>
     /// Puts an <see cref="AiRacer"/> in a physics car. Each physics step it hands the racer the car's
-    /// position and motion and passes the pedals and steering back. After a hard crash, or when the
-    /// car is stuck, it puts the car back on track as a player would with R. Lap times go to the console.
+    /// position and motion and passes the pedals and steering back. After leaving the track, spinning
+    /// or a hard crash, <see cref="Rejoin"/> brings the car back into the race. Only if that hasn't
+    /// worked after <see cref="Rejoin.GiveUpAfter"/>, or the car is stuck, is it put back on track as a
+    /// player would with R, once the gap behind is clear. Lap times go to the console.
     /// Changing the stats in the inspector during Play takes effect straight away.
     /// It starts on the minimum-curvature line and switches to the line tuned for this car's lap time
     /// once <see cref="LineTuner"/> has worked it out in the background.
@@ -153,8 +155,13 @@ namespace TarmacGauntlet.Raceday
 
             if (car.Crashed)
             {
+                // After a moment the car drives on from where it stopped, as one that lost control.
                 crashTimer += dt;
-                if (crashTimer > CrashWait) Recover();
+                if (crashTimer > CrashWait)
+                {
+                    car.ClearCrash();
+                    Racer.Rejoin.LostControl();
+                }
                 return;
             }
             crashTimer = 0f;
@@ -165,15 +172,16 @@ namespace TarmacGauntlet.Raceday
             bool racing = Starter == null || Starter.Released(this);
             AiPilot.Controls c = Racer.Step(t.position, t.forward, car.Velocity, car.YawRate, me,
                 RaceCar.Field, RaceCar.All, racing, car.Spec, dt);
-            car.SetControls(c.Throttle, c.Brake, c.Steer);
+            car.SetControls(c.Throttle, c.Brake, c.Steer, c.Reverse);
             car.Hold = Racer.Hold;
 
-            // Stuck: wants to go but isn't moving, or has spun and is facing the wrong way.
-            AiPilot active = Racer.Active;
-            bool facingBack = active.Index >= 0 && Vector3.Dot(t.forward, active.Line.Tangent[active.Index]) < -0.2f;
-            bool stalled = car.Speed < 2f && c.Throttle > 0.3f;
-            stuckTimer = stalled || facingBack ? stuckTimer + dt : 0f;
-            if (stuckTimer > StuckTime) Recover();
+            // Last resort: stuck wanting to go but not moving, or not back racing after a long while.
+            // The car is put back on the track only once no car is coming up behind.
+            bool rejoining = Racer.Rejoin.Busy;
+            bool stalled = !rejoining && car.Speed < 2f && c.Throttle > 0.3f;
+            if (stalled || Racer.Rejoin.Trying) stuckTimer += dt;
+            else if (!rejoining) stuckTimer = 0f;
+            if (stuckTimer > (rejoining ? Rejoin.GiveUpAfter : StuckTime) && Racer.Rejoin.GapClear) Recover();
 
             CountLaps();
         }

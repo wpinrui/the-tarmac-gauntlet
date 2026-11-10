@@ -28,6 +28,8 @@ sealed class StandInCar
     /// <summary>The pit lane limiter's speed while in the limiter zone, as CarController's.</summary>
     public float SpeedLimit = float.PositiveInfinity;
     public bool Hold;
+    /// <summary>In reverse gear, as CarController's gear 0 for the AI: engaged once the car is all but stopped.</summary>
+    public bool Reverse;
     /// <summary>The pit lane, so its surface counts as tarmac.</summary>
     public PitLane Pits;
 
@@ -89,8 +91,12 @@ sealed class StandInCar
         Gear = Spec.GearFor(speed);
     }
 
+    /// <summary>The pedals and steering asked for in the last step, for traces.</summary>
+    public float LastThrottle, LastBrake, LastSteer;
+
     public void Step(float dt, float throttle, float brake, float steerTarget)
     {
+        LastThrottle = throttle; LastBrake = brake; LastSteer = steerTarget;
         UpdateTrackPosition();
         if (Hold) { throttle = 0f; brake = 1f; }
         Vector3 F = Forward, R = Right;
@@ -207,11 +213,13 @@ sealed class StandInCar
         }
         if (shiftTimer > 0f) { shiftTimer -= dt; return 0f; }
         bool cut = (Supplies != null && Supplies.Empty) || along > SpeedLimit;
-        if (throttle > 0f && x < 1f && !cut)
+        // Reverse engages, as CarController's, only once the car is all but stopped.
+        bool wrongWay = Reverse ? along > 0.5f : false;
+        if (throttle > 0f && x < 1f && !cut && !wrongWay)
         {
             float xe = Math.Max(x, 0.2f);
             float torque = Spec.PowerAt(xe) / (xe * Spec.Redline);
-            return throttle * torque * (Supplies != null ? Supplies.PowerScale : 1f) * ratio / Spec.WheelRadius;
+            return (Reverse ? -1f : 1f) * throttle * torque * (Supplies != null ? Supplies.PowerScale : 1f) * ratio / Spec.WheelRadius;
         }
         float drag = 0.08f * Spec.PeakPower / Spec.Redline * ratio / Spec.WheelRadius * Mathf.Clamp01(x);
         return -Math.Sign(along) * drag;

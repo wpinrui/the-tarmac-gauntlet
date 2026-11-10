@@ -24,6 +24,8 @@ namespace TarmacGauntlet.Raceday
             public float Throttle, Brake;
             /// <summary>Front wheel angle, radians, positive to the right.</summary>
             public float Steer;
+            /// <summary>In reverse gear: only <see cref="Rejoin"/> asks for it, to turn round.</summary>
+            public bool Reverse;
         }
 
         private const float G = 9.81f;

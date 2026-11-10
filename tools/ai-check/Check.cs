@@ -13,6 +13,7 @@
 //   pace orders      a Pace 100 driver is faster than a Pace 50 driver in the same car
 //   consistency      lap times spread more for a Consistency 0 driver than a Consistency 100 driver
 //   mistakes         a Safety 0 driver overcooks corners, and still finishes every lap
+//   rejoins          see RejoinChecks.cs; pass "rejoin" to run only those, with every run printed
 //
 // Pass a car model id (e.g. a-29) to print six laps of that car at Pace 90 in detail instead: one line
 // every half second, every step within 120 m of the lap distance in AI_TRACE, and every tenth step of an
@@ -150,6 +151,12 @@ static partial class Check
             PitStopsCheck("crowded pits", i => true, verbose: true);
             return failed ? 1 : 0;
         }
+        if (args.Length > 1 && args[1] == "rejoin")
+        {
+            RejoinOffTrack(verbose: true);
+            SpunCarWaits(verbose: true);
+            return failed ? 1 : 0;
+        }
         if (args.Length > 1 && args[1] == "supplies")
         {
             SuppliesCheck(verbose: true);
@@ -177,6 +184,8 @@ static partial class Check
         LapsAtHairpin();
         RacePack(4, verbose: false);
         RacePack(4, verbose: false, reversed: true);
+        RejoinOffTrack(verbose: false);
+        SpunCarWaits(verbose: false);
         RaceRunning(verbose: false);
         GlidePace();
         GlideMistakes();
@@ -208,9 +217,10 @@ static partial class Check
         return entries;
     }
 
-    static Race RunRace(IEnumerable<Entry> entries, Func<Race, bool> done, float limit)
+    static Race RunRace(IEnumerable<Entry> entries, Func<Race, bool> done, float limit, Action<Race> setUp = null)
     {
         var race = new Race(circuit, entries, LineFor);
+        setUp?.Invoke(race);
         while (!done(race) && race.Time < limit) race.Step();
         return race;
     }
@@ -224,6 +234,8 @@ static partial class Check
         int[] pair = Environment.GetEnvironmentVariable("AI_WATCH")?.Split(',').Select(int.Parse).ToArray();
         int tick = 0;
         int solo = int.TryParse(Environment.GetEnvironmentVariable("AI_SOLO"), out int so) ? so : -1;
+        var unexplained = new List<string>();
+        List<string> rejoins = null;
         Race race = RunRace(Pack(reversed), r =>
         {
             if (pair != null && tick++ % 10 == 0)
@@ -246,8 +258,10 @@ static partial class Check
                     Console.WriteLine($"F {Race.Clock(r.Time)} #{f.Id,2} {f.Entry.Model} {f.Distance,7:0.0} lat {f.Car.Lateral,5:0.0} {f.Car.Speed * 3.6f,4:0} tspd {f.Pilot.TargetSpeed * 3.6f,4:0} {f.Craft.State,-11} {(f.Craft.Braking ? "BRK" : "   ")} off {f.Pilot.Offset,5:0.0}");
             if (pair == null) tick++;
             return r.Racers.Max(c => c.Laps) >= laps;
-        }, 60f * 20f);
+        }, 60f * 20f, r => rejoins = WatchPackRejoins(r, unexplained));
         var problems = new List<string>();
+        foreach (var w in race.OffWhy) Console.WriteLine($"  off the track while {w.Key}: {w.Value:0.0} s");
+        foreach (string u in unexplained) problems.Add($"rejoin started without leaving the track or a spin: {u}");
         int hard = race.Contacts.Count(c => c.Speed > HardHit);
         int lapping = race.Passes.Count(p => p.EndsWith("(lapping)"));
         int classes = race.Passes.Count(p => !p.EndsWith("(lapping)") && p.Split(' ')[1][0] != p.Split(' ')[3][0]);
@@ -278,7 +292,7 @@ static partial class Check
                         && b.Pilot.Profile.LapTime < a.Pilot.Profile.LapTime * 0.99f && b.Distance < a.Distance)
                         problems.Add($"{race.Name(b)} is {100f * (1f - b.Pilot.Profile.LapTime / a.Pilot.Profile.LapTime):0.0}% quicker than {race.Name(a)} but never got by");
         if (reversed && race.PassCount - lapping - classes < 1) problems.Add("no passes within a class");
-        Report($"{(reversed ? "reversed " : "")}pack race ({race.Racers.Count} cars, {laps} laps: {race.PassCount - lapping - classes} passes within a class, {classes} between classes, {lapping} lappings, {race.Contacts.Count} contacts ({race.Contacts.Count(c => c.RearEnd && c.Speed > RearHit)} rear-end over {RearHit:0} m/s), closest following {race.ClosestFollow:0.0} m, {race.Racers.Sum(r => r.Pilot.Mistakes)} mistakes, {race.Racers.Sum(r => r.MistakeOffSteps) * Race.Dt:0} s off after them, fastest car {race.FastestStuck} corners behind the slowest, any car up to {race.WorstStuck} corners behind one two classes slower, {race.Racers.Sum(r => r.Swings)} swings, {race.Racers.Sum(r => r.Dithers)} dithers, {100f * (race.FollowSteps > 0 ? (float)race.FeatherSteps / race.FollowSteps : 0f):0}% feathering, {100f * (race.CornerHeldSteps > 0 ? (float)race.OpenRoomSteps / race.CornerHeldSteps : 0f):0}% held with room beside, quicker car up to {race.QuickStuck} corners behind, same class up to {race.ClassQueue}, {race.QueuePassed} queued cars passed by slower ones)", problems);
+        Report($"{(reversed ? "reversed " : "")}pack race ({race.Racers.Count} cars, {laps} laps: {race.PassCount - lapping - classes} passes within a class, {classes} between classes, {lapping} lappings, {race.Contacts.Count} contacts ({race.Contacts.Count(c => c.RearEnd && c.Speed > RearHit)} rear-end over {RearHit:0} m/s), closest following {race.ClosestFollow:0.0} m, {race.Racers.Sum(r => r.Pilot.Mistakes)} mistakes, {race.Racers.Sum(r => r.MistakeOffSteps) * Race.Dt:0} s off after them, fastest car {race.FastestStuck} corners behind the slowest, any car up to {race.WorstStuck} corners behind one two classes slower, {race.Racers.Sum(r => r.Swings)} swings, {race.Racers.Sum(r => r.Dithers)} dithers, {100f * (race.FollowSteps > 0 ? (float)race.FeatherSteps / race.FollowSteps : 0f):0}% feathering, {100f * (race.CornerHeldSteps > 0 ? (float)race.OpenRoomSteps / race.CornerHeldSteps : 0f):0}% held with room beside, quicker car up to {race.QuickStuck} corners behind, same class up to {race.ClassQueue}, {race.QueuePassed} queued cars passed by slower ones, {rejoins.Count} rejoins, {race.Contacts.Count(c => c.Rejoining)} contacts with a rejoining car)", problems);
         if (!verbose) return;
         if (race.WorstStuck > 0) Console.WriteLine("  " + race.WorstStuckLine);
         foreach (string p in race.Passes) Console.WriteLine("  " + p);

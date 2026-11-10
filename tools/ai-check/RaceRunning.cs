@@ -193,7 +193,7 @@ static partial class Check
         if (pitContacts.Count > 0) problems.Add($"{pitContacts.Count} contacts with a pitting car: {Describe(pitContacts[0])}");
         if (!due.All(c => lapsAtRejoin.ContainsKey(c.Id))) problems.Add("ran out of time before every stop was done");
         float worstMiss = s.Cars.Max(c => c.WorstBoxMiss);
-        Report($"{name} ({due.Count} of {s.Cars.Count} cars pit,{(glide ? $" {s.Cars.Sum(c => c.GlidingStops)} called in while gliding," : "")} {s.MostInLane} in the lane at once, worst box miss {worstMiss:0.00} m, top speed in the limiter zone {s.Cars.Max(c => c.LimitZoneTop) * 3.6f:0.0} km/h, {s.Contacts.Count} contacts in all, {Session.Clock(s.Time)} run)", problems);
+        Report($"{name} ({due.Count} of {s.Cars.Count} cars pit,{(glide ? $" {s.Cars.Sum(c => c.GlidingStops)} called in while gliding," : "")} {s.MostInLane} in the lane at once, worst box miss {worstMiss:0.00} m, top speed in the limiter zone {s.Cars.Max(c => c.LimitZoneTop) * 3.6f:0.0} km/h, {s.Contacts.Count} contacts in all ({s.Contacts.Count(c => c.A.Contains("(rejoining") || c.B.Contains("(rejoining"))} with a rejoining car), {Session.Clock(s.Time)} run)", problems);
         if (!verbose) return;
         foreach (SessionCar c in s.Cars)
             foreach (string stop in c.Stops) Console.WriteLine($"  {s.Name(c)} {stop}");
