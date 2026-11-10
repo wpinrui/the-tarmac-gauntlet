@@ -1,0 +1,5 @@
+Titillium Web
+Copyright (c) 2009-2011 by Accademia di Belle Arti di Urbino and students of MA course of Visual design.
+
+Licensed under the SIL Open Font License, Version 1.1: https://openfontlicense.org
+Downloaded from Google Fonts (https://fonts.google.com/specimen/Titillium+Web).

@@ -32,6 +32,12 @@ from the pit exit line (the end of the limiter zone), the queue moving up behind
 leaves; `F` or `I` ends the fast forward early. Pit stops open once every car is out of the pit lane, and
 every car starts on a full tank. Rolling starts behind the pace car, and Grid races from the grid at once.
 
+The field is the season's 99 AI teams, by the class of their roster entry, and the player's. The timing
+tower in the top left (`RaceTower.cs`, order in `Standings.cs`) counts down the 24 hour race clock, which runs
+at 10:1 from the green or the first car out of the pit lane. It shows every class leader, the four cars either
+side of the player, and the fastest class in the rows left. Gaps are in fake laps, a tenth of the lap: the leader
+shows the fake laps it has completed and the rest +N behind it. `run.sh tower` checks the order.
+
 AI driver (`AiDriver` on the car): Pace, Consistency and Safety (0 to 100) can be changed in the
 inspector during Play. Pace sets how much of the car's grip and braking it uses (86% at 0, 98% at 100),
 Consistency how much its corner speeds wander from lap to lap, and Safety how often it overcooks a
