@@ -55,6 +55,8 @@ sealed class Racer
     public float SinceFlip = 99f;
     public float SwingExt;
     public int SwingDir;
+    /// <summary>Time since the car last had a car within 15 m ahead in its lane.</summary>
+    public float SinceQueued = 99f;
     public readonly Dictionary<Racecraft.Mode, float> ModeTime = new Dictionary<Racecraft.Mode, float>();
 }
 
@@ -83,6 +85,9 @@ sealed class Race
     /// <summary>One line per change of order between two cars running within 100 m of each other.</summary>
     public readonly List<string> Passes = new List<string>();
     public int PassCount;
+    /// <summary>Passes of a car queued behind another by a car 1% or more slower, and the first of them.</summary>
+    public int QueuePassed;
+    public string QueuePassedLine = "";
     public float Time;
     /// <summary>Closest any car got nose to tail behind a car in its path, m, and who.</summary>
     public float ClosestFollow = float.MaxValue;
@@ -202,6 +207,19 @@ sealed class Race
         }
     }
 
+    /// <summary>Whether a car sits in a queue: a car within 15 m ahead in its lane.</summary>
+    void Queued(Racer r)
+    {
+        r.SinceQueued += Dt;
+        foreach (Racer o in Racers)
+        {
+            if (o == r) continue;
+            float gap = o.Distance - r.Distance;
+            gap -= circuit.Lap * (float)Math.Round(gap / circuit.Lap);
+            if (gap > 0f && gap < 15f && Math.Abs(o.Car.Lateral - r.Car.Lateral) < 2.5f) { r.SinceQueued = 0f; return; }
+        }
+    }
+
     /// <summary>Steps in a corner held back by a car close ahead, and those of them with a clear lane beside it.</summary>
     public int CornerHeldSteps, OpenRoomSteps;
     public string OpenRoomLine = "";
@@ -294,6 +312,7 @@ sealed class Race
             AiPilot.Controls c = r.Pilot.Drive(r.Car.Position, r.Car.Forward, r.Car.Velocity, r.Car.YawRate);
             Feathering(r, c);
             OpenRoom(r);
+            Queued(r);
             r.Car.Step(Dt, c.Throttle, c.Brake, c.Steer);
             r.ModeTime[r.Craft.State] = (r.ModeTime.TryGetValue(r.Craft.State, out float t) ? t : 0f) + Dt;
         }
@@ -356,6 +375,11 @@ sealed class Race
                 if (Math.Abs(now) > 100f) continue;
                 Racer by = now > 0f ? a : b, of = now > 0f ? b : a;
                 PassCount++;
+                if (by.Pilot.Profile.LapTime > of.Pilot.Profile.LapTime * 1.01f && of.SinceQueued < 1f && by.Distance - of.Distance < circuit.Lap * 0.5f)
+                {
+                    if (QueuePassed++ == 0)
+                        QueuePassedLine = $"{Name(by)} is {100f * (by.Pilot.Profile.LapTime / of.Pilot.Profile.LapTime - 1f):0.0}% slower and passed {Name(of)} while it queued behind a car, at {Clock(Time)} at {Math.Max(by.Car.TrackIndex, 0) * circuit.Step:0} m";
+                }
                 if (Passes.Count < 400)
                     Passes.Add($"{Clock(Time)} {Name(by)} passes {Name(of)} at {Math.Max(by.Car.TrackIndex, 0) * circuit.Step:0} m{(by.Distance - of.Distance > circuit.Lap * 0.5f ? " (lapping)" : "")}");
             }
