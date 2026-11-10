@@ -1,104 +1,124 @@
-"""Lofts the Oboe's outer skin from rows.json, in pure numpy."""
+"""The Oboe's outer skin, lofted from rows.json in pure numpy.
+
+Each cross-section has three parts, left half drawn bottom centre to top centre:
+  lower: a squarish quarter from the floor centre out to the widest point,
+  side:  an S from the widest point in to the belt, vertical at both ends,
+  top:   a squarish quarter from the belt up to the centre line, leaning in on the greenhouse.
+"""
 import json
+import sys
 from pathlib import Path
 
 import numpy as np
-from scipy.interpolate import PchipInterpolator
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "common"))
+from geom import close_rings, monotone  # noqa: E402
 
 ROWS = json.loads(Path(__file__).with_name("rows.json").read_text())
-KEYS = ("zb", "zt", "w", "zs", "zw", "ks", "kt", "dt")
-SEG = 7   # points per segment of the half section
+KEYS = ("zb", "zw", "zs", "zt", "w", "kb", "nt", "lean", "nb")
+N_LOW, N_SIDE, N_TOP = 14, 10, 28
 
 
-def half_section(p):
-    """Control points of the left half section, bottom centre to top centre, in (y, z)."""
+def _quarter(n, e):
+    """Superellipse quarter from angle 0 to 90 degrees: (cos, sin) shaped by exponent e."""
+    a = np.linspace(0, np.pi / 2, n)
+    c, s = np.cos(a), np.sin(a)
+    return np.sign(c) * np.abs(c) ** (2 / e), np.sign(s) * np.abs(s) ** (2 / e)
+
+
+def half(p):
+    """Left half section, (y, z) from bottom centre to top centre."""
     zb, zt, w = p["zb"], p["zt"], p["w"]
     h = zt - zb
-    dt = min(p["dt"], 0.25 * h)
-    ztop = zt - dt
-    zs = min(max(p["zs"], zb + 0.45 * h), ztop - 0.12 * h)
-    zw = min(max(p["zw"], zb + 0.18 * h), zs - 0.15 * (zs - zb))
-    ws, wt = w * p["ks"], w * p["kt"]
-    wt = min(wt, ws - 0.01)
-    rb = min(0.06, 0.3 * h, 0.4 * w)
-    return np.array([
-        (0.0, zb), (0.5 * (w - rb), zb), (w - rb, zb + 0.004), (w - 0.25 * rb, zb + 0.6 * rb),
-        (w, zw), (w - 0.10 * (w - ws), 0.5 * (zw + zs)), (w - 0.40 * (w - ws), zw + 0.85 * (zs - zw)), (ws, zs),
-        (0.5 * (ws + wt) + 0.1 * (ws - wt), 0.5 * (zs + ztop) + 0.05 * (ztop - zs)), (wt, ztop),
-        (0.55 * wt, zt - 0.3 * dt), (0.0, zt)])
+    zw = np.clip(p["zw"], zb + 0.12 * h, zb + 0.6 * h)
+    zs = np.clip(p["zs"], zw + 0.08 * h, zt - 0.06 * h)
+    ws = w * p["kb"]
+    # lower: centre (0, zw), radii (w, zw - zb), from the bottom centre round to (w, zw)
+    c, s = _quarter(N_LOW, p["nb"])
+    low = np.column_stack([w * c[::-1], zw - (zw - zb) * s[::-1]])
+    # side: an S from (w, zw) to (ws, zs)
+    t = np.linspace(0, 1, N_SIDE + 1)[1:]
+    st = t * t * (3 - 2 * t)
+    mid = np.column_stack([w + (ws - w) * st, zw + (zs - zw) * t])
+    # top: centre (0, zs), radii (ws, zt - zs), leaning in as it rises
+    c, s = _quarter(N_TOP, p["nt"])
+    c, s = c[1:], s[1:]
+    lean = 1 - p["lean"] * s ** 1.5
+    top = np.column_stack([ws * c * lean, zs + (zt - zs) * s])
+    out = np.vstack([low, mid, top])
+    out[0, 0] = out[-1, 0] = 0.0
+    return out
 
 
 def section(p):
-    """Closed loop in (y, z), counter-clockwise seen from the front (+x)."""
-    c = half_section(p)
-    t = np.arange(len(c))
-    fy, fz = PchipInterpolator(t, c[:, 0]), PchipInterpolator(t, c[:, 1])
-    s = np.linspace(0, len(c) - 1, (len(c) - 1) * SEG + 1)
-    left = np.column_stack([fy(s), fz(s)])
-    left[0, 0] = left[-1, 0] = 0.0
+    """Closed loop in (y, z), anticlockwise seen from the front."""
+    left = half(p)
     right = left[-2:0:-1] * np.array([-1, 1])
-    # left side goes up on +y; looking from +x, +y is to the left, so up the left then down the right is clockwise.
-    loop = np.concatenate([left, right])
-    return loop[::-1]
+    return np.vstack([left, right])[::-1]
 
 
-def curves(rows):
-    xs = np.array([r["x"] for r in rows])
-    order = np.argsort(xs)
-    xs = xs[order]
-    rows = [rows[i] for i in order]
-    return xs, {k: PchipInterpolator(xs, [r[k] for r in rows]) for k in KEYS}
+def curves(stations):
+    st = sorted(stations, key=lambda r: r["x"])
+    xs = np.array([r["x"] for r in st])
+    return xs, {k: monotone(list(zip(xs, [r[k] for r in st]))) for k in KEYS}
 
 
-def loft(rows, step=0.02, inset=0.0, x0=None, x1=None):
-    """Loft the stations into a closed shell. inset shrinks every section (for the cabin)."""
-    xs, cv = curves(rows)
-    a = xs[0] if x0 is None else x0
-    b = xs[-1] if x1 is None else x1
-    n = max(2, int(np.ceil((b - a) / step)) + 1)
-    t = (1 - np.cos(np.linspace(0, np.pi, n))) / 2 if x0 is None else np.linspace(0, 1, n)
+def at(cv, x):
+    return {k: float(cv[k](x)) for k in KEYS}
+
+
+def skin(step=0.015):
+    """The outer skin as one closed solid."""
+    xs, cv = curves(ROWS["stations"])
+    n = int(np.ceil((xs[-1] - xs[0]) / step)) + 1
+    t = (1 - np.cos(np.linspace(0, np.pi, n))) / 2       # closer rings at the nose and tail
     rings = []
-    for x in a + (b - a) * t:
-        p = {k: float(cv[k](x)) for k in KEYS}
-        if inset:
-            p["zb"] += inset; p["zt"] -= inset; p["w"] -= inset
-            p["zs"] -= inset * 0.5; p["zw"] -= 0
-        sec = section(p)
+    for x in xs[0] + (xs[-1] - xs[0]) * t:
+        sec = section(at(cv, x))
         rings.append(np.column_stack([np.full(len(sec), x), sec[:, 0], sec[:, 1]]))
-    return _close(rings)
+    return close_rings(rings)
 
 
-def _close(rings, mirror=False):
-    m = len(rings[0])
-    verts = np.concatenate(rings)
-    faces = []
-    for i in range(len(rings) - 1):
-        a, b = i * m, (i + 1) * m
-        for j in range(m):
-            k = (j + 1) % m
-            faces.append((a + j, a + k, b + k, b + j))
-    for idx, ring in ((0, rings[0]), (len(rings) - 1, rings[-1])):
-        c = len(verts)
-        verts = np.vstack([verts, ring.mean(0)])
-        base = idx * m
-        for j in range(m):
-            k = (j + 1) % m
-            faces.append((base + k, base + j, c) if idx == 0 else (base + j, base + k, c))
-    if mirror:
-        verts = verts * np.array([1, -1, 1])
-        faces = [f[::-1] for f in faces]
-    return verts, faces
+def cavity(x0, x1, floor, inset=0.035, n=40):
+    """The inside of the body between x0 and x1, above floor, as a closed solid to cut away."""
+    from shapely.geometry.polygon import orient
+    _xs, cv = curves(ROWS["stations"])
+    rings = []
+    from shapely.geometry import box
+    for x in np.linspace(x0, x1, n):
+        inner = inside(cv, x, inset).intersection(box(-3, floor, 3, 5))
+        if inner.geom_type != "Polygon" or inner.area < 1e-3:
+            continue
+        ring = np.array(orient(inner, 1).exterior.coords)[:-1]
+        ring = _even(ring, 72)
+        rings.append(np.column_stack([np.full(len(ring), x), ring]))
+    return close_rings(rings)
 
 
-def extrude_outline(outline_xz, y, half_t):
-    """Flat plate from a side outline (x, z), centred on y with half thickness."""
-    o = np.asarray(outline_xz, float)
-    n = len(o)
-    front = np.column_stack([o[:, 0], np.full(n, y + half_t), o[:, 1]])
-    back = np.column_stack([o[:, 0], np.full(n, y - half_t), o[:, 1]])
-    verts = np.vstack([front, back])
-    faces = [tuple(range(n)), tuple(range(2 * n - 1, n - 1, -1))]
-    for i in range(n):
-        j = (i + 1) % n
-        faces.append((i, n + i, n + j, j))
-    return verts, faces
+def inside(cv, x, inset):
+    """The section at x shrunk by inset, also kept inset from the sections just ahead and behind,
+    so the wall keeps its thickness where the body slopes along x."""
+    from shapely.geometry import Polygon
+    out = None
+    for dx in (-inset, -inset / 2, 0, inset / 2, inset):
+        p = Polygon(section(at(cv, x + dx))).buffer(-inset)
+        out = p if out is None else out.intersection(p)
+    if out.geom_type != "Polygon":
+        out = max(getattr(out, "geoms", [out]), key=lambda g: g.area)
+    return out
+
+
+def y_at(cv, x, z):
+    """Outer half width of the skin at x and height z."""
+    h = half(at(cv, x))
+    return float(np.interp(z, h[:, 1], h[:, 0]))
+
+
+def _even(ring, n):
+    """n points round a closed loop by arc length, starting at its lowest middle point."""
+    k = int(np.argmin(np.abs(ring[:, 0]) + 10 * (ring[:, 1] - ring[:, 1].min())))
+    ring = np.roll(ring, -k, axis=0)
+    ring = np.vstack([ring, ring[:1]])
+    s = np.concatenate([[0], np.cumsum(np.linalg.norm(np.diff(ring, axis=0), axis=1))])
+    t = np.linspace(0, s[-1], n, endpoint=False)
+    return np.column_stack([np.interp(t, s, ring[:, 0]), np.interp(t, s, ring[:, 1])])
