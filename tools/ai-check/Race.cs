@@ -476,7 +476,7 @@ sealed class Race
             r.StuckTime = r.Car.Speed < 2f && !r.Rejoin.Busy ? r.StuckTime + Dt : 0f;
             if (r.Rejoin.Trying) r.RejoinTime += Dt;
             else if (!r.Rejoin.Busy) r.RejoinTime = 0f;
-            if ((r.StuckTime > 4f || r.RejoinTime > Rejoin.GiveUpAfter) && r.Rejoin.GapClear)
+            if ((r.StuckTime > 4f || r.RejoinTime > Rejoin.GiveUpAfter || r.Rejoin.Stranded) && r.Rejoin.GapClear)
             {
                 r.Recoveries++;
                 r.Car.PlaceAt(k, 0f);

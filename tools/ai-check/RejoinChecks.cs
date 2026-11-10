@@ -6,10 +6,14 @@
 //                           at no more than Rejoin.MaxEntryAngle from the track direction, and touches no
 //                           car while rejoining. The worst heading on the tarmac afterwards is reported:
 //                           a car still turning in a bend at its grip limit can run past the limit there
-//   spun car waits          cars sent into a spin on the track with traffic coming: each stops, never moves
-//                           while a car approaching from behind is inside the gap (Rejoin.GapSeconds at its
-//                           speed, at least Rejoin.GapMetres), turns round, rejoins within the heading limit,
-//                           and touches no car once it moves again
+//   spun car turns round   cars sent into a spin on the track with traffic coming: each stops, starts to
+//                           turn round within StandLimit of starting to stop, a ghost while it does on the track,
+//                           rejoins within the heading limit, and touches no car once it moves again
+//   out of the gravel       cars stopped in a gravel trap: each drives out or, stranded, is put back on the
+//                           track, racing again within GravelLimit
+//   spun cars recover       pack races on many grids: no spun car stands for longer than SpunMoveLimit, no
+//                           rejoin of any kind lasts longer than that, and no car sits facing the wrong way
+//                           without a rejoin
 //   pack races (in RacePack) no car starts a rejoin unless it has left the track or lost control
 using System;
 using System.Collections.Generic;
@@ -25,8 +29,7 @@ static partial class Check
         public bool Rejoined, Stopped, Recovered;
         public float WorstOnTarmac, WorstEntry = -1f;
         public float WaitStart = -1f, WaitEnd = -1f, BackAt = -1f;
-        public float WorstWaitSpeed;
-        public string GapBroken;
+        public bool GhostWhenTurning;
         public readonly List<string> Touches = new List<string>();
         public int TouchesStopped;
         public float SpunTo;
@@ -103,28 +106,16 @@ static partial class Check
             }
             lastEdge = edge;
             run.SpunTo = Math.Max(run.SpunTo, Math.Abs(j.Heading));
-            if (j.State == Rejoin.Stage.Waiting && was != Rejoin.Stage.Waiting)
+            if (j.State == Rejoin.Stage.Stopping && was != Rejoin.Stage.Stopping)
             {
                 run.Stopped = true;
                 if (run.WaitStart < 0f) run.WaitStart = r.Time;
             }
-            if (was == Rejoin.Stage.Waiting && j.State == Rejoin.Stage.Waiting && r.Time - lastTouch > 1f)
-                run.WorstWaitSpeed = Math.Max(run.WorstWaitSpeed, me.Car.Speed);
-            if (was == Rejoin.Stage.Waiting && j.State != Rejoin.Stage.Waiting)
+            // Stopped and moving off again: how long it stood, and whether it was a ghost then.
+            if (was == Rejoin.Stage.Stopping && j.State != Rejoin.Stage.Stopping && run.WaitEnd < 0f)
             {
                 run.WaitEnd = r.Time;
-                // The gap, measured here from where the cars are, not from what the rejoin was told.
-                foreach (Racer o in r.Racers)
-                {
-                    if (o == me) continue;
-                    int k = Math.Max(o.Car.TrackIndex, 0);
-                    float along = o.Car.Vx * circuit.Forward[k].x + o.Car.Vz * circuit.Forward[k].z;
-                    float behind = Mod(me.Distance - o.Distance);
-                    if (along < 1f || behind > circuit.Lap * 0.5f) continue;
-                    float need = Math.Max(Rejoin.GapMetres, Rejoin.GapSeconds * along);
-                    if (behind < need && run.GapBroken == null)
-                        run.GapBroken = $"{run.Name} moved off at {Race.Clock(r.Time)} with {r.Name(o)} {behind:0} m behind at {along * 3.6f:0} km/h (needs {need:0} m)";
-                }
+                run.GhostWhenTurning = me.Ghost || j.PastEdge > Rejoin.OffTrackMargin;
             }
             if (was != Rejoin.Stage.Racing && j.State == Rejoin.Stage.Racing && run.BackAt < 0f)
             {
@@ -137,13 +128,18 @@ static partial class Check
             Rejoin.Stage before = me.Rejoin.State;
             int recoveries = me.Recoveries;
             race.Step();
-            if (me.Recoveries > recoveries) run.Recovered = true;
+            if (me.Recoveries > recoveries)
+            {
+                // Put back on the track: racing again from here.
+                run.Recovered = true;
+                if (run.BackAt < 0f) { run.Rejoined = true; run.BackAt = race.Time; }
+            }
             for (; contactsSeen < race.Contacts.Count; contactsSeen++)
             {
                 Contact c = race.Contacts[contactsSeen];
                 if (c.A != run.Name && c.B != run.Name) continue;
                 lastTouch = race.Time;
-                bool moving = before != Rejoin.Stage.Racing && before != Rejoin.Stage.Waiting && before != Rejoin.Stage.Stopping;
+                bool moving = before != Rejoin.Stage.Racing && before != Rejoin.Stage.Stopping;
                 if (moving) run.Touches.Add($"{Race.Clock(c.Time)} {c.A} and {c.B} at {c.Where:0} m, {c.Speed:0.0} m/s while {before}");
                 else if (before != Rejoin.Stage.Racing) run.TouchesStopped++;
             }
@@ -203,11 +199,64 @@ static partial class Check
         Report($"rejoin from off track ({runs} runs, {rejoined} back racing, slowest after {slowest:0} s, worst heading on the tarmac {worst:0.0}° ({worstLine}), crossing the edge {Math.Max(worstEntry, 0f):0.0}°, {touches} touches while rejoining)", problems);
     }
 
-    static void SpunCarWaits(bool verbose)
+    /// <summary>
+    /// Longest a car stopped in a gravel trap may take to be back racing, driven out or put back,
+    /// seconds: the last resort's wait and a few seconds for the gap. A small car can take most of it
+    /// creeping out at full throttle.
+    /// </summary>
+    const float GravelLimit = Rejoin.GiveUpAfter + 5f;
+
+    /// <summary>
+    /// Cars stopped in a gravel trap, 3 m past the tarmac edge and beyond, at any angle: deep gravel
+    /// holds a small car whichever way it drives, so each must either drive out or, stranded, be put
+    /// back on the track, and be racing again within <see cref="GravelLimit"/>, never sit there.
+    /// </summary>
+    static void OutOfGravel(bool verbose)
+    {
+        var problems = new List<string>();
+        int runs = 0, drove = 0, put = 0;
+        float slowest = 0f;
+        string slowestLine = "";
+        string[] models = { "f-01", "c-19", "a-29" };
+        (float Towards, float Speed, float Out)[] cases = { (0f, 0f, 6f), (45f, 1f, 6f), (90f, 0f, 7f), (180f, 0f, 6f), (-30f, 2f, 8f) };
+        int n = 0;
+        foreach (float at in RejoinSpots())
+            foreach (string model in models)
+                foreach (var (angle, speed, outBy) in cases)
+                {
+                    n++;
+                    int side = n % 2 == 0 ? 1 : -1;
+                    int k = circuit.IndexOf(at);
+                    var entries = new List<Entry> { new Entry { Model = model, Start = at, Lateral = side * (circuit.HalfWidth(k) + outBy), Speed = speed, Pace = 90f, Safety = 100f, Seed = n } };
+                    bool traffic = n % 2 == 1;
+                    if (traffic) entries.AddRange(Coming(at, new[] { 120f, 260f, 420f }, n));
+                    var race = new Race(circuit, entries, LineFor);
+                    race.Racers[0].Car.GravelFrom = 3f;
+                    Aim(race.Racers[0].Car, -side * angle, speed);
+                    string what = $"{model} at {at:0} m {(side > 0 ? "left" : "right")} {outBy:0} m out in gravel {angle:0}°";
+                    if (Only != null && !what.StartsWith(Only)) continue;
+                    if (verbose) Console.WriteLine($"  {what}{(traffic ? ", traffic" : "")}");
+                    RejoinRun run = WatchRejoin(race, 90f, Only != null);
+                    runs++;
+                    float back = run.Rejoined ? run.BackAt : float.PositiveInfinity;
+                    if (run.Recovered) put++;
+                    else if (run.Rejoined) drove++;
+                    if (back > slowest) { slowest = back; slowestLine = what; }
+                    if (back > GravelLimit) problems.Add($"{what}: {(run.Rejoined ? $"back racing only after {back:0} s" : $"not back racing after 90 s ({race.Racers[0].Rejoin.State})")}");
+                    foreach (string t in run.Touches) problems.Add($"{what}: touched {t}");
+                    if (verbose) Console.WriteLine($"    {(run.Recovered ? "put back" : run.Rejoined ? "drove out" : "still there")}, back racing {(run.Rejoined ? Race.Clock(run.BackAt) : "never")}");
+                }
+        Report($"out of the gravel ({runs} runs, {drove} drove out, {put} put back when stranded, slowest back racing after {slowest:0} s ({slowestLine}))", problems);
+    }
+
+    /// <summary>Longest from a spun car starting to stop, sliding included, to it turning round, seconds.</summary>
+    const float StandLimit = 6f;
+
+    static void SpunCarTurnsRound(bool verbose)
     {
         var problems = new List<string>();
         int runs = 0, spun = 0, back = 0, stoppedTouches = 0;
-        float worst = 0f, longestWait = 0f, slowest = 0f, worstWait = 0f;
+        float worst = 0f, longestWait = 0f, slowest = 0f;
         string[] models = { "f-01", "c-19", "a-29" };
         float[] spins = { 3f, -3.5f, 4f, -2.5f };
         float[][] gaps = { new[] { 150f, 300f, 450f, 700f }, new[] { 400f, 650f }, new float[0] };
@@ -235,10 +284,10 @@ static partial class Check
                     continue;
                 }
                 spun++;
-                if (run.GapBroken != null) problems.Add(run.GapBroken);
-                if (run.WorstWaitSpeed > Rejoin.StoppedSpeed + 0.3f) problems.Add($"{what}: crept at {run.WorstWaitSpeed:0.0} m/s while waiting");
-                worstWait = Math.Max(worstWait, run.WorstWaitSpeed);
-                if (run.WaitEnd > 0f) longestWait = Math.Max(longestWait, run.WaitEnd - run.WaitStart);
+                float stood = (run.WaitEnd > 0f ? run.WaitEnd : race.Time) - run.WaitStart;
+                longestWait = Math.Max(longestWait, stood);
+                if (stood > StandLimit) problems.Add($"{what}: stood {stood:0.0} s before turning round");
+                if (run.WaitEnd > 0f && !run.GhostWhenTurning) problems.Add($"{what}: turned round on the track without being a ghost");
                 if (run.Rejoined) { back++; slowest = Math.Max(slowest, run.BackAt); }
                 else problems.Add($"{what}: not back racing after 120 s ({race.Racers[0].Rejoin.State})");
                 if (run.Recovered) problems.Add($"{what}: put back on the track");
@@ -246,10 +295,10 @@ static partial class Check
                 worst = Math.Max(worst, run.WorstOnTarmac);
                 foreach (string t in run.Touches) problems.Add($"{what}: touched {t}");
                 stoppedTouches += run.TouchesStopped;
-                if (verbose) Console.WriteLine($"    stopped at {Race.Clock(run.WaitStart)}, moved off {(run.WaitEnd > 0f ? Race.Clock(run.WaitEnd) : "never")}, back racing {(run.Rejoined ? Race.Clock(run.BackAt) : "never")}, worst heading rejoining {run.WorstOnTarmac:0.0}°, {run.Touches.Count} touches moving, {run.TouchesStopped} while stopped");
+                if (verbose) Console.WriteLine($"    stopping from {Race.Clock(run.WaitStart)}, turning round {(run.WaitEnd > 0f ? Race.Clock(run.WaitEnd) : "never")}, back racing {(run.Rejoined ? Race.Clock(run.BackAt) : "never")}, worst heading rejoining {run.WorstOnTarmac:0.0}°, {run.Touches.Count} touches moving, {run.TouchesStopped} while stopping");
             }
         if (spun < runs / 2) problems.Add($"only {spun} of {runs} spins ended past {Rejoin.SpunAngle:0}°, too few to check");
-        Report($"spun car waits ({runs} spins, {spun} stopped past {Rejoin.SpunAngle:0}°, {back} back racing, longest wait {longestWait:0} s, slowest back after {slowest:0} s, fastest while waiting {worstWait:0.00} m/s, worst heading rejoining {worst:0.0}°, {stoppedTouches} touches by others while stopped)", problems);
+        Report($"spun car turns round ({runs} spins, {spun} stopped past {Rejoin.SpunAngle:0}°, {back} back racing, longest from stopping to turning {longestWait:0.0} s, slowest back after {slowest:0} s, worst heading rejoining {worst:0.0}°, {stoppedTouches} touches while stopping)", problems);
     }
 
     /// <summary>
@@ -298,5 +347,92 @@ static partial class Check
             if (!off && !spun) unexplained.Add(line + $", on the track (lateral {car.Lateral:0.0}, half {circuit.HalfWidth(k):0.0}, rejoin sees {who.Rejoin.PastEdge:0.00} past the edge) without a spin, {who.Craft.State}");
         };
         return seen;
+    }
+
+    /// <summary>Longest a spun car may stand waiting before it starts to turn round or rejoin, seconds.</summary>
+    const float SpunMoveLimit = 60f;
+    static readonly string SpunTrace = Environment.GetEnvironmentVariable("AI_SPUN_TRACE");
+    /// <summary>Longest a car may sit facing the wrong way, slow, without a rejoin under way, seconds.</summary>
+    const float BackwardsLimit = 5f;
+
+    /// <summary>
+    /// Pack races on many grids: every car that spins and stops must start back towards its line
+    /// (turning round or rejoining) within <see cref="SpunMoveLimit"/>, not wait for ever, and not be
+    /// put back on the track by the last resort.
+    /// </summary>
+    static void SpunCarsRecover(IEnumerable<int> seeds, bool verbose)
+    {
+        var problems = new List<string>();
+        int races = 0, spins = 0;
+        float longest = 0f;
+        string longestLine = "";
+        foreach (int seed in seeds)
+        {
+            var since = new Dictionary<Racer, float>();
+            var where = new Dictionary<Racer, string>();
+            var resets = new Dictionary<Racer, int>();
+            var backwards = new Dictionary<Racer, float>();
+            var busySince = new Dictionary<Racer, float>();
+            var longRun = new HashSet<Racer>();
+            var reported = new HashSet<Racer>();
+            Race race = RunRace(Pack(false, seed), r => r.Racers.Max(c => c.Laps) >= 4, 60f * 20f, r =>
+            {
+                foreach (Racer x in r.Racers) resets[x] = 0;
+                r.OnRejoin = (rr, who, was) =>
+                {
+                    Rejoin.Stage now = who.Rejoin.State;
+                    if (SpunTrace != null && rr.Name(who) == SpunTrace && who.Rejoin.Busy && (int)Math.Round(rr.Time / Race.Dt) % (Environment.GetEnvironmentVariable("AI_EVERY") is string ev ? int.Parse(ev) : 50) == 0)
+                        Console.WriteLine($"    {Race.Clock(rr.Time)} {now} {who.Rejoin.Cause} heading {who.Rejoin.Heading:0} past {who.Rejoin.PastEdge:0.0} lat {who.Car.Lateral:0.0} {who.Car.Speed * 3.6f:0} km/h thr {who.Car.LastThrottle:0.00} brk {who.Car.LastBrake:0.00} str {who.Car.LastSteer:0.00}{(who.Car.Reverse ? " R" : "")} {who.Car.Surface}");
+                    // Any rejoin, off or spun, that runs on: cars waiting on each other, or on a gap that never comes.
+                    if (who.Rejoin.Busy)
+                    {
+                        if (!busySince.ContainsKey(who)) busySince[who] = rr.Time;
+                        else if (rr.Time - busySince[who] > SpunMoveLimit && longRun.Add(who))
+                            problems.Add($"seed {seed} {rr.Name(who)} rejoining ({who.Rejoin.Cause}) for {SpunMoveLimit:0} s from {Race.Clock(busySince[who])}, now {now}{(who.Rejoin.Yielding ? " yielding" : "")} {who.Rejoin.PastEdge:0.0} m past the edge at {who.Car.Speed * 3.6f:0} km/h");
+                    }
+                    else { busySince.Remove(who); longRun.Remove(who); }
+                    // Facing the wrong way and slow without the rejoin knowing: nothing will turn it round.
+                    bool lostBackwards = now == Rejoin.Stage.Racing && Math.Abs(who.Rejoin.Heading) > Rejoin.SpunAngle && who.Car.Speed < Rejoin.SpinSpeed;
+                    if (lostBackwards)
+                    {
+                        if (!backwards.ContainsKey(who)) backwards[who] = rr.Time;
+                        else if (rr.Time - backwards[who] > BackwardsLimit && !reported.Contains(who))
+                        {
+                            reported.Add(who);
+                            problems.Add($"seed {seed} {rr.Name(who)} facing {who.Rejoin.Heading:0}° from the track at {who.Car.Speed * 3.6f:0} km/h for {BackwardsLimit:0} s without starting a rejoin, from {Race.Clock(backwards[who])} at {Math.Max(who.Car.TrackIndex, 0) * circuit.Step:0} m ({who.Craft.State}, {who.Rejoin.PastEdge:0.0} m past the edge)");
+                        }
+                    }
+                    else { backwards.Remove(who); reported.Remove(who); }
+                    bool standing = now == Rejoin.Stage.Stopping;
+                    if (standing && !since.ContainsKey(who))
+                    {
+                        since[who] = rr.Time;
+                        where[who] = $"seed {seed} {rr.Name(who)} at {Race.Clock(rr.Time)} at {Math.Max(who.Car.TrackIndex, 0) * circuit.Step:0} m";
+                        resets[who] = who.Recoveries;
+                        spins++;
+                    }
+                    else if (!standing && since.TryGetValue(who, out float t))
+                    {
+                        float wait = rr.Time - t;
+                        string line = $"{where[who]}: waited {wait:0.0} s, then {(who.Recoveries > resets[who] ? "put back on the track" : now.ToString())}";
+                        if (verbose) Console.WriteLine("  " + line);
+                        if (wait > longest) { longest = wait; longestLine = line; }
+                        if (who.Recoveries > resets[who]) problems.Add(line);
+                        else if (wait > SpunMoveLimit) problems.Add(line);
+                        since.Remove(who);
+                    }
+                };
+            });
+            races++;
+            foreach (var w in since)
+            {
+                float wait = race.Time - w.Value;
+                string line = $"{where[w.Key]}: still {w.Key.Rejoin.State} after {wait:0.0} s at the end (gap {(w.Key.Rejoin.GapClear ? "clear" : "not clear")})";
+                if (verbose) Console.WriteLine("  " + line);
+                if (wait > longest) { longest = wait; longestLine = line; }
+                if (wait > SpunMoveLimit) problems.Add(line);
+            }
+        }
+        Report($"spun cars recover ({races} pack races, {spins} cars stopped after a spin, longest standing {longest:0} s{(longestLine != "" ? $": {longestLine}" : "")})", problems);
     }
 }
