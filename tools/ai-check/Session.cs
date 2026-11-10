@@ -205,6 +205,7 @@ sealed class Session
             r.Active.Towed = car.DragScale < 0.97f;
             AiPilot.Controls c = r.Step(car.Position, car.Forward, car.Velocity, car.YawRate, traffic[i], sorted, all, Racing && !held, car.Spec, Dt);
             car.Hold = r.Hold;
+            car.Reverse = c.Reverse;
             car.Step(Dt, c.Throttle, c.Brake, c.Steer);
 
             if (s.InPitLane) inLane++;
@@ -389,9 +390,13 @@ sealed class Session
             if (s.OffTime < 0f) { s.OffTime = Time; s.OffWhere = k * circuit.Step; }
             s.OffSeconds += Dt;
         }
-        bool stalled = car.Speed < 2f && c.Throttle > 0.3f;
-        s.StuckTime = stalled ? s.StuckTime + Dt : 0f;
-        if (s.StuckTime > 4f)
+        // As AiDriver: stuck wanting to go, or the rejoin hasn't got the car back to racing after a
+        // long while, and only once the gap behind is clear.
+        bool rejoining = s.Racer.Rejoin.Busy;
+        bool stalled = !rejoining && car.Speed < 2f && c.Throttle > 0.3f;
+        if (stalled || s.Racer.Rejoin.Trying) s.StuckTime += Dt;
+        else if (!rejoining) s.StuckTime = 0f;
+        if (s.StuckTime > (rejoining ? Rejoin.GiveUpAfter : 4f) && s.Racer.Rejoin.GapClear)
         {
             s.Recoveries++;
             car.PlaceAt(k, 0f);
@@ -403,7 +408,7 @@ sealed class Session
     void Collide()
     {
         var bodies = new List<(StandInCar Car, string Name, bool Pits)>();
-        foreach (SessionCar s in Cars) bodies.Add((s.Car, Name(s) + (s.Racer.Active.Gliding ? " (gliding)" : ""), s.InPitLane || s.Racer.Pitting));
+        foreach (SessionCar s in Cars) bodies.Add((s.Car, Name(s) + (s.Racer.Active.Gliding ? " (gliding)" : "") + (s.Racer.Rejoin.Busy ? $" (rejoining: {s.Racer.Rejoin.State}{(s.Racer.Rejoin.Yielding ? " yielding" : "")} {s.Racer.Rejoin.PastEdge:0.0} m past, heading {s.Racer.Rejoin.Heading:0}, {s.Car.Speed * 3.6f:0} km/h)" : ""), s.InPitLane || s.Racer.Pitting));
         if (PaceCar != null && !PaceCarGone) bodies.Add((PaceCar, "pace car", false));
         for (int i = 0; i < bodies.Count; i++)
             for (int j = i + 1; j < bodies.Count; j++)

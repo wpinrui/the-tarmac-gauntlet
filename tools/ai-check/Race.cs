@@ -23,6 +23,9 @@ sealed class Racer
     public StandInCar Car;
     public AiPilot Pilot;
     public Racecraft Craft;
+    public readonly Rejoin Rejoin = new Rejoin();
+    /// <summary>Seconds the rejoin has driven the car without getting it back to racing.</summary>
+    public float RejoinTime;
     public int Laps;
     public int Last;
     public float StuckTime;
@@ -68,6 +71,8 @@ sealed class Contact
     public string A, B;
     /// <summary>One car's nose into the other's tail: the push between them runs along both cars.</summary>
     public bool RearEnd;
+    /// <summary>One of the two cars was getting back into the race.</summary>
+    public bool Rejoining;
 
     /// <summary>A push along n between two cars is nose to tail when it runs along both of them.</summary>
     public static bool NoseToTail(StandInCar a, StandInCar b, float nx, float nz) =>
@@ -76,6 +81,8 @@ sealed class Contact
 
 sealed class Race
 {
+    static readonly bool Touches = Environment.GetEnvironmentVariable("AI_TOUCHES") != null;
+    public readonly Dictionary<string, float> OffWhy = new Dictionary<string, float>();
     public const float Dt = 0.01f;
     const float HalfLength = 2.3f, HalfWidth = 0.95f;   // the car's box collider
     const float KerbWidth = 1.5f;
@@ -113,6 +120,8 @@ sealed class Race
     readonly List<TrafficCar> field = new List<TrafficCar>();
     readonly TrafficField sorted = new TrafficField();
     public Action<Race> Watch;
+    /// <summary>Called after each physics car's rejoin step, with the stage it was in before it.</summary>
+    public Action<Race, Racer, Rejoin.Stage> OnRejoin;
     /// <summary>Gliding cars step this often, seconds. The game uses 0.01 at normal speed and 0.05 in fast forward.</summary>
     public float GlideStep = Dt;
     /// <summary>Each gliding car's step instead of <see cref="GlideStep"/>, if set.</summary>
@@ -273,7 +282,7 @@ sealed class Race
             {
                 bool want = Physics(r);
                 if (want && r.Pilot.Gliding) Wake(r);
-                else if (!want && !r.Pilot.Gliding) Sleep(r);
+                else if (!want && !r.Pilot.Gliding && !r.Rejoin.Busy) Sleep(r);
             }
         }
         for (int i = 0; i < Racers.Count; i++)
@@ -297,6 +306,7 @@ sealed class Race
                 continue;
             }
             r.Craft.Think(r.Pilot, field[i], sorted, Dt);
+            r.Rejoin.Prepare(r.Pilot);
             {
                 bool onLine = r.Craft.State == Racecraft.Mode.Racing;
                 r.SinceFlip += Dt;
@@ -310,9 +320,13 @@ sealed class Race
             r.Car.DragScale = Racecraft.Slipstream(circuit, field[i], field);
             r.Pilot.Towed = r.Car.DragScale < 0.97f;
             AiPilot.Controls c = r.Pilot.Drive(r.Car.Position, r.Car.Forward, r.Car.Velocity, r.Car.YawRate);
+            Rejoin.Stage was = r.Rejoin.State;
+            c = r.Rejoin.Apply(r.Pilot, c, r.Car.Position, r.Car.Forward, r.Car.Velocity, r.Car.YawRate, field[i], sorted, Dt);
+            OnRejoin?.Invoke(this, r, was);
             Feathering(r, c);
             OpenRoom(r);
             Queued(r);
+            r.Car.Reverse = c.Reverse;
             r.Car.Step(Dt, c.Throttle, c.Brake, c.Steer);
             r.ModeTime[r.Craft.State] = (r.ModeTime.TryGetValue(r.Craft.State, out float t) ? t : 0f) + Dt;
         }
@@ -347,15 +361,20 @@ sealed class Race
             else if (off > KerbWidth)
             {
                 if (r.OffSteps++ == 0) { r.OffTime = Time; r.OffWhere = k * circuit.Step; }
+                if (Environment.GetEnvironmentVariable("AI_OFFWHY") != null) OffWhy[$"{r.Rejoin.State}{(r.Rejoin.Yielding ? " yielding" : "")}"] = OffWhy.GetValueOrDefault($"{r.Rejoin.State}{(r.Rejoin.Yielding ? " yielding" : "")}") + Dt;
             }
-            float facing = r.Car.Forward.x * circuit.Forward[k].x + r.Car.Forward.z * circuit.Forward[k].z;
-            r.StuckTime = r.Car.Speed < 2f || facing < -0.2f ? r.StuckTime + Dt : 0f;
-            if (r.StuckTime > 4f)
+            // As AiDriver: stuck, or the rejoin hasn't got the car back to racing after a long while,
+            // and only once the gap behind is clear.
+            r.StuckTime = r.Car.Speed < 2f && !r.Rejoin.Busy ? r.StuckTime + Dt : 0f;
+            if (r.Rejoin.Trying) r.RejoinTime += Dt;
+            else if (!r.Rejoin.Busy) r.RejoinTime = 0f;
+            if ((r.StuckTime > 4f || r.RejoinTime > Rejoin.GiveUpAfter) && r.Rejoin.GapClear)
             {
                 r.Recoveries++;
                 r.Car.PlaceAt(k, 0f);
                 r.Pilot.Lost();
-                r.StuckTime = 0f;
+                r.Rejoin.Reset();
+                r.StuckTime = r.RejoinTime = 0f;
             }
         }
 
@@ -446,6 +465,7 @@ sealed class Race
         int k = Math.Max(r.Car.TrackIndex, 0);
         Vector3 f = circuit.Forward[k];
         r.Pilot.StartGlide(r.Car.Position, r.Car.Vx * f.x + r.Car.Vz * f.z);
+        r.Rejoin.Reset();   // it finds the track again from the pilot's place when it wakes
         r.GlideClock = (r.Id % Math.Max(1, (int)Math.Round(GlideStep / Dt))) * Dt;   // spread the cars' steps out, as the game does
         r.Handovers++;
     }
@@ -501,8 +521,14 @@ sealed class Race
                     a.Vx -= jn * nx / ma; a.Vz -= jn * nz / ma;
                     b.Vx += jn * nx / mb; b.Vz += jn * nz / mb;
                 }
-                if (touching.Add(key))
-                    Contacts.Add(new Contact { Time = Time, Speed = Math.Max(-vn, 0f), RearEnd = Contact.NoseToTail(a, b, nx, nz), Where = Math.Max(a.TrackIndex, 0) * circuit.Step, A = Name(Racers[i]), B = Name(Racers[j]) });
+                bool fresh = touching.Add(key);
+                if (fresh && Touches && (Racers[i].Rejoin.Busy || Racers[j].Rejoin.Busy))
+                {
+                    string Who(Racer x) => $"{Name(x)} {x.Rejoin.State}{(x.Rejoin.Yielding ? " yielding" : "")} {x.Rejoin.PastEdge:0.0} past, {x.Car.Speed * 3.6f:0} km/h, heading {x.Rejoin.Heading:0}, dist {x.Distance:0}";
+                    Console.WriteLine($"  touch {Clock(Time)} {Math.Max(-vn, 0f):0.0} m/s at {Math.Max(a.TrackIndex, 0) * circuit.Step:0} m: {Who(Racers[i])} | {Who(Racers[j])}");
+                }
+                if (fresh)
+                    Contacts.Add(new Contact { Time = Time, Speed = Math.Max(-vn, 0f), RearEnd = Contact.NoseToTail(a, b, nx, nz), Where = Math.Max(a.TrackIndex, 0) * circuit.Step, A = Name(Racers[i]), B = Name(Racers[j]), Rejoining = Racers[i].Rejoin.Busy || Racers[j].Rejoin.Busy });
             }
     }
 

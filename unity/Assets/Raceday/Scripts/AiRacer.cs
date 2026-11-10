@@ -22,6 +22,8 @@ namespace TarmacGauntlet.Raceday
         /// <summary>The car's pit stops, or null with no pit lane.</summary>
         public readonly PitPlan Pit;
         public readonly int Seed;
+        /// <summary>Getting back into the race after leaving the track or spinning.</summary>
+        public readonly Rejoin Rejoin = new Rejoin();
 
         /// <summary>The pilot for the car's formation column, set while it is in the formation.</summary>
         public AiPilot Formation;
@@ -63,7 +65,7 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>True when the car may glide: racing or in the formation, not making a pit stop.</summary>
-        public bool CanGlide => !Pitting && Active.Index >= 0 && (Active == Pilot || Active == Formation);
+        public bool CanGlide => !Pitting && !Rejoin.Busy && Active.Index >= 0 && (Active == Pilot || Active == Formation);
 
         /// <summary>
         /// One step of gliding, in place of <see cref="Step"/>: the same racecraft or formation limit,
@@ -74,6 +76,7 @@ namespace TarmacGauntlet.Raceday
         public bool Glide(TrafficCar me, IReadOnlyList<TrafficCar> field, bool racing, CarSpec spec, float dt)
         {
             Hold = false;
+            Rejoin.Reset();   // it finds the track again from the pilot's place when it wakes
             AiPilot want = InFormation && Formation != null ? Formation : Pilot;
             if (want != Active)
             {
@@ -121,6 +124,7 @@ namespace TarmacGauntlet.Raceday
         public void Lost()
         {
             Pit?.Abort();
+            Rejoin.Reset();
             if (!InFormation) Active = Pilot;
             Active.Lost();
             Active.Offset = 0f;
@@ -135,7 +139,7 @@ namespace TarmacGauntlet.Raceday
         {
             Hold = false;
             AiPilot want = InFormation && Formation != null ? Formation : Pitting ? Pit.Route : Pilot;
-            if (want == Pilot && racing && Pit != null && Active == Pilot && Pilot.Index >= 0 && Supplies != null && Pit.Due(Pilot.Index, Supplies))
+            if (want == Pilot && racing && Pit != null && Active == Pilot && Pilot.Index >= 0 && !Rejoin.Busy && Supplies != null && Pit.Due(Pilot.Index, Supplies))
             {
                 Pit.Box(Pilot, Seed);
                 want = Pit.Route;
@@ -150,11 +154,14 @@ namespace TarmacGauntlet.Raceday
             else if (Active == Pilot)
             {
                 if (Pilot.Index >= 0) Craft.Think(Pilot, me, field, dt);
+                Rejoin.Prepare(Pilot);
             }
             else Hold = Pit.Step(position, velocity, Supplies, spec, me.Id, cars, dt);
 
             Active.Grip = Supplies != null ? Supplies.GripScale : 1f;
             AiPilot.Controls c = Active.Drive(position, forward, velocity, yawRate);
+            if (Active == Pilot) c = Rejoin.Apply(Pilot, c, position, forward, velocity, yawRate, me, field, dt);
+            else Rejoin.Reset();
             if (Hold)
             {
                 c.Throttle = 0f;

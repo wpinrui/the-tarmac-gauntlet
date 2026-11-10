@@ -63,6 +63,7 @@ namespace TarmacGauntlet.Raceday
         private readonly Dictionary<Collider, SurfaceKind> surfaces = new Dictionary<Collider, SurfaceKind>();
         private float throttle, brake, steerInput, steer;
         private float aiThrottle, aiBrake, aiSteer;
+        private bool aiReverse;
         private float shiftTimer, reverseTimer;
         private float gripUsed;   // sum of each grounded tyre's share of its grip used, squared, this step
         private int gripCount;
@@ -109,11 +110,12 @@ namespace TarmacGauntlet.Raceday
         /// Pedals from 0 to 1 and a front wheel angle in radians, positive to the right. The wheels
         /// turn towards that angle at the same rate as they do for a player.
         /// </summary>
-        public void SetControls(float throttleIn, float brakeIn, float steerAngle)
+        public void SetControls(float throttleIn, float brakeIn, float steerAngle, bool reverse = false)
         {
             aiThrottle = Mathf.Clamp01(throttleIn);
             aiBrake = Mathf.Clamp01(brakeIn);
             aiSteer = Mathf.Clamp(steerAngle, -Spec.SteerLock, Spec.SteerLock);
+            aiReverse = reverse;
         }
 
         private void Update()
@@ -181,10 +183,14 @@ namespace TarmacGauntlet.Raceday
             float dt = Time.fixedDeltaTime;
             if (AiDriving)
             {
-                // The AI drives forwards in automatic, with its pedals set this step.
-                if (Gear == 0) Gear = 1;
+                // The AI drives in automatic, with its pedals set this step. It only asks for reverse to
+                // turn round, and gets it once the car is all but stopped: until then no throttle.
+                float rolling = Vector3.Dot(Velocity, transform.forward);
+                if (aiReverse && Gear != 0 && rolling < 0.5f) Gear = 0;
+                else if (!aiReverse && Gear == 0) Gear = 1;
                 Automatic = true;
-                throttle = Crashed ? 0f : aiThrottle;
+                bool wrongGear = aiReverse != (Gear == 0);
+                throttle = Crashed || wrongGear ? 0f : aiThrottle;
                 brake = Crashed ? 1f : aiBrake;
             }
             if (Hold)
@@ -470,6 +476,9 @@ namespace TarmacGauntlet.Raceday
             body.AddForce(-Velocity, ForceMode.VelocityChange);
             body.AddTorque(-body.angularVelocity, ForceMode.VelocityChange);
         }
+
+        /// <summary>Lets the AI drive on after a crash, from where the car stopped, instead of a reset.</summary>
+        public void ClearCrash() => Crashed = false;
 
         /// <summary>Puts the car back on the centre line at the nearest point of the track, at rest.</summary>
         public void ResetToTrack()
