@@ -144,6 +144,19 @@ namespace TarmacGauntlet.Raceday
             return Mathf.Lerp(LaneProfiles[a].Speed[k], LaneProfiles[a + 1].Speed[k], blend);
         }
 
+        /// <summary>
+        /// Where the car's path is at a line sample for an offset from the racing line: on the blend of
+        /// the lanes either side, which keep to the track, so it is what the car steers for.
+        /// </summary>
+        public Vector3 LanePoint(int k, float offset)
+        {
+            float lane = Mathf.Clamp(offset, LaneShifts[0], LaneShifts[LaneShifts.Length - 1]);
+            int a = 0;
+            while (a < LaneShifts.Length - 2 && lane > LaneShifts[a + 1]) a++;
+            float blend = (lane - LaneShifts[a]) / (LaneShifts[a + 1] - LaneShifts[a]);
+            return Vector3.Lerp(Lanes[a].Point[k], Lanes[a + 1].Point[k], blend);
+        }
+
         /// <summary>Share of the car's limit the driver uses: see <see cref="Endurance.GripFor"/>.</summary>
         public static float LimitFor(float pace) => Endurance.GripFor(pace);
 

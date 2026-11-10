@@ -23,6 +23,8 @@ namespace TarmacGauntlet.Raceday
         public float Yaw;
         /// <summary>A car getting back into the race (<see cref="Rejoin.Ghost"/>): other cars pass through it and race as if it weren't there.</summary>
         public bool Ghost;
+        /// <summary>The speeds the car's driver runs on its line, for predicting it, or null.</summary>
+        public SpeedProfile Profile;
     }
 
     /// <summary>

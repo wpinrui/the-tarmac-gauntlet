@@ -29,7 +29,9 @@ static partial class Check
         public float T;
         public float[] D, L, V, Off, Angle;
         public int[] K;
-        public bool[] Ghost;
+        public bool[] Ghost, Busy;
+        /// <summary>How far each car's body reaches across the track either side of its centre, m: more for a car turned sideways.</summary>
+        public float[] Across;
     }
 
     sealed class SetupRun
@@ -79,7 +81,7 @@ static partial class Check
         {
             race.Step();   // a car's place across the track is only known once it has stepped
             braking.Step(race);
-            var f = new Frame { T = race.Time, D = new float[run.N], L = new float[run.N], V = new float[run.N], Off = new float[run.N], Angle = new float[run.N], K = new int[run.N], Ghost = new bool[run.N] };
+            var f = new Frame { T = race.Time, D = new float[run.N], L = new float[run.N], V = new float[run.N], Off = new float[run.N], Angle = new float[run.N], K = new int[run.N], Ghost = new bool[run.N], Busy = new bool[run.N], Across = new float[run.N] };
             for (int i = 0; i < run.N; i++)
             {
                 Racer r = race.Racers[i];
@@ -93,6 +95,9 @@ static partial class Check
                 f.V[i] = along;
                 f.Angle[i] = (float)(Math.Atan2(Math.Abs(across), Math.Max(along, 0.1f)) * 180.0 / Math.PI);
                 f.Ghost[i] = r.Ghost;
+                f.Busy[i] = r.Rejoin.Busy;
+                float side = Math.Abs(r.Car.Forward.x * circuit.Left[k].x + r.Car.Forward.z * circuit.Left[k].z);
+                f.Across[i] = 0.5f * (CarL * side + CarW * (float)Math.Sqrt(Math.Max(1f - side * side, 0f)));
             }
             run.Frames.Add(f);
         }
@@ -103,103 +108,210 @@ static partial class Check
         return run;
     }
 
+    // ---------------------------------------------------------------- every set-up
+
+    /// <summary>Seconds of reaction a set-up's start allows the cars before they must brake.</summary>
+    const float StartReaction = 0.3f;
+
+    /// <summary>
+    /// Why the set-up's start can't be raced cleanly, or null: two cars placed overlapping, or a car
+    /// closing on a car in its lane faster than its brakes can shed in the gap. A correct driver must
+    /// always be able to avoid contact.
+    /// </summary>
+    static string BadStart(SetupRun run)
+    {
+        Frame f = run.Frames[0];
+        for (int i = 0; i < run.N; i++)
+            for (int j = 0; j < run.N; j++)
+            {
+                if (i == j) continue;
+                float g = run.Gap(f, i, j);
+                float apart = Math.Abs(f.L[j] - f.L[i]), reach = f.Across[i] + f.Across[j];
+                if (g >= 0f && g < CarL && apart < reach) return $"{run.Name(i)} and {run.Name(j)} placed overlapping";
+                float dv = f.V[i] - f.V[j];
+                if (g <= 0f || apart >= reach + RoomMargin || dv <= 0f) continue;
+                float need = dv * dv / (2f * BrakingOf(run, i)) + StartReaction * dv;
+                if (g - CarL - NoseMargin < need) return $"{run.Name(i)} can't brake for {run.Name(j)}: {g - CarL:0} m to shed {dv * 3.6f:0} km/h needs {need:0} m";
+            }
+        return null;
+    }
+
+    /// <summary>
+    /// The first car to leave the track while racing, or null. A car already getting back (spun or
+    /// rejoining) may be off it; a car that runs off is getting back only once it is off.
+    /// </summary>
+    static string LeftTrack(SetupRun run)
+    {
+        for (int i = 0; i < run.N; i++)
+        {
+            float racing = float.NegativeInfinity, off = 0f;
+            foreach (Frame f in run.Frames)
+            {
+                bool on = run.OnTrack(f, i);
+                if (on && !f.Busy[i]) racing = f.T;
+                else if (!on && f.T - racing < 0.5f) off += Race.Dt;
+            }
+            if (off > 0f) return $"{run.Name(i)} left the track";
+        }
+        return null;
+    }
+
+    /// <summary>Hard limit set-ups: a bad start, any contact or a car leaving the track fails, whatever the limit's own check says.</summary>
+    static (bool Pass, string Why) Verdict(SetupRun run)
+    {
+        string bad = BadStart(run);
+        if (bad != null) return (false, "bad start: " + bad);
+        var j = Judge(run);
+        int all = run.Race.Contacts.Count;
+        string off = LeftTrack(run);
+        if (all > 0 || off != null) return (false, $"{(all > 0 ? $"{all} contacts, " : "")}{(off != null ? off + ", " : "")}{j.Why}");
+        return j;
+    }
+
+    /// <summary>Behaviour set-ups: a bad start, any contact or a car leaving the track scores 0.</summary>
+    static (float Score, string Why) Mark(SetupRun run)
+    {
+        string bad = BadStart(run);
+        if (bad != null) return (0f, "bad start: " + bad);
+        var s = Score(run);
+        int all = run.Race.Contacts.Count;
+        string off = LeftTrack(run);
+        if (all > 0 || off != null) return (0f, $"{(all > 0 ? $"{all} contacts, " : "")}{(off != null ? off + ", " : "")}{s.Why}");
+        return s;
+    }
+
     // ---------------------------------------------------------------- hard limits
 
-    /// <summary>Whether the set-up kept its hard limit, and what decided it.</summary>
+    /// <summary>
+    /// Whether the set-up kept its hard limit, and what decided it. Each set-up must make its limit
+    /// bind: a limit never put to the test is a fail of the set-up, not a pass.
+    /// </summary>
     static (bool Pass, string Why) Judge(SetupRun run)
     {
         List<Frame> fs = run.Frames;
-        int hits = run.Contacts(0);
         switch (run.S.Id)
         {
             case "H1":
             {
-                float closest = float.MaxValue;
+                float closest = float.MaxValue, nearest = float.MaxValue;
                 foreach (Frame f in fs)
                     for (int j = 1; j < run.N; j++)
                     {
                         float g = run.Gap(f, 0, j);
+                        if (g > 0f) nearest = Math.Min(nearest, run.Behind(f, j, 0));
                         if (g > 0f && g < 30f && Math.Abs(f.L[j] - f.L[0]) < CarW) closest = Math.Min(closest, g - CarL);
                     }
-                return (hits == 0 && closest >= NoseMargin, $"{hits} contacts, closest nose to tail {closest:0.0} m");
+                if (nearest > 1f) return (false, $"never closed within 1 s of the cars ahead: did not bind");
+                return (closest >= NoseMargin, $"closest nose to tail {(closest == float.MaxValue ? "none in line" : $"{closest:0.0} m")}");
             }
             case "H2":
             {
                 // The inside car, on the right into the right-hander, keeps a car's width beside the first car.
                 float least = float.MaxValue;
+                int alongside = 0;
                 foreach (Frame f in fs)
                     if (Math.Abs(run.Gap(f, 0, 1)) < CarL && f.L[1] < f.L[0] && run.At(f, 0) < T7End)
+                    {
+                        alongside++;
                         least = Math.Min(least, f.L[0] - 0.5f * CarW + circuit.HalfWidth(f.K[0]));
-                return (hits == 0 && least >= CarW + RoomMargin, $"{hits} contacts, least room inside {least:0.0} m");
+                    }
+                if (alongside * Race.Dt < 0.5f) return (false, "the inside car was never alongside: did not bind");
+                return (least >= CarW + RoomMargin, $"least room inside {least:0.0} m over {alongside * Race.Dt:0.0} s alongside");
             }
             case "H3":
             {
                 // The outside car, its front level or ahead, keeps a car's width beside the first car.
                 float least = float.MaxValue;
+                int alongside = 0;
                 foreach (Frame f in fs)
                     if (run.Gap(f, 0, 1) >= 0f && run.Gap(f, 0, 1) < CarL && run.At(f, 0) < T7End)
+                    {
+                        alongside++;
                         least = Math.Min(least, circuit.HalfWidth(f.K[0]) - (f.L[0] + 0.5f * CarW));
-                return (hits == 0 && least >= CarW + RoomMargin, $"{hits} contacts, least room outside {least:0.0} m");
+                    }
+                if (alongside * Race.Dt < 0.5f) return (false, "the outside car was never almost ahead alongside: did not bind");
+                return (least >= CarW + RoomMargin, $"least room outside {least:0.0} m over {alongside * Race.Dt:0.0} s alongside");
             }
             case "H4":
             {
-                // Defending on the straight: moves away from the line, counted from the last turn back.
+                // Defending on the straight: one move away from the line, then only back towards it.
                 float brake = run.BrakeAt(0);
                 int moves = 0;
-                float low = 0f, high = 0f;
+                float low = 0f, high = 0f, closest = float.MaxValue;
                 bool out_ = false;
                 foreach (Frame f in fs)
                 {
                     if (run.At(f, 0) > brake) break;
                     float b = run.Behind(f, 0, 1);
                     if (b < 0f || b > 1f) continue;
+                    closest = Math.Min(closest, b);
                     float off = Math.Abs(f.Off[0]);
                     if (!out_ && off > low + 1f) { moves++; out_ = true; high = off; }
                     else if (out_ && off < high - 1f) { out_ = false; low = off; }
                     high = Math.Max(high, off);
                     low = Math.Min(low, off);
                 }
-                return (moves <= 1, $"{moves} moves off the line");
+                if (closest > 1f) return (false, "the attacker never closed within 1 s: did not bind");
+                if (moves == 0) return (false, "never made its defensive move: did not bind");
+                return (moves == 1, $"{moves} moves off the line");
             }
             case "H5":
             {
                 float brake = run.BrakeAt(0);
                 float? from = null;
                 float worst = 0f;
+                bool attacked = false;
                 foreach (Frame f in fs)
                 {
                     if (run.At(f, 0) < brake || run.At(f, 0) > T7End) continue;
                     float b = run.Behind(f, 0, 1);
                     if (b < -0.1f || b > 1f) continue;
+                    if (Math.Abs(f.L[1] - f.L[0]) > 1.5f) attacked = true;
                     from ??= f.Off[0];
                     worst = Math.Max(worst, Math.Sign(f.L[1] - f.L[0]) * (f.Off[0] - from.Value));
                 }
+                if (!attacked) return (false, "no attack off the line in the braking zone: did not bind");
                 return (worst < 1f, $"moved {worst:0.0} m towards the car behind");
             }
             case "H6":
             {
                 float worst = 0f;
+                bool close = false;
                 foreach (Frame f in fs)
                 {
                     float b = run.Behind(f, 0, 1);
-                    if (b > 0f && b < 2f) worst = Math.Max(worst, Math.Abs(f.Off[0]));
+                    if (b > 0f && b < 2f) { close = true; worst = Math.Max(worst, Math.Abs(f.Off[0])); }
                 }
+                if (!close) return (false, "the fast car never came within 2 s: did not bind");
                 return (worst < 1f, $"{worst:0.0} m off the line");
             }
             case "H7":
+            {
+                // No dive: it reaches its braking point close behind the car ahead, and makes the corner.
+                float brake = run.BrakeAt(0);
+                Frame f = fs.FirstOrDefault(x => run.At(x, 0) >= brake);
+                if (f == null) return (false, "never reached its braking point");
+                float b = run.Behind(f, 1, 0);
+                if (b < 0f || b > 1f) return (false, $"{(b < 0f ? "already past" : $"{b:0.0} s behind")} at its braking point: did not bind");
+                return (true, $"{b:0.0} s behind at its braking point, made the corner");
+            }
             case "H10":
             {
-                int off = fs.Count(f => !run.OnTrack(f, 0));
-                return (hits == 0 && off == 0, $"{hits} contacts, {off * Race.Dt:0.0} s off the track");
+                int alongside = fs.Count(f => Math.Abs(run.Gap(f, 0, 1)) < CarL && run.At(f, 0) >= T7Start && run.At(f, 0) <= T7End);
+                if (alongside * Race.Dt < 0.3f) return (false, "never alongside in the corner: did not bind");
+                return (true, $"{alongside * Race.Dt:0.0} s alongside in the corner, on the track");
             }
             case "H8":
             {
+                float brake = run.BrakeAt(0);
+                bool tried = fs.Any(x => run.At(x, 0) >= brake && run.At(x, 0) < T7Start && run.Gap(x, 0, 1) > CarL && run.Gap(x, 0, 1) < 15f && Math.Abs(x.L[1] - x.L[0]) > 1.5f);
+                if (!tried) return (false, "never alongside short of overlapping in the braking zone: did not bind");
                 Frame f = fs.FirstOrDefault(x => run.At(x, 0) >= T7Start);
                 if (f == null) return (false, "never reached the corner");
                 float g = run.Gap(f, 0, 1);
                 bool overlapped = g < CarL;
                 bool backedOut = Math.Abs(f.L[1] - f.L[0]) < 1.5f || g > 10f;
-                return (hits == 0 && (overlapped || backedOut), $"{hits} contacts, at turn-in {(overlapped ? "overlapped" : backedOut ? "backed out" : $"{g - CarL:0.0} m short of overlapping")}");
+                return (overlapped || backedOut, $"at turn-in {(overlapped ? "overlapped" : backedOut ? "backed out" : $"{g - CarL:0.0} m short of overlapping")}");
             }
             case "H9":
             {
@@ -209,17 +321,35 @@ static partial class Check
                     if (b < 0.5f) return (false, $"only {Math.Abs(f.Off[0]):0.0} m off the line with the lapping car {Math.Max(b, 0f):0.0} s behind");
                     if (Math.Abs(f.Off[0]) >= 1.5f) return (true, $"off the line with the lapping car {b:0.0} s behind");
                 }
-                return (false, "the lapping car never came within 0.5 s");
+                return (false, "the lapping car never came within 0.5 s: did not bind");
             }
             case "H12":
             {
+                // A car comes up on a stopped one: it is a ghost, and the car coming slows down and
+                // goes round it where there is room, as under a yellow flag.
                 bool ghost = fs.Any(f => f.Ghost[0]);
-                int all = run.Race.Contacts.Count;
-                return (all == 0 && ghost, $"{all} contacts, {(ghost ? "a ghost" : "never a ghost")}");
+                float slowest = float.MaxValue, apart = float.MaxValue, need = 0f;
+                bool met = false;
+                foreach (Frame f in fs)
+                {
+                    float g = run.Gap(f, 1, 0);
+                    if (g < -CarL || g > 100f || f.V[0] > 10f) continue;
+                    met = true;
+                    Racer r = run.Race.Racers[1];
+                    slowest = Math.Min(slowest, f.V[1] / Math.Max(r.Pilot.Profile.Speed[f.K[1]], 1f));
+                    if (Math.Abs(g) < CarL) { apart = Math.Min(apart, Math.Abs(f.L[1] - f.L[0])); need = Math.Max(need, f.Across[0] + f.Across[1] + RoomMargin); }
+                }
+                if (!met) return (false, "never came up on the stopped car: did not bind");
+                bool slowed = slowest <= SlowFor;
+                bool round = apart == float.MaxValue || apart >= need;
+                return (ghost && slowed && round, $"{(ghost ? "a ghost" : "never a ghost")}, slowed to {100f * slowest:0}% of its racing speed, {(apart == float.MaxValue ? "never level" : $"passed {apart - need + RoomMargin:0.0} m clear")}");
             }
         }
         return (false, "no judge");
     }
+
+    /// <summary>Share of its racing speed a car coming up on a stopped car slows to, at most: as under a yellow flag.</summary>
+    const float SlowFor = 0.75f;
 
     // ---------------------------------------------------------------- behaviour
 
@@ -287,23 +417,40 @@ static partial class Check
             }
             case "T4":
             {
+                // Back on the line before the braking zone, or a car's width left beside a car alongside.
+                // A car further up the road, too far ahead to pass before the corner, changes nothing:
+                // once back on the line the car stays on it.
                 float brake = run.BrakeAt(0);
                 Frame f = fs.FirstOrDefault(x => run.At(x, 0) >= brake);
                 if (f == null) return (0f, "never reached its braking point");
                 float off = Math.Abs(f.Off[0]);
                 bool alongside = Math.Abs(run.Gap(f, 0, 1)) < CarL;
                 float room = f.L[1] < f.L[0] ? f.L[0] - 0.5f * CarW + circuit.HalfWidth(f.K[0]) : circuit.HalfWidth(f.K[0]) - f.L[0] - 0.5f * CarW;
-                if (off < 1f || (alongside && room >= CarW + RoomMargin)) return (Clamp100(100f - 50f * hits), $"{off:0.0} m off the line at its braking point, {hits} contacts");
-                return (Clamp100(Scale(off, 1f, 4f) - 50f * hits), $"{off:0.0} m off the line at its braking point, {hits} contacts");
+                float back = off < 1f || (alongside && room >= CarW + RoomMargin) ? 100f : Scale(off, 1f, 4f);
+                Frame onLine = fs.FirstOrDefault(x => Math.Abs(x.Off[0]) < 1f && Math.Abs(run.Gap(x, 0, 1)) > CarL);
+                float strayed = onLine == null ? 0f : fs.Where(x => x.T >= onLine.T && x.T <= f.T).Select(x => Math.Abs(x.Off[0])).DefaultIfEmpty(0f).Max();
+                return (Math.Min(back, Scale(strayed, 1f, 3f)), $"{off:0.0} m off the line at its braking point, strayed {strayed:0.0} m once back on it");
             }
             case "T5":
             {
-                // Squeezed on the outside: cuts back or backs out before it is forced wide, to the edge
-                // of the track with the inside car beside it.
+                // Squeezed on the outside, not yet almost ahead: the inside car takes the room it may
+                // (H3), and the outside car cuts back or backs out before it is forced wide.
                 bool forced = fs.Any(f => Math.Abs(run.Gap(f, 0, 1)) < CarL && Math.Abs(f.L[1] - f.L[0]) < CarW + 1f
                     && circuit.HalfWidth(f.K[0]) - (Math.Abs(f.L[0]) + 0.5f * CarW) < 0.3f);
-                bool off = fs.Any(f => !run.OnTrack(f, 0));
-                return (hits > 0 || off || forced ? 0f : 100f, $"{(forced ? "forced to the edge alongside" : off ? "off the track" : "cut back or backed out in time")}, {hits} contacts");
+                float given = 0f;
+                int alongside = 0;
+                foreach (Frame f in fs)
+                {
+                    float g = run.Gap(f, 0, 1);
+                    if (g <= 0f || g >= CarL || run.At(f, 0) < run.BrakeAt(1) || run.At(f, 0) > T7End) continue;
+                    alongside++;
+                    float outside = Math.Sign(f.L[0] - f.L[1]);
+                    float left = circuit.HalfWidth(f.K[1]) - (outside * f.L[1] + 0.5f * CarW);
+                    given += Math.Max(left - (CarW + RoomMargin), 0f);
+                }
+                given = alongside > 0 ? given / alongside : 0f;
+                float score = forced ? 0f : Scale(given, 0.5f, 3f);
+                return (score, $"outside car {(forced ? "forced to the edge alongside" : "cut back or backed out in time")}, inside car left {given:0.0} m it didn't owe");
             }
             case "T6":
             case "T6b":
@@ -317,17 +464,28 @@ static partial class Check
                 var passed = Enumerable.Range(1, run.N - 1).Where(j => run.Gap(atBrake, 0, j) > -CarL * 0.5f && run.Gap(f, 0, j) < 0f).ToList();
                 bool wrong = passed.Any(j => run.Race.Racers[j].Entry != null && BrakingOf(run, j) >= BrakingOf(run, 0));
                 bool worseAlongside = Enumerable.Range(1, run.N - 1).Any(j => BrakingOf(run, j) < BrakingOf(run, 0) && run.Gap(atBrake, 0, j) > -CarL && run.Gap(atBrake, 0, j) < 2f * CarL);
-                float score = hits > 0 || threeWide || wrong ? 0f : worseAlongside ? (passed.Count > 0 ? 100f : 0f) : 100f;
-                return (score, $"{(threeWide ? "three wide into the corner, " : "")}outbraked {passed.Count}{(wrong ? " including a car that brakes as well or better" : "")}{(worseAlongside && passed.Count == 0 ? ", left a worse braker alongside unpassed" : "")}, {hits} contacts");
+                float score = threeWide || wrong ? 0f : worseAlongside ? (passed.Count > 0 ? 100f : 0f) : 100f;
+                string late = "";
+                if (worseAlongside)
+                {
+                    // Outbraking means braking late: against the latest point its own brakes allow.
+                    float early = EarlyBraking(run, 0);
+                    score = Math.Min(score, Scale(early, 5f, 30f));
+                    late = $", braked {early:0} m before its latest point";
+                }
+                return (score, $"{(threeWide ? "three wide into the corner, " : "")}outbraked {passed.Count}{(wrong ? " including a car that brakes as well or better" : "")}{(worseAlongside && passed.Count == 0 ? ", left a worse braker alongside unpassed" : "")}{late}");
             }
             case "T7":
             {
+                // Passes promptly: little time lost against running alone, no lift or brake on the
+                // straight, and a reasonable margin alongside.
                 float lost = run.Lost();
                 float least = float.MaxValue;
                 foreach (Frame f in fs)
                     if (Math.Abs(run.Gap(f, 0, 1)) < CarL) least = Math.Min(least, Math.Abs(f.L[1] - f.L[0]));
-                float score = Scale(lost, 0.3f, 2f) * (least >= CarW + 1f ? 1f : 0.5f);
-                return (hits > 0 ? 0f : score, $"lost {lost:0.00} s, closest alongside {(least == float.MaxValue ? 0f : least - CarW):0.0} m apart, {hits} contacts");
+                float hesitated = Hesitation(run, 0);
+                float score = Math.Min(Scale(lost, 0.2f, 1f), Scale(hesitated, 0f, 0.3f)) * (least >= CarW + 1f ? 1f : 0.5f);
+                return (score, $"lost {lost:0.00} s, lifted or braked {hesitated:0.0} s on the straight, closest alongside {(least == float.MaxValue ? 0f : least - CarW):0.0} m apart");
             }
             case "T8":
             {
@@ -412,6 +570,46 @@ static partial class Check
             }
         }
         return (0f, "no score");
+    }
+
+    /// <summary>
+    /// Metres before its latest braking point a car started braking for Turn 7: where its speed
+    /// would have met what its own lane and brakes allow there.
+    /// </summary>
+    static float EarlyBraking(SetupRun run, int i)
+    {
+        List<Frame> fs = run.Frames;
+        Racer r = run.Race.Racers[i];
+        for (int n = 10; n < fs.Count; n++)
+        {
+            Frame f = fs[n];
+            float at = run.At(f, i);
+            if (at < T7Start - 600f || at > T7Start) continue;
+            if ((fs[n - 10].V[i] - f.V[i]) / (10 * Race.Dt) < 6f) continue;
+            Frame from = fs[n - 10];
+            float v = from.V[i];
+            int k = from.K[i];
+            for (int m = 0; m < 400; m++, k = circuit.Wrap(k + 1))
+                if (r.Pilot.LaneSpeed(k, from.Off[i]) <= v) return m * circuit.Step;
+            return 0f;
+        }
+        return 0f;
+    }
+
+    /// <summary>Seconds a car lifted or braked on the straight before its braking point, below its racing speed.</summary>
+    static float Hesitation(SetupRun run, int i)
+    {
+        List<Frame> fs = run.Frames;
+        Racer r = run.Race.Racers[i];
+        float brake = run.BrakeAt(i), t = 0f;
+        for (int n = 20; n < fs.Count; n++)
+        {
+            Frame f = fs[n];
+            float at = run.At(f, i);
+            if (at < 2917f || at > brake - 10f) continue;
+            if (f.V[i] < fs[n - 20].V[i] - 0.2f && f.V[i] < r.Pilot.Profile.Speed[f.K[i]] - 1f) t += Race.Dt;
+        }
+        return t;
     }
 
     /// <summary>The braking a car has, m/s², as the others see it.</summary>
@@ -621,8 +819,8 @@ static partial class Check
         var behaviour = new List<(string Id, float Score, string Why)>();
         foreach (SetupRun run in runs)
         {
-            if (run.S.Id.StartsWith("H")) { var j = Judge(run); limits.Add((run.S.Id, j.Pass, j.Why)); }
-            else { var sc = Score(run); behaviour.Add((run.S.Id, sc.Score, sc.Why)); }
+            if (run.S.Id.StartsWith("H")) { var j = Verdict(run); limits.Add((run.S.Id, j.Pass, j.Why)); }
+            else { var sc = Mark(run); behaviour.Add((run.S.Id, sc.Score, sc.Why)); }
         }
 
         int[] seeds = full ? new[] { 11, 12, 13, 14, 15, 16, 17, 18 } : new[] { 11, 12 };
