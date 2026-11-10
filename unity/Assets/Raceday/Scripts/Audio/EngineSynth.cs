@@ -135,7 +135,7 @@ namespace TarmacGauntlet.Raceday
                 float exhaust = Pipe(0, in0) + 0.92f * Pipe(1, in1);
 
                 // Muffler: two low passes, opening up with the throttle and the revs.
-                float cutoff = s.Brightness * Lerp(5500f, 900f, s.Muffler) * (0.55f + 0.45f * load) * (0.8f + 0.5f * rev);
+                float cutoff = s.Brightness * Lerp(5500f, 900f, s.Muffler) * (0.75f + 0.25f * load) * (0.8f + 0.5f * rev);
                 float a = LowPassStep(cutoff);
                 low1 += (exhaust - low1) * a;
                 low2 += (low1 - low2) * a;
@@ -191,8 +191,8 @@ namespace TarmacGauntlet.Raceday
         private void Fire(int cylinder, float rev)
         {
             firings++;
-            // Off the throttle the engine keeps the same tone, as weak as at idle.
-            float fuel = Math.Max(load, 0.12f);
+            // Off the throttle the engine keeps the same tone, a little softer.
+            float fuel = Math.Max(load, 0.4f);
             float amp = 0.12f + 0.88f * fuel;
             amp *= cylinderGain[cylinder] * (1f + s.Roughness * Noise());
 
