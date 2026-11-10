@@ -10,7 +10,7 @@ namespace TarmacGauntlet.Raceday
     /// <see cref="Field"/>, and each car on physics gets the slipstream of the cars ahead of it.
     /// A gliding car is read from its pilot, which knows exactly where it is on its path.
     /// It also switches the pit lane limiter on and off, and serves the player in their box: stop
-    /// in it and the crew fills the tank and fits new tyres.
+    /// in it and the crew fills the tank and fits new tyres. A retired car that stops in its box stays there.
     /// </summary>
     [DefaultExecutionOrder(-20)]   // before the AI drivers think
     [RequireComponent(typeof(CarController))]
@@ -175,7 +175,14 @@ namespace TarmacGauntlet.Raceday
             {
                 Vector3 box = Pits.BoxPoint(Garage) - transform.position;
                 box.y = 0f;
-                if (box.sqrMagnitude < 2.5f * 2.5f && car.Speed < 0.5f) Service = new PitService(car.Supplies, car.Spec);
+                bool stopped = box.sqrMagnitude < 2.5f * 2.5f && car.Speed < 0.5f;
+                // Out of the race: once in the box, the car stays there.
+                if (car.Supplies.Retired)
+                {
+                    if (stopped) car.Hold = true;
+                    return;
+                }
+                if (stopped) Service = new PitService(car.Supplies, car.Spec);
                 else return;
             }
             Service.Step(Time.fixedDeltaTime);

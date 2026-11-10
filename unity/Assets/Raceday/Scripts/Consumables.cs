@@ -11,7 +11,8 @@ namespace TarmacGauntlet.Raceday
     /// How much one lap uses at Normal comes from the race maths (<see cref="Degradation"/>): the car's
     /// Fuel Efficiency and Tyre Durability and the driver's Smoothness. Within a lap, fuel follows the
     /// work the engine does and wear follows how hard the tyres are worked, so a driver who cruises
-    /// uses less than one at the limit.
+    /// uses less than one at the limit. In a career race it carries the car's <see cref="CarRaceLog"/>,
+    /// whose active issues cut power, grip, fuel efficiency and tyre life (<see cref="Effects"/>).
     /// </summary>
     public sealed class Consumables
     {
@@ -29,6 +30,19 @@ namespace TarmacGauntlet.Raceday
         /// <summary>0 for new tyres, 1 for worn out.</summary>
         public float Wear;
         public EngineMap Map = EngineMap.Normal;
+        /// <summary>The car's race in the career, or null outside one: its stops use its tyre sets, spares and lineup.</summary>
+        public CarRaceLog Log;
+        /// <summary>How the car's active issues scale its stats.</summary>
+        public IssueEffects Effects = IssueEffects.None;
+        /// <summary>
+        /// A career car's power and grip next to a new one of its model: its age and condition wear
+        /// them down, and its upgrades lift them. The physics car is the model's, so the tuned lines are shared.
+        /// </summary>
+        public float PowerTrim = 1f, GripTrim = 1f;
+        /// <summary>True once the car is out of the race: it limps to its box and parks there.</summary>
+        public bool Retired => Log != null && Log.Retired;
+        /// <summary>False once the team has no tyre sets left, so a stop can't change them.</summary>
+        public bool TyresLeft => Log == null || Log.TyreSets > 0;
 
         private readonly float litresPerJoule;
         private readonly float wearPerMetre;
@@ -71,9 +85,12 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Weight of the fuel on board, kg.</summary>
         public float FuelMass => Fuel * FuelDensity;
 
-        public float PowerScale => Map == EngineMap.Push ? 1.05f : Map == EngineMap.Conserve ? 0.92f : 1f;
-        private float FuelScale => Map == EngineMap.Push ? 1.15f : Map == EngineMap.Conserve ? 0.85f : 1f;
-        private float WearScale => Map == EngineMap.Push ? 1.3f : Map == EngineMap.Conserve ? 0.7f : 1f;
+        public float PowerScale => (Map == EngineMap.Push ? 1.05f : Map == EngineMap.Conserve ? 0.92f : 1f) * (float)Effects.Power * PowerTrim;
+        private float FuelScale => (Map == EngineMap.Push ? 1.15f : Map == EngineMap.Conserve ? 0.85f : 1f) / Mathf.Max((float)Effects.FuelEfficiency, 0.1f);
+        private float WearScale => (Map == EngineMap.Push ? 1.3f : Map == EngineMap.Conserve ? 0.7f : 1f) / Mathf.Max((float)Effects.TyreDurability, 0.1f);
+
+        /// <summary>The race maths' mode for the engine map.</summary>
+        public InstructionMode Mode => Map == EngineMap.Push ? InstructionMode.Push : Map == EngineMap.Conserve ? InstructionMode.Conserve : InstructionMode.Normal;
 
         /// <summary>Share of new tyres' grip: falls slowly, then quickly once the tyres are past three quarters worn.</summary>
         public float GripScale
@@ -81,7 +98,7 @@ namespace TarmacGauntlet.Raceday
             get
             {
                 float past = Mathf.Max(Wear - 0.75f, 0f);
-                return 1f - 0.08f * Wear - 2.4f * past * past;
+                return (1f - 0.08f * Wear - 2.4f * past * past) * (float)Effects.Handling * GripTrim;
             }
         }
 

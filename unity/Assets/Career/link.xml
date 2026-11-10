@@ -1,0 +1,5 @@
+<!-- Saves are read and written by reflection, so keep every game state type in player builds. -->
+<linker>
+  <assembly fullname="TarmacGauntlet.Simulation" preserve="all"/>
+  <assembly fullname="TarmacGauntlet.Career" preserve="all"/>
+</linker>

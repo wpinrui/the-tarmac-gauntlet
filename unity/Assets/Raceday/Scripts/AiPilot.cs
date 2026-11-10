@@ -54,6 +54,8 @@ namespace TarmacGauntlet.Raceday
         public float SpeedCap = float.PositiveInfinity;
         /// <summary>Share of the target speed to drive at.</summary>
         public float SpeedScale = 1f;
+        /// <summary>0 while racing. Out of the race, the share of its speed a car limps to the pits at, off the racing line.</summary>
+        public float Limp;
         /// <summary>
         /// The side collision filter (TORCS filterSColl), set by racecraft for this step: whether it
         /// acts, the share d/c of the pilot's own steering kept, the steering that runs parallel to the
