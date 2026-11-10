@@ -64,6 +64,8 @@ namespace TarmacGauntlet.Raceday
         private readonly Dictionary<string, string> fitted = new Dictionary<string, string>();
         private Standings.Car[] entries;
         private float clock;
+        /// <summary>Race seconds since the start, on the race clock.</summary>
+        public float RaceTime => clock * TimeCompression;
         private Font bold, semiBold;
         private GUIStyle clockStyle, posStyle, teamStyle, badgeStyle, gapStyle, headerStyle;
         private int styledFor = -1;
