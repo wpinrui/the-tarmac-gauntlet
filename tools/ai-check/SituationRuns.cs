@@ -80,6 +80,13 @@ static partial class Check
             Racer me = race.Racers[0];
             string order = string.Join(" ", race.Racers.OrderByDescending(r => r.Distance).Select(r => r.Entry.Model));
             Console.WriteLine($"{s.Name,-48} contacts {contacts,2}  order {order}  first car at {Math.Max(me.Car.TrackIndex, 0) * circuit.Step:0} m");
+            if (only != null)
+            {
+                // The suite's verdict on this set-up.
+                SetupRun run = RunSetup(s);
+                if (s.Id.StartsWith("H")) { var j = Judge(run); Console.WriteLine($"{(j.Pass ? "pass" : "FAIL")}  {j.Why}"); }
+                else { var sc = Score(run); Console.WriteLine($"score {sc.Score:0}  {sc.Why}"); }
+            }
         }
     }
 }
