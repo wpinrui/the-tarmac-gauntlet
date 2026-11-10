@@ -211,16 +211,26 @@ static partial class Check
             case "H2":
             {
                 // The inside car, on the right into the right-hander, keeps a car's width beside the first car.
-                float least = float.MaxValue;
+                // It owes that width and no more: it keeps racing on the widest line that leaves it, as
+                // fast as that line allows (Ivan: it must not wave the inside car through).
+                float least = float.MaxValue, given = 0f, lifted = 0f;
                 int alongside = 0;
+                AiPilot p0 = run.Race.Racers[0].Pilot;
                 foreach (Frame f in fs)
                     if (Math.Abs(run.Gap(f, 0, 1)) < CarL && f.L[1] < f.L[0] && run.At(f, 0) < T7End)
                     {
                         alongside++;
-                        least = Math.Min(least, f.L[0] - 0.5f * CarW + circuit.HalfWidth(f.K[0]));
+                        float room = f.L[0] - 0.5f * CarW + circuit.HalfWidth(f.K[0]);
+                        least = Math.Min(least, room);
+                        float lineRoom = p0.Line.Lateral[f.K[0]] - 0.5f * CarW + circuit.HalfWidth(f.K[0]);
+                        given += Math.Max(room - Math.Max(CarW + RoomMargin, lineRoom), 0f);
+                        if (f.V[0] < LiftShare * p0.LaneSpeed(f.K[0], f.L[0] - p0.Line.Lateral[f.K[0]])) lifted += Race.Dt;
+                        if (Environment.GetEnvironmentVariable("H2_DEBUG") == "1") Console.WriteLine($"H2 {f.T:0.00} v {f.V[0] * 3.6f:0} lane {p0.LaneSpeed(f.K[0], f.L[0] - p0.Line.Lateral[f.K[0]]) * 3.6f:0} lat {f.L[0]:0.0} line {p0.Line.Lateral[f.K[0]]:0.0} off {f.Off[0]:0.0} in {f.L[1]:0.0} room {room:0.0}");
                     }
                 if (alongside * Race.Dt < 0.5f) return (false, "the inside car was never alongside: did not bind");
-                return (least >= CarW + RoomMargin, $"least room inside {least:0.0} m over {alongside * Race.Dt:0.0} s alongside");
+                given /= alongside;
+                bool pass = least >= CarW + RoomMargin && given <= GiveSlack && lifted <= LiftSlack;
+                return (pass, $"least room inside {least:0.0} m, {given:0.0} m more than owed, lifted {lifted:0.0} s, over {alongside * Race.Dt:0.0} s alongside");
             }
             case "H3":
             {
@@ -665,6 +675,10 @@ static partial class Check
     // ---------------------------------------------------------------- races
 
     /// <summary>Each race measure, the way its score runs and the values that score 100 and 0. Lower is better unless Higher.</summary>
+    /// <summary>H2: room beyond a car's width the outside car may leave on average, m, and seconds it may lift below its lane's speed.</summary>
+    const float GiveSlack = 1f, LiftSlack = 0.5f;
+    /// <summary>Share of its lane's speed below which a car counts as lifting: the pilot's own braking runs a few per cent under it.</summary>
+    const float LiftShare = 0.93f;
     static readonly (string Name, float Good, float Bad)[] RaceTargets =
     {
         ("field lap over solo %", 3f, 15f),

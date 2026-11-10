@@ -470,9 +470,11 @@ namespace TarmacGauntlet.Raceday
             {
                 float d = minSide - Width(side);
                 float diffAngle = Mathf.DeltaAngle(me.Yaw * Mathf.Rad2Deg, side.Yaw * Mathf.Rad2Deg) * Mathf.Deg2Rad;
-                if (d < Endurance.SideCollisionMargin * margin && diffAngle * (side.Lateral - me.Lateral) < 0f)
+                // Under path choosing it is only the last resort, within 2 m: the chosen path keeps the room.
+                float reach = Experiments.Is(PathChooser.Experiment) ? PathChooser.SideFilterGap : Endurance.SideCollisionMargin * margin;
+                if (d < reach && diffAngle * (side.Lateral - me.Lateral) < 0f)
                 {
-                    float cc = Endurance.SideCollisionMargin * margin / 2f;
+                    float cc = reach / 2f;
                     d -= cc;
                     if (d < 0f) d = 0f;
                     int ks = c.IndexOf(Mathf.Repeat(side.Distance, lap));
