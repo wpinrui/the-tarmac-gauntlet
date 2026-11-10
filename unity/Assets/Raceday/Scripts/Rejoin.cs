@@ -12,23 +12,23 @@ namespace TarmacGauntlet.Raceday
     /// Off the track: the car steers back to its racing line with its heading kept within
     /// <see cref="MaxEntryAngle"/> of the track direction, at the speed the runoff's grip allows.
     /// Spun: a car that has lost control and faces more than <see cref="SpunAngle"/> from the track
-    /// direction brakes to a stop and holds there until the nearest car coming from behind is at least
-    /// <see cref="GapSeconds"/> or <see cref="GapMetres"/> away, whichever is further. Then it turns
-    /// round at walking pace, forwards or in reverse, whichever has the room, and rejoins as above.
+    /// direction brakes to a stop, then turns round at walking pace, forwards or in reverse, whichever
+    /// has the room, and rejoins as above. On the track it is a ghost meanwhile
+    /// (<see cref="Racecraft.Ghosted"/>), so the cars coming pass through it and it never waits for them.
     ///
     /// Call <see cref="Prepare"/> after racecraft and before <see cref="AiPilot.Drive"/>, and
     /// <see cref="Apply"/> on the controls the pilot returns.
     /// </summary>
     public sealed class Rejoin
     {
-        public enum Stage { Racing, Rejoining, Stopping, Waiting, Turning }
+        public enum Stage { Racing, Rejoining, Stopping, Turning }
 
         // Thresholds, all here to tune.
         /// <summary>Most the car's heading may differ from the track direction while it rejoins, degrees.</summary>
         public const float MaxEntryAngle = 15f;
         /// <summary>A car that has lost control and faces further than this from the track direction has spun, degrees.</summary>
         public const float SpunAngle = 90f;
-        /// <summary>A spun car waits until the nearest car approaching from behind is this many seconds away at its speed...</summary>
+        /// <summary>A car is only put back on the track once the nearest car approaching from behind is this many seconds away at its speed...</summary>
         public const float GapSeconds = 5f;
         /// <summary>...and at least this many metres away.</summary>
         public const float GapMetres = 200f;
@@ -56,6 +56,20 @@ namespace TarmacGauntlet.Raceday
         public const float AlignedAngle = 8f;
         /// <summary>Speed while turning round, m/s.</summary>
         public const float ManoeuvreSpeed = 3f;
+        /// <summary>
+        /// How fast the throttle builds, per second, while a car that wants to move at walking pace
+        /// isn't getting going: deep gravel or a slope can hold it at the gentle throttle it starts with.
+        /// </summary>
+        public const float PushRate = 0.5f;
+        /// <summary>At full push and still standing for this long, the way it is going is blocked, such as by a wall, seconds.</summary>
+        public const float BlockedTime = 1.5f;
+        /// <summary>
+        /// Blocked this many times running, both ways, the car can't get itself out, as a small car
+        /// can't from deep gravel: it is <see cref="Stranded"/> and waits to be put back on the track.
+        /// </summary>
+        public const int StrandedBlocks = 2;
+        /// <summary>Gaining speed faster than this, m/s², the car is getting going and needs no more push.</summary>
+        public const float PickUp = 0.3f;
         /// <summary>How far past the tarmac edge a car turning round on the track may go, metres.</summary>
         public const float ManoeuvreRoom = 1.5f;
         /// <summary>How far further out a car turning round off the track may go, metres.</summary>
@@ -77,7 +91,7 @@ namespace TarmacGauntlet.Raceday
         /// in it is still half on the kerb, in sight of the cars coming, and rejoins at its shallow angle.
         /// </summary>
         public const float YieldFrom = KerbWidth + 1f;
-        /// <summary>After trying this long (waiting for the gap aside) without getting back to racing, the car is put back on the track as a last resort, seconds.</summary>
+        /// <summary>After trying this long without getting back to racing, the car is put back on the track as a last resort, seconds.</summary>
         public const float GiveUpAfter = 60f;
 
         private const float HalfLength = 2.3f;
@@ -101,15 +115,20 @@ namespace TarmacGauntlet.Raceday
         public Stage State { get; private set; }
         /// <summary>True while the rejoin drives the car, not the racing pilot.</summary>
         public bool Busy => State != Stage.Racing;
-        /// <summary>True while it is getting the car back: busy, but not waiting for the gap, which can rightly take a while.</summary>
-        public bool Trying => Busy && State != Stage.Waiting;
+        /// <summary>True while it is getting the car back.</summary>
+        public bool Trying => Busy;
+        /// <summary>
+        /// True when the car has tried both ways and can't move, so only being put back on the track
+        /// gets it out. The driver does that once the gap is clear.
+        /// </summary>
+        public bool Stranded => Busy && blocks >= StrandedBlocks;
         /// <summary>Why the car last left racing: "off" (left the tarmac) or "spun".</summary>
         public string Cause { get; private set; } = "";
         /// <summary>The car's heading from the track direction last step, degrees, positive with the nose to the left.</summary>
         public float Heading { get; private set; }
         /// <summary>How far the car's centre was past the tarmac edge last step, metres (negative on the tarmac).</summary>
         public float PastEdge { get; private set; }
-        /// <summary>True when no car approaching from behind is inside the gap a spun car waits for.</summary>
+        /// <summary>True when no car approaching from behind is inside the gap a car needs before it is put back on the track.</summary>
         public bool GapClear { get; private set; } = true;
         /// <summary>True while it waits off the tarmac for room to rejoin.</summary>
         public bool Yielding { get; private set; }
@@ -123,12 +142,19 @@ namespace TarmacGauntlet.Raceday
         private int trackIndex = -1;
         private float lateralNow;   // the car's offset from the track's middle, last step, metres, positive left
         private float turnOuter;   // furthest out from the track middle a car turning round off the track may go
+        private bool turnOff;      // the turn started off the tarmac, so keeps to the runoff's bounds
+        private float push;        // extra throttle built up while the car can't get going, 0 to 1
+        private float blockedFor;  // seconds at full push without moving
+        private int blocks;        // times blocked running, since it last got going
+        private float stepDt, lastSpeed, prevSpeed;   // speeds this step and the one before, m/s
 
         /// <summary>Back to racing, as after the car is put back on the track.</summary>
         public void Reset()
         {
             State = Stage.Racing;
             reverse = switching = legChosen = false;
+            push = blockedFor = 0f;
+            blocks = 0;
             SinceLostControl = float.PositiveInfinity;
             trackIndex = -1;
         }
@@ -183,6 +209,7 @@ namespace TarmacGauntlet.Raceday
             float yawRate, TrafficCar me, IReadOnlyList<TrafficCar> field, float dt)
         {
             if (pilot.Index < 0) return c;
+            stepDt = dt;
             RacingLine line = pilot.Line;
             Circuit circuit = line.Circuit;
             // The track sample beside the car. Far out on the runoff the line's nearest sample can be
@@ -192,6 +219,9 @@ namespace TarmacGauntlet.Raceday
             Vector3 f = new Vector3(forward.x, 0f, forward.z).normalized;
             Vector3 v = new Vector3(velocity.x, 0f, velocity.z);
             float speed = v.magnitude;
+            prevSpeed = lastSpeed;
+            lastSpeed = speed;
+            if (speed > 1f) blocks = 0;
             float heading = Mathf.Atan2(Vector3.Dot(f, left), Vector3.Dot(f, t));
             Heading = heading * Mathf.Rad2Deg;
             Vector3 fromCentre = position - circuit.Centre[k];
@@ -206,7 +236,7 @@ namespace TarmacGauntlet.Raceday
             SinceLostControl = losing ? 0f : SinceLostControl + dt;
             bool spun = SinceLostControl < LostControlMemory && Mathf.Abs(Heading) > SpunAngle;
             GapClear = Clear(me, field, circuit.Lap);
-            bool yielding = Yielding = State == Stage.Rejoining && PastEdge > YieldFrom && PastEdge < NearEdge && !RoomToJoin(me, field, circuit.Lap, speed);
+            bool yielding = Yielding = State == Stage.Rejoining && PastEdge > YieldFrom && PastEdge < NearEdge && !RoomToJoin(me, field, circuit.Lap, speed, half);
 
             switch (State)
             {
@@ -226,13 +256,12 @@ namespace TarmacGauntlet.Raceday
                     return c;
 
                 case Stage.Stopping:
-                    if (speed < StoppedSpeed) State = Stage.Waiting;
-                    return Brakes();
-
-                case Stage.Waiting:
-                    if (!GapClear) return Brakes();
-                    if (Mathf.Abs(Heading) > AlignedAngle) StartTurning(heading, lateral);
-                    else State = Stage.Rejoining;
+                    // Stopped: straight on to turning round, or to rejoining if it already faces the way.
+                    if (speed < StoppedSpeed)
+                    {
+                        if (Mathf.Abs(Heading) > AlignedAngle) StartTurning(heading, lateral);
+                        else State = Stage.Rejoining;
+                    }
                     return Brakes();
 
                 case Stage.Turning:
@@ -278,7 +307,7 @@ namespace TarmacGauntlet.Raceday
             // Traffic coming: stay off the tarmac, running alongside it off the throttle, until there is room.
             if (yielding) c.Throttle = 0f;
             // Off the tarmac with a car alongside, it runs parallel until the car is by.
-            if (yielding || (PastEdge > 0f && Alongside(me, field, circuit.Lap))) want = 0f;
+            if (yielding || (PastEdge > 0f && Alongside(me, field, circuit.Lap, half))) want = 0f;
 
             Aim = want * Mathf.Rad2Deg;
             // Rejoined: on the tarmac, on the line and running along it.
@@ -310,13 +339,9 @@ namespace TarmacGauntlet.Raceday
             if (speed < 2f * ManoeuvreSpeed && Mathf.Abs(heading) > 2f * max)
             {
                 if (speed > StoppedSpeed) return Brakes();
-                if (PastEdge > 0f) StartTurning(heading, lateral);
-                else
-                {
-                    // On the tarmac it waits for the gap as a spun car does.
-                    State = Stage.Waiting;
-                    Cause = "spun";
-                }
+                // On the tarmac it turns round as a spun car does, a ghost while it does.
+                if (PastEdge <= 0f) Cause = "spun";
+                StartTurning(heading, lateral);
                 return Brakes();
             }
 
@@ -364,13 +389,51 @@ namespace TarmacGauntlet.Raceday
                 float turning = Mathf.Clamp01(Mathf.Abs(c.Steer) / Mathf.Max(lockNow, 0.01f));
                 c.Throttle *= Mathf.Sqrt(Mathf.Max(1f - turning * turning, 0f));
             }
+            c.Throttle = Crawl(c.Throttle, speed);
             c.Reverse = false;
+            // Can't get going forwards: back out, as turning round does.
+            if (Blocked(c.Throttle, speed))
+            {
+                StartTurning(heading, lateral);
+                legChosen = true;
+                reverse = true;
+                return Brakes();
+            }
             return c;
+        }
+
+        /// <summary>
+        /// The throttle at walking pace: what is asked, or more while the car isn't getting going, up
+        /// to full. Above walking pace it is what is asked.
+        /// </summary>
+        private float Crawl(float throttle, float speed)
+        {
+            if (throttle <= 0f || speed > ManoeuvreSpeed)
+            {
+                push = 0f;
+                return throttle;
+            }
+            // Builds only while the car isn't picking up speed, and eases off once it is.
+            bool gaining = speed - prevSpeed > PickUp * stepDt;
+            push = Mathf.Clamp01(push + (gaining ? -PushRate : PushRate) * stepDt);
+            return Mathf.Max(throttle, push);
+        }
+
+        /// <summary>True once the car has stood at full throttle for <see cref="BlockedTime"/>.</summary>
+        private bool Blocked(float throttle, float speed)
+        {
+            blockedFor = throttle >= 0.99f && speed < StoppedSpeed ? blockedFor + stepDt : 0f;
+            if (blockedFor < BlockedTime) return false;
+            blockedFor = 0f;
+            push = 0f;
+            blocks++;
+            return true;
         }
 
         private void StartTurning(float heading, float lateral)
         {
             turnOuter = Mathf.Abs(lateral) + RunoffRoom;
+            turnOff = PastEdge > 0f;
             State = Stage.Turning;
             turningLeft = heading < 0f;   // nose right of the track direction: turn left, the short way
             legChosen = switching = false;
@@ -385,8 +448,10 @@ namespace TarmacGauntlet.Raceday
             CarSpec spec = pilot.Spec;
             // Where the car may go across the track: a little past the edges on the track, and off it
             // only on its own side, out from the tarmac.
+            // The bounds are those of where the turn started: switching as the car crosses the edge
+            // would put it outside both and leave it rocking on the spot.
             float lo, hi;
-            if (PastEdge > 0f)
+            if (turnOff)
             {
                 if (lateral > 0f) { lo = half + 0.5f; hi = turnOuter; }
                 else { lo = -turnOuter; hi = -half - 0.5f; }
@@ -409,7 +474,8 @@ namespace TarmacGauntlet.Raceday
                 reverse = ahead < need && behind > ahead;
                 legChosen = true;
             }
-            else if (!switching && Room(reverse) < 0.3f && speed > 0.2f) switching = true;
+            // Out of room this way: the other way, unless that has even less.
+            else if (!switching && Room(reverse) < 0.3f && Room(!reverse) > Room(reverse) && speed > 0.2f) switching = true;
 
             if (switching)
             {
@@ -429,6 +495,9 @@ namespace TarmacGauntlet.Raceday
             if ((reverse && along > 0.3f) || (!reverse && along < -0.3f)) c.Brake = 1f;
             else if (speed < ManoeuvreSpeed) c.Throttle = Mathf.Clamp01(0.2f + 0.15f * (ManoeuvreSpeed - speed));
             else c.Brake = Mathf.Clamp01(0.3f * (speed - ManoeuvreSpeed));
+            c.Throttle = Crawl(c.Throttle, speed);
+            // Full throttle and going nowhere: something is in the way, so it goes the other way.
+            if (Blocked(c.Throttle, speed)) switching = true;
             return c;
         }
 
@@ -463,12 +532,12 @@ namespace TarmacGauntlet.Raceday
         /// cars coming: each could brake to its speed in the room there is, with
         /// <see cref="YieldSeconds"/> to spare, and none is alongside.
         /// </summary>
-        public static bool RoomToJoin(TrafficCar me, IReadOnlyList<TrafficCar> field, float lap, float speed)
+        public static bool RoomToJoin(TrafficCar me, IReadOnlyList<TrafficCar> field, float lap, float speed, float half)
         {
             for (int i = 0; i < field.Count; i++)
             {
                 TrafficCar o = field[i];
-                if (o.Id == me.Id) continue;
+                if (o.Id == me.Id || OffTrack(o, half)) continue;
                 float behind = Mathf.Repeat(me.Distance - o.Distance + AlongsideMetres, lap) - AlongsideMetres;
                 if (behind > lap * 0.5f) continue;
                 if (behind < AlongsideMetres) return false;
@@ -480,13 +549,19 @@ namespace TarmacGauntlet.Raceday
             return true;
         }
 
+        /// <summary>
+        /// True for a car off the track itself, such as another one rejoining: it is not in the way on
+        /// the tarmac, and two cars that each waited for the other would wait for ever.
+        /// </summary>
+        private static bool OffTrack(in TrafficCar o, float half) => Mathf.Abs(o.Lateral) > half + OffTrackMargin;
+
         /// <summary>True when another car is within <see cref="AlongsideMetres"/> ahead or behind.</summary>
-        public static bool Alongside(TrafficCar me, IReadOnlyList<TrafficCar> field, float lap)
+        public static bool Alongside(TrafficCar me, IReadOnlyList<TrafficCar> field, float lap, float half)
         {
             for (int i = 0; i < field.Count; i++)
             {
                 TrafficCar o = field[i];
-                if (o.Id == me.Id) continue;
+                if (o.Id == me.Id || OffTrack(o, half)) continue;
                 if (Mathf.Abs(Mathf.Repeat(me.Distance - o.Distance + 0.5f * lap, lap) - 0.5f * lap) < AlongsideMetres) return true;
             }
             return false;

@@ -157,10 +157,17 @@ static partial class Check
             PitStopsCheck("crowded pits", i => true, verbose: true);
             return failed ? 1 : 0;
         }
+        if (args.Length > 1 && args[1] == "spun")
+        {
+            int from = args.Length > 2 ? int.Parse(args[2]) : 11, to = args.Length > 3 ? int.Parse(args[3]) : 26;
+            SpunCarsRecover(Enumerable.Range(from, to - from + 1), verbose: true);
+            return failed ? 1 : 0;
+        }
         if (args.Length > 1 && args[1] == "rejoin")
         {
             RejoinOffTrack(verbose: true);
-            SpunCarWaits(verbose: true);
+            SpunCarTurnsRound(verbose: true);
+            OutOfGravel(verbose: true);
             return failed ? 1 : 0;
         }
         if (args.Length > 1 && args[1] == "supplies")
@@ -191,7 +198,9 @@ static partial class Check
         RacePack(4, verbose: false);
         RacePack(4, verbose: false, reversed: true);
         RejoinOffTrack(verbose: false);
-        SpunCarWaits(verbose: false);
+        SpunCarTurnsRound(verbose: false);
+        OutOfGravel(verbose: false);
+        SpunCarsRecover(Enumerable.Range(11, 8), verbose: false);
         RaceRunning(verbose: false);
         GlidePace();
         GlideMistakes();
@@ -201,10 +210,10 @@ static partial class Check
     }
 
     /// <summary>The field, quickest first, on the grid in that order or, reversed, quickest at the back.</summary>
-    static List<Entry> Pack(bool reversed)
+    static List<Entry> Pack(bool reversed, int seed = -1)
     {
         string[] models = { "a-29", "a-27", "a-26", "b-24", "b-22", "b-21", "c-19", "c-18", "c-16", "d-15", "d-13", "e-09", "e-07", "f-06", "f-03", "f-01" };
-        var rng = new Random(int.TryParse(Environment.GetEnvironmentVariable("AI_PACK_SEED"), out int packSeed) ? packSeed : 11);
+        var rng = new Random(seed >= 0 ? seed : int.TryParse(Environment.GetEnvironmentVariable("AI_PACK_SEED"), out int packSeed) ? packSeed : 11);
         var entries = new List<Entry>();
         for (int i = 0; i < models.Length; i++)
         {

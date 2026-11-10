@@ -7,7 +7,8 @@ namespace TarmacGauntlet.Raceday
     /// Puts an <see cref="AiRacer"/> in a physics car. Each physics step it hands the racer the car's
     /// position and motion and passes the pedals and steering back. After leaving the track, spinning
     /// or a hard crash, <see cref="Rejoin"/> brings the car back into the race. Only if that hasn't
-    /// worked after <see cref="Rejoin.GiveUpAfter"/>, or the car is stuck, is it put back on track as a
+    /// worked after <see cref="Rejoin.GiveUpAfter"/>, or the car is stuck or <see cref="Rejoin.Stranded"/>
+    /// (it can't move either way, as a small car can't in deep gravel), is it put back on track as a
     /// player would with R, once the gap behind is clear. Lap times go to the console.
     /// Changing the stats in the inspector during Play takes effect straight away.
     /// It starts on the minimum-curvature line and switches to the line tuned for this car's lap time
@@ -175,13 +176,13 @@ namespace TarmacGauntlet.Raceday
             car.SetControls(c.Throttle, c.Brake, c.Steer, c.Reverse);
             car.Hold = Racer.Hold;
 
-            // Last resort: stuck wanting to go but not moving, or not back racing after a long while.
+            // Last resort: stuck wanting to go but not moving, stranded, or not back racing after a long while.
             // The car is put back on the track only once no car is coming up behind.
             bool rejoining = Racer.Rejoin.Busy;
             bool stalled = !rejoining && car.Speed < 2f && c.Throttle > 0.3f;
             if (stalled || Racer.Rejoin.Trying) stuckTimer += dt;
             else if (!rejoining) stuckTimer = 0f;
-            if (stuckTimer > (rejoining ? Rejoin.GiveUpAfter : StuckTime) && Racer.Rejoin.GapClear) Recover();
+            if ((stuckTimer > (rejoining ? Rejoin.GiveUpAfter : StuckTime) || Racer.Rejoin.Stranded) && Racer.Rejoin.GapClear) Recover();
 
             CountLaps();
         }

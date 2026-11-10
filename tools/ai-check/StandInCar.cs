@@ -258,9 +258,12 @@ sealed class StandInCar
         return Pits != null && TrackIndex >= 0 && Pits.OnLane(p, TrackIndex);
     }
 
+    /// <summary>Past this far from the tarmac edge the runoff is a gravel trap, metres (none by default).</summary>
+    public float GravelFrom = float.TryParse(Environment.GetEnvironmentVariable("AI_GRAVEL"), out float g) ? g : float.PositiveInfinity;
+
     SurfaceKind SurfaceAt(float lateral)
     {
         float edge = Math.Abs(lateral) - circuit.HalfWidth(TrackIndex);
-        return edge < 0f ? SurfaceKind.Tarmac : edge < 1.5f ? SurfaceKind.Kerb : SurfaceKind.Grass;
+        return edge < 0f ? SurfaceKind.Tarmac : edge < 1.5f ? SurfaceKind.Kerb : edge > GravelFrom ? SurfaceKind.Gravel : SurfaceKind.Grass;
     }
 }

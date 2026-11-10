@@ -21,7 +21,7 @@ namespace TarmacGauntlet.Raceday
         public float Across;
         /// <summary>Heading of the car's body, radians anticlockwise seen from above.</summary>
         public float Yaw;
-        /// <summary>A spun car stopped on the track waiting for a gap: other cars pass through it and race as if it weren't there.</summary>
+        /// <summary>A spun car stopping or turning round on the track: other cars pass through it and race as if it weren't there.</summary>
         public bool Ghost;
     }
 
@@ -440,14 +440,14 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>
-        /// Whether a car is a ghost this step: only a spun car stopping or waiting for a gap, on the
-        /// tarmac or kerb. Once it starts to turn round or rejoin it stays a ghost only until no other
-        /// car overlaps it, so it never turns solid inside one.
+        /// Whether a car is a ghost this step: only a spun car stopping or turning round on the tarmac
+        /// or kerb. Once it starts to rejoin it stays a ghost only until no other car overlaps it, so
+        /// it never turns solid inside one.
         /// </summary>
         public static bool Ghosted(bool was, Rejoin rejoin, TrafficCar me, IReadOnlyList<TrafficCar> field, float lap)
         {
-            bool waiting = rejoin.State == Rejoin.Stage.Stopping || rejoin.State == Rejoin.Stage.Waiting;
-            if (waiting && rejoin.PastEdge <= Rejoin.OffTrackMargin) return true;
+            bool spun = rejoin.Cause == "spun" && (rejoin.State == Rejoin.Stage.Stopping || rejoin.State == Rejoin.Stage.Turning);
+            if (spun && rejoin.PastEdge <= Rejoin.OffTrackMargin) return true;
             if (!was) return false;
             for (int i = 0; i < field.Count; i++)
             {

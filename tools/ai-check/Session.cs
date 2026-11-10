@@ -470,7 +470,7 @@ sealed class Session
         bool stalled = !rejoining && car.Speed < 2f && c.Throttle > 0.3f;
         if (stalled || s.Racer.Rejoin.Trying) s.StuckTime += Dt;
         else if (!rejoining) s.StuckTime = 0f;
-        if (s.StuckTime > (rejoining ? Rejoin.GiveUpAfter : 4f) && s.Racer.Rejoin.GapClear)
+        if ((s.StuckTime > (rejoining ? Rejoin.GiveUpAfter : 4f) || s.Racer.Rejoin.Stranded) && s.Racer.Rejoin.GapClear)
         {
             s.Recoveries++;
             car.PlaceAt(k, 0f);
