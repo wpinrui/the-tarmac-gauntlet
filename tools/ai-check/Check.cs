@@ -152,6 +152,11 @@ static partial class Check
             RollingStartCheck(args.Length > 2 ? int.Parse(args[2]) : 100, verbose: true);
             return failed ? 1 : 0;
         }
+        if (args.Length > 1 && args[1] == "bvsa")
+        {
+            ClassRace();
+            return 0;
+        }
         if (args.Length > 1 && args[1] == "pits")
         {
             PitStopsCheck("pit stops", i => i % 2 == 1, verbose: true);

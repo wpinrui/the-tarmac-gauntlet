@@ -134,6 +134,11 @@ namespace TarmacGauntlet.Raceday
         /// <summary>A defender with a slower car this close ahead in time is overtaking, and may move freely, s.</summary>
         private const float ExemptTime = 1f;
 
+        // Slipstream and pull out, not in the tutorial: a car catching a slower one stays on its line in
+        // the tow and pulls out at the last moment it can still get by without braking.
+        /// <summary>Time to spare on top of the move across when deciding to pull out, s.</summary>
+        private const float PullOutBuffer = 0.5f;
+
         /// <summary>The car's size, from its box collider: the tutorial's _dimension_x and _dimension_y.</summary>
         public const float CarLength = 4.6f, CarWidth = 1.9f;
 
@@ -156,6 +161,22 @@ namespace TarmacGauntlet.Raceday
         public bool Exempt { get; private set; }
         /// <summary>True while a car behind closes so fast that this car makes no move off its line.</summary>
         public bool HoldingLine { get; private set; }
+        /// <summary>True while pulling out of the tow to pass the car ahead.</summary>
+        public bool PullingOut { get; private set; }
+        /// <summary>The car being caught, within <see cref="FrontCollDist"/>, metres ahead, or infinity.</summary>
+        public float FrontGap { get; private set; }
+        /// <summary>True on a step the braking filter fired while the passing side had room.</summary>
+        public bool BrakedWithRoom { get; private set; }
+        /// <summary>True while the car may make its one defending move: on a straight, not braking for the corner.</summary>
+        public bool MayDefend { get; private set; }
+        private int pullingFrom = -1;
+        /// <summary>The car the braking filter last braked for, how far short of it the margin is, and how far beside the car's path, m.</summary>
+        public int BrakeFor { get; private set; } = -1;
+        public float BrakeGap { get; private set; }
+        public float BrakeSide { get; private set; }
+        /// <summary>The car being caught.</summary>
+        public int FrontId { get; private set; } = -1;
+        private readonly List<(float Distance, float Lateral)> near = new List<(float, float)>();
         /// <summary>Where the car is told to run across the track this step, from the middle, positive left.</summary>
         public float Place { get; private set; }
 
@@ -182,7 +203,11 @@ namespace TarmacGauntlet.Raceday
             Defending = false;
             Exempt = false;
             HoldingLine = false;
-            if (pilot.Index < 0) { movePhase = 0; return; }
+            PullingOut = false;
+            BrakedWithRoom = false;
+            MayDefend = false;
+            FrontGap = float.PositiveInfinity;
+            if (pilot.Index < 0) { movePhase = 0; pullingFrom = -1; return; }
             RacingLine line = pilot.Line;
             Circuit c = line.Circuit;
             float lap = c.Lap;
@@ -209,6 +234,10 @@ namespace TarmacGauntlet.Raceday
             bool behind = false, closeAhead = false, roomLeft = false, roomRight = false;
             float axles = 2f * pilot.Spec.HalfWheelbase;
             TrafficCar front = default, side = default;
+            float frontDistance = 0f;
+            TrafficCar inPath = default;
+            float inPathDistance = float.MaxValue, inPathCatch = 0f;
+            near.Clear();
             int from = 0, count = field.Count;
             TrafficField sorted = field as TrafficField;
             if (sorted != null && count > 0) from = sorted.From(here - BackCollDist);
@@ -227,6 +256,7 @@ namespace TarmacGauntlet.Raceday
                     continue;
                 }
 
+                if (distance > -2f * CarLength && distance < 60f) near.Add((distance, o.Lateral));
                 // Not in the tutorial: who makes this a defence, and who is alongside.
                 if (distance < -sideCollDist && -distance < mySpeed * DefendTime && o.Speed > mySpeed - SpeedPassMargin) behind = true;
                 float closing = o.Speed - mySpeed;
@@ -257,8 +287,11 @@ namespace TarmacGauntlet.Raceday
                     {
                         minCatch = catchDist;
                         front = o;
+                        frontDistance = distance;
                         hasFront = true;
                     }
+                    // Not in the tutorial: the nearest car in the way, which is the one to pull out from.
+                    if (carDist < CarWidth && distance < inPathDistance) { inPath = o; inPathDistance = distance; inPathCatch = catchDist; }
                     if (carDist < Endurance.WidthMargin * margin)
                     {
                         // OPP_COLL: filterBColl.
@@ -270,7 +303,7 @@ namespace TarmacGauntlet.Raceday
                         brakeDist = Mathf.Max(brakeDist, brakesOnly);
                         // Not in the tutorial: only while closing. Inside the margin and already no faster
                         // than the car ahead, the tutorial still brakes, to a stop, until the gap opens.
-                        if (brakeDist > distance && currentSpeedSqr > allowedSpeedSqr) Braking = true;
+                        if (brakeDist > distance && currentSpeedSqr > allowedSpeedSqr) { Braking = true; BrakeFor = o.Id; BrakeGap = distance; BrakeSide = carDist; }
                     }
                 }
                 else if (distance > -sideCollDist && distance < sideCollDist)
@@ -300,19 +333,58 @@ namespace TarmacGauntlet.Raceday
                 float decel = Mathf.Min(spec.BrakeDecel * G, tyres);
                 step *= Mathf.Sqrt(Mathf.Max(tyres * tyres - decel * decel, 0f)) / Mathf.Max(tyres, 0.1f);
             }
+            bool pull = false;
             if (hasFront)
             {
                 State = Mode.Overtaking;
+                FrontGap = frontDistance;
+                FrontId = front.Id;
                 int ko = c.IndexOf(Mathf.Repeat(front.Distance, lap));
                 float w = c.Data.width[ko] / Endurance.OvertakeWidthDiv - BorderOvertakeMargin;
                 // Not in the tutorial: the side is picked from where the car ahead will be across the
                 // track when I catch it, at the speed it moves across.
-                float catchIn = Mathf.Min(minCatch / Mathf.Max(wantSpeed, 1f), CatchPredictFor);
-                float otm = front.Lateral + front.Across * catchIn;
-                if (otm > 0f && myOffset > -w) myOffset -= step;
-                else if (otm < 0f && myOffset < w) myOffset += step;
+                // Not in the tutorial: the car to pass is the nearest one in the way, if any, else the one
+                // caught soonest.
+                bool path = inPathDistance < float.MaxValue;
+                TrafficCar t = path ? inPath : front;
+                float tDistance = path ? inPathDistance : frontDistance;
+                float catchIn = Mathf.Min((path ? inPathCatch : minCatch) / Mathf.Max(wantSpeed, 1f), CatchPredictFor);
+                float otm = t.Lateral + t.Across * catchIn;
+                ko = c.IndexOf(Mathf.Repeat(t.Distance, lap));
+                w = c.Data.width[ko] / Endurance.OvertakeWidthDiv - BorderOvertakeMargin;
+                // Not in the tutorial: stay in the tow on the line, and pull out at the last moment.
+                // The room left is the gap, less the margin, less what it takes to brake to the car
+                // ahead's speed. Pull out once that room is what the closing speed covers in the time
+                // the move across takes, plus a buffer. The closing speed is from the speed the car
+                // would do unheld, so a car held up in a queue pulls out too.
+                float clearBy = CarWidth + Endurance.WidthMargin * margin;
+                float need = clearBy - Mathf.Abs(myOffset - otm);
+                float dir = otm > 0f ? -1f : 1f;
+                float passAt = otm + dir * clearBy;
+                bool roomToPass = Mathf.Abs(passAt) <= w && LaneFree(passAt, myOffset, tDistance, clearBy);
+                if (need > 0f && roomToPass)
+                {
+                    float frontSpeedSqr = t.Speed * t.Speed;
+                    float brakeTo = Mathf.Max(mass * (currentSpeedSqr - frontSpeedSqr) / (2f * (cm + frontSpeedSqr * (ca * mu + cw))),
+                        mass * (currentSpeedSqr - frontSpeedSqr) / (2f * (spec.BrakeDecel * G * mass + frontSpeedSqr * cw)));
+                    float room = tDistance - CarLength - Endurance.LengthMargin * margin - Mathf.Max(brakeTo, 0f);
+                    float closing = Mathf.Max(wantSpeed - t.Speed, 0.1f);
+                    float across = need / Endurance.OvertakeOffsetRate;
+                    pull = pullingFrom == t.Id || room <= closing * (across + PullOutBuffer);
+                }
+                else pull = pullingFrom == t.Id && roomToPass;
+                // Braking for a slower car with room to pull out, not braking for the corner.
+                if (Braking && roomToPass && need > 0f && !BrakingZone(pilot)) BrakedWithRoom = true;
+                if (pull)
+                {
+                    pullingFrom = t.Id;
+                    PullingOut = true;
+                    if (otm > 0f && myOffset > -w) myOffset -= step;
+                    else if (otm < 0f && myOffset < w) myOffset += step;
+                }
             }
-            else
+            if (!pull) pullingFrom = -1;
+            if (!pull)
             {
                 if (myOffset > lineHere + step) myOffset -= step;
                 else if (myOffset < lineHere - step) myOffset += step;
@@ -323,12 +395,16 @@ namespace TarmacGauntlet.Raceday
             // Not in the tutorial: racing etiquette. A defending car makes one move off its line, in one
             // direction, then may only come back towards the line. Overtaking a car close ahead, it may
             // move freely.
+            // Only on a straight before the braking zone: in the braking zone and through corners a
+            // defender makes no defensive move and holds its line.
             Defending = behind;
             Exempt = behind && closeAhead;
-            if (!Defending) movePhase = 0;
+            MayDefend = TurnAt(c, here) == 0 && !BrakingZone(pilot);
+            if (!Defending || !MayDefend) movePhase = 0;
             else if (!Exempt) newOffset = OneMove(pilot.Offset, newOffset, true);
-            // Caught far too fast to defend: no move off the line at all, only back towards it.
-            HoldingLine = fastBehind;
+            // Caught far too fast to defend, or defending off the straight: no move off the line at all,
+            // only back towards it.
+            HoldingLine = fastBehind || Defending && !Exempt && !MayDefend;
             if (HoldingLine)
             {
                 float was = pilot.Offset;
@@ -417,6 +493,34 @@ namespace TarmacGauntlet.Raceday
             if (!hold) return now;
             if (crosses) { movePhase = 2; return 0f; }
             return was;
+        }
+
+        /// <summary>
+        /// True when no car other than the one being caught is in the lane to pass it: from the car's
+        /// tail to past the car ahead, across from where the car is to where it would pass.
+        /// </summary>
+        private bool LaneFree(float passAt, float from, float frontDistance, float clearBy)
+        {
+            float lo = Mathf.Min(passAt, from) - clearBy, hi = Mathf.Max(passAt, from) + clearBy;
+            foreach ((float d, float lat) in near)
+            {
+                if (Mathf.Abs(d - frontDistance) < 0.01f) continue;
+                if (d > -CarLength && d < frontDistance + CarLength && lat > lo && lat < hi && Mathf.Abs(lat - from) > 0.5f * CarWidth)
+                    return false;
+            }
+            return true;
+        }
+
+        /// <summary>How far ahead the speed profile is read for the braking zone, metres.</summary>
+        private const float BrakingLook = 20f;
+
+        /// <summary>True in the braking zone: the car's speed profile falls over the next <see cref="BrakingLook"/>.</summary>
+        private static bool BrakingZone(AiPilot pilot)
+        {
+            SpeedProfile p = pilot.Profile;
+            Circuit c = pilot.Line.Circuit;
+            int k = pilot.Index;
+            return p.Speed[c.Wrap(k + Mathf.RoundToInt(BrakingLook / c.Step))] < p.Speed[k] - 1f;
         }
 
         /// <summary>The bend at a lap distance: +1 a right-hander, -1 a left-hander, 0 on a straight.</summary>
