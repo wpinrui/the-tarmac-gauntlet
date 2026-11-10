@@ -73,6 +73,13 @@ need after a hard hit on a barrier. `C` cycles the chase, bonnet and bumper view
 The car's physics come from its game stats (`Raceday/Scripts/CarSpec.cs`): Power sets the engine,
 Handling sets tyre grip and downforce. Grass and gravel have less grip and slow the car.
 
+Engine sound is synthesised live, with no recordings (`Raceday/Scripts/Audio/`). Each class has a
+package in `EngineSounds.Tier` and each car is that package with a few values changed in `EngineSounds.Cars`.
+`EngineSynth` fires an exhaust pulse per cylinder down a pipe, then adds the intake, valvetrain, gear whine,
+turbo and hybrid motor. `EngineAudio` on each car feeds it the revs, throttle and road speed, and only the 10
+cars nearest the listener within 350 m play. To hear a change outside Unity, `bash tools/engine-audio/run.sh`
+(or `run.sh d-14 b` for one car or class) writes a WAV per car to `out/engine-audio/`.
+
 Free camera: move the mouse to look, `W` `A` `S` `D` move along the ground, `Q` and `E` go down and up,
 `Shift` is 5x faster and the scroll wheel changes speed. Click to capture the mouse, `Esc` frees it.
 

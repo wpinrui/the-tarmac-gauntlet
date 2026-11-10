@@ -6,6 +6,7 @@ namespace TarmacGauntlet.Raceday
     public static class CarBuilder
     {
         private const int IgnoreRaycastLayer = 2;   // so the car's own suspension rays skip it
+        private static int spawned;
 
         /// <summary>
         /// A car of the given model. With no model path, or none found, it is a plain box in the given
@@ -36,6 +37,7 @@ namespace TarmacGauntlet.Raceday
             car.Keys = keys;
             car.Circuit = circuit;
             car.Setup(spec, wheels);
+            root.AddComponent<EngineAudio>().Setup(modelId, ++spawned);
             return car;
         }
 
