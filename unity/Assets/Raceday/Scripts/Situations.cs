@@ -27,6 +27,8 @@ namespace TarmacGauntlet.Raceday
         public float Turned;
         /// <summary>The car the player takes in the debug menu when they drive.</summary>
         public bool Player;
+        /// <summary>Stopped and turned across the track: it starts as a car that has just spun, a ghost getting back.</summary>
+        public bool Spun => Speed == 0f && Math.Abs(Turned) >= Rejoin.SpunAngle;
 
         /// <summary>
         /// Where the car starts: its track sample, metres left of the centre and speed in m/s.
@@ -85,9 +87,9 @@ namespace TarmacGauntlet.Raceday
                 Cars = new[]
                 {
                     new SituationCar { Model = "a-29" },
-                    new SituationCar { Model = "f-01", Ahead = 60f, Seed = 2 },
-                    new SituationCar { Model = "f-02", Ahead = 60f, Off = -4.5f, Seed = 3 },
-                    new SituationCar { Model = "f-03", Ahead = 60f, Off = -9f, Seed = 4 },
+                    new SituationCar { Model = "f-01", Ahead = 130f, Seed = 2 },
+                    new SituationCar { Model = "f-02", Ahead = 130f, Off = -4.5f, Seed = 3 },
+                    new SituationCar { Model = "f-03", Ahead = 130f, Off = -9f, Seed = 4 },
                 },
             },
             new Situation
@@ -168,7 +170,7 @@ namespace TarmacGauntlet.Raceday
                 Cars = new[]
                 {
                     new SituationCar { Model = "a-29", Speed = 250f },
-                    new SituationCar { Model = "b-25", Ahead = 1f, Off = -4f, Speed = 250f, Seed = 2 },
+                    new SituationCar { Model = "a-28", Ahead = 1f, Off = -4f, Speed = 250f, Seed = 2 },
                 },
             },
             new Situation
@@ -186,7 +188,7 @@ namespace TarmacGauntlet.Raceday
                 Cars = new[]
                 {
                     new SituationCar { Model = "f-01", Speed = 0f, Turned = 90f },
-                    new SituationCar { Model = "a-29", Ahead = -250f, Seed = 2 },
+                    new SituationCar { Model = "a-29", Ahead = -400f, Seed = 2 },
                 },
             },
 
@@ -202,11 +204,11 @@ namespace TarmacGauntlet.Raceday
             },
             new Situation
             {
-                Id = "T2", Title = "pull out instead of braking", At = T7 - 400f, Seconds = 10f,
+                Id = "T2", Title = "pull out instead of braking", At = T7 - 650f, Seconds = 12f,
                 Cars = new[]
                 {
                     new SituationCar { Model = "a-29" },
-                    new SituationCar { Model = "e-11", Ahead = 80f, Seed = 2 },
+                    new SituationCar { Model = "e-11", Ahead = 150f, Seed = 2 },
                 },
             },
             new Situation
@@ -215,16 +217,17 @@ namespace TarmacGauntlet.Raceday
                 Cars = new[]
                 {
                     new SituationCar { Model = "a-29" },
-                    new SituationCar { Model = "f-01", Ahead = 20f, Seed = 2 },
+                    new SituationCar { Model = "f-01", Ahead = 40f, Seed = 2 },
                 },
             },
             new Situation
             {
-                Id = "T4", Title = "back on the line before braking", At = T7 - 450f, Seconds = 8f,
+                Id = "T4", Title = "back on the line, a car far up the road", At = T7 - 450f, Seconds = 8f,
                 Cars = new[]
                 {
                     new SituationCar { Model = "a-29", Off = -4.5f },
                     new SituationCar { Model = "e-11", Ahead = -12f, Seed = 2 },
+                    new SituationCar { Model = "d-15", Ahead = 110f, Seed = 3 },
                 },
             },
             new Situation
@@ -256,12 +259,12 @@ namespace TarmacGauntlet.Raceday
             },
             new Situation
             {
-                Id = "T6c", Title = "two slow cars abreast into the corner", At = T7 - 250f, Seconds = 8f,
+                Id = "T6c", Title = "two slow cars abreast into the corner", At = T7 - 300f, Seconds = 8f,
                 Cars = new[]
                 {
                     new SituationCar { Model = "a-29" },
-                    new SituationCar { Model = "f-01", Ahead = 40f, Seed = 2 },
-                    new SituationCar { Model = "f-02", Ahead = 40f, Off = -4.5f, Seed = 3 },
+                    new SituationCar { Model = "f-01", Ahead = 120f, Seed = 2 },
+                    new SituationCar { Model = "f-02", Ahead = 120f, Off = -4.5f, Seed = 3 },
                 },
             },
             new Situation
@@ -288,11 +291,11 @@ namespace TarmacGauntlet.Raceday
                 Cars = new[]
                 {
                     new SituationCar { Model = "a-29" },
-                    new SituationCar { Model = "f-01", Ahead = 40f, Seed = 2 },
-                    new SituationCar { Model = "f-02", Ahead = 52f, Seed = 3 },
-                    new SituationCar { Model = "f-03", Ahead = 64f, Seed = 4 },
-                    new SituationCar { Model = "f-04", Ahead = 76f, Seed = 5 },
-                    new SituationCar { Model = "f-05", Ahead = 88f, Seed = 6 },
+                    new SituationCar { Model = "f-01", Ahead = 50f, Seed = 2 },
+                    new SituationCar { Model = "f-02", Ahead = 62f, Seed = 3 },
+                    new SituationCar { Model = "f-03", Ahead = 74f, Seed = 4 },
+                    new SituationCar { Model = "f-04", Ahead = 86f, Seed = 5 },
+                    new SituationCar { Model = "f-05", Ahead = 98f, Seed = 6 },
                 },
             },
             new Situation
@@ -307,11 +310,11 @@ namespace TarmacGauntlet.Raceday
             },
             new Situation
             {
-                Id = "T12", Title = "catching the player's car", At = T7 - 400f, Seconds = 10f,
+                Id = "T12", Title = "catching the player's car", At = T7 - 650f, Seconds = 12f,
                 Cars = new[]
                 {
                     new SituationCar { Model = "b-25" },
-                    new SituationCar { Model = "d-15", Ahead = 60f, Seed = 2, Player = true },
+                    new SituationCar { Model = "d-15", Ahead = 120f, Seed = 2, Player = true },
                 },
             },
             new Situation

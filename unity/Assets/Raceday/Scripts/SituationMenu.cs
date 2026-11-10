@@ -134,6 +134,11 @@ namespace TarmacGauntlet.Raceday
                 d.Consistency = c.Consistency;
                 d.Safety = c.Safety;
                 d.Given = p;
+                if (c.Spun)
+                {
+                    d.Prepare();
+                    d.Racer.Rejoin.Spin();
+                }
                 if (driven)
                 {
                     // Raced by the others as any AI car is, driven by the player.
@@ -294,7 +299,7 @@ namespace TarmacGauntlet.Raceday
                     int k = Circuit.Wrap(p.Index + 4 * i);
                     float t = 4f * i * Circuit.Step / speed;
                     float offset = Mathf.MoveTowards(p.Offset, d.Racer.Craft.Target, Endurance.OvertakeOffsetRate * t);
-                    Vector3 at = p.Line.Point[k] + Circuit.Left[k] * offset + Vector3.up * 0.3f;
+                    Vector3 at = p.LanePoint(k, offset) + Vector3.up * 0.3f;
                     GL.Vertex(last);
                     GL.Vertex(at);
                     last = at;

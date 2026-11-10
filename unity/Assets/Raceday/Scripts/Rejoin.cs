@@ -343,6 +343,14 @@ namespace TarmacGauntlet.Raceday
             }
         }
 
+        /// <summary>Starts the car as one that has just spun: stopping, then turning round, a ghost meanwhile.</summary>
+        public void Spin()
+        {
+            Enter(Stage.Stopping, "spun");
+            Ghost = true;
+            sinceBack = 0f;
+        }
+
         private void Enter(Stage stage, string cause)
         {
             State = stage;

@@ -32,6 +32,7 @@ static partial class Check
             if (c.Speed == 0f) r.Car.Launch(0f);
             if (c.Turned != 0f) r.Car.Heading += c.Turned * (float)Math.PI / 180f;
             r.Laps = -c.LapsDown;   // not the grid's guess from where on the lap the car starts
+            if (c.Spun) r.Rejoin.Spin();
             if (c.Wear > 0f)
             {
                 r.Car.Supplies = Consumables.For(r.Car.Spec, r.Pilot.Profile, 60f);
