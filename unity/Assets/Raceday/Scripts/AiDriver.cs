@@ -9,7 +9,7 @@ namespace TarmacGauntlet.Raceday
     /// car is stuck, it puts the car back on track as a player would with R. Lap times go to the console.
     /// Changing the stats in the inspector during Play takes effect straight away.
     /// It starts on the minimum-curvature line and switches to the line tuned for this car's lap time
-    /// once that is worked out in the background, a couple of seconds in.
+    /// once <see cref="LineTuner"/> has worked it out in the background.
     /// With a <see cref="RaceCar"/> on the car, <see cref="Racecraft"/> races the cars around it first.
     /// With <see cref="Pits"/> set, the car pits on its own when its fuel or tyres run low.
     ///
@@ -72,7 +72,9 @@ namespace TarmacGauntlet.Raceday
             CarSpec spec = car.Spec;
             float pace = Pace, consistency = Consistency, safety = Safety;
             int seed = Seed;
-            tuning = Task.Run(() => new AiPilot(new RacingLine(circuit, spec), spec, pace, consistency, safety, seed));
+            // The line is queued first, so it is ready by the time the pilot is built on the same thread.
+            Task<RacingLine> line = LineTuner.Line(circuit, spec);
+            tuning = LineTuner.Run(() => new AiPilot(line.Result, spec, pace, consistency, safety, seed));
         }
 
         private void OnEnable()

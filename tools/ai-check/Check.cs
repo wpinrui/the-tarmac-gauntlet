@@ -108,6 +108,23 @@ static partial class Check
             if (only == null || only == "start") RollingStartCheck(100, verbose: false, glide: true);
             return failed ? 1 : 0;
         }
+        if (args.Length > 1 && args[1] == "tuner")
+        {
+            // The scene's start-up work: every car's tuned line and pilot, through the one tuner thread.
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            var pilots = new List<System.Threading.Tasks.Task<AiPilot>>();
+            int seed = 0;
+            foreach (string id in SceneField())
+            {
+                CarSpec spec = CarSpec.For(id);
+                var tuned = LineTuner.Line(circuit, spec);
+                int s = ++seed;
+                pilots.Add(LineTuner.Run(() => new AiPilot(tuned.Result, spec, 85f, 80f, 90f, s)));
+            }
+            System.Threading.Tasks.Task.WaitAll(pilots.ToArray());
+            Console.WriteLine($"tuner: {pilots.Count} pilots, {SceneField().Distinct().Count()} lines, all ready after {watch.Elapsed.TotalSeconds:0.0} s on one thread");
+            return 0;
+        }
         if (args.Length > 1 && args[1] == "running")
         {
             RaceRunning(verbose: true);
