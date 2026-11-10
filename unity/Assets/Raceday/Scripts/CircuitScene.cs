@@ -8,7 +8,7 @@ namespace TarmacGauntlet.Raceday
     /// scene starts. It is a test of the AI. The field runs quickest to slowest, except the player's
     /// car, which starts last and has to carve through. Start picks how the race starts: from the
     /// grid at once, behind the pace car, or from the pit lane, where the cars queue in the fast lane
-    /// and leave ten seconds apart (<see cref="PitLaneStart"/>). The pit lane start fast forwards
+    /// and leave three seconds apart, moving up to the pit exit line (<see cref="PitLaneStart"/>). The pit lane start fast forwards
     /// until the car ahead of the player's is about to leave. I hands the player's car to you and
     /// back. V moves the cameras to the next car, and P to the next car making a pit stop. F steps
     /// the race through normal speed, 4x and 16x while the AI drives your car, and ends the pit lane

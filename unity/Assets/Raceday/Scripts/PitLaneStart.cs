@@ -4,8 +4,9 @@ namespace TarmacGauntlet.Raceday
 {
     /// <summary>
     /// The pit lane start, with no Unity objects so it can be tested outside Unity. The field waits in
-    /// single file in the pit lane's fast lane, the first car's nose at the end of the limiter zone, and
-    /// leaves one car every <see cref="Interval"/> seconds, front first. Each car drives the fast lane at
+    /// single file in the pit lane's fast lane, the first car's nose at the pit exit line (the end of the
+    /// limiter zone), and leaves one car every <see cref="Interval"/> seconds, front first. When a car
+    /// leaves, the queue behind it moves up, so the next car waits at the line. Each car drives the fast lane at
     /// the limiter, down the exit road and onto the track, and races from where its route meets its
     /// racing line. Pit stops stay closed until every car has left the pit lane, so nobody pits into
     /// the queue.
@@ -13,13 +14,15 @@ namespace TarmacGauntlet.Raceday
     public sealed class PitLaneStart
     {
         /// <summary>Seconds between one car leaving and the next.</summary>
-        public const float Interval = 10f;
+        public const float Interval = 3f;
         /// <summary>Seconds before the first car leaves.</summary>
         public const float FirstGo = 5f;
         /// <summary>From one car's middle to the next one's in the queue, m.</summary>
         public const float Spacing = 8f;
-        /// <summary>The first car's middle stands this far short of the end of the limiter zone, m.</summary>
+        /// <summary>The first car's middle stands this far short of the pit exit line, m.</summary>
         private const float FrontBack = 3f;
+        /// <summary>Braking to stop at the line, m/s².</summary>
+        private const float StopBraking = 3.5f;
         /// <summary>Fast forward stops this long before the car ahead of the last one leaves, seconds.</summary>
         public const float Lead = 3f;
 
@@ -79,6 +82,34 @@ namespace TarmacGauntlet.Raceday
             }
             forward = Route.Tangent[k];
             return Route.Point[k];
+        }
+
+        /// <summary>
+        /// Distance along the route from a car at track sample k and a position to the pit exit line, m:
+        /// negative past it.
+        /// </summary>
+        public float ToLine(int k, Vector3 position)
+        {
+            Circuit c = pits.Circuit;
+            int ahead = c.Wrap(front - k);
+            if (ahead > c.Count / 2) ahead -= c.Count;
+            float d = 0f;
+            for (int j = 0; j < ahead; j++) d += Route.Segment[c.Wrap(k + j)];
+            for (int j = 0; j > ahead; j--) d -= Route.Segment[c.Wrap(k + j - 1)];
+            Vector3 t = Route.Tangent[k];
+            return d - ((position.x - Route.Point[k].x) * t.x + (position.z - Route.Point[k].z) * t.z);
+        }
+
+        /// <summary>
+        /// Fastest a car in the queue may go, m/s, given what it needs to keep clear of the car ahead
+        /// on the route (<c>follow</c>): until its turn it also stops with its nose at the line.
+        /// </summary>
+        public float Cap(int place, int k, Vector3 position, float follow)
+        {
+            if (Gone(place)) return follow;
+            if (k < 0) return 0f;
+            float room = ToLine(k, position) - FrontBack;
+            return Mathf.Min(follow, room > 0f ? Mathf.Sqrt(2f * StopBraking * room) : 0f);
         }
 
         /// <summary>
