@@ -273,43 +273,51 @@ def _mirror_root():
     return body.y_at(CV, m["x_back"] + m["length"] / 2, m["z"]) - 0.025     # sunk into the door
 
 
-MIRROR_H = 0.13      # housing height
-MIRROR_R = 0.03      # corner rounding
+MIRROR_H = 0.10      # housing height
+MIRROR_W = 0.19      # housing width, out from the arm
+MIRROR_D = 0.06      # housing depth front to back
+MIRROR_R = 0.025     # corner rounding
 
 
-def _mirror_face():
-    """The housing seen from behind, in (y, z): a plain rounded box."""
+def _rounded_bar(name, y0, y1, z0, z1, x0, x1, r, sgn, mat="body"):
+    face = box(y0, z0, y1, z1).buffer(-r, join_style=1).buffer(r, join_style=1)
+    ring = body._even(np.array(face.exterior.coords)[:-1], 96)
+    rings = [np.column_stack([np.full(96, x), ring[:, 0] * sgn, ring[:, 1]]) for x in (x0, x1)]
+    v, f = geom.close_rings(rings)
+    return blend.make(name, v, f, mat)
+
+
+def _housing():
+    """(y0, y1, z0, z1) of the housing seen from behind."""
     m = R["mirror"]
-    return box(_mirror_root(), m["z"] - MIRROR_H / 2, m["y_out"], m["z"] + MIRROR_H / 2).buffer(
-        -MIRROR_R, join_style=1).buffer(MIRROR_R, join_style=1)
+    return m["y_out"] - MIRROR_W, m["y_out"], m["z"] - MIRROR_H / 2, m["z"] + MIRROR_H / 2
 
 
 def mirrors():
-    """Plain rounded boxes: the face shape carried from the back to the front of the mirror."""
+    """A slim rounded housing on a short arm from the door."""
     m = R["mirror"]
-    ring = body._even(np.array(_mirror_face().exterior.coords)[:-1], 96)
+    y0, y1, z0, z1 = _housing()
+    xb = m["x_back"]
     obs = []
     for sgn, side in ((1, "l"), (-1, "r")):
-        rings = [np.column_stack([np.full(96, x), ring[:, 0] * sgn, ring[:, 1]])
-                 for x in (m["x_back"], m["x_back"] + m["length"] * 0.7)]
-        v, f = geom.close_rings(rings)
-        obs.append(blend.make(f"mirror_{side}", v, f, "body"))
+        house = _rounded_bar(f"mirror_{side}", y0, y1, z0, z1, xb, xb + MIRROR_D, MIRROR_R, sgn)
+        arm = _rounded_bar(f"mirror_arm_{side}", _mirror_root(), y0 + 0.03, m["z"] - 0.035, m["z"] + 0.005,
+                           xb + 0.015, xb + MIRROR_D - 0.005, 0.012, sgn)
+        blend.boolean(house, arm, "UNION")
+        obs.append(house)
     return obs
 
 
 def mirror_recess():
     """A shallow recess in each housing's back, with the glass inside."""
     m = R["mirror"]
-    face = _mirror_face().intersection(box(m["y_in"] + 0.02, -5, 5, 5)).buffer(-0.01, join_style=1)
+    y0, y1, z0, z1 = _housing()
     cut, glass = [], []
     for sgn, side in ((1, "l"), (-1, "r")):
-        for name, (xa, xb), pad, mat, store in (
-                ("cut_mirror", (m["x_back"] - 0.03, m["x_back"] + 0.008), 0.0, "trim", cut),
-                ("mirror_glass", (m["x_back"] + 0.003, m["x_back"] + 0.006), 0.0015, "mirror_glass", glass)):
-            ring = body._even(np.array(face.buffer(-pad).exterior.coords)[:-1], 96)
-            rings = [np.column_stack([np.full(96, x), ring[:, 0] * sgn, ring[:, 1]]) for x in (xa, xb)]
-            v, f = geom.close_rings(rings)
-            store.append(blend.make(f"{name}_{side}", v, f, mat))
+        cut.append(_rounded_bar(f"cut_mirror_{side}", y0 + 0.01, y1 - 0.01, z0 + 0.01, z1 - 0.01,
+                                m["x_back"] - 0.03, m["x_back"] + 0.006, MIRROR_R - 0.01, sgn, "trim"))
+        glass.append(_rounded_bar(f"mirror_glass_{side}", y0 + 0.0115, y1 - 0.0115, z0 + 0.0115, z1 - 0.0115,
+                                  m["x_back"] + 0.002, m["x_back"] + 0.005, MIRROR_R - 0.0115, sgn, "mirror_glass"))
     return cut, glass
 
 
