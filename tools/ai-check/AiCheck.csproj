@@ -23,6 +23,7 @@
     <Compile Include="../../unity/Assets/Raceday/Scripts/PitPlan.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/RollingStart.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/AiRacer.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/LineTuner.cs" />
     <Compile Include="../../unity/Assets/Simulation/**/*.cs" />
   </ItemGroup>
 </Project>
