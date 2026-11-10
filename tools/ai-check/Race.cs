@@ -47,6 +47,14 @@ sealed class Racer
     public float SinceWake = float.MaxValue;
     public float WorstAfterWake;
     public float WorstSpeedJump;
+    /// <summary>Times the offset racecraft steers for turned back by 2 m or more: out and back in is two.</summary>
+    public int Swings;
+    /// <summary>Times the car went back to the line, or off it, within a second of the opposite move.</summary>
+    public int Dithers;
+    public bool OnLine = true;
+    public float SinceFlip = 99f;
+    public float SwingExt;
+    public int SwingDir;
     public readonly Dictionary<Racecraft.Mode, float> ModeTime = new Dictionary<Racecraft.Mode, float>();
 }
 
@@ -153,6 +161,7 @@ sealed class Race
         sorted.Set(field, circuit.Lap);
     }
 
+    static readonly int FlipWatch = int.TryParse(System.Environment.GetEnvironmentVariable("AI_FLIPS"), out int fw) ? fw : -1;
     public void Step()
     {
         Snapshot();
@@ -188,6 +197,16 @@ sealed class Race
                 continue;
             }
             r.Craft.Think(r.Pilot, field[i], sorted, Dt);
+            {
+                bool onLine = r.Craft.Plan == "Line";
+                r.SinceFlip += Dt;
+                if (onLine != r.OnLine && r.Id == FlipWatch) Console.WriteLine($"FLIP {Clock(Time)} {r.Car.TrackIndex * circuit.Step:0} m {r.Car.Speed * 3.6f:0} kmh {(onLine ? "->Line" : "->" + r.Craft.Plan)} after {r.SinceFlip:0.0}s lat {r.Car.Lateral:0.0} off {r.Pilot.Offset:0.0}");
+                if (onLine != r.OnLine) { if (r.SinceFlip < 1f) r.Dithers++; r.SinceFlip = 0f; r.OnLine = onLine; }
+                float g = r.Craft.Target;
+                if (r.SwingDir > 0 && g > r.SwingExt || r.SwingDir < 0 && g < r.SwingExt) r.SwingExt = g;
+                else if (r.SwingDir >= 0 && g < r.SwingExt - 2f) { if (r.SwingDir > 0) r.Swings++; r.SwingDir = -1; r.SwingExt = g; }
+                else if (r.SwingDir <= 0 && g > r.SwingExt + 2f) { if (r.SwingDir < 0) r.Swings++; r.SwingDir = 1; r.SwingExt = g; }
+            }
             r.Car.DragScale = Racecraft.Slipstream(circuit, field[i], field);
             r.Pilot.Towed = r.Car.DragScale < 0.97f;
             AiPilot.Controls c = r.Pilot.Drive(r.Car.Position, r.Car.Forward, r.Car.Velocity, r.Car.YawRate);
