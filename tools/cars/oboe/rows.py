@@ -1,234 +1,409 @@
-"""Traced rows for the Kaiser Oboe, based on the 2009 VW Golf GTI 3-door (Mk5).
+"""Measured rows for the Kaiser Oboe, based on the 2009 VW Golf GTI 3-door (Mk5).
 
-References (Ivan's): side, front, top, front three-quarter, high front and rear renders.
-Published: wheelbase 2578 mm, length 4216 mm, width 1759 mm, height 1466 mm, 225/45 R17.
-
-Side render, mirrored so the nose is on the left. It is a perspective shot from nearer the
-rear: the rear wheel reads 140 px across and the front 130, so each column gets its own scale
-before use. Wheel centres (252, 463) and (1272, 482); nose x 40, tail x 1515.
-Front render: face centre x 459, half width 400 px. Rear render: centre x 513, half width 359 px.
-Top render: half width 262 px.
+Reference: Ivan's 3D model of the Golf GTI (a .glb, kept out of the repo). Its renders and
+measurements replace a drawing. Every row here is measured from it:
+  - body sections: the outer skin cut across at stations along the car, read as a radius at
+    even angles round a centre point, so every station has the same number of points;
+  - glass, lamps, grille, shut lines, mirror, spoiler and the option spots: outlines of the
+    matching panels, seen from the side, front, rear or top, or as 3D loops for the lamps.
+The model is scaled so its wheelbase is the published 2578 mm, and sits on the ground one
+published tyre radius (225/45 R17) under the wheel centres.
 Build space: metres, x forward from mid wheelbase, y left, z up from the ground.
 
-Run: python3 rows.py  -> rows.json
+Run: python3 rows.py [path/to/golf.glb]  -> rows.json
 """
 import json
+import sys
 from pathlib import Path
 
 import numpy as np
 
-WHEELBASE, LENGTH, WIDTH, HEIGHT = 2.578, 4.216, 1.759, 1.466
+WHEELBASE = 2.578
 TYRE_R = round((17 * 25.4 + 2 * 0.45 * 225) / 2000, 4)
 RIM_R = round(17 * 25.4 / 2000, 4)
-HALF_W = WIDTH / 2
+GLB = "/mnt/project-files/vw_golf_v_gti_grand_turismo_5.glb"
+ANGLES = 73                    # points round each half section, bottom centre to top centre
+STEP = 0.03                    # station spacing along the car
 
-# ---------------------------------------------------------------- side view mapping
-NOSE, TAIL, WF, WR = 40, 1515, 252, 1272
-WF_Y, WR_Y = 463, 482
-GROW = (140 / 130 - 1) / (WR - WF)          # per px, how much nearer the camera a column is
-
-
-def scale(px):
-    return 1 + GROW * (np.asarray(px, float) - WF)
-
-
-def even(px):
-    """Side px with the perspective removed."""
-    return WF + np.log(scale(px)) / GROW
-
-
-def axle_y(px):
-    return WF_Y + (px - WF) * (WR_Y - WF_Y) / (WR - WF)
-
-
-def _x_lookup():
-    """px -> x. The wheelbase and the overhangs each get their own stretch, blended over a
-    short run so no kink lands in a body line; solved so wheelbase and length are exact."""
-    px = np.arange(NOSE - 4, TAIL + 4.5, 0.5)
-    e = even(px)
-    ef, er = float(even(WF)), float(even(WR))
-    blend = 1 / (1 + np.exp(-(ef - e) / 20)) + 1 / (1 + np.exp(-(e - er) / 20))
-    de = np.gradient(e)
-    run = lambda w: np.concatenate([[0], np.cumsum(((w * de)[1:] + (w * de)[:-1]) / 2)])
-    inner, outer = run(1 - blend), run(blend)
-    at = lambda p: int(round((p - px[0]) * 2))
-    eq = np.array([[inner[at(WR)] - inner[at(WF)], outer[at(WR)] - outer[at(WF)]],
-                   [inner[at(TAIL)] - inner[at(NOSE)], outer[at(TAIL)] - outer[at(NOSE)]]])
-    ki, ko = np.linalg.solve(eq, [WHEELBASE, LENGTH])
-    x = -(ki * inner + ko * outer)
-    return px, x - (x[at(WF)] + x[at(WR)]) / 2
+# The model's panels, by mesh name.
+TYRES = ["Tubo_Nuovo_0", "Tubo.2_Nuovo_0", "Tubo.3_Nuovo_0", "Tubo.4_Nuovo_0"]
+PAINT = ["w177_body_w177_paint_0", "w177_body_w177_roof_0", "Poligono_w177_paint_0",
+         "w177_tailgate_a_w177_paint_0", "w177_fender_FL_w177_paint_0", "w177_fender_FR_w177_paint_0",
+         "w177_door_FL_w177_paint_0", "Poligono.4_w177_paint_0", "w177_paint_door_L_w177_paint_0",
+         "w177_paint_door_R_w177_paint_0", "w177_paint_w177_paint_0", "w177_bumper_gti_w177_paint_0",
+         "w177_bumper_GTI_R_w177_paint_0"]
+GLASS = ["w177_windshield_vivace_glass_0", "w177_doorglass_FL_vivace_glass_0", "w177_doorglass_FR_vivace_glass_0",
+         "w177_sideglass_RL_vivace_glass_0", "w177_sideglass_RR_vivace_glass_0", "w177_tailgateglass_vivace_glass_0"]
+LAMPS = ["w177_headlightglass_R_vivace_glass_0", "w177_headlightglass_L_vivace_glass_0",
+         "w177_taillight_L_vivace_glass_0", "w177_taillight_R_vivace_glass_0",
+         "w177_tailgate_a_lightglass_L_vivace_glass_0", "w177_tailgate_a_lightglass_R_vivace_glass_0"]
+BLACK = ["w177_bumper_gti_etk800.1_0", "w177_bumper_gti1_etk800.1_0", "w177_bumper_GTI_R3_Nuovo.8_0"]
+SHELL = PAINT + GLASS + LAMPS + BLACK
 
 
-_PX, _X = _x_lookup()
-ROOF_PX, ROOF_PY = 1040, 43
-DZ = (HEIGHT - TYRE_R) / ((axle_y(ROOF_PX) - ROOF_PY) / scale(ROOF_PX))   # metres per px
+# ---------------------------------------------------------------- loading
+def load(path):
+    import bpy
+    import bmesh
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    bpy.ops.import_scene.gltf(filepath=str(path))
+    out = {}
+    for o in bpy.context.scene.objects:
+        if o.type != "MESH":
+            continue
+        bm = bmesh.new(); bm.from_mesh(o.data); bm.transform(o.matrix_world)
+        bmesh.ops.triangulate(bm, faces=bm.faces)
+        out[o.name] = np.array([[v.co[:] for v in f.verts] for f in bm.faces])
+        bm.free()
+    return out
 
 
-def X(px):
-    return round(float(np.interp(px, _PX, _X)), 4)
+class Space:
+    """Model coordinates (X right of the car's left, Y back, Z up) to build space."""
+
+    def __init__(self, m):
+        c = {k: (m[k].reshape(-1, 3).min(0) + m[k].reshape(-1, 3).max(0)) / 2 for k in TYRES}
+        front = [v for v in c.values() if v[1] < 0]
+        rear = [v for v in c.values() if v[1] > 0]
+        yf, yr = np.mean([v[1] for v in front]), np.mean([v[1] for v in rear])
+        self.s = WHEELBASE / (yr - yf)
+        self.ymid = (yf + yr) / 2
+        self.zc = np.mean([v[2] for v in c.values()])
+        tyre = np.vstack([m[k].reshape(-1, 3) for k in TYRES])
+        self.outer_y = float(np.abs(tyre[:, 0]).max() * self.s)
+
+    def __call__(self, p):
+        p = np.asarray(p, float)
+        return np.stack([-(p[..., 1] - self.ymid) * self.s, p[..., 0] * self.s,
+                         (p[..., 2] - self.zc) * self.s + TYRE_R], -1)
 
 
-def Z(px, py):
-    return round(float(TYRE_R + (axle_y(px) - py) / scale(px) * DZ), 4)
+# ---------------------------------------------------------------- 2D helpers
+def r4(a):
+    return np.round(np.asarray(a, float), 4).tolist()
 
 
-def side(pts):
-    return [[X(px), Z(px, py)] for px, py in pts]
+def project(tris, a, b):
+    """Union of triangles seen along the third axis, as a shapely shape in (axis a, axis b)."""
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    polys = [Polygon(t[:, [a, b]]) for t in tris]
+    return unary_union([p.buffer(1e-4) for p in polys if p.area > 1e-9])
 
 
-# ---------------------------------------------------------------- front, rear, top mappings
-F_C, F_S = 459, HALF_W / 400
-F_TO_SIDE = [(210, 205), (283, 283), (377, 350), (470, 420), (600, 491), (640, 505)]
-R_C, R_S = 513, HALF_W / 359
-R_TO_SIDE = [(88, 50), (113, 86), (250, 186), (262, 198), (357, 292), (487, 398), (640, 515)]
-T_S = HALF_W / 262
-T_TO_SIDE = [(88, 40), (505, 465), (1346, 1515)]
+def outline(g, simplify=0.003):
+    """The biggest piece's outer edge, holes filled."""
+    if g.geom_type != "Polygon":
+        g = max(g.geoms, key=lambda p: p.area)
+    from shapely.geometry import Polygon
+    return np.array(Polygon(g.exterior).simplify(simplify).exterior.coords)[:-1]
 
 
-def _lerp(table, v):
-    a, b = zip(*table)
-    return float(np.interp(v, a, b))
+def loops3d(tris):
+    """Boundary loops of a triangle sheet, in 3D, longest first."""
+    v = tris.reshape(-1, 3)
+    key = {tuple(np.round(p, 5)): None for p in v}
+    for i, k in enumerate(key):
+        key[k] = i
+    pts = np.array(list(key.keys()))
+    idx = np.array([key[tuple(np.round(p, 5))] for p in v]).reshape(-1, 3)
+    count = {}
+    for t in idx:
+        for a, b in ((t[0], t[1]), (t[1], t[2]), (t[2], t[0])):
+            e = (min(a, b), max(a, b))
+            count[e] = count.get(e, 0) + 1
+    nxt = {}
+    for (a, b), n in count.items():
+        if n == 1:
+            nxt.setdefault(a, []).append(b); nxt.setdefault(b, []).append(a)
+    seen, loops = set(), []
+    for start in nxt:
+        if start in seen:
+            continue
+        loop, prev, cur = [start], None, start
+        seen.add(start)
+        while True:
+            options = [n for n in nxt[cur] if n != prev and n not in seen]
+            if not options:
+                break
+            prev, cur = cur, options[0]
+            loop.append(cur); seen.add(cur)
+        if len(loop) > 8:
+            loops.append(pts[loop])
+    return sorted(loops, key=len, reverse=True)
 
 
-def front(pts):
-    """Front render px -> (y, z); image right is the car's left (+y)."""
-    return [[round((px - F_C) * F_S, 4), Z(60, _lerp(F_TO_SIDE, py))] for px, py in pts]
+def even_loop(p, step):
+    p = np.vstack([p, p[:1]])
+    s = np.concatenate([[0], np.cumsum(np.linalg.norm(np.diff(p, axis=0), axis=1))])
+    t = np.arange(0, s[-1], step)
+    return np.column_stack([np.interp(t, s, p[:, k]) for k in range(p.shape[1])])
 
 
-def rear(pts):
-    """Rear render px -> (y, z); image left is the car's left (+y)."""
-    return [[round((R_C - px) * R_S, 4), Z(1490, _lerp(R_TO_SIDE, py))] for px, py in pts]
+# ---------------------------------------------------------------- body sections
+def slice_x(tris, x):
+    """Segments where the plane at x cuts the triangles, in (y, z)."""
+    d = tris[:, :, 0] - x
+    sgn = np.sign(d)
+    cut = (sgn.min(1) < 0) & (sgn.max(1) > 0)
+    t = tris[cut]; dd = d[cut]
+    pts = []
+    for i, j in ((0, 1), (1, 2), (2, 0)):
+        a, b = dd[:, i], dd[:, j]
+        m = (a * b) < 0
+        k = np.where(m, a / np.where(m, a - b, 1), 0)[:, None]
+        p = t[:, i, 1:] + (t[:, j, 1:] - t[:, i, 1:]) * k
+        pts.append(np.where(m[:, None], p, np.nan))
+    pts = np.stack(pts, 1)                                   # (n, 3, 2), two of three valid
+    segs = []
+    for row in pts:
+        ok = row[~np.isnan(row[:, 0])]
+        if len(ok) >= 2:
+            segs.append(ok[:2])
+    return np.array(segs) if segs else np.zeros((0, 2, 2))
 
 
-def half_loop(pts, c):
-    """A trace from the centre line round one half, closed by its mirror about c."""
-    return pts + [(2 * c - p, q) for p, q in pts[-2:0:-1]]
+def polar(segs, zc, th):
+    """Farthest hit along each ray from (0, zc) at angles th, on the half y >= 0."""
+    s = segs.copy(); s[:, :, 0] = np.abs(s[:, :, 0])
+    p, q = s[:, 0], s[:, 1]
+    e = q - p
+    r = np.full(len(th), np.nan)
+    for i, a in enumerate(th):
+        d = np.array([np.cos(a), np.sin(a)])
+        o = np.array([0.0, zc])
+        den = d[0] * e[:, 1] - d[1] * e[:, 0]
+        ok = np.abs(den) > 1e-12
+        w = p - o
+        t = np.where(ok, (w[:, 0] * e[:, 1] - w[:, 1] * e[:, 0]) / np.where(ok, den, 1), -1)
+        u = np.where(ok, (w[:, 0] * d[1] - w[:, 1] * d[0]) / np.where(ok, den, 1), -1)
+        hit = ok & (t > 0) & (u >= 0) & (u <= 1)
+        if hit.any():
+            r[i] = t[hit].max()
+    return r
 
 
-def across(pts, c):
-    """An open path from one side to the centre line, carried on to the other side."""
-    return pts + [(2 * c - p, q) for p, q in pts[-2::-1]]
+def sections(sp, m, arches):
+    tris = sp(np.vstack([m[k] for k in SHELL]))
+    # the roof spoiler is its own part, so keep it out of the skin
+    tris = tris[~spoiler_mask(sp, m, tris)]
+    xs_all = tris[:, :, 0]
+    nose, tail = xs_all.max(), xs_all.min()
+    xs = np.concatenate([[nose - 0.004, nose - 0.012], np.arange(nose - 0.025, tail + 0.02, -STEP),
+                         [tail + 0.012, tail + 0.004]])
+    th = np.linspace(-np.pi / 2, np.pi / 2, ANGLES)
+    in_arch = lambda x: any(abs(x - wx) < ar + 0.012 for wx, ar in arches)
+    cuts = [(x, slice_x(tris, x)) for x in xs]
+    cuts = [(x, sg) for x, sg in cuts if len(sg) >= 3]
+    xs = np.array([x for x, _ in cuts])
+    zlo = np.array([sg[:, :, 1].min() for _, sg in cuts])
+    zhi = np.array([sg[:, :, 1].max() for _, sg in cuts])
+    ok = np.array([not in_arch(x) for x in xs])
+    zlo = np.interp(-xs, -xs[ok], zlo[ok])              # the arches have no floor of their own
+    zcs = (zlo + zhi) / 2
+    rows = []
+    for x, (_x, segs), zc, lo in zip(xs, cuts, zcs, zlo):
+        r = polar(segs, zc, np.clip(th, -np.pi / 2 + 0.01, np.pi / 2 - 0.01))
+        if in_arch(x):
+            # the side is open round the wheel: fill the lower half from the stations either side
+            top = TYRE_R + max(ar for _w, ar in arches)
+            zz = zc + r * np.sin(th)
+            r[(th < 0) & (np.isnan(r) | (zz < top))] = -1
+        miss = np.isnan(r) & (th < -0.05)                 # a floor where the model has none
+        r[miss] = (lo - zc) / np.sin(th[miss])
+        rows.append([x, zc, r])
+    X = np.array([row[0] for row in rows]); ZC = np.array([row[1] for row in rows])
+    Rm = np.array([row[2] for row in rows])
+    Rm[Rm < 0] = np.nan
+    for j in range(ANGLES):                       # fill across the arches and any gaps
+        col = Rm[:, j]; ok = ~np.isnan(col)
+        if ok.sum() >= 2:
+            Rm[:, j] = np.interp(X, X[ok][::-1], col[ok][::-1]) if X[0] > X[-1] else np.interp(X, X[ok], col[ok])
+    # the top and bottom centre lie flat: no spike or notch where the halves meet
+    k = 6
+    for j in list(range(k)) + list(range(ANGLES - k, ANGLES)):
+        ref = k if j < k else ANGLES - 1 - k
+        z = ZC + Rm[:, ref] * np.sin(th[ref])
+        Rm[:, j] = (z - ZC) / np.sin(th[j])
+    from scipy.ndimage import median_filter
+    Rm = median_filter(Rm, size=(3, 5), mode="nearest")
+    from scipy.ndimage import gaussian_filter
+    Rm = gaussian_filter(Rm, sigma=(1.0, 1.2), mode="nearest")      # smooth panels, no ripples
+    ZC = median_filter(ZC, size=5, mode="nearest")
+    return [dict(x=round(float(x), 4), zc=round(float(zc), 4), r=r4(r)) for x, zc, r in zip(X, ZC, Rm)]
 
 
-# ---------------------------------------------------------------- body profiles (side px)
-TOP = [(40, 391), (44, 365), (48, 358), (52, 352), (60, 344), (64, 336), (72, 323), (80, 313),
-       (100, 297), (120, 283), (140, 276), (160, 270), (200, 258), (260, 244), (300, 235),
-       (340, 226), (380, 215), (405, 206), (440, 185), (480, 162), (520, 140), (560, 119),
-       (600, 101), (640, 86), (680, 74), (720, 65), (760, 59), (800, 54), (840, 50), (880, 47),
-       (920, 45), (980, 44), (1040, 43), (1100, 44), (1160, 46), (1220, 50), (1280, 54),
-       (1320, 57), (1340, 62), (1360, 80), (1380, 109), (1400, 130), (1420, 151), (1440, 175),
-       (1460, 198), (1472, 222), (1482, 252), (1492, 300), (1500, 340), (1508, 368), (1515, 400)]
-BOTTOM = [(40, 410), (44, 440), (48, 466), (56, 479), (70, 490), (100, 498), (130, 502),
-          (400, 519), (700, 523), (1100, 530), (1420, 522), (1460, 513), (1480, 499),
-          (1500, 474), (1510, 450), (1515, 425)]
-# Belt and shoulder: where the vertical side ends and the top (bonnet, glass, tailgate) begins.
-BELT = [(40, 352), (60, 328), (100, 302), (140, 291), (200, 274), (300, 254), (400, 242),
-        (490, 239), (700, 228), (1000, 209), (1197, 192), (1260, 196), (1300, 202), (1350, 212),
-        (1400, 232), (1440, 258), (1470, 290), (1495, 340), (1515, 430)]
-WIDEST = [(40, 410), (100, 418), (300, 402), (1100, 396), (1400, 405), (1515, 415)]
-# Half widths: nose and tail from the front and rear renders (the top render's perspective
-# narrows them), the middle from the top render.
-_NOSE_W = [(40, 0.16), (44, 0.44), (50, 0.62), (60, 0.74), (75, 0.805), (95, 0.845), (125, 0.868),
-           (160, 0.876)]
-_TOP_W = [(208, 233), (238, 244), (268, 257), (298, 262), (330, 264), (370, 263.5), (430, 260),
-          (600, 259), (700, 261.5), (800, 262), (900, 262), (1000, 259.5), (1100, 260.5)]
-_TAIL_W = [(1180, 0.879), (1260, 0.877), (1330, 0.873), (1390, 0.868), (1440, 0.862),
-           (1465, 0.85), (1485, 0.82), (1500, 0.775), (1508, 0.71), (1513, 0.57), (1515, 0.32)]
-HALF = (_NOSE_W + [(_lerp(T_TO_SIDE, t), h * T_S) for t, h in _TOP_W if 200 < _lerp(T_TO_SIDE, t) < 1150]
-        + _TAIL_W)
-# Section shape along the car: belt width as a share of the half width, the top's squareness,
-# the greenhouse's lean in, and the lower corner's squareness.
-K_BELT = [(40, 0.97), (120, 0.985), (380, 0.985), (480, 0.95), (1200, 0.935), (1380, 0.955),
-          (1515, 0.95)]
-N_TOP = [(40, 4.5), (380, 5.0), (470, 3.8), (1230, 3.8), (1330, 4.4), (1515, 4.0)]
-LEAN = [(40, 0.0), (400, 0.0), (480, 0.20), (1220, 0.20), (1340, 0.10), (1515, 0.0)]
-N_LOW = [(40, 3.0), (200, 3.6), (1300, 3.6), (1515, 3.0)]
+
+def spoiler_mask(sp, m, tris):
+    """Which triangles stand above the rear glass in side view: the roof spoiler."""
+    g = sp(m["w177_tailgateglass_vivace_glass_0"]).reshape(-1, 3)
+    top = g[np.argmax(g[:, 2])]; bot = g[np.argmin(g[:, 2])]
+    c = tris.mean(1)
+    line = top[2] + (c[:, 0] - top[0]) * (bot[2] - top[2]) / (bot[0] - top[0])
+    return (c[:, 0] < top[0] + 0.03) & (c[:, 2] > line + 0.012) & (c[:, 2] > top[2] - 0.12)
 
 
-def stations():
-    pxs = sorted({round(p, 1) for t in (TOP, BOTTOM, HALF, BELT) for p, _ in t})
+def spoiler_tris(sp, m):
+    t = sp(np.vstack([m[k] for k in ("w177_body_w177_paint_0", "w177_tailgate_a_w177_paint_0",
+                                     "w177_body_w177_roof_0")]))
+    return t[spoiler_mask(sp, m, t)]
+
+
+def arches(sp, m, wheel_x):
+    """Arch radius round each wheel centre, from the body paint at the sides."""
+    v = sp(np.vstack([m[k] for k in PAINT + BLACK])).reshape(-1, 3)
     out = []
-    for px in pxs:
-        out.append(dict(x=X(px), zb=Z(px, _lerp(BOTTOM, px)), zt=Z(px, _lerp(TOP, px)),
-                        zs=Z(px, _lerp(BELT, px)), zw=Z(px, _lerp(WIDEST, px)),
-                        w=round(max(_lerp(HALF, px), 0.03), 4), kb=_lerp(K_BELT, px),
-                        nt=_lerp(N_TOP, px), lean=_lerp(LEAN, px), nb=_lerp(N_LOW, px)))
+    for wx in wheel_x:
+        near = v[(np.abs(v[:, 1]) > 0.6) & (np.abs(v[:, 0] - wx) < 0.6) & (v[:, 2] < TYRE_R + 0.6)]
+        d = np.hypot(near[:, 0] - wx, near[:, 2] - TYRE_R)
+        out.append((wx, round(float(np.percentile(d, 0.5)), 4)))
     return out
 
 
 # ---------------------------------------------------------------- the rows
-rows = {
-    "name": "KaiserOboe",
-    "wheel": {"r": TYRE_R, "rim_r": RIM_R, "width": 0.225, "outer_y": 0.865,
-              "front_x": X(WF), "rear_x": X(WR), "arch_r": round(TYRE_R + 0.03, 4)},
-    "stations": stations(),
-    # Side glass opening, outer edge of its black surround (side px).
-    "dlo": side([(493, 237), (490, 221), (505, 204), (560, 169), (641, 125), (720, 98), (797, 82),
-                 (870, 71), (937, 64), (1010, 61), (1076, 60), (1130, 62), (1163, 66), (1192, 76),
-                 (1210, 91), (1224, 113), (1229, 133), (1227, 153), (1216, 172), (1197, 187),
-                 (1100, 198), (1000, 207), (850, 215), (728, 223), (600, 230)]),
-    "b_pillar": [X(915), X(942)],
-    # Black sail where the mirror meets the door, front corner of the side glass (side px).
-    "sail": side([(489, 240), (487, 222), (501, 205), (538, 200), (543, 240)]),
-    # Windscreen: centre of its base, its top edge, and how wide the body-coloured A-pillar is.
-    "screen": {"x_base": X(408), "x_top": X(792), "pillar": 0.065},
-    "rear_glass": rear(half_loop([(513, 108), (300, 110), (283, 118), (263, 160), (246, 205),
-                                  (233, 240), (241, 253), (513, 255)], R_C)),
-    # Headlight: front render px (car's right, image left) and where it wraps onto the side.
-    "head": front([(105, 285), (130, 278), (160, 280), (190, 290), (215, 305), (235, 325),
-                   (245, 345), (250, 362), (240, 374), (200, 377), (160, 374), (120, 368), (95, 360),
-                   (88, 350), (90, 330), (96, 305)]),
-    "head_side": side([(60, 349), (66, 338), (82, 322), (99, 300), (117, 282), (112, 300),
-                       (101, 326), (92, 342), (75, 350)]),
-    "head_lenses": [[round((145 - F_C) * F_S, 4), Z(60, _lerp(F_TO_SIDE, 322)), 0.048],
-                    [round((203 - F_C) * F_S, 4), Z(60, _lerp(F_TO_SIDE, 332)), 0.041]],
-    # Black grille shield (front px, centre line round the car's right half).
-    "shield": front(half_loop([(459, 322), (350, 322), (256, 324), (258, 360), (262, 400), (278, 467),
-                               (287, 494), (296, 531), (305, 553), (322, 562), (459, 563)], F_C)),
-    "shield_bar": front(half_loop([(459, 404), (298, 404), (290, 412), (296, 470), (306, 476),
-                                   (459, 476)], F_C)),
-    "intake": front([(75, 448), (130, 452), (200, 463), (245, 470), (251, 499), (258, 529),
-                     (250, 548), (200, 553), (130, 548), (89, 540), (80, 499), (72, 465)]),
-    "fog": front([(114, 504)])[0] + [round(17 * F_S, 4)],
-    "chin": front(half_loop([(459, 574), (200, 574), (95, 571), (74, 580), (88, 598), (200, 604),
-                             (459, 605)], F_C)),
-    # Tail light: rear render px (car's left, image left) and where it wraps onto the side.
-    "tail": rear([(198, 266), (215, 262), (240, 264), (270, 270), (300, 281), (316, 295),
-                  (322, 315), (318, 338), (305, 354), (280, 357), (240, 357), (200, 357),
-                  (184, 350), (180, 330), (182, 300), (188, 280)]),
-    "tail_side": side([(1428, 205), (1466, 206), (1479, 236), (1480, 266), (1479, 287),
-                       (1412, 291), (1421, 250)]),
-    "brake3": rear([(440, 98), (586, 98), (586, 106), (440, 106)]),
-    "spoiler": {"profile": side([(1282, 52), (1320, 48), (1350, 51), (1371, 61), (1369, 70),
-                                 (1346, 84), (1320, 74), (1290, 62)]), "half": 0.60},
-    "rear_lower": {"z": Z(1480, 398), "x": X(1425)},
-    "exhaust": {"y": [round((R_C - 232) * R_S, 4), round((R_C - 282) * R_S, 4)],
-                "z": Z(1490, _lerp(R_TO_SIDE, 600)), "r": 0.046},
-    "strip": side([(440, 384), (1095, 367), (1095, 375), (440, 392)]),
-    "mirror": {"x_back": X(490), "length": 0.13, "y_in": 0.80, "y_out": 0.975,
-               "z": Z(465, 206), "h_in": 0.085, "h_out": 0.125},
-    # Shut lines.
-    "door": side([(926, 213), (922, 300), (919, 400), (915, 480), (896, 507), (470, 510),
-                  (440, 501), (424, 440), (420, 360), (424, 290), (440, 251), (478, 239)]),
-    "bonnet_front": front([(141, 280), (160, 281), (200, 288), (235, 312), (258, 321), (300, 322),
-                           (459, 321), (618, 322), (660, 321), (683, 312), (718, 288), (758, 281),
-                           (777, 280)]),
-    "bonnet_side_y": 0.69,
-    "tailgate": rear(across([(230, 245), (233, 253), (255, 263), (255, 357), (262, 400),
-                             (276, 432), (300, 438), (513, 440)], R_C)),
-    "head_back": X(140),
-    "tail_front": X(1408),
-    # Option spots for the badge and the name.
-    "spots": {"grille_z": Z(60, _lerp(F_TO_SIDE, 343)), "bonnet_x": X(190),
-              "tailgate_z": Z(1490, _lerp(R_TO_SIDE, 315)), "tailgate_low_z": Z(1490, _lerp(R_TO_SIDE, 410)),
-              "name_y": round((R_C - 300) * R_S, 4), "name_z": Z(1490, _lerp(R_TO_SIDE, 383)),
-              "quarter_x": X(1180), "quarter_z": Z(1180, 300)},
-    # Ivan's picks from the viewer.
-    "picks": {"frontbadge": 1, "rearbadge": 1, "name": 1},
-}
+def measure(path):
+    from shapely.geometry import MultiPoint, Polygon, box
+    from shapely.ops import unary_union
+    m = load(path)
+    sp = Space(m)
+    T = lambda *names: sp(np.vstack([m[k] for k in names]))
+    left = lambda t: t[t[:, :, 1].mean(1) > 0]
+    right = lambda t: t[t[:, :, 1].mean(1) < 0]
+    wheel_x = [WHEELBASE / 2, -WHEELBASE / 2]
+    arch = arches(sp, m, wheel_x)
+    stations = sections(sp, m, arch)
+
+    # glass: side (x, z), screen top (x, y), rear (y, z)
+    door_g = project(left(T("w177_doorglass_FL_vivace_glass_0")), 0, 2)
+    quarter_g = project(left(T("w177_sideglass_RL_vivace_glass_0")), 0, 2)
+    dlo = unary_union([door_g, quarter_g]).buffer(0.09, join_style=2).buffer(-0.09, join_style=2)
+    mid_z = (dlo.bounds[1] + dlo.bounds[3]) / 2
+    band = box(-5, mid_z - 0.05, 5, mid_z + 0.05)
+    b_pillar = [door_g.intersection(band).bounds[0] + 0.03, quarter_g.intersection(band).bounds[2] - 0.03]
+    screen = project(T("w177_windshield_vivace_glass_0"), 0, 1).buffer(-0.008)
+    so = outline(screen)
+    centre = so[np.abs(so[:, 1]) < 0.05]
+    rear_glass = outline(project(T("w177_tailgateglass_vivace_glass_0"), 1, 2).buffer(-0.006))
+
+    # lamps as 3D loops on the car's left; the lenses as centre and radius
+    head = [r4(even_loop(l, 0.01)) for l in loops3d(left(T("w177_headlightglass_L_vivace_glass_0")))[:1]]
+    tail = [r4(even_loop(l, 0.01)) for k in ("w177_taillight_L_vivace_glass_0", "w177_tailgate_a_lightglass_L_vivace_glass_0")
+            for l in loops3d(T(k))[:1]]
+    lenses = []
+    for k in ("w177_headlight_L_w177_lowbeam_0", "w177_headlight_L_w177_highbeam_0"):
+        v = T(k).reshape(-1, 3)
+        c = (v.min(0) + v.max(0)) / 2
+        lenses.append(r4(list(c) + [max(v[:, 1].max() - v[:, 1].min(), v[:, 2].max() - v[:, 2].min()) / 2 + 0.008]))
+
+    # front, seen from ahead (y, z), car's right where a side is meant
+    black = right(T("w177_bumper_gti_etk800.1_0"))
+    blk = project(black, 1, 2).buffer(0.012).buffer(-0.012)
+    pieces = list(getattr(blk, "geoms", [blk]))
+    mid = [p for p in pieces if p.centroid.x > -0.4 and p.area > 1e-3]
+    side = [p for p in pieces if p.centroid.x <= -0.4 and p.area > 1e-3]
+    shield_half = unary_union(mid).convex_hull.intersection(box(-1, 0, 0, 3))
+    shield = unary_union([shield_half, Polygon([(-y, z) for y, z in shield_half.exterior.coords])]).buffer(0.002)
+    intake = unary_union(side).buffer(0.004)
+    plate = project(T("w177_bumper_gti_licenseplate-52-11_0"), 1, 2).envelope.buffer(0.012, join_style=2)
+    chin = project(T("w177_bumper_gti1_etk800.1_0"), 1, 2).buffer(0.01).buffer(-0.01)
+    fogs = project(right(T("w177_bumper_gti_vivace_glass_0")), 1, 2)
+    fg = max(getattr(fogs, "geoms", [fogs]), key=lambda p: p.area)
+    fog = [round(fg.centroid.x, 4), round(fg.centroid.y, 4), round(np.sqrt(fg.area / np.pi), 4)]
+
+    # rear
+    rl = T("w177_bumper_GTI_R3_Nuovo.8_0").reshape(-1, 3)
+    ctr = rl[np.abs(rl[:, 1]) < 0.3]
+    sidepart = rl[np.abs(rl[:, 1]) > 0.8]
+    rear_lower = {"z": round(float(ctr[:, 2].max()), 4), "x": round(float(sidepart[:, 0].max()), 4)}
+    tips = T("w177_bumper_GTI_R_vivace.1_0").reshape(-1, 3)
+    ys = np.sort(tips[:, 1]); half = (ys[0] + ys[-1]) / 2
+    ex_r = round(float((tips[:, 2].max() - tips[:, 2].min()) / 2), 4)
+    exhaust = {"x": round(float(tips[:, 0].min()), 4), "y": [round(float((ys[0] + half) / 2), 4), round(float((half + ys[-1]) / 2), 4)],
+               "z": round(float((tips[:, 2].max() + tips[:, 2].min()) / 2), 4), "r": ex_r}
+
+    # spoiler: side profile and half width; third brake light on its back face
+    st = spoiler_tris(sp, m)
+    prof = outline(project(st, 0, 2).buffer(0.006).buffer(-0.006), 0.004)
+    back = prof[prof[:, 0] < prof[:, 0].min() + 0.03]
+    bz0, bz1 = back[:, 1].min(), back[:, 1].max()
+    bm = (bz0 + bz1) / 2
+    brake3 = [[0.17, bm + 0.009], [-0.17, bm + 0.009], [-0.17, bm - 0.009], [0.17, bm - 0.009]]
+
+    # side trim and mirror
+    strip = outline(project(left(T("w177_paint_door_L_w177_paint_0", "w177_paint_w177_paint_0")), 0, 2)
+                    .buffer(0.004).buffer(-0.004))
+    mv = left(T("w177_mirror_L_paint_w177_paint_0")).reshape(-1, 3)
+    mirror = {"x_back": round(float(mv[:, 0].min()), 4), "length": round(float(np.ptp(mv[:, 0])), 4),
+              "y_in": round(float(mv[:, 1].min()), 4), "y_out": round(float(mv[:, 1].max()), 4),
+              "z": round(float((mv[:, 2].min() + mv[:, 2].max()) / 2), 4),
+              "h_in": round(float(np.ptp(mv[:, 2]) * 0.6), 4), "h_out": round(float(np.ptp(mv[:, 2])), 4)}
+    sail = outline(project(left(T("w177_mirror_L_paint_Nuovo.8_0")), 0, 2).convex_hull.intersection(dlo.buffer(0.03)))
+
+    # shut lines
+    door_o = outline(project(left(T("w177_door_FL_w177_paint_0")), 0, 2), 0.002)
+    keep = np.array([not dlo.buffer(0.012).contains(MultiPoint([p]).geoms[0]) for p in door_o])
+    k0 = int(np.argmax(~keep))                          # start the open path just after the glass
+    rolled = np.roll(door_o, -k0, axis=0); kr = np.roll(keep, -k0)
+    door = rolled[kr]
+    bonnet = outline(project(T("Poligono_w177_paint_0"), 0, 1), 0.002)
+    tg = outline(project(T("w177_tailgate_a_w177_paint_0"), 1, 2), 0.002)
+    top_cut = rear_glass[:, 1].max() - 0.01
+    kt = tg[:, 1] < top_cut
+    k0 = int(np.argmax(~kt))
+    tailgate = np.roll(tg, -k0, axis=0)[np.roll(kt, -k0)]
+
+    # option spots
+    vw_f = T("w177_bumper_gti_vivace.1_0").reshape(-1, 3)
+    vw_r = T("w177_tailgate_a_etk800.1_0").reshape(-1, 3)
+    gti = T("w177_lettering_GTI_etk800.1_0").reshape(-1, 3)
+    bon = T("Poligono_w177_paint_0").reshape(-1, 3)
+    spots = {"grille_z": round(float(np.median(vw_f[:, 2])), 4) if len(vw_f) else 0.65,
+             "bonnet_x": round(float(bon[:, 0].max() - 0.2), 4),
+             "tailgate_z": round(float((vw_r[:, 2].min() + vw_r[:, 2].max()) / 2), 4),
+             "tailgate_low_z": round(float((gti[:, 2].min() + gti[:, 2].max()) / 2), 4),
+             "name_y": round(float((gti[:, 1].min() + gti[:, 1].max()) / 2), 4),
+             "name_z": round(float((gti[:, 2].min() + gti[:, 2].max()) / 2), 4),
+             "quarter_x": round(float((b_pillar[1] + wheel_x[1] + arch[1][1]) / 2), 4),
+             "quarter_z": round(float(strip[:, 1].max() + 0.12), 4)}
+
+    return {
+        "name": "KaiserOboe",
+        "wheel": {"r": TYRE_R, "rim_r": RIM_R, "width": 0.225, "outer_y": round(sp.outer_y, 4),
+                  "front_x": wheel_x[0], "rear_x": wheel_x[1], "arch_r": round(max(a for _x, a in arch), 4)},
+        "stations": stations,
+        "dlo": r4(outline(dlo)),
+        "b_pillar": r4(b_pillar),
+        "sail": r4(sail),
+        "screen": {"outline": r4(so), "x_base": round(float(centre[:, 0].max()), 4),
+                   "x_top": round(float(centre[:, 0].min()), 4)},
+        "rear_glass": r4(rear_glass),
+        "head": head,
+        "head_lenses": lenses,
+        "shield": r4(outline(shield)),
+        "shield_bar": r4(outline(plate)),
+        "intake": r4(outline(intake)),
+        "fog": fog,
+        "chin": r4(outline(chin)),
+        "tail": tail,
+        "brake3": r4(brake3),
+        "spoiler": {"profile": r4(prof), "half": round(float(np.abs(st[:, :, 1]).max()), 4)},
+        "rear_lower": rear_lower,
+        "exhaust": exhaust,
+        "strip": r4(strip),
+        "mirror": mirror,
+        "door": r4(door),
+        "bonnet": r4(bonnet),
+        "tailgate": r4(tailgate),
+        "spots": spots,
+        # Ivan's picks from the viewer.
+        "picks": {"frontbadge": 1, "rearbadge": 1, "name": 1},
+    }
+
 
 if __name__ == "__main__":
+    rows = measure(sys.argv[1] if len(sys.argv) > 1 else GLB)
     out = Path(__file__).with_name("rows.json")
     out.write_text(json.dumps(rows, indent=1))
-    print("wrote", out, "nose", X(NOSE), "tail", X(TAIL), "roof", Z(ROOF_PX, ROOF_PY),
-          "lamp z", rows["tail"][1][1], rows["tail"][10][1])
+    st = rows["stations"]
+    print("wrote", out, len(st), "stations, nose", st[0]["x"], "tail", st[-1]["x"],
+          "arch", rows["wheel"]["arch_r"], "outer", rows["wheel"]["outer_y"])

@@ -52,6 +52,27 @@ def boolean(target, other, op):
     bpy.data.objects.remove(other)
 
 
+def relax(ob, voxel=0.014, iters=12, factor=0.5):
+    """Remesh a lofted solid into even cells and smooth it, so pinched rings at its ends
+    leave no ripples."""
+    bpy.context.view_layer.objects.active = ob
+    for kind, opts in (("REMESH", dict(mode="VOXEL", voxel_size=voxel)),
+                       ("LAPLACIANSMOOTH", dict(iterations=iters, lambda_factor=factor,
+                                                use_volume_preserve=True))):
+        mod = ob.modifiers.new(kind.lower(), kind)
+        for k, v in opts.items():
+            setattr(mod, k, v)
+        bpy.ops.object.modifier_apply(modifier=mod.name)
+
+
+def thin(ob, ratio):
+    """Collapse-decimate a dense mesh to ratio of its faces."""
+    bpy.context.view_layer.objects.active = ob
+    mod = ob.modifiers.new("thin", "DECIMATE")
+    mod.ratio = ratio
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+
+
 def union_all(obs, name):
     base = obs[0]
     base.name = name
@@ -140,10 +161,16 @@ def triangulate(poly, step):
     return t["vertices"], [tuple(int(i) for i in tri) for tri in t["triangles"]]
 
 
-def lay(bvh, name, geom, fr, d0, d1, mat, step=0.01, accept=None):
+def _ray_dir(fr, a, b):
+    d = fr(a, b)[1] if callable(fr) else fr[3]
+    return np.asarray(d, float) / np.linalg.norm(d)
+
+
+def lay(bvh, name, geom, fr, d0, d1, mat, step=0.01, accept=None, along_ray=False):
     """Lay a flat shapely shape onto the body as a thin solid between d0 and d1 off the
     surface. A point whose ray misses (or is refused) moves towards the middle of its piece.
-    Returns a list of objects, one per piece."""
+    along_ray: offset back along each point's ray instead of the surface normal, which
+    cannot fold over a crease (for cutters). Returns a list of objects, one per piece."""
     polys = [geom] if geom.geom_type == "Polygon" else list(getattr(geom, "geoms", []))
     obs = []
     for i, poly in enumerate(p for p in polys if p.area > 1e-7):
@@ -161,16 +188,19 @@ def lay(bvh, name, geom, fr, d0, d1, mat, step=0.01, accept=None):
             if got is None:
                 print("missed", name)
                 break
-            hits.append(got)
+            hits.append(got if not along_ray else (got[0], -_ray_dir(fr, *q)))
         if len(hits) < len(pts):
             continue
         # smooth the normals over each vertex's triangles so the offset has no steps
         nrm = np.array([h[1] for h in hits])
-        acc = np.zeros_like(nrm)
-        for t in tris:
-            for j in t:
-                acc[j] += nrm[list(t)].sum(0)
-        acc /= np.linalg.norm(acc, axis=1, keepdims=True)
+        if along_ray:
+            acc = nrm
+        else:
+            acc = np.zeros_like(nrm)
+            for t in tris:
+                for j in t:
+                    acc[j] += nrm[list(t)].sum(0)
+            acc /= np.linalg.norm(acc, axis=1, keepdims=True)
         loc = np.array([h[0] for h in hits])
         n = len(pts)
         verts = np.vstack([loc + acc * d0, loc + acc * d1])

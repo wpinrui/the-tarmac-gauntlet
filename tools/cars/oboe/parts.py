@@ -101,31 +101,35 @@ class Wrap:
         k = np.tan(self.tilt) * w
         return np.array([o[0], o[1] * s, z + 0.5 * k]), np.array([d[0], d[1] * s, -k])
 
-    def from_y(self, y):
-        y = abs(y)
+    def to_uv(self, p):
+        """The (u, z) whose ray passes through the 3D point p."""
+        x, y, z = float(p[0]), abs(float(p[1])), float(p[2])
+        f, k = self.f, np.tan(self.tilt)
+        dx = f * (x - self.xc)
         if y <= self.yc:
-            return y
-        return self.yc + self.rc * np.arcsin(min((y - self.yc) / self.rc, 1.0))
+            return y, z
+        if dx <= 0:
+            u = self.u1 - dx
+            run = self.yc + self.rc + 0.5 - y
+            return u, z - k * 0.5 + k * run
+        t = np.arctan2(y - self.yc, dx)
+        u = self.yc + self.rc * t
+        run = self.rc + 0.5 - np.hypot(dx, y - self.yc)
+        w = np.sin(t)
+        return u, z - k * w * 0.5 + k * w * run
 
-    def from_x(self, x):
-        k = self.f * (x - self.xc)
-        if k <= 0:
-            return self.u1 - k
-        return self.yc + self.rc * np.arccos(min(k / self.rc, 1.0))
-
-    def shape(self, face_pts, side_pts):
-        """One outline from a face trace (y, z) and a side trace (x, z) of the same lamp."""
-        a = poly([(self.from_y(y), z) for y, z in face_pts])
-        b = poly([(self.from_x(x), z) for x, z in side_pts])
-        u = unary_union([a, b])
+    def outline(self, loops):
+        """One outline in (u, z) from the lamp's 3D edge loops."""
+        u = unary_union([poly([self.to_uv(p) for p in loop]) for loop in loops])
         if u.geom_type != "Polygon":
-            u = unary_union([a, b, u.convex_hull.intersection(box(a.bounds[2] - 0.04, -1, b.bounds[0] + 0.04, 3))])
-        u = u.buffer(0.015, join_style=1).buffer(-0.015, join_style=1)
-        return u.buffer(-0.004, join_style=1).buffer(0.004, join_style=1)
+            u = u.buffer(0.02, join_style=1).buffer(-0.02, join_style=1)
+        if u.geom_type != "Polygon":
+            u = max(u.geoms, key=lambda g: g.area)
+        return u.buffer(-0.002, join_style=1).buffer(0.002, join_style=1)
 
 
-HEAD_WRAP = dict(end="front", xc=NOSE - 0.31, yc=0.62, rc=0.25, tilt=0.5)
-TAIL_WRAP = dict(end="rear", xc=TAIL + 0.33, yc=0.62, rc=0.25, tilt=0.3)
+HEAD_WRAP = dict(end="front", xc=NOSE - 0.36, yc=0.55, rc=0.3, tilt=0.5)
+TAIL_WRAP = dict(end="rear", xc=TAIL + 0.36, yc=0.55, rc=0.3, tilt=0.3)
 
 
 # ---------------------------------------------------------------- lamps and front
@@ -133,42 +137,41 @@ def lamp_parts(ref, cutters, out, sgn, which):
     side = "l" if sgn > 0 else "r"
     if which == "head":
         wr = Wrap(sgn=sgn, **HEAD_WRAP)
-        shp = wr.shape(R["head"], R["head_side"])
-        cutters += blend.lay(ref, f"cut_head_{side}", shp, wr, -0.0145, 0.006, "housing", 0.006)
-        out += blend.lay(ref, f"head_housing_{side}", shp.buffer(-0.0015), wr, -0.0135, -0.0105, "housing", 0.006)
-        for i, (y, z, r) in enumerate(R["head_lenses"]):
-            c = Point(wr.from_y(y), z)
+        shp = wr.outline(R["head"])
+        cutters += blend.lay(ref, f"cut_head_{side}", shp, wr, -0.0145, 0.006, "housing", 0.01, along_ray=True)
+        out += blend.lay(ref, f"head_housing_{side}", shp.buffer(-0.0015), wr, -0.0135, -0.0105, "housing", 0.01)
+        for i, (x, y, z, r) in enumerate(R["head_lenses"]):
+            c = Point(*wr.to_uv((x, y, z)))
             keep = shp.buffer(-0.004)
             out += blend.lay(ref, f"lamp_head_{side}{i}", c.buffer(r, 48).intersection(keep), wr, -0.0099, -0.006, "lamp_head", 0.004)
             out += blend.lay(ref, f"head_reflector_{side}{i}", c.buffer(r + 0.011, 48).difference(c.buffer(r + 0.001, 48)).intersection(keep),
                              wr, -0.0099, -0.0082, "reflector", 0.004)
-        out += blend.lay(ref, f"head_glass_{side}", shp.buffer(-0.0015), wr, -0.004, -0.0015, "head_glass", 0.006)
+        out += blend.lay(ref, f"head_glass_{side}", shp.buffer(-0.0015), wr, -0.004, -0.0015, "head_glass", 0.01)
     else:
         wr = Wrap(sgn=sgn, **TAIL_WRAP)
-        shp = wr.shape(R["tail"], R["tail_side"])
-        cutters += blend.lay(ref, f"cut_tail_{side}", shp, wr, -0.0145, 0.006, "housing", 0.006)
-        out += blend.lay(ref, f"tail_housing_{side}", shp.buffer(-0.0015), wr, -0.0135, -0.0105, "housing", 0.006)
+        shp = wr.outline(R["tail"])
+        cutters += blend.lay(ref, f"cut_tail_{side}", shp, wr, -0.0145, 0.006, "housing", 0.01, along_ray=True)
+        out += blend.lay(ref, f"tail_housing_{side}", shp.buffer(-0.0015), wr, -0.0135, -0.0105, "housing", 0.01)
         core = shp.buffer(-0.014)
         zmid = (shp.bounds[1] + shp.bounds[3]) / 2
         out += blend.lay(ref, f"lamp_tail_{side}", core.intersection(box(-5, zmid + 0.005, 5, 5)), wr,
                          -0.0099, -0.007, "lamp_tail", 0.005)
         out += blend.lay(ref, f"lamp_brake_{side}", core.intersection(box(-5, -5, 5, zmid - 0.005)), wr,
                          -0.0099, -0.007, "lamp_brake", 0.005)
-        out += blend.lay(ref, f"tail_glass_{side}", shp.buffer(-0.0015), wr, -0.004, -0.0015, "tail_glass", 0.006)
+        out += blend.lay(ref, f"tail_glass_{side}", shp.buffer(-0.0015), wr, -0.004, -0.0015, "tail_glass", 0.01)
 
 
 def front_parts(ref, cutters, out):
     fr = front_fr()
-    groove_z = min(z for y, z in R["bonnet_front"] if abs(y) < 0.4)
-    shield = poly(R["shield"]).intersection(box(-1, 0, 1, groove_z - 0.005))
-    out += blend.lay(ref, "shield", shield, fr, 0.0, 0.004, "grille", 0.012)
+    shield = poly(R["shield"])
+    out += blend.lay(ref, "shield", shield, fr, -0.001, 0.004, "grille", 0.012)
     out += blend.lay(ref, "shield_bar", poly(R["shield_bar"]), fr, 0.0044, 0.0074, "trim", 0.008)
-    out += blend.lay(ref, "chin", poly(R["chin"]), fr, 0.0, 0.004, "trim", 0.008)
+    out += blend.lay(ref, "chin", poly(R["chin"]), fr, -0.001, 0.004, "trim", 0.008)
     fy, fz, fr_r = R["fog"]
     for sgn, side in ((1, "l"), (-1, "r")):
-        g = poly(R["intake"])
+        g = poly(R["intake"]).convex_hull.buffer(-0.01, join_style=1).buffer(0.01, join_style=1)
         g = g if sgn < 0 else flip(g)
-        cutters += blend.lay(ref, f"cut_intake_{side}", g, fr, -0.025, 0.006, "grille", 0.012)
+        cutters += blend.lay(ref, f"cut_intake_{side}", g, fr, -0.025, 0.006, "grille", 0.012, along_ray=True)
         out += blend.lay(ref, f"intake_{side}", g.buffer(-0.0015), fr, -0.0225, -0.0195, "grille", 0.012)
         c = Point(fy if sgn < 0 else -fy, fz)
         out += blend.lay(ref, f"fog_ring_{side}", c.buffer(fr_r + 0.008, 40).difference(c.buffer(fr_r + 0.0005, 40)),
@@ -186,25 +189,14 @@ def dlo_shapes():
 
 
 def screen_shapes():
-    s = R["screen"]
-    d = np.array(R["dlo"])
-    top = d[1:13]                                # the upper edge, front to back
-    def ye(x):
-        zd = float(np.interp(-x, -top[:, 0], top[:, 1]))
-        return body.y_at(CV, x, zd) - s["pillar"]
-    x_corner = float(top[0, 0]) + 0.03
-    xs = np.linspace(s["x_top"], x_corner, 40)
-    side = [(x, ye(x)) for x in xs]
-    yc, yt = side[-1][1], side[0][1]
-    base = [(s["x_base"] - (s["x_base"] - x_corner) * (y / yc) ** 2, y) for y in np.linspace(yc, -yc, 41)]
-    topl = [(s["x_top"] - 0.05 * (y / yt) ** 2, y) for y in np.linspace(-yt, yt, 41)]
-    outline = poly(side[::-1] + base + [(x, -y) for x, y in side] + topl).buffer(-0.02, join_style=1).buffer(0.02, join_style=1)
+    outline = poly(R["screen"]["outline"]).buffer(-0.02, join_style=1).buffer(0.02, join_style=1)
     glass = outline.buffer(-0.026, join_style=1)
     return outline, glass, outline.difference(glass)
 
 
 def rear_shapes():
     rg = poly(R["rear_glass"])
+    rg = rg.intersection(box(-5, -5, 5, rg.bounds[3] - 0.015))    # clear of the spoiler's underside
     glass = rg.buffer(-0.022, join_style=1)
     return rg, glass, rg.difference(glass)
 
@@ -213,17 +205,17 @@ def glass_parts(ref0, cutters, out):
     _d, g, t = dlo_shapes()
     for sgn, side in ((1, "l"), (-1, "r")):
         fr = side_fr(sgn)
-        cutters += blend.lay(ref0, f"cut_side_{side}", g, fr, -0.08, 0.006, "trim")
+        cutters += blend.lay(ref0, f"cut_side_{side}", g, fr, -0.08, 0.006, "trim", along_ray=True)
         out += blend.lay(ref0, f"side_glass_{side}", g.buffer(-0.001), fr, -0.008, -0.004, "glass", 0.02)
-        out += blend.lay(ref0, f"window_trim_{side}", t.union(poly(R["sail"])), fr, 0.0, 0.0025, "trim", 0.006)
+        out += blend.lay(ref0, f"window_trim_{side}", t.union(poly(R["sail"])), fr, -0.001, 0.0025, "trim", 0.01)
     _o, g, t = screen_shapes()
-    cutters += blend.lay(ref0, "cut_screen", g, top_fr(), -0.08, 0.006, "trim")
+    cutters += blend.lay(ref0, "cut_screen", g, top_fr(), -0.08, 0.006, "trim", along_ray=True)
     out += blend.lay(ref0, "screen_glass", g.buffer(-0.001), top_fr(), -0.008, -0.004, "glass", 0.02)
-    out += blend.lay(ref0, "screen_trim", t, top_fr(), 0.0, 0.0025, "trim", 0.006)
+    out += blend.lay(ref0, "screen_trim", t, top_fr(), -0.001, 0.0025, "trim", 0.01)
     _o, g, t = rear_shapes()
-    cutters += blend.lay(ref0, "cut_rear", g, rear_fr(), -0.08, 0.004, "trim")
+    cutters += blend.lay(ref0, "cut_rear", g, rear_fr(), -0.08, 0.004, "trim", along_ray=True)
     out += blend.lay(ref0, "rear_glass", g.buffer(-0.001), rear_fr(), -0.008, -0.004, "glass", 0.02)
-    out += blend.lay(ref0, "rear_trim", t, rear_fr(), 0.0, 0.0025, "trim", 0.006)
+    out += blend.lay(ref0, "rear_trim", t, rear_fr(), -0.001, 0.0025, "trim", 0.01)
 
 
 def grooves(ref):
@@ -231,15 +223,11 @@ def grooves(ref):
     obs = []
     for sgn, side in ((1, "l"), (-1, "r")):
         obs.append(blend.groove(ref, f"g_door_{side}", R["door"], side_fr(sgn)))
-    bf = [list(p) for p in R["bonnet_front"]]
-    obs.append(blend.groove(ref, "g_bonnet_front", bf, front_fr()))
-    yb = R["bonnet_side_y"]
-    loc, _n = blend.cast(ref, front_fr(), bf[-1][0], bf[-1][1])
-    x_front = float(loc[0]) + 0.01
-    x_back = R["screen"]["x_base"] + 0.035
-    for sgn, side in ((1, "l"), (-1, "r")):
-        obs.append(blend.groove(ref, f"g_bonnet_{side}", [(x_front, yb * sgn), (x_back, yb * sgn)], top_fr()))
-    obs.append(blend.groove(ref, "g_bonnet_back", [(x_back, -yb - 0.004), (x_back, yb + 0.004)], top_fr()))
+    # a closed loop as two open halves that overlap a little, each its own cutter
+    b = R["bonnet"]
+    h = len(b) // 2
+    obs.append(blend.groove(ref, "g_bonnet_a", b[: h + 2], top_fr()))
+    obs.append(blend.groove(ref, "g_bonnet_b", b[h:] + b[:2], top_fr()))
     obs.append(blend.groove(ref, "g_tailgate", R["tailgate"], rear_fr()))
     return obs
 
@@ -268,8 +256,10 @@ def mirrors():
     obs = []
     for sgn, side in ((1, "l"), (-1, "r")):
         rings = []
-        for t in np.linspace(0, 1, 16):
-            y = m["y_in"] + (m["y_out"] - m["y_in"]) * t
+        x_mid = m["x_back"] + m["length"] / 2
+        y0 = body.y_at(body.curves(body.ROWS["stations"])[1], x_mid, m["z"]) - 0.025   # sunk into the door
+        for y in np.linspace(y0, m["y_out"], 18):
+            t = max(0.0, (y - m["y_in"]) / (m["y_out"] - m["y_in"]))
             h = m["h_in"] + (m["h_out"] - m["h_in"]) * np.sin(t * np.pi / 2)
             ln = m["length"] * (0.75 + 0.25 * np.sin(t * np.pi / 2))
             if t > 0.8:                               # round off the outer end
@@ -318,8 +308,8 @@ def exhaust():
     e = R["exhaust"]
     cut, pipes = [], []
     for i, y in enumerate(e["y"]):
-        x_end = TAIL + 0.03
-        prof = [(e["r"] - 0.004, 0.0), (e["r"], 0.0), (e["r"], 0.26), (e["r"] - 0.004, 0.26)]
+        x_end = e["x"]
+        prof = [(e["r"] - 0.003, 0.0), (e["r"], 0.0), (e["r"], 0.26), (e["r"] - 0.003, 0.26)]
         v, f = geom.lathe(prof, 48, axis="z")
         v = np.column_stack([x_end + v[:, 2], y + v[:, 0], e["z"] + v[:, 1]])
         pipes.append(blend.make(f"exhaust_{i}", v, f, "chrome"))
@@ -383,8 +373,9 @@ def interior(floor):
     obs.append(_rbox("bench_back", -1.20, -1.08, -0.49, 0.49, 0.535, 1.04, lean=0.25))
     xm = R["screen"]["x_top"] - 0.03
     roof_in = body.inside(CV, xm, 0.035).bounds[3]
-    m = _rbox("mirror_rear", xm - 0.02, xm, -0.11, 0.11, 1.27, 1.325, r=0.02)
-    stem = _rbox("stem", xm - 0.016, xm - 0.004, -0.012, 0.012, 1.31, roof_in - 0.0008, r=0.004)
+    top = roof_in - 0.07
+    m = _rbox("mirror_rear", xm - 0.02, xm, -0.11, 0.11, top - 0.055, top, r=0.02)
+    stem = _rbox("stem", xm - 0.016, xm - 0.004, -0.012, 0.012, top - 0.015, roof_in - 0.0008, r=0.004)
     obs.append(blend.union_all([m, stem], "mirror_rear"))
     return obs
 
@@ -460,7 +451,7 @@ def name_shape():
 def _flat(ref, g, size, fr, a, b, up, name, d0, d1, mat):
     """Lay shape g (right, up, 1 unit = size) flat on the panel that fr's ray at (a, b) meets."""
     pf = blend.panel_frame(ref, fr, a, b, up)
-    return blend.lay(ref, name, sscale(g, size, size, origin=(0, 0)), pf, d0, d1, mat, 0.003)
+    return blend.lay(ref, name, sscale(g, size, size, origin=(0, 0)), pf, d0, d1, mat, 0.005)
 
 
 def options(ref):

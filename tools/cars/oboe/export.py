@@ -28,18 +28,20 @@ def copy(ob, name):
 
 def cut(target, cutters):
     for c in cutters:
+        name, n0 = c.name, len(target.data.polygons)
         blend.boolean(target, c, "DIFFERENCE")
+        if len(target.data.polygons) < 0.6 * n0:
+            raise RuntimeError(f"cutting {name} wrecked {target.name}")
 
 
 def build(game=False):
     blend.reset(MATERIALS)
     v, f = body.skin()
     shell = blend.make("body", v, f, "body")
+    blend.relax(shell)
     ref0 = blend.tree(shell)                       # plain skin, for glass laid under the spoiler
 
     blend.boolean(shell, parts.spoiler(), "UNION")
-    for m in parts.mirrors():
-        blend.boolean(shell, m, "UNION")
     plain = copy(shell, "plain")
     ref = blend.tree(plain)
 
@@ -64,6 +66,8 @@ def build(game=False):
     print("cabin cut")
     cut(shell, cutters)
     print("openings cut")
+    for m in parts.mirrors():                      # after the glass, so no opening cuts them
+        blend.boolean(shell, m, "UNION")
     mcut, mglass = parts.mirror_recess()
     cut(shell, mcut)
     out += mglass
@@ -87,6 +91,7 @@ def build(game=False):
         if p.material_index == k_body and c.z < rl["z"] and c.x < rl["x"]:
             p.material_index = k_trim
     blend.tidy(shell)
+    blend.thin(shell, 0.55)
 
     out += parts.interior(FLOOR)
     out += parts.wheels()
