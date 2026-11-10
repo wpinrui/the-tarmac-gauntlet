@@ -83,6 +83,8 @@ sealed class Session
 
     static readonly int trace = int.TryParse(Environment.GetEnvironmentVariable("PIT_TRACE"), out int t) ? t : -1;
 
+    static readonly int TraceEvery = int.TryParse(Environment.GetEnvironmentVariable("PIT_EVERY"), out int te) ? te : 50;
+
     public bool Racing => Start == null || Start.State == RollingStart.Phase.Green;
 
     /// <summary>
@@ -346,8 +348,8 @@ sealed class Session
     {
         StandInCar car = s.Car;
         int k = Math.Max(car.TrackIndex, 0);
-        if (trace == s.Id && (int)(Time / Dt) % 50 == 0)
-            Console.WriteLine($"    {Clock(Time)} #{s.Id} {k * circuit.Step,5:0} m lat {car.Lateral,6:0.0} {car.Speed * 3.6f,4:0} km/h {s.Racer.Pit.State} {(s.Racer.Active == s.Racer.Pilot ? "racing" : s.Racer.Active == s.Racer.Formation ? "formation" : "route")} idx {s.Racer.Active.Index * circuit.Step:0} err {s.Racer.Active.LateralError:0.0} {car.Surface} cap {Math.Min(s.Racer.Active.SpeedCap, 999f) * 3.6f:0} tgt {s.Racer.Active.TargetSpeed * 3.6f:0} R {1f / Math.Max(Math.Abs(s.Racer.Active.Line.Curvature[Math.Max(s.Racer.Active.Index,0)]), 1e-4f):0} seg {s.Racer.Active.Line.Segment[Math.Max(s.Racer.Active.Index,0)]:0.00}");
+        if (trace == s.Id && (int)(Time / Dt) % TraceEvery == 0)
+            Console.WriteLine($"    {Clock(Time)} #{s.Id} {k * circuit.Step,5:0} m lat {car.Lateral,6:0.0} {car.Speed * 3.6f,4:0} km/h {s.Racer.Pit.State} {(s.Racer.Active == s.Racer.Pilot ? "racing" : s.Racer.Active == s.Racer.Formation ? "formation" : "route")} idx {s.Racer.Active.Index * circuit.Step:0} err {s.Racer.Active.LateralError:0.0} {car.Surface} cap {Math.Min(s.Racer.Active.SpeedCap, 999f) * 3.6f:0} tgt {s.Racer.Active.TargetSpeed * 3.6f:0} R {1f / Math.Max(Math.Abs(s.Racer.Active.Line.Curvature[Math.Max(s.Racer.Active.Index,0)]), 1e-4f):0} seg {s.Racer.Active.Line.Segment[Math.Max(s.Racer.Active.Index,0)]:0.00} {s.Racer.Craft.State} {(s.Racer.Craft.Braking ? "BRK" : "")} {(s.Racer.Craft.SideSteering ? "SIDE" : "")} off {s.Racer.Pilot.Offset:0.0}");
         if (car.SpeedLimit < 1000f) s.LimitZoneTop = Math.Max(s.LimitZoneTop, car.Speed);
         if (s.Racer.Supplies.Empty) s.RanDry = true;
 

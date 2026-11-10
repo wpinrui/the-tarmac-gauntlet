@@ -161,7 +161,7 @@ static partial class Check
     static void PitStopsCheck(string name, Func<int, bool> shortOfFuel, bool verbose, bool glide = false)
     {
         string[] models = { "a-29", "a-27", "a-26", "b-24", "b-22", "b-21", "c-19", "c-18", "c-16", "d-15", "d-13", "e-09", "e-07", "f-06", "f-03", "f-01" };
-        var entries = models.Select((m, i) => (m, shortOfFuel(i) ? 0.13f : 1f)).ToList();
+        var entries = models.Select((m, i) => (m, shortOfFuel(i) ? (float.TryParse(Environment.GetEnvironmentVariable("AI_FUEL"), out float fu) ? fu : 0.13f) : 1f)).ToList();
         var s = new Session(circuit, line, entries, rolling: false, LineFor);
         if (glide) Watch(s, s.Cars[s.Cars.Count - 1]);
         var due = s.Cars.Where(c => shortOfFuel(c.Id)).ToList();
