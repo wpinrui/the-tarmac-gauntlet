@@ -48,10 +48,15 @@ namespace TarmacGauntlet.Raceday
 
         /// <summary>Where to drive relative to the racing line, metres, positive left. Set by racecraft.</summary>
         public float Offset;
-        /// <summary>Fastest the car may go right now, m/s, to keep its gap to the car ahead. Set by racecraft.</summary>
+        /// <summary>Fastest the car may go right now, m/s: 0 when racecraft brakes for the car ahead.</summary>
         public float SpeedCap = float.PositiveInfinity;
-        /// <summary>Share of the target speed to drive at, below 1 to lift and let a faster car by.</summary>
+        /// <summary>Share of the target speed to drive at.</summary>
         public float SpeedScale = 1f;
+        /// <summary>
+        /// The side collision filter, set by racecraft: the share of the pilot's own steering kept,
+        /// and the steering the rest is made of, radians, positive to the right.
+        /// </summary>
+        public float SideWeight = 1f, SideSteer;
         /// <summary>
         /// True while the car is in another's slipstream: with less drag it outruns the target speeds
         /// on the straights, so it keeps its foot down instead of lifting back to them.
@@ -194,6 +199,7 @@ namespace TarmacGauntlet.Raceday
             Vector3 right = new Vector3(flatForward.z, 0f, -flatForward.x);
             float slide = speed > 5f ? Mathf.Atan2(Vector3.Dot(flatVelocity, right), Vector3.Dot(flatVelocity, flatForward)) : 0f;
             steer += YawGain * (speed * kappa - yawRate) + SlideGain * slide;
+            steer = steer * SideWeight + SideSteer * (1f - SideWeight);
             steer = Mathf.Clamp(steer, -Spec.SteerLock, Spec.SteerLock);
 
             // Speed: read the target a reaction time ahead, follow its acceleration, and close the gap.
@@ -235,15 +241,16 @@ namespace TarmacGauntlet.Raceday
             }
             else
                 controls.Brake = Mathf.Clamp01(-needed / (Spec.BrakeDecel * G));
-            // Faster than the car ahead allows: the gap is closing, so brake as hard as the tyres can
-            // take on top of the corner. Full brakes mid-corner run the car wide.
-            if (held && speed > target + 1f)
+            // Full brakes for the car ahead (racecraft's SpeedCap of 0), through the equivalent of the
+            // TORCS robot's ABS filter: as hard as the tyres can take on top of the corner, as locked
+            // or overloaded tyres spin the car.
+            if (held && SpeedCap <= 0f)
             {
                 float tyres = Spec.Grip * G * Mathf.Clamp(Grip, 0.3f, 1f);
                 float cornering = speed * yawRate;
                 float spare = Mathf.Sqrt(Mathf.Max(tyres * tyres - cornering * cornering, 0f));
                 controls.Throttle = 0f;
-                controls.Brake = Mathf.Max(controls.Brake, Mathf.Clamp(spare / (Spec.BrakeDecel * G), 0.5f, 1f));
+                controls.Brake = Mathf.Clamp01(spare / (Spec.BrakeDecel * G));
             }
             return controls;
         }

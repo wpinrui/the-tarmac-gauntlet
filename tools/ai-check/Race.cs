@@ -93,6 +93,9 @@ sealed class Race
     /// <summary>Most corners a car 1% or more quicker started stuck behind a slower one.</summary>
     public int QuickStuck;
     public string QuickStuckLine = "";
+    /// <summary>Most corners a car 2% or more quicker started stuck behind a slower car of its own class.</summary>
+    public int ClassQueue;
+    public string ClassQueueLine = "";
     public string FastestStuckLine = "";
     Racer Fastest => Racers.OrderBy(r => r.Pilot.Profile.LapTime).First();
     Racer Slowest => Racers.OrderBy(r => r.Pilot.Profile.LapTime).Last();
@@ -127,7 +130,7 @@ sealed class Race
                 Entry = e,
                 Car = new StandInCar(spec, line),
                 Pilot = new AiPilot(line, spec, e.Pace, e.Consistency, e.Safety, e.Seed),
-                Craft = new Racecraft(e.Seed),
+                Craft = new Racecraft(),
             };
             int k = circuit.IndexOf(e.Start);
             r.Car.PlaceAt(k, e.Lateral);
@@ -157,8 +160,8 @@ sealed class Race
                 Speed = r.Car.Vx * f.x + r.Car.Vz * f.z,
                 LapPace = pace,
                 Braking = r.Car.Spec.BrakeDecel * 9.81f * AiPilot.LimitFor(r.Pilot.Pace),
-                GivingWay = r.Craft.State == Racecraft.Mode.GivingWay,
-                Craft = r.Craft,
+                Across = r.Car.Vx * circuit.Left[k].x + r.Car.Vz * circuit.Left[k].z,
+                Yaw = (float)Math.Atan2(r.Car.Forward.z, r.Car.Forward.x),
             });
         }
         sorted.Set(field, circuit.Lap);
@@ -184,11 +187,54 @@ sealed class Race
         }
         if (!behind) return;
         FollowSteps++;
-        if (r.Pilot.HeldBy > 0.5f && r.Pilot.SpeedCap < r.Car.Speed + 0.5f && c.Brake <= 0f && c.Throttle < 0.95f)
+        // Lifting or braking for the car ahead, rather than flat out on a straight.
+        if (r.Pilot.HeldBy > 0.5f && r.Pilot.SpeedCap < r.Car.Speed + 0.5f && c.Throttle < 0.95f)
         {
             FeatherSteps++;
             if (FeatherLog && FeatherSteps % 50 == 0)
-                Console.WriteLine($"FEATHER {Clock(Time)} {Name(r)} {k * circuit.Step:0} m {r.Car.Speed * 3.6f:0} kmh thr {c.Throttle:0.00} cap {r.Pilot.SpeedCap * 3.6f:0} {r.Craft.State} {r.Craft.Plan} off {r.Pilot.Offset:0.0} lat {r.Car.Lateral:0.0} towed {r.Pilot.Towed}");
+                Console.WriteLine($"FEATHER {Clock(Time)} {Name(r)} {k * circuit.Step:0} m {r.Car.Speed * 3.6f:0} kmh thr {c.Throttle:0.00} cap {r.Pilot.SpeedCap * 3.6f:0} {r.Craft.State} off {r.Pilot.Offset:0.0} lat {r.Car.Lateral:0.0} towed {r.Pilot.Towed}");
+        }
+    }
+
+    /// <summary>Steps in a corner held back by a car close ahead, and those of them with a clear lane beside it.</summary>
+    public int CornerHeldSteps, OpenRoomSteps;
+    public string OpenRoomLine = "";
+
+    /// <summary>Held up behind a car in a corner while the track beside it is empty for 10 m behind to 30 m ahead.</summary>
+    void OpenRoom(Racer r)
+    {
+        int k = r.Car.TrackIndex;
+        if (k < 0 || Math.Abs(r.Pilot.Line.Curvature[k]) < 0.003f || r.Car.Speed < 10f) return;
+        if (!(r.Pilot.HeldBy > 0.5f && r.Pilot.SpeedCap < r.Car.Speed + 0.5f)) return;
+        Racer ahead = null;
+        foreach (Racer o in Racers)
+        {
+            if (o == r) continue;
+            float gap = o.Distance - r.Distance;
+            gap -= circuit.Lap * (float)Math.Round(gap / circuit.Lap);
+            if (gap > 0f && gap < 25f && Math.Abs(o.Car.Lateral - r.Car.Lateral) < 2.5f) { ahead = o; break; }
+        }
+        if (ahead == null) return;
+        CornerHeldSteps++;
+        float half = circuit.HalfWidth(k) - 1.5f;
+        foreach (float side in new[] { -1f, 1f })
+        {
+            float lane = ahead.Car.Lateral + side * 3.5f;
+            if (Math.Abs(lane) > half) continue;
+            bool clear = true;
+            foreach (Racer o in Racers)
+            {
+                if (o == r || o == ahead) continue;
+                float gap = o.Distance - r.Distance;
+                gap -= circuit.Lap * (float)Math.Round(gap / circuit.Lap);
+                if (gap > -10f && gap < 30f && Math.Abs(o.Car.Lateral - lane) < 2.8f) { clear = false; break; }
+            }
+            if (!clear) continue;
+            OpenRoomSteps++;
+            if (OpenRoomSteps % 100 == 1)
+                OpenRoomLine = $"{Name(r)} held behind {Name(ahead)} in the corner at {k * circuit.Step:0} m at {Clock(Time)} with the {(side * Math.Sign(r.Pilot.Line.Curvature[k]) > 0 ? "inside" : "outside")} open";
+            if (FeatherLog && OpenRoomSteps % 20 == 1) Console.WriteLine("OPEN " + OpenRoomLine + $" {r.Craft.State} off {r.Pilot.Offset:0.0}");
+            return;
         }
     }
 
@@ -228,9 +274,9 @@ sealed class Race
             }
             r.Craft.Think(r.Pilot, field[i], sorted, Dt);
             {
-                bool onLine = r.Craft.Plan == "Line";
+                bool onLine = r.Craft.State == Racecraft.Mode.Racing;
                 r.SinceFlip += Dt;
-                if (onLine != r.OnLine && r.Id == FlipWatch) Console.WriteLine($"FLIP {Clock(Time)} {r.Car.TrackIndex * circuit.Step:0} m {r.Car.Speed * 3.6f:0} kmh {(onLine ? "->Line" : "->" + r.Craft.Plan)} after {r.SinceFlip:0.0}s lat {r.Car.Lateral:0.0} off {r.Pilot.Offset:0.0}");
+                if (onLine != r.OnLine && r.Id == FlipWatch) Console.WriteLine($"FLIP {Clock(Time)} {r.Car.TrackIndex * circuit.Step:0} m {r.Car.Speed * 3.6f:0} kmh {(onLine ? "->Racing" : "->Overtaking")} after {r.SinceFlip:0.0}s lat {r.Car.Lateral:0.0} off {r.Pilot.Offset:0.0}");
                 if (onLine != r.OnLine) { if (r.SinceFlip < 1f) r.Dithers++; r.SinceFlip = 0f; r.OnLine = onLine; }
                 float g = r.Craft.Target;
                 if (r.SwingDir > 0 && g > r.SwingExt || r.SwingDir < 0 && g < r.SwingExt) r.SwingExt = g;
@@ -241,6 +287,7 @@ sealed class Race
             r.Pilot.Towed = r.Car.DragScale < 0.97f;
             AiPilot.Controls c = r.Pilot.Drive(r.Car.Position, r.Car.Forward, r.Car.Velocity, r.Car.YawRate);
             Feathering(r, c);
+            OpenRoom(r);
             r.Car.Step(Dt, c.Throttle, c.Brake, c.Steer);
             r.ModeTime[r.Craft.State] = (r.ModeTime.TryGetValue(r.Craft.State, out float t) ? t : 0f) + Dt;
         }
@@ -336,6 +383,11 @@ sealed class Race
                 {
                     QuickStuck = corners;
                     QuickStuckLine = $"{Name(fast)} is {100f * (1f - fast.Pilot.Profile.LapTime / slow.Pilot.Profile.LapTime):0.0}% quicker and started {corners} corners behind {Name(slow)}, the last at {Clock(Time)} at {Math.Max(fast.Car.TrackIndex, 0) * circuit.Step:0} m";
+                }
+                if (Class(fast) == Class(slow) && fast.Pilot.Profile.LapTime < slow.Pilot.Profile.LapTime * 0.98f && corners > ClassQueue)
+                {
+                    ClassQueue = corners;
+                    ClassQueueLine = $"{Name(fast)} is {100f * (1f - fast.Pilot.Profile.LapTime / slow.Pilot.Profile.LapTime):0.0}% quicker and started {corners} corners behind {Name(slow)} of its own class, the last at {Clock(Time)} at {Math.Max(fast.Car.TrackIndex, 0) * circuit.Step:0} m";
                 }
                 if (!twoClasses) continue;
                 if (corners > WorstStuck)

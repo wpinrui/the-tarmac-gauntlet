@@ -114,7 +114,7 @@ sealed class Session
                 Garage = garage,
                 Model = model,
                 Car = new StandInCar(spec, line) { Supplies = supplies, Pits = pits },
-                Racer = new AiRacer(pilot, new Racecraft(i + 1), supplies, new PitPlan(pits, garage, supplies), i + 1),
+                Racer = new AiRacer(pilot, new Racecraft(), supplies, new PitPlan(pits, garage, supplies), i + 1),
             };
             GridPlace(i, out float d, out float lateral);
             int k = circuit.IndexOf(d - 2.6f);
@@ -271,8 +271,8 @@ sealed class Session
                 Speed = car.Vx * f.x + car.Vz * f.z,
                 LapPace = s.Racer.Pilot.Profile.LapTime,
                 Braking = car.Spec.BrakeDecel * 9.81f * AiPilot.LimitFor(s.Racer.Pilot.Pace),
-                GivingWay = !s.Racer.Pitting && s.Racer.Craft.State == Racecraft.Mode.GivingWay,
-                Craft = s.Racer.Craft,
+                Across = car.Vx * circuit.Left[k].x + car.Vz * circuit.Left[k].z,
+                Yaw = (float)Math.Atan2(car.Forward.z, car.Forward.x),
             };
             traffic.Add(t);
             if (!s.InPitLane) field.Add(t);
