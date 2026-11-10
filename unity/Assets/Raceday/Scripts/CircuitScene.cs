@@ -5,7 +5,8 @@ namespace TarmacGauntlet.Raceday
 {
     /// <summary>
     /// Builds the circuit, the sun, a grid of 100 AI cars from every class, the pace car and the
-    /// cameras when the scene starts, and the rolling start begins. The grid is reversed, so the
+    /// cameras when the scene starts. It is a test of the AI, so the race starts from the grid at
+    /// once; tick Rolling Start for the full game's pace car lap instead. The grid is reversed, so the
     /// quickest car starts last and has to carve through. I hands it to you and back. V moves the
     /// cameras to the next car, and P to the next car making a pit stop. F steps the race through
     /// normal speed, 4x and 16x while the AI drives your car. Cars away from the camera glide
@@ -13,6 +14,9 @@ namespace TarmacGauntlet.Raceday
     /// </summary>
     public sealed class CircuitScene : MonoBehaviour
     {
+        /// <summary>Starts behind the pace car, as the full game will, instead of straight from the grid.</summary>
+        [SerializeField] private bool rollingStart;
+
         private KeyboardState keys;
         private AiDriver ai;
         private static readonly float[] Speeds = { 1f, 4f, 16f };
@@ -64,7 +68,7 @@ namespace TarmacGauntlet.Raceday
             var cars = new CarController[field.Length];
             var grid = new RaceCar[field.Length];
             var drivers = new AiDriver[field.Length];
-            RaceStart start = new GameObject("Race start").AddComponent<RaceStart>();
+            RaceStart start = rollingStart ? new GameObject("Race start").AddComponent<RaceStart>() : null;
             for (int i = 0; i < field.Length; i++)
             {
                 bool player = i == field.Length - 1;
@@ -104,6 +108,9 @@ namespace TarmacGauntlet.Raceday
             range.Drivers = drivers;
             range.Player = ai.Car;
 
+            Camera(circuit, cars, keys);
+            if (!rollingStart) return;
+
             // The pace car waits ahead of pole, in pole's column.
             CarController paceCar = CarBuilder.Spawn(PaceCarModel, null, circuit, null, new Color(0.95f, 0.95f, 0.95f));
             paceCar.name = "Pace car";
@@ -111,7 +118,6 @@ namespace TarmacGauntlet.Raceday
             start.Grid = grid;
             start.PaceCar = paceCar;
             start.Pits = pits;
-            Camera(circuit, cars, keys);
         }
 
         /// <summary>The field, quickest first: classes fastest first, each cycling through its models.</summary>
