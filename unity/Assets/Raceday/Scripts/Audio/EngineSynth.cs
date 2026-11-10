@@ -227,8 +227,8 @@ namespace TarmacGauntlet.Raceday
             float[] line = pipe[b];
             int pos = pipePos[b];
             float back = line[pos];
-            pipeDamp[b] += (back - pipeDamp[b]) * 0.55f;
-            float y = x - s.PipeResonance * pipeDamp[b];
+            pipeDamp[b] += (back - pipeDamp[b]) * 0.3f;
+            float y = x - 0.3f * s.PipeResonance * pipeDamp[b];
             line[pos] = y;
             pipePos[b] = pos + 1 == pipeLength[b] ? 0 : pos + 1;
             return y;
