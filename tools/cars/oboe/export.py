@@ -53,7 +53,6 @@ def build(game=False):
     parts.front_parts(ref, cutters, out)
     parts.glass_parts(ref0, cutters, out)
     out += parts.strips(ref)
-    out += parts.brake3(ref)
     print("laid", len(out), "parts,", len(cutters), "cutters")
 
     arch, tubs = parts.arches()
@@ -77,19 +76,6 @@ def build(game=False):
     cut(shell, parts.grooves(ref))
     print("grooves cut")
 
-    # black lower rear bumper, on a clean line
-    rl = R["rear_lower"]
-    blend.split_by_planes(shell, [((0, 0, rl["z"]), (0, 0, 1)), ((rl["x"], 0, 0), (1, 0, 0))])
-    names = [m.name for m in shell.data.materials]
-    k_body = names.index("body")
-    if "trim" not in names:
-        shell.data.materials.append(bpy.data.materials["trim"])
-        names.append("trim")
-    k_trim = names.index("trim")
-    for p in shell.data.polygons:
-        c = p.center
-        if p.material_index == k_body and c.z < rl["z"] and c.x < rl["x"]:
-            p.material_index = k_trim
     blend.tidy(shell)
     blend.thin(shell, 0.55)
 

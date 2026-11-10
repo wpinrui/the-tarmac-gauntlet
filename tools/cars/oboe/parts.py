@@ -161,12 +161,20 @@ def lamp_parts(ref, cutters, out, sgn, which):
         out += blend.lay(ref, f"tail_glass_{side}", shp.buffer(-0.0015), wr, -0.004, -0.0015, "tail_glass", 0.01)
 
 
+# the lower grille stops at the first height, the upper starts at the second; body colour between
+GRILLE_SPLIT = (0.45, 0.50, 5.0)
+
+
 def front_parts(ref, cutters, out):
     fr = front_fr()
     shield = poly(R["shield"])
-    out += blend.lay(ref, "shield", shield, fr, -0.001, 0.004, "grille", 0.012)
-    out += blend.lay(ref, "shield_bar", poly(R["shield_bar"]), fr, 0.0044, 0.0074, "trim", 0.008)
-    out += blend.lay(ref, "chin", poly(R["chin"]), fr, -0.001, 0.004, "trim", 0.008)
+    for name, (z0, z1) in (("grille_upper", GRILLE_SPLIT[1:]), ("grille_lower", (-5, GRILLE_SPLIT[0]))):
+        part = shield.intersection(box(-5, z0, 5, z1)).buffer(-0.006, join_style=1).buffer(0.006, join_style=1)
+        out += blend.lay(ref, name, part, fr, -0.001, 0.004, "grille", 0.012)
+    bar = poly(R["shield_bar"])
+    bar = translate(bar, 0, GRILLE_SPLIT[0] - 0.035 - bar.bounds[3])     # plate centred in the lower grille
+    out += blend.lay(ref, "shield_bar", bar, fr, 0.0044, 0.0074, "trim", 0.008)
+    out += blend.lay(ref, "chin", poly(R["chin"]), fr, -0.001, 0.004, "body", 0.008)
     fy, fz, fr_r = R["fog"]
     for sgn, side in ((1, "l"), (-1, "r")):
         g = poly(R["intake"]).convex_hull.buffer(-0.01, join_style=1).buffer(0.01, join_style=1)
@@ -181,8 +189,9 @@ def front_parts(ref, cutters, out):
 
 # ---------------------------------------------------------------- glass and trim
 def dlo_shapes():
-    dlo = poly(R["dlo"])
     b0, b1 = sorted(R["b_pillar"])
+    # the traced outline dips at the B-pillar top and bottom: run straight across it instead
+    dlo = poly([p for p in R["dlo"] if not b0 + 0.003 < p[0] < b1 - 0.003])
     glass = dlo.buffer(-0.018, join_style=1).difference(box(b0, -1, b1, 3))
     trim = dlo.difference(glass)
     return dlo, glass, trim
@@ -218,11 +227,17 @@ def glass_parts(ref0, cutters, out):
     out += blend.lay(ref0, "rear_trim", t, rear_fr(), -0.001, 0.0025, "trim", 0.01)
 
 
+def door_path():
+    """The door shut line, carried up past the window line so it meets the glass."""
+    d = [list(p) for p in R["door"]]
+    return [[d[0][0], d[0][1] + 0.09]] + d + [[d[-1][0], d[-1][1] + 0.13]]
+
+
 def grooves(ref):
     """Shut lines as V grooves to cut: doors, bonnet, tailgate."""
     obs = []
     for sgn, side in ((1, "l"), (-1, "r")):
-        obs.append(blend.groove(ref, f"g_door_{side}", R["door"], side_fr(sgn)))
+        obs.append(blend.groove(ref, f"g_door_{side}", door_path(), side_fr(sgn)))
     # a closed loop as two open halves that overlap a little, each its own cutter
     b = R["bonnet"]
     h = len(b) // 2
@@ -320,15 +335,11 @@ def exhaust():
 
 def strips(ref):
     obs = []
-    door = LineString(R["door"]).buffer(0.0045)
+    door = LineString(door_path()).buffer(0.0045)
     g = poly(R["strip"]).difference(door)
     for sgn, side in ((1, "l"), (-1, "r")):
         obs += blend.lay(ref, f"side_strip_{side}", g, side_fr(sgn), 0.0, 0.004, "body", 0.006)
     return obs
-
-
-def brake3(ref):
-    return blend.lay(ref, "lamp_brake_3", poly(R["brake3"]), rear_fr(), 0.0, 0.003, "lamp_brake", 0.004)
 
 
 # ---------------------------------------------------------------- interior
@@ -362,8 +373,8 @@ def interior(floor):
     obs = [_loft("firewall", x0 - 0.010, x0 - 0.004, lambda x: box(-2, floor + 0.002, 2, 3), n=2),
            _loft("dash", x0 - 0.0125, 0.52, lambda x: box(-2, 0.80, 2, 0.80 + 0.19 * (1 - (x0 - x) / 0.6) + 0.03), n=10)]
     for sgn, side in ((1, "l"), (-1, "r")):
-        clip = lambda x, s=sgn: (box(0.3, 0.46, 1.2, 0.97) if s > 0 else box(-1.2, 0.46, -0.3, 0.97)).difference(
-            body.inside(CV, x, 0.035 + 0.025))
+        clip = lambda x, s=sgn: (box(0.3, 0.46, 1.2, 0.97) if s > 0 else box(-1.2, 0.46, -0.3, 0.97)).intersection(
+            body.inside(CV, x, 0.035 + 0.003)).difference(body.inside(CV, x, 0.035 + 0.025))
         obs.append(_loft(f"door_card_{side}", -0.37, 0.76, clip, n=12))
         yc = 0.37 * sgn
         obs.append(_rbox(f"seat_base_{side}", -0.36, 0.14, yc - 0.25, yc + 0.25, floor + 0.002, 0.52))
@@ -466,7 +477,7 @@ def options(ref):
             ob.name = f"opt_{group}_{n}_{i}"
             out.append(ob)
     # front: 1 on the grille (the reference), 2 on the bonnet
-    add("frontbadge", 1, _flat(ref, bdg, 0.08, front_fr(), 0, sp["grille_z"], up, "fb", 0.0045, 0.0075, "chrome"))
+    add("frontbadge", 1, _flat(ref, bdg, 0.08, front_fr(), 0, 0.6, up, "fb", 0.0045, 0.0075, "chrome"))
     add("frontbadge", 2, _flat(ref, bdg, 0.08, top_fr(), sp["bonnet_x"], 0, fwd, "fb", 0.0, 0.003, "chrome"))
     # rear: 1 tailgate centre (the reference), 2 lower on the tailgate
     add("rearbadge", 1, _flat(ref, bdg, 0.10, rear_fr(), 0, sp["tailgate_z"], up, "rb", 0.0, 0.003, "chrome"))
