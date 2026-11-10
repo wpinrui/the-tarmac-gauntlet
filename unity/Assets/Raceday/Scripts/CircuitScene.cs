@@ -6,8 +6,8 @@ namespace TarmacGauntlet.Raceday
     /// <summary>
     /// Builds the circuit, the sun, a grid of 100 AI cars from every class, the pace car and the
     /// cameras when the scene starts. It is a test of the AI, so the race starts from the grid at
-    /// once; tick Rolling Start for the full game's pace car lap instead. The grid is reversed, so the
-    /// quickest car starts last and has to carve through. I hands it to you and back. V moves the
+    /// once; tick Rolling Start for the full game's pace car lap instead. The grid runs quickest to
+    /// slowest, except the player's car, which starts last and has to carve through. I hands it to you and back. V moves the
     /// cameras to the next car, and P to the next car making a pit stop. F steps the race through
     /// normal speed, 4x and 16x while the AI drives your car. Cars away from the camera glide
     /// without physics (<see cref="PhysicsRange"/>).
@@ -65,8 +65,11 @@ namespace TarmacGauntlet.Raceday
             var line = new RacingLine(circuit);
             var pits = new PitLane(circuit);
             var rng = new System.Random(11);
-            string[] field = Field();
-            System.Array.Reverse(field);   // slowest on pole, quickest last
+            // Grid order, quickest on pole, with the player's car moved from pole to the back.
+            string[] quickestFirst = Field();
+            var field = new string[quickestFirst.Length];
+            System.Array.Copy(quickestFirst, 1, field, 0, quickestFirst.Length - 1);
+            field[field.Length - 1] = quickestFirst[0];
             var cars = new CarController[field.Length];
             var grid = new RaceCar[field.Length];
             var drivers = new AiDriver[field.Length];
@@ -220,7 +223,7 @@ namespace TarmacGauntlet.Raceday
             cam.gameObject.AddComponent<FreeCamera>();
             RaceCameras views = cam.gameObject.AddComponent<RaceCameras>();
             views.Cars = cars;
-            views.Car = cars[cars.Length - 1];   // the quickest car, at the back
+            views.Car = cars[cars.Length - 1];   // the player's car, at the back
             views.Keys = keys;
             views.Hud = cam.gameObject.AddComponent<DriveHud>();
             views.Hud.Car = cars[cars.Length - 1];
