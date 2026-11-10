@@ -58,6 +58,12 @@ sealed class Racer
     public float SinceFlip = 99f;
     public float SwingExt;
     public int SwingDir;
+    /// <summary>Last step's overtake offset and place across the track, for the etiquette checks.</summary>
+    public float LastDev, LastPlace = float.NaN, LastLateral = float.NaN;
+    public bool WasOff;
+    /// <summary>This defending spell: the direction of its move, whether it turned back, and whether it broke the rule.</summary>
+    public float SpellDir;
+    public bool SpellBack, SpellBroken;
     /// <summary>Time since the car last had a car within 15 m ahead in its lane.</summary>
     public float SinceQueued = 99f;
     public readonly Dictionary<Racecraft.Mode, float> ModeTime = new Dictionary<Racecraft.Mode, float>();
@@ -216,6 +222,82 @@ sealed class Race
         }
     }
 
+    /// <summary>Defending spells with a second move off the line, and the first of them.</summary>
+    public int SecondMoves;
+    public string SecondMoveLine = "";
+    /// <summary>Times a car closed the room owed to a car alongside to under a car's width, and the first.</summary>
+    public int RoomViolations;
+    public string RoomViolationLine = "";
+    readonly HashSet<(int, int)> squeezing = new HashSet<(int, int)>();
+    /// <summary>Times a car went off at the bends at 1036 m and the hairpin at 1442 m.</summary>
+    public int HairpinOffs;
+
+    /// <summary>
+    /// The F1 one-move rule, measured on the overtake offset while defending and not overtaking: after
+    /// the first move turns back, any move away from the line breaks it. And never towards a car alongside.
+    /// </summary>
+    static readonly bool EtiquetteLog = Environment.GetEnvironmentVariable("AI_ETIQ") != null;
+
+    void Etiquette(Racer r)
+    {
+        float dev = r.Pilot.Offset, place = r.Craft.Place;
+        if (!r.Craft.Defending || r.Craft.Exempt) { r.SpellDir = 0f; r.SpellBack = false; r.SpellBroken = false; }
+        else
+        {
+            float change = dev - r.LastDev;
+            if (Math.Abs(change) > 1e-3f)
+            {
+                bool away = Math.Abs(dev) > Math.Abs(r.LastDev) || dev * r.LastDev < 0f;
+                float dir = Math.Sign(change);
+                if (r.SpellDir == 0f) { if (away) r.SpellDir = dir; }
+                else if (dir != r.SpellDir) { r.SpellBack = true; r.SpellDir = dir; }
+                if (r.SpellBack && away && EtiquetteLog)
+                    Console.WriteLine($"ETIQ {Clock(Time)} {Name(r)} {Math.Max(r.Car.TrackIndex, 0) * circuit.Step:0} m dev {r.LastDev:0.000} -> {dev:0.000} side {r.Craft.SideSteering} state {r.Craft.State} brk {r.Craft.Braking} phase {r.Craft.MovePhase} rejoin {r.Rejoin.State} pit {r.Pilot.Index}");
+                if (r.SpellBack && away && !r.SpellBroken && !r.Craft.SideSteering)
+                {
+                    r.SpellBroken = true;
+                    if (SecondMoves++ == 0)
+                        SecondMoveLine = $"{Name(r)} moved off its line a second time while defending, at {Clock(Time)} at {Math.Max(r.Car.TrackIndex, 0) * circuit.Step:0} m";
+                }
+            }
+        }
+        r.LastDev = dev;
+        Room(r);
+        r.LastLateral = r.Car.Lateral;
+        r.LastPlace = r.Pilot.Index >= 0 ? place : float.NaN;
+    }
+
+    /// <summary>
+    /// Room: a car alongside with its front axle past this car's rear axle is owed a car's width
+    /// between this car and the track edge on its side. This car breaks it when it is the one that
+    /// moved across to close the room.
+    /// </summary>
+    void Room(Racer r)
+    {
+        int k = r.Car.TrackIndex;
+        if (k < 0 || float.IsNaN(r.LastLateral)) return;
+        float axles = 2f * r.Pilot.Spec.HalfWheelbase;
+        foreach (Racer o in Racers)
+        {
+            if (o == r || o.Pilot.Gliding || float.IsNaN(o.LastLateral)) continue;
+            float gap = o.Distance - r.Distance;
+            gap -= circuit.Lap * (float)Math.Round(gap / circuit.Lap);
+            var key = (r.Id, o.Id);
+            if (!(gap > -axles && gap < Racecraft.CarLength)) { squeezing.Remove(key); continue; }
+            int ko = Math.Max(o.Car.TrackIndex, 0);
+            if (Math.Abs(o.Car.Lateral) > circuit.HalfWidth(ko)) { squeezing.Remove(key); continue; }
+            float side = Math.Sign(o.Car.Lateral - r.Car.Lateral);
+            float room = circuit.HalfWidth(k) - (side * r.Car.Lateral + Racecraft.CarWidth / 2f);
+            float mine = side * (r.Car.Lateral - r.LastLateral), theirs = -side * (o.Car.Lateral - o.LastLateral);
+            bool closing = room < Racecraft.CarWidth && mine > 0.25f * Dt && mine >= theirs;
+            if (!closing) { squeezing.Remove(key); continue; }
+            if (!squeezing.Add(key)) continue;
+            if (EtiquetteLog) Console.WriteLine($"ROOM {Clock(Time)} {Name(r)} lat {r.Car.Lateral:0.00} place {r.Craft.Place:0.00} line {r.Pilot.Line.Lateral[Math.Max(r.Pilot.Index,0)]:0.00} off {r.Pilot.Offset:0.00} spd {r.Car.Speed * 3.6f:0} | {Name(o)} lat {o.Car.Lateral:0.00} gap {gap:0.0} hw {circuit.HalfWidth(k):0.0} room {room:0.00} mine {mine:0.000} theirs {theirs:0.000} side {r.Craft.SideSteering}");
+            if (RoomViolations++ == 0)
+                RoomViolationLine = $"{Name(r)} squeezed {Name(o)} to {Math.Max(room, 0f):0.0} m of room, at {Clock(Time)} at {k * circuit.Step:0} m";
+        }
+    }
+
     /// <summary>Whether a car sits in a queue: a car within 15 m ahead in its lane.</summary>
     void Queued(Racer r)
     {
@@ -306,6 +388,7 @@ sealed class Race
                 continue;
             }
             r.Craft.Think(r.Pilot, field[i], sorted, Dt);
+            Etiquette(r);
             r.Rejoin.Prepare(r.Pilot);
             {
                 bool onLine = r.Craft.State == Racecraft.Mode.Racing;
@@ -358,6 +441,11 @@ sealed class Race
             // A mistake lasts until the car has been back on the track for a couple of seconds.
             r.SinceMistake = r.Pilot.Overcooking ? 0f : off > KerbWidth && r.SinceMistake < 2f ? 0f : r.SinceMistake + Dt;
             if (off > KerbWidth && r.SinceMistake < 2f) r.MistakeOffSteps++;
+            bool isOff = off > KerbWidth;
+            float at = k * circuit.Step;
+            if (isOff && !r.WasOff && (at > 1000f && at < 1110f || at > 1430f && at < 1500f)) HairpinOffs++;
+            r.WasOff = isOff;
+            if (off > KerbWidth && r.SinceMistake < 2f) { }
             else if (off > KerbWidth)
             {
                 if (r.OffSteps++ == 0) { r.OffTime = Time; r.OffWhere = k * circuit.Step; }
