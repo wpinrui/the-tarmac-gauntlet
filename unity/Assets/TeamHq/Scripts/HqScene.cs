@@ -6,7 +6,6 @@ namespace TarmacGauntlet.TeamHq
 {
     /// <summary>
     /// Builds the team's home workshop, lights it with fixed daylight and sets up the menu camera.
-    /// Until the menus exist, Left and Right (or Up and Down) step through the menu shots.
     /// </summary>
     public sealed class HqScene : MonoBehaviour
     {
@@ -18,9 +17,6 @@ namespace TarmacGauntlet.TeamHq
             "",
             "",
         };
-
-        private HqCamera cam;
-        private int screen;
 
         private void Awake()
         {
@@ -37,8 +33,7 @@ namespace TarmacGauntlet.TeamHq
             c.farClipPlane = 200;
             c.backgroundColor = new Color(0.1f, 0.12f, 0.11f);
             camObject.AddComponent<AudioListener>();
-            cam = camObject.AddComponent<HqCamera>();
-            cam.Cut(HqCamera.Screens[0]);
+            camObject.AddComponent<HqCamera>().Cut(HqCamera.Screens[0]);
         }
 
         private static void AddPart(Transform parent, string key, HqPart part)
@@ -138,19 +133,6 @@ namespace TarmacGauntlet.TeamHq
             probe.size = new Vector3(HqGeometry.W, HqGeometry.H * 2, HqGeometry.D);
             probe.boxProjection = true;
             probe.RenderProbe();
-        }
-
-        // Keys come through IMGUI events, so this works with either of Unity's input systems.
-        private void OnGUI()
-        {
-            Event ev = Event.current;
-            if (ev.type != EventType.KeyDown) return;
-            int step = ev.keyCode == KeyCode.RightArrow || ev.keyCode == KeyCode.DownArrow ? 1
-                : ev.keyCode == KeyCode.LeftArrow || ev.keyCode == KeyCode.UpArrow ? -1 : 0;
-            if (step == 0) return;
-            screen = (screen + step + HqCamera.Screens.Length) % HqCamera.Screens.Length;
-            cam.Show(HqCamera.Screens[screen]);
-            ev.Use();
         }
     }
 }

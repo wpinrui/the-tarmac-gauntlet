@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Builds the Unity career and save sources outside Unity, against the same API level and C# version. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>TarmacGauntlet.Career</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Assets/Career/**/*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The version com.unity.nuget.newtonsoft-json 3.2.1 ships. -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../TarmacGauntlet.Simulation/TarmacGauntlet.Simulation.csproj" />
+  </ItemGroup>
+</Project>

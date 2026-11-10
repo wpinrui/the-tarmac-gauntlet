@@ -50,7 +50,10 @@ namespace TarmacGauntlet.TeamHq
         private const float MZF = -2.5f;
         /// <summary>Bay centres, left to right seen from the doors. The race car stands in the second.</summary>
         public static readonly float[] BayX = { -8f, -3f, 2f, 7f };
-        private const float CarZ = 1.5f;
+        /// <summary>Bay centres from the doors, in the viewer's frame (Unity's Z is the negative).</summary>
+        public const float CarZ = 1.5f;
+        /// <summary>The bay that holds the race car.</summary>
+        public const int RaceBay = 1;
         private const float DoorW = 3.6f, DoorH = 3.4f, DadoH = 1.2f;
         private static readonly float[] PostX = { -10.5f, -5.5f, -0.5f, 4.5f, 9.5f };
 

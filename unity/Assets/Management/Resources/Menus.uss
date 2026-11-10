@@ -1,0 +1,96 @@
+/* The management menus: frosted glass with broadcast type, laid out on a 1600 x 900 reference screen.
+   Fonts are set from code (Menus.cs). Glass blur, sheen and shadows are drawn by MenuGlass.cs. */
+
+.root { position: absolute; left: 0; top: 0; right: 0; bottom: 0; color: rgb(255, 255, 255); }
+.layer { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
+.centre { align-items: center; justify-content: center; }
+.fade { transition-property: opacity; transition-duration: 0.18s; }
+.off { opacity: 0; }
+.dimmer { background-color: rgba(0, 0, 0, 0.28); }
+
+/* Glass */
+.glass { overflow: hidden; border-width: 1px; border-color: rgba(255, 255, 255, 0.2); border-top-color: rgba(255, 255, 255, 0.3); border-radius: 20px; }
+.glass-blur, .glass-sheen { position: absolute; -unity-background-scale-mode: stretch-to-fill; }
+.glass-sheen { left: 0; top: 0; right: 0; bottom: 0; }
+.glass-shadow { position: absolute; -unity-background-scale-mode: stretch-to-fill; -unity-slice-left: 32; -unity-slice-right: 32; -unity-slice-top: 32; -unity-slice-bottom: 32; }
+
+/* Top bar */
+.top { position: absolute; left: 32px; right: 32px; top: 24px; flex-direction: row; justify-content: space-between; align-items: center; }
+.team { flex-direction: row; align-items: center; }
+.badge { width: 32px; height: 32px; margin-right: 14px; -unity-background-scale-mode: scale-to-fit; }
+.team-name { font-size: 16px; letter-spacing: 1.1px; }
+.meta { flex-direction: row; align-items: center; height: 46px; padding-left: 22px; padding-right: 22px; }
+.year { font-size: 15px; letter-spacing: 0.9px; color: rgba(255, 255, 255, 0.62); margin-right: 18px; }
+.money { font-size: 21px; color: rgb(61, 220, 132); }
+
+/* Menus */
+.menu { position: absolute; left: 32px; top: 112px; padding: 10px; }
+.layer.centre > .menu { position: relative; left: 0; top: 0; }
+.group.spaced { margin-top: 14px; }
+.item { width: 272px; height: 40px; padding-left: 16px; padding-right: 16px; border-radius: 12px; font-size: 15px; letter-spacing: 0.9px; -unity-text-align: middle-left; }
+.item:hover { background-color: rgba(255, 255, 255, 0.1); }
+.item.on { background-color: rgba(255, 255, 255, 0.2); }
+
+/* Icon strip */
+.strip { position: absolute; left: 32px; top: 112px; padding: 8px; }
+.strip .group.spaced { margin-top: 12px; }
+.icon { width: 52px; height: 46px; border-radius: 12px; align-items: center; justify-content: center; }
+.icon:hover, .icon.on { background-color: rgba(255, 255, 255, 0.1); }
+.icon.on { background-color: rgba(255, 255, 255, 0.2); }
+.icon-image { width: 22px; height: 22px; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.75); }
+.icon:hover .icon-image, .icon.on .icon-image { -unity-background-image-tint-color: rgb(255, 255, 255); }
+
+/* Car tag */
+.tag { position: absolute; width: 250px; padding: 12px 16px; }
+.tag-name { font-size: 16px; letter-spacing: 0.8px; margin-bottom: 8px; white-space: normal; }
+.condition { flex-direction: row; align-items: center; }
+.bar { flex-grow: 1; height: 5px; border-radius: 9px; background-color: rgba(255, 255, 255, 0.15); margin-right: 10px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 9px; }
+.percent { font-size: 15px; }
+.hi .bar-fill { background-color: rgb(61, 220, 132); }
+.hi .percent { color: rgb(61, 220, 132); }
+.mid .bar-fill { background-color: rgb(255, 176, 32); }
+.mid .percent { color: rgb(255, 176, 32); }
+.lo .bar-fill { background-color: rgb(255, 90, 79); }
+.lo .percent { color: rgb(255, 90, 79); }
+
+/* Red buttons: a gradient child under the label, clipped to the corners */
+.red { overflow: hidden; border-radius: 20px; border-top-width: 1px; border-color: rgba(255, 255, 255, 0.3); border-left-width: 0; border-right-width: 0; border-bottom-width: 0; align-items: center; justify-content: center; }
+.red-fill { position: absolute; left: 0; top: 0; right: 0; bottom: 0; -unity-background-scale-mode: stretch-to-fill; }
+.red:hover .red-fill { -unity-background-image-tint-color: rgb(255, 225, 220); }
+.red-label { letter-spacing: 2.9px; -unity-text-align: middle-center; }
+.race { position: absolute; right: 40px; bottom: 40px; height: 62px; padding-left: 54px; padding-right: 54px; }
+.race .red-label { font-size: 22px; letter-spacing: 3.5px; }
+.panel-button { height: 52px; flex-shrink: 0; }
+.panel-button .red-label { font-size: 18px; }
+
+/* Docked panel */
+.panel { position: absolute; right: 32px; top: 100px; bottom: 32px; width: 620px; border-radius: 24px; padding: 16px; }
+.panel-body { flex-grow: 1; }
+
+/* Main menu: a tall glass column on the left edge */
+.main-column { position: absolute; left: 0; top: 0; bottom: 0; width: 470px; border-left-width: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; border-top-right-radius: 28px; border-bottom-right-radius: 28px; padding: 110px 56px; }
+.wordmark { height: 200px; margin-bottom: 80px; -unity-background-scale-mode: scale-to-fit; }
+.main-item { height: auto; padding: 12px 18px; margin-left: -18px; border-radius: 14px; font-size: 24px; letter-spacing: 0; }
+.main-item:hover { background-color: rgba(255, 255, 255, 0.2); }
+.main-item .label { font-size: 24px; }
+.main-item .sub { font-size: 14px; color: rgba(255, 255, 255, 0.62); margin-top: 2px; }
+
+/* Settings */
+.settings { width: 560px; border-radius: 24px; padding: 16px; }
+.settings-group.spaced { margin-top: 22px; }
+.row { flex-direction: row; align-items: center; height: 44px; padding-left: 16px; padding-right: 6px; border-radius: 12px; }
+.row:hover { background-color: rgba(255, 255, 255, 0.1); }
+.row-label { flex-grow: 1; font-size: 14px; letter-spacing: 1.1px; color: rgba(255, 255, 255, 0.62); }
+.stepper { width: 250px; flex-direction: row; align-items: center; }
+.stepper-value { flex-grow: 1; font-size: 15px; letter-spacing: 0.6px; -unity-text-align: middle-center; }
+.chevron { width: 36px; height: 36px; border-radius: 10px; align-items: center; justify-content: center; }
+.chevron:hover { background-color: rgba(255, 255, 255, 0.1); }
+.chevron-image { width: 18px; height: 18px; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.75); }
+.chevron:hover .chevron-image { -unity-background-image-tint-color: rgb(255, 255, 255); }
+.slider { width: 250px; flex-direction: row; align-items: center; padding-right: 10px; }
+.track { flex-grow: 1; height: 34px; justify-content: center; margin-right: 12px; }
+.track-line { height: 6px; border-radius: 9px; background-color: rgba(255, 255, 255, 0.15); }
+.track-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 9px; background-color: rgb(255, 255, 255); }
+.knob { position: absolute; top: 9px; width: 16px; height: 16px; margin-left: -8px; border-radius: 8px; background-color: rgb(255, 255, 255); }
+.slider-value { width: 32px; font-size: 15px; -unity-text-align: middle-right; }
