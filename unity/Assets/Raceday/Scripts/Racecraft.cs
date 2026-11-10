@@ -116,6 +116,10 @@ namespace TarmacGauntlet.Raceday
         private const float SideCollisionMargin = 2f;      // SIDE_COLLISION_MARGIN, m
         private const float BorderOvertakeMargin = 0.5f;   // BORDER_OVERTAKE_MARGIN, m
         private const float WidthDiv = 3f;                 // WIDTH_DIV
+        /// <summary>Not in the tutorial: how far ahead the braking check follows a car drifting across the track, s.</summary>
+        private const float PredictFor = 1f;
+        /// <summary>Not in the tutorial: how far ahead picking the overtaking side follows the car ahead's drift, s.</summary>
+        private const float CatchPredictFor = 2f;
         /// <summary>
         /// Not in the tutorial: overtaking uses width / 2.5 either side of the middle, not width / 3.
         /// At width / 3 three slow cars side by side fill the room, and a lap-1 pack queues behind them.
@@ -162,6 +166,9 @@ namespace TarmacGauntlet.Raceday
             float lap = c.Lap;
             float here = Mathf.Repeat(me.Distance, lap);
             float mySpeed = me.Speed;
+            // Not in the tutorial: a car held back by the one ahead compares with the speed it would
+            // go without it, so a car it has slowed to match still counts as slower and is overtaken.
+            float wantSpeed = Mathf.Max(mySpeed, pilot.FreeSpeed);
 
             // filterBColl's terms for this car.
             CarSpec spec = pilot.Spec;
@@ -194,13 +201,18 @@ namespace TarmacGauntlet.Raceday
                     continue;
                 }
 
-                if (distance > sideCollDist && o.Speed < mySpeed)
+                if (distance > sideCollDist && o.Speed < wantSpeed)
                 {
                     // OPP_FRONT
-                    float catchDist = mySpeed * distance / (mySpeed - o.Speed);
+                    float catchDist = wantSpeed * distance / (wantSpeed - o.Speed);
                     distance -= CarLength;   // MAX of the two cars' lengths
                     distance -= LengthMargin;
-                    float carDist = Mathf.Abs(o.Lateral - me.Lateral) - Mathf.Abs(Width(o) / 2f) - CarWidth / 2f;
+                    // Not in the tutorial: the car ahead is taken where it will be across the track when
+                    // I reach it, at the speed it moves across, as well as where it is now.
+                    float reachIn = mySpeed > o.Speed ? Mathf.Min(distance / (mySpeed - o.Speed), PredictFor) : 0f;
+                    float later = o.Lateral + o.Across * reachIn;
+                    float nearest = Mathf.Clamp(me.Lateral, Mathf.Min(o.Lateral, later), Mathf.Max(o.Lateral, later));
+                    float carDist = Mathf.Abs(nearest - me.Lateral) - Mathf.Abs(Width(o) / 2f) - CarWidth / 2f;
                     if (catchDist < minCatch)
                     {
                         minCatch = catchDist;
@@ -251,7 +263,10 @@ namespace TarmacGauntlet.Raceday
                 State = Mode.Overtaking;
                 int ko = c.IndexOf(Mathf.Repeat(front.Distance, lap));
                 float w = c.Data.width[ko] / OvertakeWidthDiv - BorderOvertakeMargin;
-                float otm = front.Lateral;
+                // Not in the tutorial: the side is picked from where the car ahead will be across the
+                // track when I catch it, at the speed it moves across.
+                float catchIn = Mathf.Min(minCatch / Mathf.Max(wantSpeed, 1f), CatchPredictFor);
+                float otm = front.Lateral + front.Across * catchIn;
                 if (otm > 0f && myOffset > -w) myOffset -= step;
                 else if (otm < 0f && myOffset < w) myOffset += step;
             }
