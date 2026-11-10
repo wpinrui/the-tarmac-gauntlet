@@ -10,9 +10,12 @@ namespace TarmacGauntlet.Raceday
         public readonly Material Material;
         /// <summary>Cars collide with it.</summary>
         public readonly bool Solid;
+        /// <summary>Stands up off the ground, so it casts a shadow worth drawing.</summary>
+        public readonly bool CastsShadows;
 
-        public CircuitPart(string name, MeshKit kit, Material material, bool solid)
+        public CircuitPart(string name, MeshKit kit, Material material, bool solid, bool castsShadows)
         {
+            CastsShadows = castsShadows;
             Name = name;
             Kit = kit;
             Material = material;

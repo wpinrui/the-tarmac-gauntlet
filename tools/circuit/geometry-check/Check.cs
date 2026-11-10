@@ -21,6 +21,8 @@
 //   fences clear of the road  no fence stands on or leans over the road or pit lane
 //   no ground walls       past an unfenced runoff edge the ground rises no steeper than 1 in 1
 //   no missing faces      fences and buildings are closed solids, with no open face to see through
+//   cheap to draw         at most 1M triangles and 600k vertices in all, 40k triangles in any one mesh, and no
+//                         mesh spread wider than 300 m, so the meshes out of view are culled
 // GC_KINDS=1 lists failures per pair of parts; GC_STEP or GC_FIGHT set to such a pair lists its spots.
 using System;
 using System.Collections.Generic;
@@ -56,7 +58,17 @@ static partial class Check
         var data = JsonSerializer.Deserialize<CircuitData>(File.ReadAllText(args[0]), new JsonSerializerOptions { IncludeFields = true });
         circuit = new Circuit(data);
         builder = new CircuitBuilder(circuit, null);
-        List<CircuitPart> parts = builder.Build();
+        List<CircuitPart> chunks = builder.Build();
+        Budget(chunks);
+        // The other rules judge each part whole, however it is cut up for drawing.
+        var parts = new List<CircuitPart>();
+        foreach (var named in chunks.GroupBy(p => p.Name))
+        {
+            var kit = new MeshKit();
+            foreach (CircuitPart p in named) kit.Append(p.Kit);
+            CircuitPart first = named.First();
+            parts.Add(new CircuitPart(first.Name, kit, first.Material, first.Solid, first.CastsShadows));
+        }
 
         foreach (CircuitPart p in parts.Where(p => !NotCover.Contains(p.Name)))
             foreach (var t in TopTriangles(p)) Add(t, p.Name);
