@@ -205,7 +205,7 @@ static partial class Check
                 float road = x.Distance - y.Distance;
                 road -= circuit.Lap * (float)Math.Round(road / circuit.Lap);
                 if (Math.Abs(road) < 40f)
-                    Console.WriteLine($"{Race.Clock(r.Time)} {x.Car.TrackIndex * circuit.Step,5:0} m gap {road,6:0.0}  #{x.Id} {x.Car.Speed * 3.6f,4:0} {x.Craft.State,-10} {x.Craft.Plan,-10} off {x.Pilot.Offset,5:0.0} tgt {x.Craft.Target,5:0.0} cap {Math.Min(x.Pilot.SpeedCap, 999f) * 3.6f,4:0} lat {x.Car.Lateral,5:0.0}   #{y.Id} {y.Car.Speed * 3.6f,4:0} {y.Craft.State,-10} {y.Craft.Plan,-10} off {y.Pilot.Offset,5:0.0} tgt {y.Craft.Target,5:0.0} cap {Math.Min(y.Pilot.SpeedCap, 999f) * 3.6f,4:0} lat {y.Car.Lateral,5:0.0}");
+                    Console.WriteLine($"{Race.Clock(r.Time)} {x.Car.TrackIndex * circuit.Step,5:0} m gap {road,6:0.0}  #{x.Id} {x.Car.Speed * 3.6f,4:0} {x.Craft.State,-10} {x.Craft.Plan,-10} off {x.Pilot.Offset,5:0.0} tgt {x.Craft.Target,5:0.0} cap {Math.Min(x.Pilot.SpeedCap, 999f) * 3.6f,4:0} lat {x.Car.Lateral,5:0.0} yaw {x.Car.YawRate,5:0.00} err {x.Pilot.LateralError,5:0.0} tspd {x.Pilot.TargetSpeed * 3.6f,4:0}   #{y.Id} {y.Car.Speed * 3.6f,4:0} {y.Craft.State,-10} {y.Craft.Plan,-10} off {y.Pilot.Offset,5:0.0} tgt {y.Craft.Target,5:0.0} cap {Math.Min(y.Pilot.SpeedCap, 999f) * 3.6f,4:0} lat {y.Car.Lateral,5:0.0}");
             }
             return r.Racers.Max(c => c.Laps) >= laps;
         }, 60f * 20f);
@@ -222,14 +222,23 @@ static partial class Check
         if (race.Contacts.Count > race.Racers.Count) problems.Add($"{race.Contacts.Count} contacts");
         if (lapping == 0) problems.Add("nobody was lapped");
         if (race.FastestStuck >= 3) problems.Add(race.FastestStuckLine);
-        if (race.PassCount - lapping - classes < 1) problems.Add("no passes within a class");
+        // Within a class the cars are close in pace, so on the normal grid a pass is only owed where
+        // one is clearly quicker than a classmate it started behind. On the reversed grid the field
+        // is all traffic, which decides who catches whom in four laps, but there are always passes.
+        if (!reversed)
+            foreach (Racer a in race.Racers)
+                foreach (Racer b in race.Racers)
+                    if (a.Entry.Model[0] == b.Entry.Model[0] && b.Entry.Start < a.Entry.Start
+                        && b.Pilot.Profile.LapTime < a.Pilot.Profile.LapTime * 0.99f && b.Distance < a.Distance)
+                        problems.Add($"{race.Name(b)} is {100f * (1f - b.Pilot.Profile.LapTime / a.Pilot.Profile.LapTime):0.0}% quicker than {race.Name(a)} but never got by");
+        if (reversed && race.PassCount - lapping - classes < 1) problems.Add("no passes within a class");
         Report($"{(reversed ? "reversed " : "")}pack race ({race.Racers.Count} cars, {laps} laps: {race.PassCount - lapping - classes} passes within a class, {classes} between classes, {lapping} lappings, {race.Contacts.Count} contacts, closest following {race.ClosestFollow:0.0} m, {race.Racers.Sum(r => r.Pilot.Mistakes)} mistakes, {race.Racers.Sum(r => r.MistakeOffSteps) * Race.Dt:0} s off after them, fastest car {race.FastestStuck} corners behind the slowest, any car up to {race.WorstStuck} corners behind one two classes slower)", problems);
         if (!verbose) return;
         if (race.WorstStuck > 0) Console.WriteLine("  " + race.WorstStuckLine);
         foreach (string p in race.Passes) Console.WriteLine("  " + p);
         foreach (Contact c in race.Contacts) Console.WriteLine($"  contact {Race.Clock(c.Time)} {c.A} and {c.B} at {c.Where:0} m, {c.Speed:0.0} m/s");
         foreach (Racer r in race.Racers.OrderByDescending(r => r.Distance))
-            Console.WriteLine($"  {race.Name(r),-8} lap {r.Laps} pace {r.Entry.Pace:0} laps {string.Join(" ", r.LapTimes.Select(Time))}  passes {r.Craft.Passes} defences {r.Craft.Defences}  {string.Join(" ", r.ModeTime.Select(m => $"{m.Key} {m.Value:0}s"))}");
+            Console.WriteLine($"  {race.Name(r),-8} lap {r.Laps} pace {r.Entry.Pace:0} solo {Time(r.Pilot.Profile.LapTime)} laps {string.Join(" ", r.LapTimes.Select(Time))}  passes {r.Craft.Passes} defences {r.Craft.Defences}  {string.Join(" ", r.ModeTime.Select(m => $"{m.Key} {m.Value:0}s"))}");
     }
 
     /// <summary>Two identical cars, the second close behind: it can't pass, so it must hold a gap without touching.</summary>
