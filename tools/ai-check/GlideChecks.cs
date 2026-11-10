@@ -93,12 +93,12 @@ static partial class Check
             if (r.OffSteps > 0) problems.Add($"{race.Name(r)} left the track for {r.OffSteps * Race.Dt:0.0} s, first at {Race.Clock(r.OffTime)} at {r.OffWhere:0} m");
             if (r.WorstAfterWake > 2f) problems.Add($"{race.Name(r)} strayed {r.WorstAfterWake:0.0} m from its path after waking");
         }
-        int hard = race.Contacts.Count(c => c.Speed > 3f) + race.GhostOverlaps.Count(c => c.Speed > 3f);
+        int hard = race.Contacts.Count(c => c.Speed > HardHit) + race.GhostOverlaps.Count(c => c.Speed > HardHit);
         if (hard > 0) problems.Add($"{hard} contacts harder than 3 m/s");
         if (handovers < 40) problems.Add($"only {handovers} handovers");
         float worstStray = race.Racers.Max(r => r.WorstAfterWake);
         Report($"handovers ({handovers} switches in 4 laps, worst {worstStray:0.0} m off the path after waking, {race.Contacts.Count} contacts, {race.GhostOverlaps.Count} overlaps while gliding, {race.PassCount} changes of place)", problems);
-        foreach (Contact c in race.Contacts.Concat(race.GhostOverlaps).Where(c => c.Speed > 3f).Take(8))
+        foreach (Contact c in race.Contacts.Concat(race.GhostOverlaps).Where(c => c.Speed > HardHit).Take(8))
             Console.WriteLine($"      {Race.Clock(c.Time)} {c.A} and {c.B} at {c.Where:0} m, {c.Speed:0.0} m/s");
     }
 

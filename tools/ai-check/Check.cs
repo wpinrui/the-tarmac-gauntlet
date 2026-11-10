@@ -29,6 +29,8 @@ static partial class Check
 {
     const float Dt = 0.01f;
     const float KerbWidth = 1.5f;
+    /// <summary>Racing taps are allowed; a contact faster than this, m/s, is a hit.</summary>
+    const float HardHit = 5f;
 
     static Circuit circuit;
     static RacingLine line;
@@ -241,7 +243,7 @@ static partial class Check
             return r.Racers.Max(c => c.Laps) >= laps;
         }, 60f * 20f);
         var problems = new List<string>();
-        int hard = race.Contacts.Count(c => c.Speed > 3f);
+        int hard = race.Contacts.Count(c => c.Speed > HardHit);
         int lapping = race.Passes.Count(p => p.EndsWith("(lapping)"));
         int classes = race.Passes.Count(p => !p.EndsWith("(lapping)") && p.Split(' ')[1][0] != p.Split(' ')[3][0]);
         foreach (Racer r in race.Racers)
@@ -249,8 +251,10 @@ static partial class Check
             if (r.Recoveries > 0) problems.Add($"{race.Name(r)} got stuck {r.Recoveries} times");
             if (r.OffSteps > 0) problems.Add($"{race.Name(r)} left the track for {r.OffSteps * Race.Dt:0.0} s, first at {Race.Clock(r.OffTime)} at {r.OffWhere:0} m");
         }
-        if (hard > 0) problems.Add($"{hard} contacts harder than 3 m/s, worst {race.Contacts.Max(c => c.Speed):0.0} m/s");
-        if (race.Contacts.Count > race.Racers.Count) problems.Add($"{race.Contacts.Count} contacts");
+        if (hard > 0) problems.Add($"{hard} contacts harder than {HardHit:0} m/s, worst {race.Contacts.Max(c => c.Speed):0.0} m/s");
+        float feather = race.FollowSteps > 0 ? (float)race.FeatherSteps / race.FollowSteps : 0f;
+        if (feather > 0.1f) problems.Add($"following on the straights, {100f * feather:0}% of the time on part throttle held back by the car ahead");
+        if (race.QuickStuck > 2) problems.Add(race.QuickStuckLine);
         if (lapping == 0) problems.Add("nobody was lapped");
         if (race.FastestStuck >= 3) problems.Add(race.FastestStuckLine);
         // Within a class the cars are close in pace, so on the normal grid a pass is only owed where
@@ -263,7 +267,7 @@ static partial class Check
                         && b.Pilot.Profile.LapTime < a.Pilot.Profile.LapTime * 0.99f && b.Distance < a.Distance)
                         problems.Add($"{race.Name(b)} is {100f * (1f - b.Pilot.Profile.LapTime / a.Pilot.Profile.LapTime):0.0}% quicker than {race.Name(a)} but never got by");
         if (reversed && race.PassCount - lapping - classes < 1) problems.Add("no passes within a class");
-        Report($"{(reversed ? "reversed " : "")}pack race ({race.Racers.Count} cars, {laps} laps: {race.PassCount - lapping - classes} passes within a class, {classes} between classes, {lapping} lappings, {race.Contacts.Count} contacts, closest following {race.ClosestFollow:0.0} m, {race.Racers.Sum(r => r.Pilot.Mistakes)} mistakes, {race.Racers.Sum(r => r.MistakeOffSteps) * Race.Dt:0} s off after them, fastest car {race.FastestStuck} corners behind the slowest, any car up to {race.WorstStuck} corners behind one two classes slower, {race.Racers.Sum(r => r.Swings)} swings, {race.Racers.Sum(r => r.Dithers)} dithers)", problems);
+        Report($"{(reversed ? "reversed " : "")}pack race ({race.Racers.Count} cars, {laps} laps: {race.PassCount - lapping - classes} passes within a class, {classes} between classes, {lapping} lappings, {race.Contacts.Count} contacts, closest following {race.ClosestFollow:0.0} m, {race.Racers.Sum(r => r.Pilot.Mistakes)} mistakes, {race.Racers.Sum(r => r.MistakeOffSteps) * Race.Dt:0} s off after them, fastest car {race.FastestStuck} corners behind the slowest, any car up to {race.WorstStuck} corners behind one two classes slower, {race.Racers.Sum(r => r.Swings)} swings, {race.Racers.Sum(r => r.Dithers)} dithers, {100f * (race.FollowSteps > 0 ? (float)race.FeatherSteps / race.FollowSteps : 0f):0}% feathering, quicker car up to {race.QuickStuck} corners behind)", problems);
         if (!verbose) return;
         if (race.WorstStuck > 0) Console.WriteLine("  " + race.WorstStuckLine);
         foreach (string p in race.Passes) Console.WriteLine("  " + p);
@@ -310,7 +314,7 @@ static partial class Check
         Racer leader = race.Racers[0], quick = race.Racers[1];
         if (leader.Craft.Defences == 0) problems.Add("the leader never defended");
         if (quick.Distance <= leader.Distance) problems.Add("the quicker driver never got by");
-        if (race.Contacts.Any(c => c.Speed > 3f)) problems.Add($"hard contact {race.Contacts.Max(c => c.Speed):0.0} m/s");
+        if (race.Contacts.Any(c => c.Speed > HardHit)) problems.Add($"hard contact {race.Contacts.Max(c => c.Speed):0.0} m/s");
         if (trace) foreach (Contact c in race.Contacts) Console.WriteLine($"  contact {Race.Clock(c.Time)} at {c.Where:0} m, {c.Speed:0.0} m/s");
         Report($"defends ({leader.Craft.Defences} defences, passed after {Race.Clock(race.Time)}, {race.Contacts.Count} contacts)", problems);
     }

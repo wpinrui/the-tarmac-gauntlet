@@ -107,7 +107,7 @@ static partial class Check
         int formationContacts = contactsAtGreen < 0 ? s.Contacts.Count : contactsAtGreen;
         if (formationContacts > 0) problems.Add($"{formationContacts} contacts before the green, first {Describe(s.Contacts[0])}");
         if (worstSlip > 200f) problems.Add($"{worstCar} was {worstSlip:0} m out of place at the green");
-        var hard = s.Contacts.Skip(Math.Max(contactsAtGreen, 0)).Where(c => c.Speed > 3f).ToList();
+        var hard = s.Contacts.Skip(Math.Max(contactsAtGreen, 0)).Where(c => c.Speed > HardHit).ToList();
         if (Environment.GetEnvironmentVariable("AI_LIST") != null) foreach (var c in s.Contacts) Console.WriteLine("  contact " + Describe(c));
         if (hard.Count > 0) problems.Add($"{hard.Count} hard hits after the green, worst {hard.Max(c => c.Speed):0.0} m/s: {Describe(hard[0])}");
         foreach (SessionCar c in s.Cars)

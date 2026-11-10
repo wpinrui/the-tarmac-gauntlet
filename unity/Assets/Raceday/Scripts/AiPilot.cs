@@ -218,7 +218,11 @@ namespace TarmacGauntlet.Raceday
             // car turns out to be too fast, so it runs wide or off.
             float correction = SpeedGain * (target - speed);
             if (committed && !held && correction < 0f) correction = 0f;
-            float want = (held ? 0f : laneAccel * scale * scale * SpeedScale * SpeedScale * worn * worn) + correction;
+            // Held back only once the cap is down to this car's speed: until then it stays flat, rather
+            // than trimming the throttle to creep up on the car ahead.
+            bool capped = held && SpeedCap < speed + 0.5f;
+            float want = (capped ? 0f : laneAccel * scale * scale * SpeedScale * SpeedScale * worn * worn) + correction;
+            if (held && !capped) want = Mathf.Max(want, Profile.EngineAccel(speed));
             float needed = want + Profile.Resist(Index, speed);
             var controls = new Controls { Steer = steer };
             if (needed >= 0f)
