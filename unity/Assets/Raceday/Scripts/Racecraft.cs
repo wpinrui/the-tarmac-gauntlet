@@ -131,6 +131,8 @@ namespace TarmacGauntlet.Raceday
         private const float Tick = 0.1f;
         /// <summary>Metres further on, over the planning time, that make a path worth leaving the line for.</summary>
         private const float WorthIt = 1f;
+        /// <summary>Metres the line has to gain over a pass under way before the car gives the pass up.</summary>
+        private const float Stick = 4f;
         /// <summary>Metres a path is credited with for winning the place from the car ahead.</summary>
         private const float PassWorth = 15f;
         /// <summary>Distance a pass may go on losing to the line before it is dropped, metres.</summary>
@@ -155,6 +157,7 @@ namespace TarmacGauntlet.Raceday
             public Kind Kind;
             public int Corner = -1;
             public int Start;              // line sample the path starts at
+            public float Off;              // the offset it moves to and holds
             public float[] Offset;         // per sample from Start
             public float[] Speed;          // per sample from Start, braking in time for what is ahead
             public float Score;            // metres covered over the planning time
@@ -171,6 +174,7 @@ namespace TarmacGauntlet.Raceday
         private float losing;              // metres the pass has been losing to the line for
         private int bannedCorner = -1;     // corner a pass was given up at: no new pass into it
         private float speed;               // this car's, this step
+        private float sincePass = float.PositiveInfinity;   // seconds since this car last planned a pass
         private float heldUp;              // how long the car ahead has been holding this one up, seconds
         private bool committed;            // having a go at an evenly matched car
         private int defendCorner = -1;
@@ -228,6 +232,7 @@ namespace TarmacGauntlet.Raceday
             float shift = pilot.Shift;
             speed = me.Speed;
             heldUp = pilot.HeldBy > 1f ? heldUp + dt : 0f;
+            sincePass = plan.Kind != Kind.Line ? 0f : sincePass + dt;
 
             // Who is around, and how they relate to this car.
             near.Clear();
@@ -495,11 +500,18 @@ namespace TarmacGauntlet.Raceday
             // the car behind plans round where it is going.
             int target = baseline.Blocked ? BlockerAhead(line, c, pilot.Shift) : -1;
             if (givingWay && target >= 0 && !(near[target].Slower || near[target].BeingLapped)) target = -1;
+            // Getting by a slower car, or a queue of them, a pass under way is held on to; between
+            // evenly matched cars a pass is a move into one corner.
+            bool queue = target >= 0 && (near[target].Slower || near[target].BeingLapped);
+            bool going = plan.Kind != Kind.Line && (queue || plan.Corner == corner);
             if (target >= 0 && !defending && corner >= 0 && corner != bannedCorner)
             {
                 Near t = near[target];
                 float inner = Mathf.Clamp(t.Shift + inside * Beside, -MaxShift, MaxShift);
                 float outer = Mathf.Clamp(t.Shift - inside * Beside, -MaxShift, MaxShift);
+                // Stay where it is, out of the queue, and keep its foot down to the corner's turn-in.
+                if (queue && Mathf.Abs(now) > 1f && a > ramp)
+                    candidates.Add(Make(Kind.Straight, start, samples, c, now, ramp, now, 0f, a - 30f, corner));
                 // The inside of this corner, held to its exit.
                 candidates.Add(Make(Kind.Inside, start, samples, c, now, ramp, inner, 0f, b + 20f, corner));
                 // The same with later braking, while there is a braking zone still to come.
@@ -537,14 +549,31 @@ namespace TarmacGauntlet.Raceday
 
             // The furthest path wins. Leaving the line has to be worth it, but a pass already under
             // way only has to keep up with the line.
+            // Mid-pass, a line that cuts back into a car alongside is no way out: the car holds its
+            // course until there is room, rather than steering at the car and being fenced off again.
+            bool trapped = going && queue && baseline.Rejected;
             Path best = baseline;
-            bool going = plan.Kind != Kind.Line && plan.Corner == corner;
-            foreach (Path p in candidates)
+            if (trapped)
+            {
+                best = candidates.Find(q => q.Kind == Kind.Straight && q.Off == now) ?? candidates.Find(q => q.Kind == plan.Kind) ?? baseline;
+                foreach (Path p in candidates)
+                    if (p != baseline && !p.Rejected && (best.Rejected || p.Score > best.Score)) best = p;
+            }
+            else foreach (Path p in candidates)
             {
                 if (p == baseline || p.Rejected) continue;
                 // A pass under way only has to stay close to the line; a committed dive more so, since
                 // the inside line is slower until the place is won.
                 float need = !(going && p.Kind == plan.Kind) ? WorthIt : committed ? -8f : -WorthIt;
+                if (queue)
+                {
+                    // Past slower cars it gives way to nothing but a clearly better line, or the car
+                    // twitches between them. Crossing to the other side of the car being passed has to
+                    // be clearly worth it, and so has going straight out again just after coming back in.
+                    bool sameSide = (p.Off - near[target].Shift) * (now - near[target].Shift) > 0f;
+                    need = going ? (p.Kind == plan.Kind ? -Stick : sameSide ? -Stick * 0.5f : WorthIt + Stick)
+                        : WorthIt + (sincePass < 1.5f ? (sameSide ? Stick : 3f * Stick) : 0f);
+                }
                 if (p.Score > best.Score + need) best = p;
             }
 
@@ -568,7 +597,7 @@ namespace TarmacGauntlet.Raceday
 
             // Give up a pass that has been losing to the line for a while: back in line, which frees
             // the space beside the car ahead for whoever is behind.
-            if (best.Kind != Kind.Line && going)
+            if (best.Kind != Kind.Line && going && !trapped)
             {
                 losing = best.Score < baseline.Score ? losing + speed * PlanEvery : 0f;
                 if (losing > GiveUpAfter) { bannedCorner = corner; best = baseline; }
@@ -590,7 +619,7 @@ namespace TarmacGauntlet.Raceday
         private static Path Make(Kind kind, int start, int samples, Circuit c, float now, float ramp, float off,
             float from = 0f, float to = float.MaxValue, int corner = -1)
         {
-            var p = new Path { Kind = kind, Start = start, Corner = kind == Kind.Line ? -1 : corner, Offset = new float[samples], Speed = new float[samples] };
+            var p = new Path { Kind = kind, Start = start, Corner = kind == Kind.Line ? -1 : corner, Off = off, Offset = new float[samples], Speed = new float[samples] };
             float reach = Mathf.Max(from, ramp);
             for (int m = 0; m < samples; m++)
             {
@@ -723,7 +752,7 @@ namespace TarmacGauntlet.Raceday
                             }
                         }
                     }
-                    else if (gap > -CarLength * 0.6f && o.Gap > -(CarLength + 1f) && p.Kind != Kind.Line)
+                    else if (gap > -CarLength * 0.6f && o.Gap > -(CarLength + 1f))
                         p.Rejected = true;   // into a car beside it
                 }
                 s = next;
