@@ -18,6 +18,8 @@ sealed class Entry
 
 sealed class Racer
 {
+    /// <summary>The throttle its pilot asked for this step, 0 to 1.</summary>
+    public float Throttle;
     public int Id;
     /// <summary>Times the car was set back on its wheels.</summary>
     public int Righted;
@@ -464,6 +466,7 @@ sealed class Race
             Queued(r);
             r.Car.Reverse = c.Reverse;
             if (r.Car.UpY < Rejoin.FlippedUp) c = new AiPilot.Controls { Brake = 1f };
+            r.Throttle = c.Throttle;
             r.Car.Step(Dt, c.Throttle, c.Brake, c.Steer);
             r.ModeTime[r.Craft.State] = (r.ModeTime.TryGetValue(r.Craft.State, out float t) ? t : 0f) + Dt;
         }

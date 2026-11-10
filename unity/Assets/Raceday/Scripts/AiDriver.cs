@@ -39,6 +39,8 @@ namespace TarmacGauntlet.Raceday
         public int Garage = -1;
         /// <summary>The start this car takes part in, if any.</summary>
         public Starter Starter;
+        /// <summary>True once the car is out of the race and limps to its box: it keeps its physics, so it drives at its limping pace.</summary>
+        [System.NonSerialized] public bool Limping;
         /// <summary>A pilot built beforehand, on its tuned line: the car drives with it from the start, with no tuning.</summary>
         [System.NonSerialized] public AiPilot Given;
 
@@ -113,10 +115,20 @@ namespace TarmacGauntlet.Raceday
             if (Racer != null && (Pilot.Pace != Pace || Pilot.Consistency != Consistency || Pilot.Safety != Safety)) Use(NewPilot(Pilot.Line));
         }
 
+        /// <summary>A new driver takes the wheel, as at a driver change: the car drives at their pace from now on.</summary>
+        public void SetDriver(float pace, float consistency, float safety)
+        {
+            Pace = pace;
+            Consistency = consistency;
+            Safety = safety;
+            if (Racer != null && (Pilot.Pace != Pace || Pilot.Consistency != Consistency || Pilot.Safety != Safety)) Use(NewPilot(Pilot.Line));
+        }
+
         private AiPilot NewPilot(RacingLine line) => new AiPilot(line, car.Spec, Pace, Consistency, Safety, Seed);
 
         private void Use(AiPilot pilot)
         {
+            pilot.Limp = Pilot.Limp;   // a limping car keeps limping on its new pilot
             Racer.UsePilot(pilot);
             Line = pilot.Line;
             Log(pilot);

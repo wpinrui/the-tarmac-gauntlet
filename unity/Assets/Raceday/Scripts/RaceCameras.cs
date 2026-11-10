@@ -38,7 +38,14 @@ namespace TarmacGauntlet.Raceday
                 Apply();
             }
             if (Keys != null && Keys.Pressed(KeyCode.V) && Cars != null && Cars.Length > 1)
-                Watch(Cars[(System.Array.IndexOf(Cars, Car) + 1) % Cars.Length]);
+            {
+                int from = System.Array.IndexOf(Cars, Car);
+                for (int i = 1; i < Cars.Length; i++)
+                {
+                    CarController next = Cars[(from + i) % Cars.Length];
+                    if (next.gameObject.activeInHierarchy) { Watch(next); break; }   // retired cars are skipped
+                }
+            }
             if (Keys != null && Keys.Pressed(KeyCode.P) && Cars != null)
             {
                 int from = System.Array.IndexOf(Cars, Car);
@@ -46,7 +53,7 @@ namespace TarmacGauntlet.Raceday
                 {
                     CarController next = Cars[(from + i + Cars.Length) % Cars.Length];
                     AiDriver d = next.GetComponent<AiDriver>();
-                    if (d != null && d.enabled && d.Pitting) { Watch(next); break; }
+                    if (d != null && d.isActiveAndEnabled && d.Pitting) { Watch(next); break; }
                 }
             }
         }

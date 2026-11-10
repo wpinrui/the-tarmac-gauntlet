@@ -44,7 +44,9 @@ namespace TarmacGauntlet.Raceday
         private static float Knob(string name, float value) =>
             float.TryParse(System.Environment.GetEnvironmentVariable("AI_E1_" + name), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float v) ? v : value;
         /// <summary>Seconds of the car's speed a following car keeps on top of <see cref="Headway"/>, so following never breaks H1.</summary>
-        private const float FollowExtra = 0.1f;
+        private static readonly float FollowExtra = Knob("EXTRA", 0f);
+        /// <summary>Braking it plans on when closing up behind a car, m/s².</summary>
+        private static readonly float CloseDecel = Knob("CLOSEDEC", 4f);
         /// <summary>How fast a following car closes the gap to the one it keeps, per second.</summary>
         private static readonly float FollowGain = Knob("GAIN", 0.5f), BrakeDrop = Knob("DROP", 3f), OpenDecel = Knob("OPEN", 6f), CapTrust = Knob("CAPT", 1f);
         private float lapLength;
@@ -52,6 +54,10 @@ namespace TarmacGauntlet.Raceday
         private const float StoppedSpeed = 10f;
         /// <summary>Gap to a car alongside, side to side, inside which TORCS's parallel steering still takes over, m (spec: 2 m).</summary>
         public const float SideFilterGap = 2f;
+        /// <summary>Seconds of score per second spent lifting or braking for a car ahead below its lane's speed.</summary>
+        private static readonly float LiftCost = Knob("LIFT", 0.1f);
+        /// <summary>Side-to-side gap H1 keeps to a car alongside, m.</summary>
+        private static readonly float AlongsideGap = Knob("SIDEGAP", 0.5f);
         /// <summary>Share of its lane's speed a car may carry towards a stopped car, as under a yellow flag.</summary>
         private const float YellowShare = 0.7f;
         /// <summary>How far ahead a stopped car slows the cars coming, m.</summary>
@@ -214,7 +220,8 @@ namespace TarmacGauntlet.Raceday
             if (best == null) best = Candidates[0];
             Chosen = best;
             // The pilot's own offset, not where the car is, as the car lags what its pilot steers.
-            Target = best.Owe ? pilot.Offset + best.SoonOff : best.Shift;
+            // A path that moves later holds where it is for now: in the tow until the last safe moment.
+            Target = best.Owe ? pilot.Offset + best.SoonOff : best.Delay > 0f ? pilot.Offset : best.Shift;
             Cap = CapAt(best.Pedal, ahead, 0, mySpeed, me.Distance, margin);
             lastShift = best.Shift;
             lastPedal = best.Pedal;
@@ -257,7 +264,9 @@ namespace TarmacGauntlet.Raceday
             float keep = margin + (Headway + FollowExtra) * Mathf.Max(v, 0f);
             // Too close, it drops back gently, as a gap a little short of the one it keeps is no danger:
             // a queue into a slow corner then doesn't fall further below the corner's speed at every car.
-            float follow = gap >= keep ? v + FollowGain * (gap - keep)
+            // With the gap open it stays flat until it must slow, as late as moderate braking allows, so it
+            // never feathers the throttle on the way up to the car ahead (Ivan).
+            float follow = gap >= keep ? Mathf.Sqrt(v * v + 2f * CloseDecel * (gap - keep))
                 : Mathf.Sqrt(Mathf.Max(v * v - 2f * OpenDecel * (keep - gap), 0f));
             // Braking opens the gap harder for a second.
             if (pedal == Pedal.Brake && s * Tick <= 1f) follow = Mathf.Min(follow, Mathf.Max(v - BrakeDrop, 0f));
@@ -273,7 +282,7 @@ namespace TarmacGauntlet.Raceday
             float lap = c.Lap;
             float d = me.Distance, lat = me.Lateral, v = me.Speed;
             float holdOffset = me.Lateral - line.Lateral[c.IndexOf(Mathf.Repeat(d, lap))], off = holdOffset;
-            float over = 0f, risk = 0f, yellow = 0f;
+            float over = 0f, risk = 0f, yellow = 0f, lifted = 0f;
             bool onTrack = OnTrack(c, me.Lateral, me.Distance);
             float turnIn = NextCornerStart(c, Mathf.Repeat(d, lap));
             bool turnedIn = false;
@@ -303,7 +312,10 @@ namespace TarmacGauntlet.Raceday
                 }
                 if (s == 1) cand.SoonOff = off - holdOffset;
                 float lane = pilot.LaneSpeed(k, lat - line.Lateral[k]);
-                float limit = Mathf.Min(lane, CapAt(cand.Pedal, ahead, s, me.Speed, d, margin));
+                float cap = CapAt(cand.Pedal, ahead, s, me.Speed, d, margin);
+                float limit = Mathf.Min(lane, cap);
+                // Off the throttle for a car ahead, short of what its lane allows.
+                if (cap < lane - 1f && v >= cap - 0.5f) lifted += Tick;
                 if (v < limit)
                 {
                     float resist = prof.Resist(k, v), drag = resist - prof.Resist(k, 0f);
@@ -339,7 +351,7 @@ namespace TarmacGauntlet.Raceday
                     float apart = Mathf.Abs(side);
                     // H1: never into a car ahead or alongside, with a margin kept: a passing margin past a
                     // car ahead, a little less beside one. A car already closer than that must not get closer.
-                    float need = (g > 0.7f * CarL ? Clear(margin) : CarW + 0.25f) + reach[j] - 0.5f * CarW;
+                    float need = (g > 0.7f * CarL ? Clear(margin) : CarW + AlongsideGap) + reach[j] - 0.5f * CarW;
                     float start = Mathf.Abs(ol[j, 0] - me.Lateral);
                     float from = Road(od[j, 0] - me.Distance, lap);
                     // Nose to tail the margin grows with speed: room for the car ahead to brake harder than expected.
@@ -413,13 +425,19 @@ namespace TarmacGauntlet.Raceday
                 {
                     float closing = Mathf.Max(v - ov[j, Steps], 0.1f);
                     float needs = (g + CarL + 1f) / closing;
-                    // The slowest car it is stuck behind is the one that holds it up.
-                    if (needs > toBrake / Mathf.Max(v, 1f)) stuck = Mathf.Max(stuck, (1f - ov[j, Steps] / Mathf.Max(freeSpeed, 1f)) * WaitToPass * StuckScale);
+                    // Held to its speed until it gets by: as long as the pass takes from here, or until the
+                    // next place to pass if this straight runs out first. A car sitting at the speed of the
+                    // one ahead never gets by, so matching its speed costs the most. The slowest car it is
+                    // stuck behind is the one that holds it up.
+                    float held = needs > toBrake / Mathf.Max(v, 1f) ? 2f * WaitToPass : Mathf.Min(needs, 2f * WaitToPass);
+                    stuck = Mathf.Max(stuck, (1f - ov[j, Steps] / Mathf.Max(freeSpeed, 1f)) * held * StuckScale);
                 }
                 if (!stopped[j] && Road(od[j, 0] - me.Distance, lap) > 0f && g < 0f) score -= passCost;
             }
             cand.Gain = score; cand.Risk = riskWeight * risk; cand.Stuck = stuck;
-            cand.Score = score - stuck - riskWeight * risk - YellowWeight * yellow;
+            // Lifting to sit behind a car is the last thing to do, not a way to wait (Ivan): a pass that
+            // keeps its foot in beats it unless it really is slower.
+            cand.Score = score - stuck - riskWeight * risk - YellowWeight * yellow - LiftCost * lifted;
         }
 
         /// <summary>Share of its drag a car at (d, lat) feels at step s, in the wake of the cars ahead.</summary>

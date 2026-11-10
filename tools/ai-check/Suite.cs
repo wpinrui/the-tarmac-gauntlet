@@ -27,7 +27,7 @@ static partial class Check
     sealed class Frame
     {
         public float T;
-        public float[] D, L, V, Off, Angle;
+        public float[] D, L, V, Off, Angle, Throttle;
         public int[] K;
         public bool[] Ghost, Busy;
         /// <summary>How far each car's body reaches across the track either side of its centre, m: more for a car turned sideways.</summary>
@@ -48,6 +48,27 @@ static partial class Check
         public string Name(int i) => Race.Name(Race.Racers[i]);
         public int Contacts(int i) => Race.Contacts.Count(c => c.A == Name(i) || c.B == Name(i));
         public float Gap(Frame f, int i, int j) => Check.Gap(f.D[j] - f.D[i]);
+        /// <summary>
+        /// Seconds car i spent off the throttle behind car j: within 2.5 s of it, no faster than it,
+        /// and short of its own lane's speed, while the track beside it had room for a car.
+        /// </summary>
+        public float LiftedBehind(int i, int j)
+        {
+            AiPilot p = Race.Racers[i].Pilot;
+            float t = 0f;
+            foreach (Frame f in Frames)
+            {
+                float g = Gap(f, i, j);
+                if (g <= CarL || Behind(f, j, i) > 2.5f || f.V[i] > f.V[j] + 0.5f) continue;
+                // Off the throttle, where its lane alone would not have it lift.
+                int k = f.K[i];
+                if (f.Throttle[i] > 0.9f || f.V[i] >= 0.98f * p.LaneSpeed(k, f.L[i] - p.Line.Lateral[k])) continue;
+                float hw = circuit.HalfWidth(k);
+                bool room = hw - (f.L[j] + 0.5f * CarW) >= CarW + RoomMargin || f.L[j] - 0.5f * CarW + hw >= CarW + RoomMargin;
+                if (room) t += Race.Dt;
+            }
+            return t;
+        }
         /// <summary>Lap distance, m.</summary>
         public float At(Frame f, int i) => ((f.D[i] % circuit.Lap) + circuit.Lap) % circuit.Lap;
         /// <summary>On the track as F1 counts it: some part of a tyre on the tarmac or its white line. Kerbs are not track.</summary>
@@ -81,7 +102,7 @@ static partial class Check
         {
             race.Step();   // a car's place across the track is only known once it has stepped
             braking.Step(race);
-            var f = new Frame { T = race.Time, D = new float[run.N], L = new float[run.N], V = new float[run.N], Off = new float[run.N], Angle = new float[run.N], K = new int[run.N], Ghost = new bool[run.N], Busy = new bool[run.N], Across = new float[run.N] };
+            var f = new Frame { T = race.Time, D = new float[run.N], L = new float[run.N], V = new float[run.N], Throttle = new float[run.N], Off = new float[run.N], Angle = new float[run.N], K = new int[run.N], Ghost = new bool[run.N], Busy = new bool[run.N], Across = new float[run.N] };
             for (int i = 0; i < run.N; i++)
             {
                 Racer r = race.Racers[i];
@@ -93,6 +114,7 @@ static partial class Check
                 float along = r.Car.Vx * circuit.Forward[k].x + r.Car.Vz * circuit.Forward[k].z;
                 float across = r.Car.Vx * circuit.Left[k].x + r.Car.Vz * circuit.Left[k].z;
                 f.V[i] = along;
+                f.Throttle[i] = r.Throttle;
                 f.Angle[i] = (float)(Math.Atan2(Math.Abs(across), Math.Max(along, 0.1f)) * 180.0 / Math.PI);
                 f.Ghost[i] = r.Ghost;
                 f.Busy[i] = r.Rejoin.Busy;
@@ -400,7 +422,9 @@ static partial class Check
                     if (Math.Abs(f.Off[0]) < 1f) onLine++;
                 }
                 float share = follow > 0 ? (float)onLine / follow : 0f;
-                return (Clamp100(100f * share - 25f * hits), $"on the line {100f * share:0}% of {follow * Race.Dt:0.0} s following, {hits} contacts");
+                // Flat in the tow, not lifting to sit at the speed of the car ahead (Ivan).
+                float lifted = run.LiftedBehind(0, 1);
+                return (Clamp100(Math.Min(100f * share, Scale(lifted, 0.3f, 2f)) - 25f * hits), $"on the line {100f * share:0}% of {follow * Race.Dt:0.0} s following, lifted behind it {lifted:0.0} s, {hits} contacts");
             }
             case "T2":
             case "T12":
@@ -412,8 +436,9 @@ static partial class Check
                 Frame pullAt = fs.FirstOrDefault(f => Math.Abs(f.Off[0]) > 1f && run.Gap(f, 0, 1) > 0f);
                 Frame level = fs.FirstOrDefault(f => run.Gap(f, 0, 1) < CarL);
                 float early = pullAt != null && level != null ? level.T - pullAt.T : 0f;
-                float score = Math.Min(Math.Min(Scale(room, 0f, 1f), Scale(lost, 0.2f, 1.5f)), Scale(early, 2f, 5f));
-                return (Clamp100(score - 50f * hits), $"braked with room {room:0.00} s, pulled out {early:0.0} s before drawing level, lost {lost:0.00} s, {hits} contacts");
+                float lifted = run.LiftedBehind(0, 1);
+                float score = Math.Min(Math.Min(Math.Min(Scale(room, 0f, 1f), Scale(lost, 0.2f, 1.5f)), Scale(early, 2f, 5f)), Scale(lifted, 0.3f, 2f));
+                return (Clamp100(score - 50f * hits), $"braked with room {room:0.00} s, lifted behind {lifted:0.0} s, pulled out {early:0.0} s before drawing level, lost {lost:0.00} s, {hits} contacts");
             }
             case "T3":
             {

@@ -34,6 +34,9 @@ namespace TarmacGauntlet.TeamHq
 
         public string Current { get; private set; }
 
+        /// <summary>Whether the camera is moving between shots.</summary>
+        public bool Gliding => glideStart >= 0;
+
         private void Awake()
         {
             cam = GetComponent<Camera>();

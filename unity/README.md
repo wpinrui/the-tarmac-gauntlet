@@ -110,8 +110,7 @@ Unity's at the end.
 Each menu screen has a camera shot, set by Ivan in that viewer and copied into `Resources/CameraPresets.json`
 (viewer frame: metres, +Z towards the bay doors, vertical field of view in degrees). `HqCamera.Show(screen)`
 glides to a shot in half a second. Nobody adjusts shots in the editor: when Ivan saves new ones in the viewer,
-copy them from the viewer's `presets` store into the JSON. Until the menus exist, the arrow keys step through
-the shots in Play.
+copy them from the viewer's `presets` store into the JSON.
 
 `bash tools/team-hq/geometry-check/run.sh [folder]` builds the building outside Unity and checks every part
 lies inside the shell with sound normals and winding. It also checks every placed prop has its files. With a folder it writes `hq.obj`, `props.json` and
@@ -123,3 +122,30 @@ into `Resources/Props` as `<id>.json`, `<id>_mesh.bytes` and its textures; `HqGe
 `HqProps.cs` builds them, so the scene needs no import packages. The viewer reads the same files.
 `tools/team-hq/props/props.json` holds each model's height, pose and simplification, and `props.txt` the list.
 `make_textures.py` turns Poly Haven photo textures into the building's surfaces in `Resources/Textures`.
+
+## Menus and saving
+
+The management menus sit over the Team HQ scene (`Assets/Management`, approved in the viewer
+https://claude.ai/artifact/9oLpt153QSeZj1edjd7mHt). `Menus.cs` builds them with UI Toolkit from code, styled by
+`Resources/Menus.uss` on a 1600 x 900 reference screen. The main menu is a tall glass column with the wordmark slot
+(`#wordmark`, empty until the wordmark is designed) over Continue, New game, Settings and Quit game in Hanken
+Grotesk. In the game, the hub menu (Garage then Office, told apart by spacing), the top bar, the race car's name and
+condition beside its bay, and the Race button. A screen opens as one panel docked right, with the menu collapsed to
+an icon strip; Q and E cycle screens and clicking the open screen's icon goes back to the hub. Escape closes a
+screen, and on the hub opens Resume, Settings, Quit to main menu and Quit game. Every change of screen calls
+`HqCamera.Show`. Screens are empty: fill one from `Menus.ScreenOpened(slug, body)`.
+
+The frosted glass is `MenuGlass.cs`: `GlassBackdrop` on the camera keeps a quarter size copy of the scene blurred
+and saturated (`Resources/MenuGlassBlur.shader`), and every glass panel shows its own slice of it under a white sheen.
+Settings (`GameSettings.cs`) apply at once and are kept in PlayerPrefs.
+
+`Assets/Career` (no Unity references) holds the live game. `GameSession.State` is the current `GameState`; change it
+only through `GameSession.Apply`, which autosaves in the background. Each career has its own folder under
+`persistentDataPath/careers/<id>/` with `autosave.json` and a small `info.json`, so careers never share an autosave.
+For now a new game deletes the other careers once it is saved. A finished race (`RaceWeekend.Finished`) is applied
+and saved by `GameSession` itself. Saves are JSON (Newtonsoft); raise `SaveJson.Version` and add a step to
+`SaveJson.Migrate` when the format changes.
+
+```
+dotnet test unity/dotnet/TarmacGauntlet.Career.Tests
+```

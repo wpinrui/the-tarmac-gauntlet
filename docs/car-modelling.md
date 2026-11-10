@@ -36,6 +36,15 @@ Overhangs stretch to the published length.
 Each row's height and width becomes a smooth curve (monotone cubic), so no outline is jagged.
 rows.py writes rows.json.
 
+### Measuring without perspective (optional)
+A photo or a render with perspective puts near parts too big and far parts too small. Traced from one, the pillars, overhangs and glass lines land in the wrong places.
+When Ivan supplies a 3D model, measure it directly instead of tracing pictures of it:
+- Load it in Blender's Python module. Find the wheel centres from the tyre meshes and scale the model to the published wheelbase.
+- Slice the painted body meshes at stations a few centimetres apart along the car. Each slice gives that station's section.
+- Take each part's outline (glass, lamps, grille, shut lines, mirrors) from its own meshes, projected straight onto the matching view plane.
+- Write it all to rows.json as usual.
+When there is no model, use orthographic drawings only, never perspective photos. Look up published measurements as well: overhangs, ground to roof, belt line, windscreen base and top, door length, glass heights. Check every traced row against them.
+
 ## 4. Build the body (body.py)
 body.py lofts the outer skin from rows.json, in pure numpy.
 Build space is metres: x forward from mid wheelbase, y left, z up from the ground.
@@ -52,11 +61,13 @@ Lamp parts and materials are named so the game can light them: `lamp_head`, `lam
 The interior gets a firewall, a dash meeting it, seats, door cards and a mirror.
 Door mirrors get a separate recessed glass part.
 Every inner face uses an interior material.
+Paint every car amber, whatever colour the reference car is.
 
 ## 6. Badge and name
 The brand badge from `src/renderer/assets/brands/<brand>/` goes on the front and rear.
 The model name goes on the car in the brand font, as letter outlines (glyphs.py).
 Badge and name placement are open calls for Ivan, asked in the viewer.
+Lay every badge and name flat on its panel: project it along the panel's normal at its centre, never along the car's axes, so a sloped panel cannot stretch it.
 No real brand or sponsor graphics.
 
 ## 7. Show Ivan the direction first
@@ -77,5 +88,5 @@ Record Ivan's viewer picks in rows.py, then `export.py <dir> --game` writes only
 Export into `unity/Assets/Art/Vehicles/<Name>/` with the OBJ, MTL and textures.
 Every file and folder gets a committed `.meta` with its own random guid.
 The build scripts live in `tools/cars/<name>/`: rows.py, rows.json, body.py, parts.py, glyphs.py, glyphs.json, export.py, publish.py, check.py.
-Copy them from the last car built and change the numbers.
+Shared primitives live in `tools/cars/common/`: lofting, laying shapes on the body, grooves, booleans, lathing, export, the viewer, checks and glyph outlines. They hold no shapes, sizes, colours or part designs. Every visual decision is written fresh in the car's own scripts. Nothing visual carries over from another car.
 Merge to main so Ivan can test it in Unity.
