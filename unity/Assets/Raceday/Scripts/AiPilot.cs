@@ -81,6 +81,8 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Front axle's distance from the line, positive to the left.</summary>
         public float LateralError { get; private set; }
         public float TargetSpeed { get; private set; }
+        /// <summary>The speed the car would aim for with no car ahead holding it back, m/s.</summary>
+        public float FreeSpeed { get; private set; }
         /// <summary>True while the driver is in an overcooked corner.</summary>
         public bool Overcooking => committed;
         /// <summary>How many corners this driver has overcooked so far.</summary>
@@ -219,6 +221,7 @@ namespace TarmacGauntlet.Raceday
             // Held back by the car ahead: match the cap and drop the profile's own acceleration.
             float laneAccel = Mathf.Lerp(LaneProfiles[a].Accel[la], LaneProfiles[b].Accel[la], blend);
             if (Towed && laneAccel > 0f && scale >= 1f) target = Mathf.Max(target, speed);
+            FreeSpeed = target;
             bool held = SpeedCap < target;
             HeldBy = held ? target - SpeedCap : 0f;
             if (held) target = SpeedCap;
