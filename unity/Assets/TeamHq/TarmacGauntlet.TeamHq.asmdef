@@ -1,0 +1,14 @@
+{
+    "name": "TarmacGauntlet.TeamHq",
+    "rootNamespace": "TarmacGauntlet.TeamHq",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
