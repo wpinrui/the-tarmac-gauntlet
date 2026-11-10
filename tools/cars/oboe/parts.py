@@ -195,9 +195,9 @@ def dlo_shapes():
     b0, b1 = sorted(R["b_pillar"])
     # the traced outline dips at the B-pillar top and bottom: run straight across it instead
     dlo = poly([p for p in R["dlo"] if not b0 + 0.003 < p[0] < b1 - 0.003])
-    # the window stops just behind the mirror: the corner ahead of it is body colour, for the stalk
-    dlo = dlo.intersection(box(-5, -5, R["mirror"]["x_back"] + 0.02, 5))
-    glass = dlo.buffer(-0.018, join_style=1).difference(box(b0, -1, b1, 3))
+    # the glass stops just behind the mirror: the corner ahead of it is a flat black triangle
+    glass = dlo.intersection(box(-5, -5, R["mirror"]["x_back"] + 0.02, 5))
+    glass = glass.buffer(-0.018, join_style=1).difference(box(b0, -1, b1, 3))
     trim = dlo.difference(glass)
     return dlo, glass, trim
 
