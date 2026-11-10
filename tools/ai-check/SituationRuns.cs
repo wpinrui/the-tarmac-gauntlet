@@ -65,16 +65,22 @@ static partial class Check
             while (r.Time < until)
             {
                 r.Step();
+                if (Environment.GetEnvironmentVariable("JAM_AT") is string ja && Math.Abs(r.Time - float.Parse(ja)) < 0.005f)
+                    foreach (Racer o in r.Racers.OrderByDescending(o => o.Distance))
+                        if (o.Car.TrackIndex * circuit.Step > 700f && o.Car.TrackIndex * circuit.Step < 1100f)
+                            Console.WriteLine($"JAM {r.Name(o)} {o.Car.TrackIndex * circuit.Step:0} m lat {o.Car.Lateral:0.0} {o.Car.Speed * 3.6f:0} km/h ghost {o.Ghost} busy {o.Rejoin.Busy} {o.Rejoin.State} brk {o.Craft.Braking} cap {Math.Min(o.Pilot.SpeedCap, 99f) * 3.6f:0} {o.Craft.Chooser?.Reason} {o.Craft.Chooser?.Chosen?.Pedal} {o.Craft.Chooser?.Chosen?.Rejected}@{o.Craft.Chooser?.Chosen?.BrokeBy}");
                 if (tick++ % 25 != 0) continue;
                 Racer x = r.Racers[id];
                 int k = Math.Max(x.Car.TrackIndex, 0);
                 float free = x.Pilot.Profile.Speed[k];
-                if (x.Car.Speed > 0.92f * free || r.Time < 20f) continue;
+                bool window = Environment.GetEnvironmentVariable("RACE_FROM") is string rf && r.Time >= float.Parse(rf);
+                if (window) Console.WriteLine($"   tspd {x.Pilot.TargetSpeed * 3.6f:0} cap {Math.Min(x.Pilot.SpeedCap, 99f) * 3.6f:0} off {x.Pilot.Offset:0.0} brk {x.Craft.Braking} scale {x.Pilot.SpeedScale:0.00}");
+                if (!window && (x.Car.Speed > 0.92f * free || r.Time < 20f)) continue;
                 PathChooser pc = x.Craft.Chooser;
                 Racer ahead = r.Racers.Where(o => o != x && Gap(o.Distance - x.Distance) > 0f).OrderBy(o => Gap(o.Distance - x.Distance)).FirstOrDefault();
                 string a = ahead == null ? "" : $"ahead {r.Name(ahead)} {Gap(ahead.Distance - x.Distance):0.0} m lat {ahead.Car.Lateral:0.0} {ahead.Car.Speed * 3.6f:0}";
                 Console.WriteLine($"{r.Time,6:0.0} {k * circuit.Step,5:0} m {x.Car.Speed * 3.6f:0}/{free * 3.6f:0} lat {x.Car.Lateral,5:0.0} {(x.Craft.Braking ? "BRK" : "   ")} {a} [{pc?.Reason} -> {pc?.Chosen?.Shift:0.0}{(pc?.Chosen?.Delay > 0 ? "d" + pc.Chosen.Delay : "")} {pc?.Chosen?.Pedal} | "
-                    + (pc == null ? "" : string.Join(" ", pc.Candidates.Where(c => c.Pedal == PathChooser.Pedal.Go && c.Delay == 0).Select(c => $"{c.Shift:0.#}:{c.Rejected ?? c.Score.ToString("0.00")}"))) + "]");
+                    + (pc == null ? "" : string.Join(" ", pc.Candidates.Where(c => c.Pedal == PathChooser.Pedal.Go && c.Delay == 0).Select(c => $"{c.Shift:0.#}:{(c.Rejected != null ? c.Rejected + (c.BrokeBy >= 0 ? "@" + c.BrokeBy + "s" + c.BrokeAt : "") : c.Score.ToString("0.00"))}"))) + "]");
             }
             return;
         }

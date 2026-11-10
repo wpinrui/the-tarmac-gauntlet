@@ -816,7 +816,7 @@ static partial class Check
         foreach (string m in BModels.Concat(new[] { "a-29" })) LineFor(m);
         if (full) foreach (Entry e in GameField(0)) LineFor(e.Model);
 
-        Situation[] ready = Situations.All.Where(x => x.Ready).ToArray();
+        Situation[] ready = Situations.All.Where(x => x.Ready && Environment.GetEnvironmentVariable("SUITE_NO_SETUPS") == null).ToArray();
         var runs = new SetupRun[ready.Length];
         Parallel.For(0, ready.Length, i => runs[i] = RunSetup(ready[i]));
         var limits = new List<(string Id, bool Pass, string Why)>();
@@ -859,7 +859,7 @@ static partial class Check
         int fails = limits.Count(l => !l.Pass);
         Console.WriteLine($"Hard limits: {limits.Count - fails} of {limits.Count} pass{(fails > 0 ? "  RED" : "")}");
         foreach (var l in limits) Console.WriteLine($"  {l.Id,-5} {(l.Pass ? "pass" : "FAIL")}  {l.Why}");
-        float behaviourScore = behaviour.Average(b => b.Score);
+        float behaviourScore = behaviour.Count > 0 ? behaviour.Average(b => b.Score) : 0f;
         Console.WriteLine($"Behaviour: {behaviourScore:0.0}");
         foreach (var b in behaviour) Console.WriteLine($"  {b.Id,-5} {b.Score,5:0}  {b.Why}");
         foreach (RaceScore r in races)

@@ -351,6 +351,9 @@ sealed class Session
                 Yaw = (float)Math.Atan2(car.Forward.z, car.Forward.x),
                 Ghost = s.Racer.Ghost,
                 Profile = s.Racer.Pilot.Profile,
+                Planned = true,
+                Aim = s.Racer.Craft.Target,
+                Cap = s.Racer.Pilot.SpeedCap,
             };
             traffic.Add(t);
             if (!s.InPitLane) field.Add(t);

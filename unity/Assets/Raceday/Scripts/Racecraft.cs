@@ -25,6 +25,12 @@ namespace TarmacGauntlet.Raceday
         public bool Ghost;
         /// <summary>The speeds the car's driver runs on its line, for predicting it, or null.</summary>
         public SpeedProfile Profile;
+        /// <summary>True when the car's driver says where it is heading: <see cref="Aim"/> and <see cref="Cap"/>.</summary>
+        public bool Planned;
+        /// <summary>The offset from its own racing line the car is heading for, m, positive left.</summary>
+        public float Aim;
+        /// <summary>The speed its driver holds it to, m/s, or infinity.</summary>
+        public float Cap;
     }
 
     /// <summary>

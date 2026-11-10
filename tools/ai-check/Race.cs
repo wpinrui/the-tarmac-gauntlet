@@ -201,6 +201,9 @@ sealed class Race
                 Yaw = (float)Math.Atan2(r.Car.Forward.z, r.Car.Forward.x),
                 Ghost = r.Ghost && !r.Pilot.Gliding,
                 Profile = r.Pilot.Profile,
+                Planned = true,
+                Aim = r.Craft.Target,
+                Cap = r.Pilot.SpeedCap,
             });
         }
         sorted.Set(field, circuit.Lap);
