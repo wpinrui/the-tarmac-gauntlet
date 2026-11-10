@@ -18,6 +18,7 @@
     <Compile Include="../../unity/Assets/Raceday/Scripts/SpeedProfile.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/AiPilot.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/Racecraft.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Endurance.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/Consumables.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/PitLane.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/PitPlan.cs" />

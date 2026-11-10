@@ -144,8 +144,8 @@ namespace TarmacGauntlet.Raceday
             return Mathf.Lerp(LaneProfiles[a].Speed[k], LaneProfiles[a + 1].Speed[k], blend);
         }
 
-        /// <summary>Share of the car's limit the driver uses: 86% at Pace 0, 98% at Pace 100.</summary>
-        public static float LimitFor(float pace) => 0.86f + 0.12f * pace / 100f;
+        /// <summary>Share of the car's limit the driver uses: see <see cref="Endurance.GripFor"/>.</summary>
+        public static float LimitFor(float pace) => Endurance.GripFor(pace);
 
         /// <summary>Forget where the car was, after it is moved (a reset).</summary>
         public void Lost()
