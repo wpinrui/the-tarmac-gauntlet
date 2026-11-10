@@ -457,42 +457,34 @@ def name_shape():
     return sscale(g, 1 / gl["cap"], 1 / gl["cap"], origin=(0, 0))
 
 
-def _place(g, size, a0, b0, ka=1, kb=1, swap=False):
-    """Badge or name shape g (right, up) into frame coordinates: a = a0 + ka*right, b = b0 + kb*up."""
-    from shapely.affinity import affine_transform
-    if swap:
-        return affine_transform(g, [0, kb * size, ka * size, 0, a0, b0])
-    return affine_transform(g, [ka * size, 0, 0, kb * size, a0, b0])
+def _flat(ref, g, size, fr, a, b, up, name, d0, d1, mat):
+    """Lay shape g (right, up, 1 unit = size) flat on the panel that fr's ray at (a, b) meets."""
+    pf = blend.panel_frame(ref, fr, a, b, up)
+    return blend.lay(ref, name, sscale(g, size, size, origin=(0, 0)), pf, d0, d1, mat, 0.003)
 
 
 def options(ref):
-    """Every badge and name option, named opt_<group>_<n>_<i>."""
+    """Every badge and name option, named opt_<group>_<n>_<i>. Each lies flat on its panel."""
     sp = R["spots"]
     bdg, nm = badge_shape(), name_shape()
+    up, fwd = (0, 0, 1), (-1, 0, 0)
     out = []
 
     def add(group, n, objs):
         for i, ob in enumerate(objs):
             ob.name = f"opt_{group}_{n}_{i}"
             out.append(ob)
-    # front: 1 on the shield (the reference), 2 on the bonnet
-    add("frontbadge", 1, blend.lay(ref, "fb", _place(bdg, 0.08, 0, sp["grille_z"] - 0.005), front_fr(),
-                                   0.0045, 0.0075, "chrome", 0.004))
-    add("frontbadge", 2, blend.lay(ref, "fb", _place(bdg, 0.08, sp["bonnet_x"], 0, ka=1, kb=-1, swap=True), top_fr(),
-                                   0.0, 0.003, "chrome", 0.004))
+    # front: 1 on the grille (the reference), 2 on the bonnet
+    add("frontbadge", 1, _flat(ref, bdg, 0.08, front_fr(), 0, sp["grille_z"], up, "fb", 0.0045, 0.0075, "chrome"))
+    add("frontbadge", 2, _flat(ref, bdg, 0.08, top_fr(), sp["bonnet_x"], 0, fwd, "fb", 0.0, 0.003, "chrome"))
     # rear: 1 tailgate centre (the reference), 2 lower on the tailgate
-    add("rearbadge", 1, blend.lay(ref, "rb", _place(bdg, 0.10, 0, sp["tailgate_z"], ka=-1), rear_fr(),
-                                  0.0, 0.003, "chrome", 0.004))
-    add("rearbadge", 2, blend.lay(ref, "rb", _place(bdg, 0.08, 0, sp["tailgate_low_z"], ka=-1), rear_fr(),
-                                  0.0, 0.003, "chrome", 0.004))
+    add("rearbadge", 1, _flat(ref, bdg, 0.10, rear_fr(), 0, sp["tailgate_z"], up, "rb", 0.0, 0.003, "chrome"))
+    add("rearbadge", 2, _flat(ref, bdg, 0.08, rear_fr(), 0, sp["tailgate_low_z"], up, "rb", 0.0, 0.003, "chrome"))
     cap = 0.03
-    add("name", 1, blend.lay(ref, "nm", _place(nm, cap, sp["name_y"], sp["name_z"], ka=-1), rear_fr(),
-                             0.0, 0.0025, "name", 0.0025))
-    add("name", 2, blend.lay(ref, "nm", _place(nm, cap, -sp["name_y"], sp["name_z"], ka=-1), rear_fr(),
-                             0.0, 0.0025, "name", 0.0025))
+    add("name", 1, _flat(ref, nm, cap, rear_fr(), sp["name_y"], sp["name_z"], up, "nm", 0.0, 0.0025, "name"))
+    add("name", 2, _flat(ref, nm, cap, rear_fr(), -sp["name_y"], sp["name_z"], up, "nm", 0.0, 0.0025, "name"))
     q = []
     for sgn in (1, -1):
-        q += blend.lay(ref, "nm", _place(nm, cap, sp["quarter_x"], sp["quarter_z"], ka=-sgn), side_fr(sgn),
-                       0.0, 0.0025, "name", 0.0025)
+        q += _flat(ref, nm, cap, side_fr(sgn), sp["quarter_x"], sp["quarter_z"], up, "nm", 0.0, 0.0025, "name")
     add("name", 3, q)
     return out

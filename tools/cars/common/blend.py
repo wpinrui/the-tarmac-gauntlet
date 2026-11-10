@@ -71,6 +71,17 @@ def frame(origin, u, v, d):
     return tuple(np.asarray(a, float) for a in (origin, u, v, d))
 
 
+def panel_frame(bvh, fr, a, b, up):
+    """A frame lying flat on the panel where fr's ray at (a, b) lands: rays run along the
+    panel's normal there, u points right and v up (towards the world direction up), so a flat
+    shape keeps its true proportions on a sloped panel."""
+    loc, nrm = cast(bvh, fr, a, b)
+    n = nrm / np.linalg.norm(nrm)
+    u = np.cross(np.asarray(up, float), n); u /= np.linalg.norm(u)
+    v = np.cross(n, u)
+    return frame(loc, u, v, -n)
+
+
 def cast(bvh, fr, a, b):
     """Ray from the 2D point (a, b) into the body. Returns (location, normal) or (None, None)."""
     if callable(fr):

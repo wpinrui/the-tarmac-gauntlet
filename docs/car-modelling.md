@@ -57,6 +57,7 @@ Every inner face uses an interior material.
 The brand badge from `src/renderer/assets/brands/<brand>/` goes on the front and rear.
 The model name goes on the car in the brand font, as letter outlines (glyphs.py).
 Badge and name placement are open calls for Ivan, asked in the viewer.
+Lay every badge and name flat on its panel: project it along the panel's normal at its centre, never along the car's axes, so a sloped panel cannot stretch it.
 No real brand or sponsor graphics.
 
 ## 7. Show Ivan the direction first
