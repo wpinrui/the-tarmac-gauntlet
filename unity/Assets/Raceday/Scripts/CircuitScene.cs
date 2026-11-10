@@ -23,7 +23,7 @@ namespace TarmacGauntlet.Raceday
         /// How the race starts: from the grid at once, behind the pace car as the full game will, or
         /// from the pit lane one car at a time.
         /// </summary>
-        [SerializeField] private StartMode start = StartMode.PitLane;
+        [SerializeField] private StartMode start = StartMode.Rolling;
 
         private KeyboardState keys;
         private AiDriver ai;
