@@ -130,6 +130,11 @@ static partial class Check
             RaceRunning(verbose: true);
             return failed ? 1 : 0;
         }
+        if (args.Length > 1 && args[1] == "scene")
+        {
+            SceneTrace(args.Length > 2 ? float.Parse(args[2]) : 120f);
+            return 0;
+        }
         if (args.Length > 1 && args[1] == "start")
         {
             RollingStartCheck(args.Length > 2 ? int.Parse(args[2]) : 100, verbose: true);

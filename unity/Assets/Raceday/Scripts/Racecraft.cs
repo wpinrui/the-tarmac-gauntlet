@@ -111,6 +111,8 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Offset that puts a car beside another.</summary>
         private const float Beside = SideBySide + 0.4f;
         private const float MaxShift = 5f;
+        /// <summary>Offsets from the line searched for open road when held up.</summary>
+        private static readonly float[] GapLanes = { -6f, -3f, 3f, 6f };
         private const float LookAhead = 150f;
         private const float LookBehind = 90f;
         /// <summary>Lap pace ratio that makes another car a different class.</summary>
@@ -498,7 +500,8 @@ namespace TarmacGauntlet.Raceday
             // Only worth looking for a way past when the line is going to be held up, and never while
             // covering a move. A car making room for one behind may still pass a slower one ahead:
             // the car behind plans round where it is going.
-            int target = baseline.Blocked ? BlockerAhead(line, c, pilot.Shift) : -1;
+            // Held back by the car ahead right now counts too, however far back the gap keeps it.
+            int target = baseline.Blocked || pilot.HeldBy > 0.5f ? BlockerAhead(line, c, pilot.Shift) : -1;
             if (givingWay && target >= 0 && !(near[target].Slower || near[target].BeingLapped)) target = -1;
             // Getting by a slower car, or a queue of them, a pass under way is held on to; between
             // evenly matched cars a pass is a move into one corner.
@@ -509,6 +512,12 @@ namespace TarmacGauntlet.Raceday
                 Near t = near[target];
                 float inner = Mathf.Clamp(t.Shift + inside * Beside, -MaxShift, MaxShift);
                 float outer = Mathf.Clamp(t.Shift - inside * Beside, -MaxShift, MaxShift);
+                // Open road: any lane across the track, flat out to the corner's turn-in. A gap rather
+                // than a car to dodge, so held up behind one car it finds the clear side of the next.
+                if (a > ramp)
+                    foreach (float lane in GapLanes)
+                        if (Mathf.Abs(lane - now) > 1f)
+                            candidates.Add(Make(Kind.Straight, start, samples, c, now, ramp, lane, 0f, a - 30f, corner));
                 // Stay where it is, out of the queue, and keep its foot down to the corner's turn-in.
                 if (queue && Mathf.Abs(now) > 1f && a > ramp)
                     candidates.Add(Make(Kind.Straight, start, samples, c, now, ramp, now, 0f, a - 30f, corner));
@@ -736,7 +745,10 @@ namespace TarmacGauntlet.Raceday
                         if (o.Car.Id == passing && gap < CarLength * 0.3f) p.WinsPlace = true;
                         continue;
                     }
-                    float follow = CarLength + 1f + 0.03f * vel;   // tucked in, as close as an attacker sits
+                    // As close as it will really sit: tucked in when attacking, further back when only
+                    // following, which is what makes a queue look as slow as it is.
+                    bool attack = p.Kind != Kind.Line || o.BeingLapped || o.Slower || me.LapPace < o.Car.LapPace * 0.995f;
+                    float follow = CarLength + 1f + (attack ? 0.03f : 0.2f) * vel;
                     if (gap >= CarLength * 0.6f)
                     {
                         // Ahead in the path: follow it.

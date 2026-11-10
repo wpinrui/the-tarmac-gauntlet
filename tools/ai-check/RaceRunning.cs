@@ -37,6 +37,39 @@ static partial class Check
         return field;
     }
 
+    /// <summary>
+    /// The raceday test scene: 100 cars racing from the reversed grid at once, the camera on the
+    /// quickest at the back. Traces that car every 0.1 s, and counts how often it swung its aim
+    /// back towards the line and out again.
+    /// </summary>
+    static void SceneTrace(float seconds)
+    {
+        var s = new Session(circuit, line, SceneField().Select(m => (m, 1f)).ToList(), rolling: false, LineFor);
+        SessionCar me = s.Cars[s.Cars.Count - 1];
+        Watch(s, me);
+        int tick = 0, swings = 0, dir = 0, flips = 0;
+        float ext = 0f, sinceFlip = 99f;
+        bool onLine = true;
+        while (s.Time < seconds)
+        {
+            s.Step();
+            Racecraft craft = me.Racer.Craft;
+            float g = craft.Target;
+            if (dir > 0 && g > ext || dir < 0 && g < ext) ext = g;
+            else if (dir >= 0 && g < ext - 2f) { if (dir > 0) swings++; dir = -1; ext = g; }
+            else if (dir <= 0 && g > ext + 2f) { if (dir < 0) swings++; dir = 1; ext = g; }
+            sinceFlip += Session.Dt;
+            bool line = craft.Plan == "Line";
+            if (line != onLine) { if (sinceFlip < 1f) flips++; sinceFlip = 0f; onLine = line; }
+            if (tick++ % 10 != 0) continue;
+            SessionCar ahead = s.Cars.Where(o => o != me && o.Distance > me.Distance).OrderBy(o => o.Distance).FirstOrDefault();
+            string a = ahead == null ? "" : $"ahead {ahead.Model} {ahead.Distance - me.Distance,5:0.0} m lat {ahead.Car.Lateral,5:0.0} {ahead.Car.Speed * 3.6f,4:0}";
+            AiPilot p = me.Racer.Active;
+            Console.WriteLine($"{Session.Clock(s.Time)} {me.Car.TrackIndex * circuit.Step,5:0} m {me.Car.Speed * 3.6f,4:0} {craft.State,-10} {craft.Plan,-10} off {p.Offset,5:0.0} tgt {g,5:0.0} cap {Math.Min(p.SpeedCap, 999f) * 3.6f,4:0} lat {me.Car.Lateral,5:0.0} sw {swings} fl {flips}  {a}");
+        }
+        Console.WriteLine($"scene: {swings} swings, {flips} dithers in {seconds:0} s");
+    }
+
     static void RollingStartCheck(int cars, bool verbose, bool glide = false)
     {
         var entries = SceneField().Take(cars).Select(m => (m, 1f)).ToList();
