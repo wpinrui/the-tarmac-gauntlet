@@ -65,7 +65,7 @@ namespace TarmacGauntlet.Raceday
             if (Line == null || car.Spec == null) return;
             AiPilot pilot = NewPilot(Line);
             PitPlan pit = Pits != null && Garage >= 0 && car.Supplies != null ? new PitPlan(Pits, Garage, car.Supplies) : null;
-            Racer = new AiRacer(pilot, new Racecraft(Seed), car.Supplies, pit, Seed);
+            Racer = new AiRacer(pilot, new Racecraft(), car.Supplies, pit, Seed);
             Log(pilot);
             // The tuned line and the pilot's lanes beside it take a while: both are made off the main thread.
             Circuit circuit = Line.Circuit;

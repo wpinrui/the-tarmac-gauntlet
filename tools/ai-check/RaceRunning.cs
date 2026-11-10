@@ -59,13 +59,13 @@ static partial class Check
             else if (dir >= 0 && g < ext - 2f) { if (dir > 0) swings++; dir = -1; ext = g; }
             else if (dir <= 0 && g > ext + 2f) { if (dir < 0) swings++; dir = 1; ext = g; }
             sinceFlip += Session.Dt;
-            bool line = craft.Plan == "Line";
+            bool line = craft.State == Racecraft.Mode.Racing;
             if (line != onLine) { if (sinceFlip < 1f) flips++; sinceFlip = 0f; onLine = line; }
             if (tick++ % 10 != 0) continue;
             SessionCar ahead = s.Cars.Where(o => o != me && o.Distance > me.Distance).OrderBy(o => o.Distance).FirstOrDefault();
             string a = ahead == null ? "" : $"ahead {ahead.Model} {ahead.Distance - me.Distance,5:0.0} m lat {ahead.Car.Lateral,5:0.0} {ahead.Car.Speed * 3.6f,4:0}";
             AiPilot p = me.Racer.Active;
-            Console.WriteLine($"{Session.Clock(s.Time)} {me.Car.TrackIndex * circuit.Step,5:0} m {me.Car.Speed * 3.6f,4:0} {craft.State,-10} {craft.Plan,-10} off {p.Offset,5:0.0} tgt {g,5:0.0} cap {Math.Min(p.SpeedCap, 999f) * 3.6f,4:0} lat {me.Car.Lateral,5:0.0} sw {swings} fl {flips}  {a}");
+            Console.WriteLine($"{Session.Clock(s.Time)} {me.Car.TrackIndex * circuit.Step,5:0} m {me.Car.Speed * 3.6f,4:0} {craft.State,-11} off {p.Offset,5:0.0} tgt {g,5:0.0} cap {Math.Min(p.SpeedCap, 999f) * 3.6f,4:0} lat {me.Car.Lateral,5:0.0} sw {swings} fl {flips}  {a}");
         }
         Console.WriteLine($"scene: {swings} swings, {flips} dithers in {seconds:0} s");
     }

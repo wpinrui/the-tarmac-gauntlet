@@ -142,7 +142,6 @@ namespace TarmacGauntlet.Raceday
             }
             if (want != Active) HandOver(want);
 
-            if (Active != Pilot) Craft.Forget();
             if (Active == Formation)
             {
                 Active.SpeedScale = 1f;

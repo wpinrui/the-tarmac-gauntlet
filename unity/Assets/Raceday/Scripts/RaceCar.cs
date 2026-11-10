@@ -91,7 +91,8 @@ namespace TarmacGauntlet.Raceday
                 InPitLane = false;
                 car.SpeedLimit = float.PositiveInfinity;
                 velocity = active.Line.Tangent[active.Index] * active.GlideSpeed;
-                Traffic = Describe(pilot, Laps * c.Lap + active.GlideDistance, active.GlideLateral, active.GlideSpeed);
+                active.GlidePose(0f, out _, out Vector3 heading, out _);
+                Traffic = Describe(pilot, Laps * c.Lap + active.GlideDistance, active.GlideLateral, active.GlideSpeed, 0f, Mathf.Atan2(heading.z, heading.x));
                 return;
             }
             Vector3 p = transform.position;
@@ -105,7 +106,9 @@ namespace TarmacGauntlet.Raceday
             float lateral = d.x * c.Left[k].x + d.z * c.Left[k].z;
             InPitLane = Pits != null && Pits.OffTrackInLane(k, lateral);
             car.SpeedLimit = Pits != null && Pits.InLimitZone(p, k) ? Pits.LimitSpeed : float.PositiveInfinity;
-            Traffic = Describe(pilot, Laps * c.Lap + c.DistanceAt(k, p), lateral, v.x * f.x + v.z * f.z);
+            Vector3 ahead = transform.forward;
+            Traffic = Describe(pilot, Laps * c.Lap + c.DistanceAt(k, p), lateral, v.x * f.x + v.z * f.z,
+                v.x * c.Left[k].x + v.z * c.Left[k].z, Mathf.Atan2(ahead.z, ahead.x));
         }
 
         /// <summary>Counts the laps as the car moves to sample k.</summary>
@@ -117,7 +120,7 @@ namespace TarmacGauntlet.Raceday
             index = k;
         }
 
-        private TrafficCar Describe(AiPilot pilot, float distance, float lateral, float speed) => new TrafficCar
+        private TrafficCar Describe(AiPilot pilot, float distance, float lateral, float speed, float across, float yaw) => new TrafficCar
         {
             Id = id,
             Distance = distance,
@@ -125,9 +128,8 @@ namespace TarmacGauntlet.Raceday
             Speed = speed,
             LapPace = pilot != null ? pilot.Profile.LapTime : 0f,
             Braking = car.Spec.BrakeDecel * G * AiPilot.LimitFor(pilot != null ? pilot.Pace : 100f),
-            GivingWay = driver != null && driver.enabled && driver.Craft != null && !driver.Pitting && driver.Craft.State == Racecraft.Mode.GivingWay,
-            // A player's car has no plan: the AI expects it to carry on as it is going.
-            Craft = driver != null && driver.enabled ? driver.Craft : null,
+            Across = across,
+            Yaw = yaw,
         };
 
         /// <summary>Takes one lap off every car's count, at the green: the formation lap doesn't count.</summary>

@@ -130,7 +130,7 @@ sealed class Race
                 Entry = e,
                 Car = new StandInCar(spec, line),
                 Pilot = new AiPilot(line, spec, e.Pace, e.Consistency, e.Safety, e.Seed),
-                Craft = new Racecraft(e.Seed),
+                Craft = new Racecraft(),
             };
             int k = circuit.IndexOf(e.Start);
             r.Car.PlaceAt(k, e.Lateral);
@@ -160,8 +160,8 @@ sealed class Race
                 Speed = r.Car.Vx * f.x + r.Car.Vz * f.z,
                 LapPace = pace,
                 Braking = r.Car.Spec.BrakeDecel * 9.81f * AiPilot.LimitFor(r.Pilot.Pace),
-                GivingWay = r.Craft.State == Racecraft.Mode.GivingWay,
-                Craft = r.Craft,
+                Across = r.Car.Vx * circuit.Left[k].x + r.Car.Vz * circuit.Left[k].z,
+                Yaw = (float)Math.Atan2(r.Car.Forward.z, r.Car.Forward.x),
             });
         }
         sorted.Set(field, circuit.Lap);
@@ -192,7 +192,7 @@ sealed class Race
         {
             FeatherSteps++;
             if (FeatherLog && FeatherSteps % 50 == 0)
-                Console.WriteLine($"FEATHER {Clock(Time)} {Name(r)} {k * circuit.Step:0} m {r.Car.Speed * 3.6f:0} kmh thr {c.Throttle:0.00} cap {r.Pilot.SpeedCap * 3.6f:0} {r.Craft.State} {r.Craft.Plan} off {r.Pilot.Offset:0.0} lat {r.Car.Lateral:0.0} towed {r.Pilot.Towed}");
+                Console.WriteLine($"FEATHER {Clock(Time)} {Name(r)} {k * circuit.Step:0} m {r.Car.Speed * 3.6f:0} kmh thr {c.Throttle:0.00} cap {r.Pilot.SpeedCap * 3.6f:0} {r.Craft.State} off {r.Pilot.Offset:0.0} lat {r.Car.Lateral:0.0} towed {r.Pilot.Towed}");
         }
     }
 
@@ -233,7 +233,7 @@ sealed class Race
             OpenRoomSteps++;
             if (OpenRoomSteps % 100 == 1)
                 OpenRoomLine = $"{Name(r)} held behind {Name(ahead)} in the corner at {k * circuit.Step:0} m at {Clock(Time)} with the {(side * Math.Sign(r.Pilot.Line.Curvature[k]) > 0 ? "inside" : "outside")} open";
-            if (FeatherLog && OpenRoomSteps % 20 == 1) Console.WriteLine("OPEN " + OpenRoomLine + $" {r.Craft.State} {r.Craft.Plan} off {r.Pilot.Offset:0.0}");
+            if (FeatherLog && OpenRoomSteps % 20 == 1) Console.WriteLine("OPEN " + OpenRoomLine + $" {r.Craft.State} off {r.Pilot.Offset:0.0}");
             return;
         }
     }
@@ -274,9 +274,9 @@ sealed class Race
             }
             r.Craft.Think(r.Pilot, field[i], sorted, Dt);
             {
-                bool onLine = r.Craft.Plan == "Line";
+                bool onLine = r.Craft.State == Racecraft.Mode.Racing;
                 r.SinceFlip += Dt;
-                if (onLine != r.OnLine && r.Id == FlipWatch) Console.WriteLine($"FLIP {Clock(Time)} {r.Car.TrackIndex * circuit.Step:0} m {r.Car.Speed * 3.6f:0} kmh {(onLine ? "->Line" : "->" + r.Craft.Plan)} after {r.SinceFlip:0.0}s lat {r.Car.Lateral:0.0} off {r.Pilot.Offset:0.0}");
+                if (onLine != r.OnLine && r.Id == FlipWatch) Console.WriteLine($"FLIP {Clock(Time)} {r.Car.TrackIndex * circuit.Step:0} m {r.Car.Speed * 3.6f:0} kmh {(onLine ? "->Racing" : "->Overtaking")} after {r.SinceFlip:0.0}s lat {r.Car.Lateral:0.0} off {r.Pilot.Offset:0.0}");
                 if (onLine != r.OnLine) { if (r.SinceFlip < 1f) r.Dithers++; r.SinceFlip = 0f; r.OnLine = onLine; }
                 float g = r.Craft.Target;
                 if (r.SwingDir > 0 && g > r.SwingExt || r.SwingDir < 0 && g < r.SwingExt) r.SwingExt = g;
