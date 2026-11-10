@@ -132,6 +132,10 @@ namespace TarmacGauntlet.Raceday
         // Racing etiquette, not in the tutorial: the F1 rule of one move when defending, and room for a car alongside.
         /// <summary>A car defends when a car behind closing on it is this close in time, s.</summary>
         private const float DefendTime = 1f;
+        /// <summary>A car closing faster than this is not defended against: the car ahead holds its line, m/s.</summary>
+        private const float NoDefendClosing = 10f;
+        /// <summary>...once that car is this close in time, s.</summary>
+        private const float NoDefendTime = 2f;
         /// <summary>SPEED_PASS_MARGIN from bt's OPP_BACK: a car behind counts unless this much slower, m/s.</summary>
         private const float SpeedPassMargin = 5f;
         /// <summary>A defender with a slower car this close ahead in time is overtaking, and may move freely, s.</summary>
@@ -157,6 +161,8 @@ namespace TarmacGauntlet.Raceday
         public bool Defending { get; private set; }
         /// <summary>True while defending with a slower car close ahead: it is overtaking, so moves freely.</summary>
         public bool Exempt { get; private set; }
+        /// <summary>True while a car behind closes so fast that this car makes no move off its line.</summary>
+        public bool HoldingLine { get; private set; }
         /// <summary>Where the car is told to run across the track this step, from the middle, positive left.</summary>
         public float Place { get; private set; }
 
@@ -181,6 +187,7 @@ namespace TarmacGauntlet.Raceday
             SideSteering = false;
             Defending = false;
             Exempt = false;
+            HoldingLine = false;
             if (pilot.Index < 0) { movePhase = 0; return; }
             RacingLine line = pilot.Line;
             Circuit c = line.Circuit;
@@ -204,6 +211,7 @@ namespace TarmacGauntlet.Raceday
             const float sideCollDist = CarLength;   // MIN of the two cars' lengths
             float minCatch = float.MaxValue, minSide = float.MaxValue;
             bool hasFront = false, hasSide = false;
+            bool fastBehind = false;
             bool behind = false, closeAhead = false, roomLeft = false, roomRight = false;
             float axles = 2f * pilot.Spec.HalfWheelbase;
             TrafficCar front = default, side = default;
@@ -226,6 +234,8 @@ namespace TarmacGauntlet.Raceday
 
                 // Not in the tutorial: who makes this a defence, and who is alongside.
                 if (distance < -sideCollDist && -distance < mySpeed * DefendTime && o.Speed > mySpeed - SpeedPassMargin) behind = true;
+                float closing = o.Speed - mySpeed;
+                if (distance < -sideCollDist && closing > NoDefendClosing && -distance < closing * NoDefendTime) fastBehind = true;
                 if (distance > sideCollDist && distance < mySpeed * ExemptTime && o.Speed < wantSpeed) closeAhead = true;
                 // Room: a car alongside with its front axle past my rear axle is owed a car's width. A car
                 // alongside ahead of me always is; one behind once it is more than its axles' length up.
@@ -320,6 +330,14 @@ namespace TarmacGauntlet.Raceday
             Exempt = behind && closeAhead;
             if (!Defending) movePhase = 0;
             else if (!Exempt) newOffset = OneMove(pilot.Offset, newOffset, true);
+            // Caught far too fast to defend: no move off the line at all, only back towards it.
+            HoldingLine = fastBehind;
+            if (HoldingLine)
+            {
+                float was = pilot.Offset;
+                if (was * newOffset < 0f) newOffset = 0f;
+                else if (Mathf.Abs(newOffset) > Mathf.Abs(was)) newOffset = was;
+            }
             pilot.Offset = newOffset;
             Target = pilot.Offset;
 
