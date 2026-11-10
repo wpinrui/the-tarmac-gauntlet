@@ -13,6 +13,7 @@ namespace TarmacGauntlet.Raceday
     /// back. V moves the cameras to the next car, and P to the next car making a pit stop. F steps
     /// the race through normal speed, 4x and 16x while the AI drives your car, and ends the pit lane
     /// start's fast forward. Cars away from the camera glide without physics (<see cref="PhysicsRange"/>).
+    /// The field is the season's 99 AI teams and the player's, shown on the timing tower (<see cref="RaceTower"/>).
     /// </summary>
     public sealed class CircuitScene : MonoBehaviour
     {
@@ -36,8 +37,14 @@ namespace TarmacGauntlet.Raceday
         private const string PlayerCar = "a-29";
         private const string PlayerModel = "Assets/Art/Vehicles/CheonmaCX24Si/CheonmaCX24Si.obj";
         private const string PaceCarModel = "c-19";
-        /// <summary>How many of the field come from each class, fastest class first: 100 cars.</summary>
-        private static readonly (char Class, int Count)[] ClassCounts = { ('a', 17), ('b', 17), ('c', 17), ('d', 17), ('e', 16), ('f', 16) };
+        /// <summary>The player's team name on the timing tower.</summary>
+        private const string PlayerTeam = "Your Team";
+        /// <summary>Classes fastest first, as the field is ordered.</summary>
+        private static readonly TarmacGauntlet.Simulation.CarClass[] QuickestClassFirst =
+        {
+            TarmacGauntlet.Simulation.CarClass.A, TarmacGauntlet.Simulation.CarClass.B, TarmacGauntlet.Simulation.CarClass.C,
+            TarmacGauntlet.Simulation.CarClass.D, TarmacGauntlet.Simulation.CarClass.E, TarmacGauntlet.Simulation.CarClass.F,
+        };
         /// <summary>
         /// AI cars start with between this share of a tank and a full one, so some need to stop in
         /// the first laps and the pit stops can be seen early.
@@ -77,10 +84,12 @@ namespace TarmacGauntlet.Raceday
             var pits = new PitLane(circuit);
             var rng = new System.Random(11);
             // Grid order, quickest on pole, with the player's car moved from pole to the back.
-            string[] quickestFirst = Field();
-            var field = new string[quickestFirst.Length];
-            System.Array.Copy(quickestFirst, 1, field, 0, quickestFirst.Length - 1);
-            field[field.Length - 1] = quickestFirst[0];
+            List<(string Model, string Team)> quickestFirst = Field();
+            quickestFirst.Add(quickestFirst[0]);
+            quickestFirst.RemoveAt(0);
+            var field = new string[quickestFirst.Count];
+            var teams = new string[quickestFirst.Count];
+            for (int i = 0; i < field.Length; i++) (field[i], teams[i]) = quickestFirst[i];
             var cars = new CarController[field.Length];
             var grid = new RaceCar[field.Length];
             var drivers = new AiDriver[field.Length];
@@ -134,6 +143,7 @@ namespace TarmacGauntlet.Raceday
             range.Player = ai.Car;
 
             Camera(circuit, cars, keys);
+            Tower(circuit, grid, field, teams, starter);
             if (start == StartMode.PitLane)
             {
                 var pitStart = (PitStart)starter;
@@ -154,25 +164,24 @@ namespace TarmacGauntlet.Raceday
             rolling.Pits = pits;
         }
 
-        /// <summary>The field, quickest first: classes fastest first, each cycling through its models.</summary>
-        private static string[] Field()
+        /// <summary>
+        /// The field, quickest first: the player's car, then the AI teams of the season's roster by
+        /// class, fastest class first, each class cycling through its models.
+        /// </summary>
+        private static List<(string Model, string Team)> Field()
         {
-            var field = new List<string> { PlayerCar };
-            foreach ((char cls, int count) in ClassCounts)
+            var field = new List<(string, string)> { (PlayerCar, PlayerTeam) };
+            foreach (TarmacGauntlet.Simulation.CarClass cls in QuickestClassFirst)
             {
                 var models = new List<string>();
                 foreach (TarmacGauntlet.Simulation.CarModel m in TarmacGauntlet.Simulation.CarModels.All)
-                    if (m.Id[0] == cls && m.Id[1] == '-') models.Add(m.Id);
+                    if (m.CarClass == cls && m.Id[1] == '-') models.Add(m.Id);
                 models.Sort((x, y) => string.CompareOrdinal(y, x));
-                int have = cls == PlayerCar[0] ? 1 : 0;
-                for (int j = 0; have < count; j++)
-                {
-                    string id = models[j % models.Count];
-                    field.Add(id);
-                    have++;
-                }
+                int j = 0;
+                foreach (TarmacGauntlet.Simulation.AiTeamEntry team in TarmacGauntlet.Simulation.AiTeamRoster.All)
+                    if (team.CarClass == cls) field.Add((models[j++ % models.Count], team.Name));
             }
-            return field.ToArray();
+            return field;
         }
 
         /// <summary>
@@ -217,6 +226,27 @@ namespace TarmacGauntlet.Raceday
                 // Let a slow frame catch up with all its physics steps rather than fall behind the clock.
                 Time.maximumDeltaTime = Mathf.Max(1f / 3f, scale / 30f);
             }
+        }
+
+        /// <summary>The timing tower, its clock running from the green, or from the first car out of the pit lane.</summary>
+        private void Tower(Circuit circuit, RaceCar[] grid, string[] field, string[] teams, Starter starter)
+        {
+            RaceTower tower = new GameObject("Timing tower").AddComponent<RaceTower>();
+            tower.Cars = grid;
+            tower.Teams = teams;
+            tower.Classes = new TarmacGauntlet.Simulation.CarClass[field.Length];
+            tower.Colours = new Color[field.Length];
+            var paint = new System.Random(23);
+            for (int i = 0; i < field.Length; i++)
+            {
+                string id = field[i];
+                tower.Classes[i] = System.Linq.Enumerable.First(TarmacGauntlet.Simulation.CarModels.All, m => m.Id == id).CarClass;
+                tower.Colours[i] = RaceTower.TeamColours[paint.Next(RaceTower.TeamColours.Length)];
+            }
+            tower.Player = field.Length - 1;
+            tower.Lap = circuit.Lap;
+            if (starter is RaceStart rolling) tower.Racing = () => rolling.Racing;
+            else if (pitLaneStart != null) tower.Racing = () => pitLaneStart.Gone(0);
         }
 
         private static void Sun()

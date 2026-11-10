@@ -14,6 +14,7 @@
 //   consistency      lap times spread more for a Consistency 0 driver than a Consistency 100 driver
 //   mistakes         a Safety 0 driver overcooks corners, and still finishes every lap
 //   rejoins          see RejoinChecks.cs; pass "rejoin" to run only those, with every run printed
+//   timing tower     see TowerChecks.cs; pass "tower" to run only that
 //
 // Pass a car model id (e.g. a-29) to print six laps of that car at Pace 90 in detail instead: one line
 // every half second, every step within 120 m of the lap distance in AI_TRACE, and every tenth step of an
@@ -163,6 +164,11 @@ static partial class Check
             SpunCarsRecover(Enumerable.Range(from, to - from + 1), verbose: true);
             return failed ? 1 : 0;
         }
+        if (args.Length > 1 && args[1] == "tower")
+        {
+            TowerChecks();
+            return failed ? 1 : 0;
+        }
         if (args.Length > 1 && args[1] == "rejoin")
         {
             RejoinOffTrack(verbose: true);
@@ -186,6 +192,7 @@ static partial class Check
             return 0;
         }
 
+        TowerChecks();
         LineUsesWidth();
         TuningHelps();
         CleanLaps();
