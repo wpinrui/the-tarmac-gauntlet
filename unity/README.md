@@ -25,12 +25,12 @@ compiles in Unity.
 `Assets/Raceday/Raceday.unity` opens when the editor starts. Press Play and the AI drives the Seorak
 Cheonma CX-24Si. `I` hands the car to you, and pressing it again hands it back.
 
-Start on the scene's `CircuitScene` picks how the race starts. Pit Lane (the default): the 100 cars
+Start on the scene's `CircuitScene` picks how the race starts. Rolling (the default) starts behind the pace car. Pit Lane: the 100 cars
 queue in the pit lane's fast lane, quickest first with the Cheonma last, and leave three seconds apart
 from the pit exit line (the end of the limiter zone), the queue moving up behind each car that goes
 (`PitLaneStart.cs`). The scene fast forwards at 32x until just before the car ahead of the Cheonma
 leaves; `F` or `I` ends the fast forward early. Pit stops open once every car is out of the pit lane, and
-every car starts on a full tank. Rolling starts behind the pace car, and Grid races from the grid at once.
+every car starts on a full tank. Grid races from the grid at once.
 
 The field is the season's 99 AI teams, by the class of their roster entry, and the player's. The timing
 tower in the top left (`RaceTower.cs`, order in `Standings.cs`) counts down the 24 hour race clock, which runs
