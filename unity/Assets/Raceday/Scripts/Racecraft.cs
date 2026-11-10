@@ -21,6 +21,8 @@ namespace TarmacGauntlet.Raceday
         public float Across;
         /// <summary>Heading of the car's body, radians anticlockwise seen from above.</summary>
         public float Yaw;
+        /// <summary>A spun car stopped on the track waiting for a gap: other cars pass through it and race as if it weren't there.</summary>
+        public bool Ghost;
     }
 
     /// <summary>
@@ -222,7 +224,7 @@ namespace TarmacGauntlet.Raceday
             {
                 int i = sorted != null ? (from + j) % count : j;
                 TrafficCar o = field[i];
-                if (o.Id == me.Id) continue;
+                if (o.Id == me.Id || o.Ghost) continue;
                 float distance = (sorted != null ? sorted.At(i) : Mathf.Repeat(o.Distance, lap)) - here;
                 if (distance > lap * 0.5f) distance -= lap;
                 else if (distance < -lap * 0.5f) distance += lap;
@@ -444,6 +446,29 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>
+        /// Whether a car is a ghost this step: only a spun car stopping or waiting for a gap, on the
+        /// tarmac or kerb. Once it starts to turn round or rejoin it stays a ghost only until no other
+        /// car overlaps it, so it never turns solid inside one.
+        /// </summary>
+        public static bool Ghosted(bool was, Rejoin rejoin, TrafficCar me, IReadOnlyList<TrafficCar> field, float lap)
+        {
+            bool waiting = rejoin.State == Rejoin.Stage.Stopping || rejoin.State == Rejoin.Stage.Waiting;
+            if (waiting && rejoin.PastEdge <= Rejoin.OffTrackMargin) return true;
+            if (!was) return false;
+            for (int i = 0; i < field.Count; i++)
+            {
+                TrafficCar o = field[i];
+                if (o.Id == me.Id) continue;
+                float gap = Mathf.Repeat(o.Distance - me.Distance + lap * 0.5f, lap) - lap * 0.5f;
+                if (Mathf.Abs(gap) < CarLength + GhostClear && Mathf.Abs(o.Lateral - me.Lateral) < CarLength) return true;
+            }
+            return false;
+        }
+
+        /// <summary>Space a ghost keeps clear of other cars, metres, before it turns solid again.</summary>
+        public const float GhostClear = 2f;
+
+        /// <summary>
         /// Share of its normal drag a car feels in the wake of the cars ahead: down to 55% right
         /// behind a car, fading out by 80 m back or a car's width to the side.
         /// </summary>
@@ -453,7 +478,7 @@ namespace TarmacGauntlet.Raceday
             for (int i = 0; i < field.Count; i++)
             {
                 TrafficCar o = field[i];
-                if (o.Id == me.Id) continue;
+                if (o.Id == me.Id || o.Ghost) continue;
                 float gap = Mathf.Repeat(Mathf.Repeat(o.Distance, lap) - here, lap);
                 float side = Mathf.Abs(o.Lateral - me.Lateral);
                 if (gap < WakeFrom || gap > WakeLength || side > 2f) continue;

@@ -24,6 +24,8 @@ namespace TarmacGauntlet.Raceday
         public readonly int Seed;
         /// <summary>Getting back into the race after leaving the track or spinning.</summary>
         public readonly Rejoin Rejoin = new Rejoin();
+        /// <summary>True while the car is a ghost: spun and waiting on the track (<see cref="Racecraft.Ghosted"/>).</summary>
+        public bool Ghost { get; private set; }
 
         /// <summary>The pilot for the car's formation column, set while it is in the formation.</summary>
         public AiPilot Formation;
@@ -77,6 +79,7 @@ namespace TarmacGauntlet.Raceday
         {
             Hold = false;
             Rejoin.Reset();   // it finds the track again from the pilot's place when it wakes
+            Ghost = false;
             AiPilot want = InFormation && Formation != null ? Formation : Pilot;
             if (want != Active)
             {
@@ -162,6 +165,7 @@ namespace TarmacGauntlet.Raceday
             AiPilot.Controls c = Active.Drive(position, forward, velocity, yawRate);
             if (Active == Pilot) c = Rejoin.Apply(Pilot, c, position, forward, velocity, yawRate, me, field, dt);
             else Rejoin.Reset();
+            Ghost = Racecraft.Ghosted(Ghost, Rejoin, me, field, Pilot.Line.Circuit.Lap);
             if (Hold)
             {
                 c.Throttle = 0f;

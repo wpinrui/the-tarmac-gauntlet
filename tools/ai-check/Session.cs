@@ -276,6 +276,7 @@ sealed class Session
                 Braking = car.Spec.BrakeDecel * 9.81f * AiPilot.LimitFor(s.Racer.Pilot.Pace),
                 Across = car.Vx * circuit.Left[k].x + car.Vz * circuit.Left[k].z,
                 Yaw = (float)Math.Atan2(car.Forward.z, car.Forward.x),
+                Ghost = s.Racer.Ghost,
             };
             traffic.Add(t);
             if (!s.InPitLane) field.Add(t);
@@ -408,7 +409,7 @@ sealed class Session
     void Collide()
     {
         var bodies = new List<(StandInCar Car, string Name, bool Pits)>();
-        foreach (SessionCar s in Cars) bodies.Add((s.Car, Name(s) + (s.Racer.Active.Gliding ? " (gliding)" : "") + (s.Racer.Rejoin.Busy ? $" (rejoining: {s.Racer.Rejoin.State}{(s.Racer.Rejoin.Yielding ? " yielding" : "")} {s.Racer.Rejoin.PastEdge:0.0} m past, heading {s.Racer.Rejoin.Heading:0}, {s.Car.Speed * 3.6f:0} km/h)" : ""), s.InPitLane || s.Racer.Pitting));
+        foreach (SessionCar s in Cars) bodies.Add((s.Car, Name(s) + (s.Racer.Active.Gliding ? " (gliding)" : "") + (s.Racer.Ghost ? " (ghost)" : "") + (s.Racer.Rejoin.Busy ? $" (rejoining: {s.Racer.Rejoin.State}{(s.Racer.Rejoin.Yielding ? " yielding" : "")} {s.Racer.Rejoin.PastEdge:0.0} m past, heading {s.Racer.Rejoin.Heading:0}, {s.Car.Speed * 3.6f:0} km/h)" : ""), s.InPitLane || s.Racer.Pitting));
         if (PaceCar != null && !PaceCarGone) bodies.Add((PaceCar, "pace car", false));
         for (int i = 0; i < bodies.Count; i++)
             for (int j = i + 1; j < bodies.Count; j++)
@@ -419,6 +420,11 @@ sealed class Session
                 bool hit = dx * dx + dz * dz < 30f && Race.Overlap(a, b, out nx, out nz, out depth);
                 var key = (i, j);
                 if (!hit) { touching.Remove(key); continue; }
+                if (bodies[i].Name.Contains("(ghost)") || bodies[j].Name.Contains("(ghost)"))
+                {
+                    touching.Add(key);
+                    continue;
+                }
                 if (bodies[i].Name.EndsWith("(gliding)") || bodies[j].Name.EndsWith("(gliding)"))
                 {
                     // No bodies to bump: a gliding car has no collider in the game.
