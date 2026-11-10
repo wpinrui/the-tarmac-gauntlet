@@ -111,6 +111,8 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Offset that puts a car beside another.</summary>
         private const float Beside = SideBySide + 0.4f;
         private const float MaxShift = 5f;
+        /// <summary>Offsets from the line searched for open road when held up.</summary>
+        private static readonly float[] GapLanes = { -9f, -6f, -3f, 3f, 6f, 9f };
         private const float LookAhead = 150f;
         private const float LookBehind = 90f;
         /// <summary>Lap pace ratio that makes another car a different class.</summary>
@@ -133,6 +135,10 @@ namespace TarmacGauntlet.Raceday
         private const float WorthIt = 1f;
         /// <summary>Metres the line has to gain over a pass under way before the car gives the pass up.</summary>
         private const float Stick = 4f;
+        /// <summary>Metres a path is credited with for each car it gets by, over the planning time.</summary>
+        private const float PlaceWorth = 10f;
+        /// <summary>Metres a path is charged for each second it is held up behind a car.</summary>
+        private const float HeldCost = 4f;
         /// <summary>Metres a path is credited with for winning the place from the car ahead.</summary>
         private const float PassWorth = 15f;
         /// <summary>Distance a pass may go on losing to the line before it is dropped, metres.</summary>
@@ -388,14 +394,21 @@ namespace TarmacGauntlet.Raceday
                 // A car crawling after a spin goes anywhere: give it a wide berth.
                 bool crawling = n.Car.Speed < 20f && n.Car.Speed < 0.5f * me.Speed;
                 if (crawling) margin = SideBySide + 1f;
-                bool inPath = !alongside && (Apart(line, n, shift) < margin
-                    || (n.Gap < 30f && Apart(line, n, pilot.Offset) < margin)
-                    || plan.HeldBy.Contains(n.Car.Id));
+                // Pulling out to pass, the car stays flat: the plan already knows whether its path clears
+                // the car ahead, so only a car the plan runs into, or one about to be hit before the car
+                // is out of its way, holds it back.
+                float closing = Mathf.Max(me.Speed - n.Car.Speed, 0f);
+                bool inPath = !alongside && (mode == Mode.Passing
+                    ? plan.HeldBy.Contains(n.Car.Id) || (n.Gap < CarLength + 2f + 0.5f * closing && Apart(line, n, shift) < margin)
+                    : Apart(line, n, shift) < margin
+                        || (n.Gap < 30f && Apart(line, n, pilot.Offset) < margin)
+                        || plan.HeldBy.Contains(n.Car.Id));
                 if (!inPath) continue;
-                // Closer when attacking: tucked right in on a straight, in its slipstream, ready to pull out.
-                bool attacking = mode == Mode.Passing || me.LapPace < n.Car.LapPace * 0.995f || n.BeingLapped || n.Slower;
+                // No gap held for its own sake: flat out until the car ahead is close enough that, were
+                // it to stop as hard as it can, this one would only just stop behind it. Tucked right in
+                // on a straight, in its slipstream, ready to pull out.
                 bool straight = !inCorner && (corner < 0 || toCorner > 2f * me.Speed);
-                float wanted = CarLength + 1f + (attacking ? (straight ? 0.03f : 0.08f) : 0.2f) * me.Speed;
+                float wanted = CarLength + 1f + (straight ? 0.03f : 0.08f) * me.Speed;
                 // A gliding car looks only every few physics steps, so it keeps back the extra ground it
                 // could close before it looks again, with the same again to spare.
                 float room = n.Gap - wanted - 2f * Mathf.Max(dt - PhysicsStep, 0f) * Mathf.Max(me.Speed - n.Car.Speed, 0f);
@@ -498,8 +511,12 @@ namespace TarmacGauntlet.Raceday
             // Only worth looking for a way past when the line is going to be held up, and never while
             // covering a move. A car making room for one behind may still pass a slower one ahead:
             // the car behind plans round where it is going.
-            int target = baseline.Blocked ? BlockerAhead(line, c, pilot.Shift) : -1;
-            if (givingWay && target >= 0 && !(near[target].Slower || near[target].BeingLapped)) target = -1;
+            // A car in the way within two seconds counts too: always looking for a gap, not only once
+            // stuck behind.
+            int target = BlockerAhead(line, c, pilot.Shift);
+            if (target >= 0 && !baseline.Blocked && !(near[target].Gap < 2f * Mathf.Max(speed, 10f) && Apart(line, near[target], pilot.Shift) < SideBySide)) target = -1;
+            // Making room for a car behind does not stop it racing the car ahead: the car behind plans
+            // round wherever it goes.
             // Getting by a slower car, or a queue of them, a pass under way is held on to; between
             // evenly matched cars a pass is a move into one corner.
             bool queue = target >= 0 && (near[target].Slower || near[target].BeingLapped);
@@ -509,6 +526,12 @@ namespace TarmacGauntlet.Raceday
                 Near t = near[target];
                 float inner = Mathf.Clamp(t.Shift + inside * Beside, -MaxShift, MaxShift);
                 float outer = Mathf.Clamp(t.Shift - inside * Beside, -MaxShift, MaxShift);
+                // Open road: any lane across the track's width, flat out to the corner's braking point.
+                // A gap rather than a car to dodge, so it finds the clear side of a whole queue.
+                if (a > ramp)
+                    foreach (float lane in GapLanes)
+                        if (Mathf.Abs(lane - now) > 1f)
+                            candidates.Add(Make(Kind.Straight, start, samples, c, now, ramp, lane, 0f, a - 30f, corner));
                 // Stay where it is, out of the queue, and keep its foot down to the corner's turn-in.
                 if (queue && Mathf.Abs(now) > 1f && a > ramp)
                     candidates.Add(Make(Kind.Straight, start, samples, c, now, ramp, now, 0f, a - 30f, corner));
@@ -692,6 +715,7 @@ namespace TarmacGauntlet.Raceday
             p.Rejected = false;
             p.WinsPlace = false;
             p.HeldBy.Clear();
+            float heldTime = 0f;
             p.Distance[0] = me.Distance;
             p.Lateral[0] = me.Lateral;
             float lastLat = me.Lateral;
@@ -736,7 +760,7 @@ namespace TarmacGauntlet.Raceday
                         if (o.Car.Id == passing && gap < CarLength * 0.3f) p.WinsPlace = true;
                         continue;
                     }
-                    float follow = CarLength + 1f + 0.03f * vel;   // tucked in, as close as an attacker sits
+                    float follow = CarLength + 1f + 0.03f * vel;   // tucked in, as close as it really sits
                     if (gap >= CarLength * 0.6f)
                     {
                         // Ahead in the path: follow it.
@@ -748,6 +772,7 @@ namespace TarmacGauntlet.Raceday
                                 next = held;
                                 vel = (next - s) / Tick;
                                 p.Blocked = true;
+                                heldTime += Tick;
                                 if (!p.HeldBy.Contains(o.Car.Id)) p.HeldBy.Add(o.Car.Id);
                             }
                         }
@@ -760,7 +785,11 @@ namespace TarmacGauntlet.Raceday
                 p.Distance[step] = me.Distance + (s - startS);
                 p.Lateral[step] = lat;
             }
-            p.Score = s - startS;
+            // Racing for places, not metres: each car passed is worth a good deal, and every moment
+            // held up behind one costs, so a path that could pass but sits behind scores badly.
+            p.Score = s - startS - HeldCost * heldTime;
+            for (int x = 0, end = Steps * inReach.Count; x < inReach.Count; x++)
+                if (near[inReach[x]].Gap > CarLength * 0.6f && gapAt[end + x] - (s - startS) < -CarLength * 0.6f) p.Score += PlaceWorth;
         }
 
         // Where this car will be as the others see it, each Tick from now: ground gained and lateral.

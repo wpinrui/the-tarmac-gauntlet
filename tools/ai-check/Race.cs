@@ -90,6 +90,9 @@ sealed class Race
     public string WorstStuckLine = "";
     /// <summary>The same for the fastest car behind the slowest one.</summary>
     public int FastestStuck;
+    /// <summary>Most corners a car 1% or more quicker started stuck behind a slower one.</summary>
+    public int QuickStuck;
+    public string QuickStuckLine = "";
     public string FastestStuckLine = "";
     Racer Fastest => Racers.OrderBy(r => r.Pilot.Profile.LapTime).First();
     Racer Slowest => Racers.OrderBy(r => r.Pilot.Profile.LapTime).Last();
@@ -162,6 +165,33 @@ sealed class Race
     }
 
     static readonly int FlipWatch = int.TryParse(System.Environment.GetEnvironmentVariable("AI_FLIPS"), out int fw) ? fw : -1;
+    /// <summary>Steps on a straight with a car within two seconds ahead in the way, and those of them on part throttle held back by it.</summary>
+    public int FollowSteps, FeatherSteps;
+    static readonly float FeatherFrom = float.TryParse(Environment.GetEnvironmentVariable("AI_FEATHER_FROM"), out float ff) ? ff : 0f;
+    static readonly bool FeatherLog = Environment.GetEnvironmentVariable("AI_FEATHER") != null;
+
+    void Feathering(Racer r, AiPilot.Controls c)
+    {
+        int k = r.Car.TrackIndex;
+        if (k < 0 || Math.Abs(r.Pilot.Line.Curvature[k]) > 0.003f || r.Car.Speed < 20f || Time < FeatherFrom) return;
+        bool behind = false;
+        foreach (Racer o in Racers)
+        {
+            if (o == r) continue;
+            float gap = o.Distance - r.Distance;
+            gap -= circuit.Lap * (float)Math.Round(gap / circuit.Lap);
+            if (gap > 0f && gap < 2f * r.Car.Speed && Math.Abs(o.Car.Lateral - r.Car.Lateral) < 2.5f) { behind = true; break; }
+        }
+        if (!behind) return;
+        FollowSteps++;
+        if (r.Pilot.HeldBy > 0.5f && r.Pilot.SpeedCap < r.Car.Speed + 0.5f && c.Brake <= 0f && c.Throttle < 0.95f)
+        {
+            FeatherSteps++;
+            if (FeatherLog && FeatherSteps % 50 == 0)
+                Console.WriteLine($"FEATHER {Clock(Time)} {Name(r)} {k * circuit.Step:0} m {r.Car.Speed * 3.6f:0} kmh thr {c.Throttle:0.00} cap {r.Pilot.SpeedCap * 3.6f:0} {r.Craft.State} {r.Craft.Plan} off {r.Pilot.Offset:0.0} lat {r.Car.Lateral:0.0} towed {r.Pilot.Towed}");
+        }
+    }
+
     public void Step()
     {
         Snapshot();
@@ -210,6 +240,7 @@ sealed class Race
             r.Car.DragScale = Racecraft.Slipstream(circuit, field[i], field);
             r.Pilot.Towed = r.Car.DragScale < 0.97f;
             AiPilot.Controls c = r.Pilot.Drive(r.Car.Position, r.Car.Forward, r.Car.Velocity, r.Car.YawRate);
+            Feathering(r, c);
             r.Car.Step(Dt, c.Throttle, c.Brake, c.Steer);
             r.ModeTime[r.Craft.State] = (r.ModeTime.TryGetValue(r.Craft.State, out float t) ? t : 0f) + Dt;
         }
@@ -276,11 +307,13 @@ sealed class Race
                     Passes.Add($"{Clock(Time)} {Name(by)} passes {Name(of)} at {Math.Max(by.Car.TrackIndex, 0) * circuit.Step:0} m{(by.Distance - of.Distance > circuit.Lap * 0.5f ? " (lapping)" : "")}");
             }
 
-        // A car more than one class quicker held up behind a slower one: corners it starts while still behind.
+        // A car quicker held up behind a slower one: corners it starts while still behind.
         foreach (Racer fast in Racers)
             foreach (Racer slow in Racers)
             {
-                if (Class(slow) - Class(fast) < 2) continue;
+                bool twoClasses = Class(slow) - Class(fast) >= 2;
+                bool quicker = fast.Pilot.Profile.LapTime < slow.Pilot.Profile.LapTime * 0.99f;
+                if (!twoClasses && !quicker) continue;
                 float gap = slow.Distance - fast.Distance;
                 gap -= circuit.Lap * (float)Math.Round(gap / circuit.Lap);
                 var key = (fast.Id, slow.Id);
@@ -299,6 +332,12 @@ sealed class Race
                     FastestStuck = corners;
                     FastestStuckLine = $"{Name(fast)}, the fastest car, started {corners} corners behind {Name(slow)}, the slowest, the last at {Clock(Time)} at {Math.Max(fast.Car.TrackIndex, 0) * circuit.Step:0} m";
                 }
+                if (quicker && corners > QuickStuck)
+                {
+                    QuickStuck = corners;
+                    QuickStuckLine = $"{Name(fast)} is {100f * (1f - fast.Pilot.Profile.LapTime / slow.Pilot.Profile.LapTime):0.0}% quicker and started {corners} corners behind {Name(slow)}, the last at {Clock(Time)} at {Math.Max(fast.Car.TrackIndex, 0) * circuit.Step:0} m";
+                }
+                if (!twoClasses) continue;
                 if (corners > WorstStuck)
                 {
                     WorstStuck = corners;
