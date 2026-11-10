@@ -17,8 +17,8 @@ namespace TarmacGauntlet.Raceday
             {
                 Layout = EngineLayout.Inline4, IdleRpm = 850f, RedlineRpm = 5800f,
                 HeaderLength = 0.45f, PipeLength = 2.6f, PipeResonance = 0.25f, Muffler = 0.95f, Brightness = 0.6f,
-                PulseWidth = 0.65f, Breath = 0.3f, Roughness = 0.16f, Asymmetry = 0.12f, Drive = 1.05f,
-                IntakeLevel = 0.12f, IntakePitch = 340f, MechLevel = 0.16f, Volume = 0.5f,
+                PulseWidth = 0.65f, Breath = 0.12f, Roughness = 0.16f, Asymmetry = 0.12f, Drive = 1.05f,
+                IntakeLevel = 0.12f, IntakePitch = 340f, MechLevel = 0.08f, Volume = 0.5f,
             },
             // Modern family fours, mostly small turbos: smooth and quiet.
             CarClass.E => new EngineSound
@@ -94,9 +94,9 @@ namespace TarmacGauntlet.Raceday
         public static readonly Dictionary<string, System.Action<EngineSound>> Cars = new Dictionary<string, System.Action<EngineSound>>
         {
             // F
-            ["f-01"] = s => { s.Roughness = 0.22f; s.Asymmetry = 0.16f; s.RedlineRpm = 5800f; s.MechLevel = 0.2f; },          // Nusa Carrier: old and rough
+            ["f-01"] = s => { s.Roughness = 0.22f; s.Asymmetry = 0.16f; s.RedlineRpm = 5800f; s.MechLevel = 0.1f; },          // Nusa Carrier: old and rough
             ["f-02"] = s => { s.PipeLength = 2.2f; s.Brightness = 0.7f; s.RedlineRpm = 6200f; s.IntakePitch = 380f; },         // Liberty Omaha: small and buzzy
-            ["f-03"] = s => { s.Roughness = 0.07f; s.Asymmetry = 0.05f; s.Muffler = 0.97f; s.MechLevel = 0.08f; },           // Tora Daruma: smooth and quiet
+            ["f-03"] = s => { s.Roughness = 0.07f; s.Asymmetry = 0.05f; s.Muffler = 0.97f; s.MechLevel = 0.04f; },           // Tora Daruma: smooth and quiet
             ["f-04"] = s => { s.IdleRpm = 800f; s.RedlineRpm = 5400f; s.PipeLength = 3.0f; s.PulseWidth = 0.7f; s.Brightness = 0.5f; }, // Kaiser Firefly: big lazy four
             ["f-05"] = s => { s.Brightness = 0.65f; s.RedlineRpm = 6000f; },                                                       // Liberty Collier
             ["f-06"] = s => { s.Muffler = 0.88f; s.Brightness = 0.7f; s.RedlineRpm = 6300f; s.Drive = 1.2f; s.IntakeLevel = 0.18f; },               // Nusa Fox: a little livelier

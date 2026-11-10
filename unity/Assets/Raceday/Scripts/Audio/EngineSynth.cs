@@ -154,7 +154,7 @@ namespace TarmacGauntlet.Raceday
                 mechLow += (noise - mechLow) * LowPassStep(2500f);
                 float tick = 0.5f + 0.5f * (float)Math.Sin(2.0 * Math.PI * cycles * cylinders * 2.0);
                 tick *= tick * tick;
-                float mech = (noise - mechLow) * s.MechLevel * (0.25f + 0.75f * rev) * (0.1f + 0.9f * load) * tick * tick;
+                float mech = (noise - mechLow) * 0.3f * s.MechLevel * (0.25f + 0.75f * rev) * (0.1f + 0.9f * load) * tick * tick;
 
                 float engine = s.Drive * (body + intake + mech) * 0.9f;
                 float shaped = (float)Math.Tanh(engine) / (float)Math.Sqrt(s.Drive) + 0.6f * popLow;
