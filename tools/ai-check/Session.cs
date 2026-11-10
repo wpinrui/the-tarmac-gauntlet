@@ -350,6 +350,7 @@ sealed class Session
                 Across = car.Vx * circuit.Left[k].x + car.Vz * circuit.Left[k].z,
                 Yaw = (float)Math.Atan2(car.Forward.z, car.Forward.x),
                 Ghost = s.Racer.Ghost,
+                Profile = s.Racer.Pilot.Profile,
             };
             traffic.Add(t);
             if (!s.InPitLane) field.Add(t);

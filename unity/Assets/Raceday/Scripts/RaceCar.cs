@@ -148,6 +148,7 @@ namespace TarmacGauntlet.Raceday
             Across = across,
             Yaw = yaw,
             Ghost = driver != null && driver.isActiveAndEnabled && driver.Racer != null && driver.Racer.Ghost,
+            Profile = pilot?.Profile,
         };
 
         /// <summary>Takes one lap off every car's count, at the green: the formation lap doesn't count.</summary>

@@ -200,6 +200,7 @@ sealed class Race
                 Across = r.Car.Vx * circuit.Left[k].x + r.Car.Vz * circuit.Left[k].z,
                 Yaw = (float)Math.Atan2(r.Car.Forward.z, r.Car.Forward.x),
                 Ghost = r.Ghost && !r.Pilot.Gliding,
+                Profile = r.Pilot.Profile,
             });
         }
         sorted.Set(field, circuit.Lap);
