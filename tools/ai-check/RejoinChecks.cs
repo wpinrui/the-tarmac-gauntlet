@@ -13,8 +13,12 @@
 //                           track, racing again within GravelLimit
 //   spun cars recover       pack races on many grids: no spun car stands for longer than SpunMoveLimit, no
 //                           rejoin of any kind lasts longer than that, and no car sits facing the wrong way
-//                           without a rejoin
-//   pack races (in RacePack) no car starts a rejoin unless it has left the track or lost control
+//                           without a rejoin, no pile-up and no long ghost (as in pack races)
+//   flipped cars            cars on their roof with traffic coming: each is a ghost while upside down, is set
+//                           back on its wheels after Rejoin.FlippedTime, gets back to racing and touches no car
+//   pack races (in RacePack) no car starts a rejoin unless it has left the track or lost control; no pile-up
+//                           (PileCars or more cars stopped together on the track, two of them solid); and no
+//                           car still a ghost GhostTail after it is back racing
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -363,7 +367,8 @@ static partial class Check
     static void SpunCarsRecover(IEnumerable<int> seeds, bool verbose)
     {
         var problems = new List<string>();
-        int races = 0, spins = 0;
+        int races = 0, spins = 0, pileUps = 0, ghostGroups = 0;
+        float ghostTime = 0f, longestTail = 0f;
         float longest = 0f;
         string longestLine = "";
         foreach (int seed in seeds)
@@ -375,7 +380,8 @@ static partial class Check
             var busySince = new Dictionary<Racer, float>();
             var longRun = new HashSet<Racer>();
             var reported = new HashSet<Racer>();
-            Race race = RunRace(Pack(false, seed), r => r.Racers.Max(c => c.Laps) >= 4, 60f * 20f, r =>
+            var piles = new PileWatch($"seed {seed} ");
+            Race race = RunRace(Pack(false, seed), r => { piles.Step(r); return r.Racers.Max(c => c.Laps) >= 4; }, 60f * 20f, r =>
             {
                 foreach (Racer x in r.Racers) resets[x] = 0;
                 r.OnRejoin = (rr, who, was) =>
@@ -424,6 +430,12 @@ static partial class Check
                 };
             });
             races++;
+            problems.AddRange(piles.PileUps);
+            problems.AddRange(piles.LongGhosts);
+            pileUps += piles.PileUps.Count;
+            ghostGroups += piles.GhostGroups;
+            ghostTime += piles.GhostSteps;
+            longestTail = Math.Max(longestTail, piles.LongestTail);
             foreach (var w in since)
             {
                 float wait = race.Time - w.Value;
@@ -433,6 +445,124 @@ static partial class Check
                 if (wait > SpunMoveLimit) problems.Add(line);
             }
         }
-        Report($"spun cars recover ({races} pack races, {spins} cars stopped after a spin, longest standing {longest:0} s{(longestLine != "" ? $": {longestLine}" : "")})", problems);
+        Report($"spun cars recover ({races} pack races, {spins} cars stopped after a spin, {pileUps} pile-ups, {ghostGroups} groups of spun ghosts at one spot, {ghostTime:0} s of ghosts, longest a ghost after getting back {longestTail:0.0} s, longest standing {longest:0} s{(longestLine != "" ? $": {longestLine}" : "")})", problems);
+    }
+
+    /// <summary>A pile-up: this many cars or more at one spot on the track, all at a crawl or stopped.</summary>
+    const int PileCars = 3;
+    /// <summary>Cars closer than this along the track, metres, are at one spot.</summary>
+    const float PileGap = 12f;
+    /// <summary>Slower than this, m/s, a car is crawling or stopped.</summary>
+    const float PileSpeed = 3f;
+
+    /// <summary>
+    /// Watches a race for pile-ups (<see cref="PileCars"/> or more cars at one spot on the track, all
+    /// crawling or stopped, at least two of them solid, after the start) and for ghosts that last: a car must not still be a ghost
+    /// <see cref="GhostTail"/> after it is back racing.
+    /// </summary>
+    sealed class PileWatch
+    {
+        public readonly List<string> PileUps = new List<string>();
+        public readonly List<string> LongGhosts = new List<string>();
+        public float GhostSteps, LongestTail;
+        /// <summary>Times three or more cars, all but one ghosts, were stopped together: spun cars recovering at one corner.</summary>
+        public int GhostGroups;
+        readonly Dictionary<Racer, float> tail = new Dictionary<Racer, float>();
+        readonly HashSet<Racer> flagged = new HashSet<Racer>();
+        float lastPile = -100f;
+        readonly string label;
+
+        public PileWatch(string label) { this.label = label; }
+
+        public void Step(Race r)
+        {
+            foreach (Racer x in r.Racers)
+            {
+                if (x.Rejoin.Ghost) GhostSteps += Race.Dt;
+                bool back = x.Rejoin.Ghost && !x.Rejoin.Busy && !x.Rejoin.Flipped;
+                float t = back ? (tail.TryGetValue(x, out float was) ? was : 0f) + Race.Dt : 0f;
+                tail[x] = t;
+                LongestTail = Math.Max(LongestTail, t);
+                if (t > GhostTail && flagged.Add(x))
+                    LongGhosts.Add($"{label}{r.Name(x)} still a ghost {GhostTail:0} s after getting back, at {Race.Clock(r.Time)} at {Math.Max(x.Car.TrackIndex, 0) * circuit.Step:0} m, {x.Car.Speed * 3.6f:0} km/h");
+                if (t == 0f) flagged.Remove(x);
+            }
+            // After the start, a few times a second.
+            if (r.Time < 15f || (int)Math.Round(r.Time / Race.Dt) % 10 != 0 || r.Time - lastPile < 5f) return;
+            var slow = r.Racers.Where(x => x.Car.Speed < PileSpeed && x.Car.TrackIndex >= 0
+                    && Math.Abs(x.Car.Lateral) - circuit.HalfWidth(x.Car.TrackIndex) < KerbWidth)
+                .OrderBy(x => Mod(x.Distance)).ToList();
+            for (int i = 0; i < slow.Count; i++)
+            {
+                int n = 1;
+                while (n < slow.Count && Mod(slow[(i + n) % slow.Count].Distance - slow[(i + n - 1) % slow.Count].Distance) < PileGap) n++;
+                if (n < PileCars) continue;
+                var group = Enumerable.Range(0, n).Select(j => slow[(i + j) % slow.Count]).ToList();
+                // Ghosts pass through each other, so spun cars recovering at one corner can't pile up;
+                // it takes two solid cars stopped together.
+                if (group.Count(x => !x.Rejoin.Ghost) < 2) { GhostGroups++; lastPile = r.Time; return; }
+                lastPile = r.Time;
+                PileUps.Add($"{label}{n} cars at {Math.Max(slow[i].Car.TrackIndex, 0) * circuit.Step:0} m at {Race.Clock(r.Time)}: " + string.Join(", ", Enumerable.Range(0, n).Select(j => slow[(i + j) % slow.Count]).Select(x => $"{r.Name(x)} {x.Rejoin.State}{(x.Rejoin.Ghost ? " ghost" : "")} {x.Car.Speed * 3.6f:0} km/h")));
+                return;
+            }
+        }
+    }
+
+    /// <summary>Longest a car may stay a ghost once back racing, seconds: the hold, and time to clear a car still overlapping.</summary>
+    const float GhostTail = Rejoin.GhostHold + 4f;
+
+    /// <summary>
+    /// Cars on their roof, at a stop on the racing line with traffic coming: each is a ghost while
+    /// it is upside down, is set back on its wheels after Rejoin.FlippedTime, gets back to racing,
+    /// and touches no car.
+    /// </summary>
+    static void FlippedCars(bool verbose)
+    {
+        var problems = new List<string>();
+        int runs = 0, back = 0;
+        float slowest = 0f;
+        string[] models = { "f-01", "c-19", "a-29" };
+        int n = 0;
+        foreach (float at in RejoinSpots())
+            foreach (string model in models)
+            {
+                n++;
+                int k = circuit.IndexOf(at);
+                var entries = new List<Entry> { new Entry { Model = model, Start = at, Lateral = LineFor(model).Lateral[k], Speed = 0f, Pace = 90f, Safety = 100f, Seed = n } };
+                entries.AddRange(Coming(at, new[] { 60f, 150f, 300f }, n));
+                var race = new Race(circuit, entries, LineFor);
+                Racer me = race.Racers[0];
+                me.Car.UpY = -1f;
+                // Face it the wrong way on odd runs: righted, it turns round as a spun car does.
+                if (n % 2 == 1) Aim(me.Car, 180f, 0f);
+                string what = $"{model} at {at:0} m on its roof{(n % 2 == 1 ? " facing back" : "")}";
+                if (Only != null && !what.StartsWith(Only)) continue;
+                runs++;
+                bool ghostWhileFlipped = true;
+                float righted = -1f, backAt = -1f;
+                int contacts = 0;
+                var watch = new PileWatch("");
+                while (race.Time < 90f && (backAt < 0f || race.Time < backAt + 3f))
+                {
+                    int seen = race.Contacts.Count;
+                    race.Step();
+                    watch.Step(race);
+                    for (int c = seen; c < race.Contacts.Count; c++)
+                        if (race.Contacts[c].A == race.Name(me) || race.Contacts[c].B == race.Name(me)) contacts++;
+                    if (me.Car.UpY < Rejoin.FlippedUp && !me.Rejoin.Ghost) ghostWhileFlipped = false;
+                    if (righted < 0f && me.Righted > 0) righted = race.Time;
+                    if (righted >= 0f && backAt < 0f && !me.Rejoin.Busy && !me.Rejoin.Ghost) backAt = race.Time;
+                }
+                if (!ghostWhileFlipped) problems.Add($"{what}: not a ghost while on its roof");
+                if (righted < 0f) problems.Add($"{what}: never set back on its wheels");
+                else if (righted > Rejoin.FlippedTime + 0.5f) problems.Add($"{what}: set back on its wheels only after {righted:0.0} s");
+                if (backAt < 0f) problems.Add($"{what}: not back racing after 90 s ({me.Rejoin.State})");
+                else { back++; slowest = Math.Max(slowest, backAt); }
+                if (contacts > 0) problems.Add($"{what}: {contacts} contacts");
+                problems.AddRange(watch.PileUps);
+                problems.AddRange(watch.LongGhosts);
+                if (verbose) Console.WriteLine($"  {what}: righted at {(righted >= 0f ? Race.Clock(righted) : "never")}, back racing {(backAt >= 0f ? Race.Clock(backAt) : "never")}, {contacts} contacts");
+            }
+        Report($"flipped cars ({runs} on their roof, {back} back racing, slowest after {slowest:0} s)", problems);
     }
 }

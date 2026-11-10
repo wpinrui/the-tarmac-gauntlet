@@ -13,8 +13,10 @@ namespace TarmacGauntlet.Raceday
     /// <see cref="MaxEntryAngle"/> of the track direction, at the speed the runoff's grip allows.
     /// Spun: a car that has lost control and faces more than <see cref="SpunAngle"/> from the track
     /// direction brakes to a stop, then turns round at walking pace, forwards or in reverse, whichever
-    /// has the room, and rejoins as above. On the track it is a ghost meanwhile
-    /// (<see cref="Racecraft.Ghosted"/>), so the cars coming pass through it and it never waits for them.
+    /// has the room, and rejoins as above. A car that is spun, stopped, flipped, turning or rejoining
+    /// is a ghost (<see cref="Ghost"/>): the other cars pass through it and race as if it weren't there,
+    /// and it never waits for another ghost. It stays one until it is back at racing speed on its line
+    /// with no car overlapping it.
     ///
     /// Call <see cref="Prepare"/> after racecraft and before <see cref="AiPilot.Drive"/>, and
     /// <see cref="Apply"/> on the controls the pilot returns.
@@ -68,6 +70,22 @@ namespace TarmacGauntlet.Raceday
         /// can't from deep gravel: it is <see cref="Stranded"/> and waits to be put back on the track.
         /// </summary>
         public const int StrandedBlocks = 2;
+        /// <summary>
+        /// A car stays a ghost after it is back racing until it is up to this share of its racing
+        /// speed on its line, with no car overlapping it.
+        /// </summary>
+        public const float GhostSpeedShare = 0.8f;
+        /// <summary>Within this far of its line, metres, the car is on it, for turning solid again.</summary>
+        public const float GhostOnLine = 2f;
+        /// <summary>
+        /// Longest a car stays a ghost once back racing short of its racing speed, seconds, as one
+        /// held in a queue: it turns solid when no car overlaps it, so it never stays a ghost for ever.
+        /// </summary>
+        public const float GhostHold = 8f;
+        /// <summary>The car is on its roof or side when its up direction points less than this far up (its y).</summary>
+        public const float FlippedUp = 0.3f;
+        /// <summary>On its roof or side this long, seconds, the car is set back on its wheels where it is.</summary>
+        public const float FlippedTime = 2f;
         /// <summary>Gaining speed faster than this, m/s², the car is getting going and needs no more push.</summary>
         public const float PickUp = 0.3f;
         /// <summary>How far past the tarmac edge a car turning round on the track may go, metres.</summary>
@@ -122,6 +140,16 @@ namespace TarmacGauntlet.Raceday
         /// gets it out. The driver does that once the gap is clear.
         /// </summary>
         public bool Stranded => Busy && blocks >= StrandedBlocks;
+        /// <summary>
+        /// True while the car is a ghost: other cars pass through it and race as if it weren't there,
+        /// so none piles into it. That is while it is getting back (spun, stopping, turning round or
+        /// rejoining) or on its roof or side, and afterwards until it is up to racing speed on its
+        /// line with no car overlapping it (<see cref="Haunt"/>).
+        /// </summary>
+        public bool Ghost { get; private set; }
+        /// <summary>True while the car is on its roof or side (<see cref="Upturned"/>).</summary>
+        public bool Flipped { get; private set; }
+        private float sinceBack, flippedFor;
         /// <summary>Why the car last left racing: "off" (left the tarmac) or "spun".</summary>
         public string Cause { get; private set; } = "";
         /// <summary>The car's heading from the track direction last step, degrees, positive with the nose to the left.</summary>
@@ -157,6 +185,43 @@ namespace TarmacGauntlet.Raceday
             blocks = 0;
             SinceLostControl = float.PositiveInfinity;
             trackIndex = -1;
+        }
+
+        /// <summary>
+        /// Once a step, after <see cref="Apply"/>: whether the car is a ghost (<see cref="Ghost"/>).
+        /// <c>speed</c> is the car's speed, m/s.
+        /// </summary>
+        public void Haunt(AiPilot pilot, TrafficCar me, IReadOnlyList<TrafficCar> field, float speed, float dt)
+        {
+            if (Busy || Flipped)
+            {
+                Ghost = true;
+                sinceBack = 0f;
+                return;
+            }
+            if (!Ghost) return;
+            sinceBack += dt;
+            // Never solid inside another car.
+            if (Racecraft.Overlapped(me, field, pilot.Line.Circuit.Lap)) return;
+            int k = pilot.Index;
+            bool racing = k >= 0 && speed >= GhostSpeedShare * pilot.Profile.Speed[k] && Mathf.Abs(pilot.LateralError) < GhostOnLine;
+            if (racing || sinceBack > GhostHold) Ghost = false;
+        }
+
+        /// <summary>
+        /// Once a step with the car's up direction's height (its y): true when it has been on its roof
+        /// or side for <see cref="FlippedTime"/>, and the caller should set it back on its wheels. It
+        /// is a ghost meanwhile, and once righted it rejoins as a car that has lost control.
+        /// </summary>
+        public bool Upturned(float upY, float dt)
+        {
+            Flipped = upY < FlippedUp;
+            flippedFor = Flipped ? flippedFor + dt : 0f;
+            if (flippedFor < FlippedTime) return false;
+            flippedFor = 0f;
+            Flipped = false;
+            LostControl();
+            return true;
         }
 
         /// <summary>The car has lost control another way, such as a crash into a barrier.</summary>
@@ -537,7 +602,7 @@ namespace TarmacGauntlet.Raceday
             for (int i = 0; i < field.Count; i++)
             {
                 TrafficCar o = field[i];
-                if (o.Id == me.Id || OffTrack(o, half)) continue;
+                if (o.Id == me.Id || o.Ghost || OffTrack(o, half)) continue;
                 float behind = Mathf.Repeat(me.Distance - o.Distance + AlongsideMetres, lap) - AlongsideMetres;
                 if (behind > lap * 0.5f) continue;
                 if (behind < AlongsideMetres) return false;
@@ -561,7 +626,7 @@ namespace TarmacGauntlet.Raceday
             for (int i = 0; i < field.Count; i++)
             {
                 TrafficCar o = field[i];
-                if (o.Id == me.Id || OffTrack(o, half)) continue;
+                if (o.Id == me.Id || o.Ghost || OffTrack(o, half)) continue;
                 if (Mathf.Abs(Mathf.Repeat(me.Distance - o.Distance + 0.5f * lap, lap) - 0.5f * lap) < AlongsideMetres) return true;
             }
             return false;
