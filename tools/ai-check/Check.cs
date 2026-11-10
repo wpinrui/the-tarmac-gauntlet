@@ -255,6 +255,8 @@ static partial class Check
         float feather = race.FollowSteps > 0 ? (float)race.FeatherSteps / race.FollowSteps : 0f;
         if (feather > 0.1f) problems.Add($"following on the straights, {100f * feather:0}% of the time on part throttle held back by the car ahead");
         if (race.QuickStuck > 2) problems.Add(race.QuickStuckLine);
+        float open = race.CornerHeldSteps > 0 ? (float)race.OpenRoomSteps / race.CornerHeldSteps : 0f;
+        if (open > 0.1f) problems.Add($"held up in corners with room beside the car ahead {100f * open:0}% of the time, e.g. {race.OpenRoomLine}");
         if (lapping == 0) problems.Add("nobody was lapped");
         if (race.FastestStuck >= 3) problems.Add(race.FastestStuckLine);
         // Within a class the cars are close in pace, so on the normal grid a pass is only owed where
@@ -267,7 +269,7 @@ static partial class Check
                         && b.Pilot.Profile.LapTime < a.Pilot.Profile.LapTime * 0.99f && b.Distance < a.Distance)
                         problems.Add($"{race.Name(b)} is {100f * (1f - b.Pilot.Profile.LapTime / a.Pilot.Profile.LapTime):0.0}% quicker than {race.Name(a)} but never got by");
         if (reversed && race.PassCount - lapping - classes < 1) problems.Add("no passes within a class");
-        Report($"{(reversed ? "reversed " : "")}pack race ({race.Racers.Count} cars, {laps} laps: {race.PassCount - lapping - classes} passes within a class, {classes} between classes, {lapping} lappings, {race.Contacts.Count} contacts, closest following {race.ClosestFollow:0.0} m, {race.Racers.Sum(r => r.Pilot.Mistakes)} mistakes, {race.Racers.Sum(r => r.MistakeOffSteps) * Race.Dt:0} s off after them, fastest car {race.FastestStuck} corners behind the slowest, any car up to {race.WorstStuck} corners behind one two classes slower, {race.Racers.Sum(r => r.Swings)} swings, {race.Racers.Sum(r => r.Dithers)} dithers, {100f * (race.FollowSteps > 0 ? (float)race.FeatherSteps / race.FollowSteps : 0f):0}% feathering, quicker car up to {race.QuickStuck} corners behind)", problems);
+        Report($"{(reversed ? "reversed " : "")}pack race ({race.Racers.Count} cars, {laps} laps: {race.PassCount - lapping - classes} passes within a class, {classes} between classes, {lapping} lappings, {race.Contacts.Count} contacts, closest following {race.ClosestFollow:0.0} m, {race.Racers.Sum(r => r.Pilot.Mistakes)} mistakes, {race.Racers.Sum(r => r.MistakeOffSteps) * Race.Dt:0} s off after them, fastest car {race.FastestStuck} corners behind the slowest, any car up to {race.WorstStuck} corners behind one two classes slower, {race.Racers.Sum(r => r.Swings)} swings, {race.Racers.Sum(r => r.Dithers)} dithers, {100f * (race.FollowSteps > 0 ? (float)race.FeatherSteps / race.FollowSteps : 0f):0}% feathering, {100f * (race.CornerHeldSteps > 0 ? (float)race.OpenRoomSteps / race.CornerHeldSteps : 0f):0}% held with room beside, quicker car up to {race.QuickStuck} corners behind)", problems);
         if (!verbose) return;
         if (race.WorstStuck > 0) Console.WriteLine("  " + race.WorstStuckLine);
         foreach (string p in race.Passes) Console.WriteLine("  " + p);

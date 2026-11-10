@@ -110,7 +110,7 @@ namespace TarmacGauntlet.Raceday
         private const float Clearance = 2.4f;
         /// <summary>Offset that puts a car beside another.</summary>
         private const float Beside = SideBySide + 0.4f;
-        private const float MaxShift = 5f;
+        private const float MaxShift = 9f;
         /// <summary>Offsets from the line searched for open road when held up.</summary>
         private static readonly float[] GapLanes = { -9f, -6f, -3f, 3f, 6f, 9f };
         private const float LookAhead = 150f;
@@ -528,10 +528,13 @@ namespace TarmacGauntlet.Raceday
                 float outer = Mathf.Clamp(t.Shift - inside * Beside, -MaxShift, MaxShift);
                 // Open road: any lane across the track's width, flat out to the corner's braking point.
                 // A gap rather than a car to dodge, so it finds the clear side of a whole queue.
-                if (a > ramp)
-                    foreach (float lane in GapLanes)
-                        if (Mathf.Abs(lane - now) > 1f)
-                            candidates.Add(Make(Kind.Straight, start, samples, c, now, ramp, lane, 0f, a - 30f, corner));
+                // And the same lanes held on round the corner: the room on the outside, or up the inside.
+                foreach (float lane in GapLanes)
+                {
+                    if (Mathf.Abs(lane - now) <= 1f) continue;
+                    if (a > ramp) candidates.Add(Make(Kind.Straight, start, samples, c, now, ramp, lane, 0f, a - 30f, corner));
+                    candidates.Add(Make(lane * inside < 0f ? Kind.Outside : Kind.Inside, start, samples, c, now, ramp, lane, 0f, b + 20f, corner));
+                }
                 // Stay where it is, out of the queue, and keep its foot down to the corner's turn-in.
                 if (queue && Mathf.Abs(now) > 1f && a > ramp)
                     candidates.Add(Make(Kind.Straight, start, samples, c, now, ramp, now, 0f, a - 30f, corner));

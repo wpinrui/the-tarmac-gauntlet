@@ -192,6 +192,48 @@ sealed class Race
         }
     }
 
+    /// <summary>Steps in a corner held back by a car close ahead, and those of them with a clear lane beside it.</summary>
+    public int CornerHeldSteps, OpenRoomSteps;
+    public string OpenRoomLine = "";
+
+    /// <summary>Held up behind a car in a corner while the track beside it is empty for 10 m behind to 30 m ahead.</summary>
+    void OpenRoom(Racer r)
+    {
+        int k = r.Car.TrackIndex;
+        if (k < 0 || Math.Abs(r.Pilot.Line.Curvature[k]) < 0.003f || r.Car.Speed < 10f) return;
+        if (!(r.Pilot.HeldBy > 0.5f && r.Pilot.SpeedCap < r.Car.Speed + 0.5f)) return;
+        Racer ahead = null;
+        foreach (Racer o in Racers)
+        {
+            if (o == r) continue;
+            float gap = o.Distance - r.Distance;
+            gap -= circuit.Lap * (float)Math.Round(gap / circuit.Lap);
+            if (gap > 0f && gap < 25f && Math.Abs(o.Car.Lateral - r.Car.Lateral) < 2.5f) { ahead = o; break; }
+        }
+        if (ahead == null) return;
+        CornerHeldSteps++;
+        float half = circuit.HalfWidth(k) - 1.5f;
+        foreach (float side in new[] { -1f, 1f })
+        {
+            float lane = ahead.Car.Lateral + side * 3.5f;
+            if (Math.Abs(lane) > half) continue;
+            bool clear = true;
+            foreach (Racer o in Racers)
+            {
+                if (o == r || o == ahead) continue;
+                float gap = o.Distance - r.Distance;
+                gap -= circuit.Lap * (float)Math.Round(gap / circuit.Lap);
+                if (gap > -10f && gap < 30f && Math.Abs(o.Car.Lateral - lane) < 2.8f) { clear = false; break; }
+            }
+            if (!clear) continue;
+            OpenRoomSteps++;
+            if (OpenRoomSteps % 100 == 1)
+                OpenRoomLine = $"{Name(r)} held behind {Name(ahead)} in the corner at {k * circuit.Step:0} m at {Clock(Time)} with the {(side * Math.Sign(r.Pilot.Line.Curvature[k]) > 0 ? "inside" : "outside")} open";
+            if (FeatherLog && OpenRoomSteps % 20 == 1) Console.WriteLine("OPEN " + OpenRoomLine + $" {r.Craft.State} {r.Craft.Plan} off {r.Pilot.Offset:0.0}");
+            return;
+        }
+    }
+
     public void Step()
     {
         Snapshot();
@@ -241,6 +283,7 @@ sealed class Race
             r.Pilot.Towed = r.Car.DragScale < 0.97f;
             AiPilot.Controls c = r.Pilot.Drive(r.Car.Position, r.Car.Forward, r.Car.Velocity, r.Car.YawRate);
             Feathering(r, c);
+            OpenRoom(r);
             r.Car.Step(Dt, c.Throttle, c.Brake, c.Steer);
             r.ModeTime[r.Craft.State] = (r.ModeTime.TryGetValue(r.Craft.State, out float t) ? t : 0f) + Dt;
         }
