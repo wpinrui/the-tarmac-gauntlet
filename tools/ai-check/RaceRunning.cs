@@ -110,6 +110,8 @@ static partial class Check
         var hard = s.Contacts.Skip(Math.Max(contactsAtGreen, 0)).Where(c => c.Speed > HardHit).ToList();
         if (Environment.GetEnvironmentVariable("AI_LIST") != null) foreach (var c in s.Contacts) Console.WriteLine("  contact " + Describe(c));
         if (hard.Count > 0) problems.Add($"{hard.Count} hard hits after the green, worst {hard.Max(c => c.Speed):0.0} m/s: {Describe(hard[0])}");
+        var rear = s.Contacts.Skip(Math.Max(contactsAtGreen, 0)).Where(c => c.RearEnd && c.Speed > RearHit).ToList();
+        if (rear.Count > 0) problems.Add($"{rear.Count} rear-end hits over {RearHit:0} m/s after the green, worst {rear.Max(c => c.Speed):0.0} m/s: {Describe(rear[0])}");
         foreach (SessionCar c in s.Cars)
         {
             if (c.Recoveries > 0) problems.Add($"{s.Name(c)} got stuck {c.Recoveries} times");
@@ -131,7 +133,7 @@ static partial class Check
         s.Physics = c => s.Apart(c) < (c.Racer.Active.Gliding ? 300f : 375f);
     }
 
-    static string Describe(Contact c) => $"{Session.Clock(c.Time)} {c.A} and {c.B} at {c.Where:0} m, {c.Speed:0.0} m/s";
+    static string Describe(Contact c) => $"{Session.Clock(c.Time)} {c.A} and {c.B} at {c.Where:0} m, {c.Speed:0.0} m/s{(c.RearEnd ? " REAR" : "")}";
 
     static void SuppliesCheck(bool verbose)
     {

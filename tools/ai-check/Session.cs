@@ -433,6 +433,7 @@ sealed class Session
                     {
                         Time = Time,
                         Speed = Math.Max(-vn, 0f),
+                        RearEnd = Contact.NoseToTail(a, b, nx, nz),
                         Where = Math.Max(a.TrackIndex, 0) * circuit.Step,
                         A = bodies[i].Name + (bodies[i].Pits ? " (pits)" : ""),
                         B = bodies[j].Name + (bodies[j].Pits ? " (pits)" : ""),

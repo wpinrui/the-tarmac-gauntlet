@@ -253,7 +253,9 @@ namespace TarmacGauntlet.Raceday
             // or overloaded tyres spin the car.
             if (held && SpeedCap <= 0f)
             {
-                float tyres = Spec.Grip * G * Mathf.Clamp(Grip, 0.3f, 1f);
+                // The tyres' grip includes the downforce at this speed.
+                float load = G + 0.5f * CarSpec.AirDensity * Spec.LiftArea * speed * speed / Spec.Mass;
+                float tyres = Spec.Grip * Mathf.Clamp(Grip, 0.3f, 1f) * load;
                 float cornering = speed * yawRate;
                 float spare = Mathf.Sqrt(Mathf.Max(tyres * tyres - cornering * cornering, 0f));
                 controls.Throttle = 0f;

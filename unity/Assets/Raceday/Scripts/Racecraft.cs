@@ -207,6 +207,10 @@ namespace TarmacGauntlet.Raceday
                         // OPP_COLL: filterBColl.
                         float allowedSpeedSqr = o.Speed * o.Speed;
                         float brakeDist = mass * (currentSpeedSqr - allowedSpeedSqr) / (2f * (cm + allowedSpeedSqr * (ca * mu + cw)));
+                        // Not in the tutorial: TORCS brakes can always lock the tyres, ours can be weaker
+                        // than the tyres' grip with downforce, so the brakes' own limit stretches the distance.
+                        float brakesOnly = mass * (currentSpeedSqr - allowedSpeedSqr) / (2f * (spec.BrakeDecel * G * mass + allowedSpeedSqr * cw));
+                        brakeDist = Mathf.Max(brakeDist, brakesOnly);
                         if (brakeDist > distance) Braking = true;
                     }
                 }

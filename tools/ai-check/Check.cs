@@ -31,6 +31,8 @@ static partial class Check
     const float KerbWidth = 1.5f;
     /// <summary>Racing taps are allowed; a contact faster than this, m/s, is a hit.</summary>
     const float HardHit = 5f;
+    /// <summary>A nose into a tail faster than this, m/s, is ploughing into the car ahead.</summary>
+    const float RearHit = 2f;
 
     static Circuit circuit;
     static RacingLine line;
@@ -251,6 +253,8 @@ static partial class Check
             if (r.Recoveries > 0) problems.Add($"{race.Name(r)} got stuck {r.Recoveries} times");
             if (r.OffSteps > 0) problems.Add($"{race.Name(r)} left the track for {r.OffSteps * Race.Dt:0.0} s, first at {Race.Clock(r.OffTime)} at {r.OffWhere:0} m");
         }
+        var rear = race.Contacts.Where(c => c.RearEnd && c.Speed > RearHit).ToList();
+        if (rear.Count > 0) problems.Add($"{rear.Count} rear-end hits over {RearHit:0} m/s, worst {rear.Max(c => c.Speed):0.0} m/s: {Race.Clock(rear[0].Time)} {rear[0].A} and {rear[0].B} at {rear[0].Where:0} m");
         if (hard > 0) problems.Add($"{hard} contacts harder than {HardHit:0} m/s, worst {race.Contacts.Max(c => c.Speed):0.0} m/s");
         float feather = race.FollowSteps > 0 ? (float)race.FeatherSteps / race.FollowSteps : 0f;
         if (feather > 0.1f) problems.Add($"following on the straights, {100f * feather:0}% of the time on part throttle held back by the car ahead");
@@ -270,11 +274,11 @@ static partial class Check
                         && b.Pilot.Profile.LapTime < a.Pilot.Profile.LapTime * 0.99f && b.Distance < a.Distance)
                         problems.Add($"{race.Name(b)} is {100f * (1f - b.Pilot.Profile.LapTime / a.Pilot.Profile.LapTime):0.0}% quicker than {race.Name(a)} but never got by");
         if (reversed && race.PassCount - lapping - classes < 1) problems.Add("no passes within a class");
-        Report($"{(reversed ? "reversed " : "")}pack race ({race.Racers.Count} cars, {laps} laps: {race.PassCount - lapping - classes} passes within a class, {classes} between classes, {lapping} lappings, {race.Contacts.Count} contacts, closest following {race.ClosestFollow:0.0} m, {race.Racers.Sum(r => r.Pilot.Mistakes)} mistakes, {race.Racers.Sum(r => r.MistakeOffSteps) * Race.Dt:0} s off after them, fastest car {race.FastestStuck} corners behind the slowest, any car up to {race.WorstStuck} corners behind one two classes slower, {race.Racers.Sum(r => r.Swings)} swings, {race.Racers.Sum(r => r.Dithers)} dithers, {100f * (race.FollowSteps > 0 ? (float)race.FeatherSteps / race.FollowSteps : 0f):0}% feathering, {100f * (race.CornerHeldSteps > 0 ? (float)race.OpenRoomSteps / race.CornerHeldSteps : 0f):0}% held with room beside, quicker car up to {race.QuickStuck} corners behind, same class up to {race.ClassQueue})", problems);
+        Report($"{(reversed ? "reversed " : "")}pack race ({race.Racers.Count} cars, {laps} laps: {race.PassCount - lapping - classes} passes within a class, {classes} between classes, {lapping} lappings, {race.Contacts.Count} contacts ({race.Contacts.Count(c => c.RearEnd && c.Speed > RearHit)} rear-end over {RearHit:0} m/s), closest following {race.ClosestFollow:0.0} m, {race.Racers.Sum(r => r.Pilot.Mistakes)} mistakes, {race.Racers.Sum(r => r.MistakeOffSteps) * Race.Dt:0} s off after them, fastest car {race.FastestStuck} corners behind the slowest, any car up to {race.WorstStuck} corners behind one two classes slower, {race.Racers.Sum(r => r.Swings)} swings, {race.Racers.Sum(r => r.Dithers)} dithers, {100f * (race.FollowSteps > 0 ? (float)race.FeatherSteps / race.FollowSteps : 0f):0}% feathering, {100f * (race.CornerHeldSteps > 0 ? (float)race.OpenRoomSteps / race.CornerHeldSteps : 0f):0}% held with room beside, quicker car up to {race.QuickStuck} corners behind, same class up to {race.ClassQueue})", problems);
         if (!verbose) return;
         if (race.WorstStuck > 0) Console.WriteLine("  " + race.WorstStuckLine);
         foreach (string p in race.Passes) Console.WriteLine("  " + p);
-        foreach (Contact c in race.Contacts) Console.WriteLine($"  contact {Race.Clock(c.Time)} {c.A} and {c.B} at {c.Where:0} m, {c.Speed:0.0} m/s");
+        foreach (Contact c in race.Contacts) Console.WriteLine($"  contact {Race.Clock(c.Time)} {c.A} and {c.B} at {c.Where:0} m, {c.Speed:0.0} m/s{(c.RearEnd ? " REAR" : "")}");
         foreach (Racer r in race.Racers.OrderByDescending(r => r.Distance))
             Console.WriteLine($"  {race.Name(r),-8} lap {r.Laps} pace {r.Entry.Pace:0} solo {Time(r.Pilot.Profile.LapTime)} laps {string.Join(" ", r.LapTimes.Select(Time))}  swings {r.Swings} dithers {r.Dithers}  {string.Join(" ", r.ModeTime.Select(m => $"{m.Key} {m.Value:0}s"))}");
     }
