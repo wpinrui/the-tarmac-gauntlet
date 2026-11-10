@@ -267,7 +267,9 @@ namespace TarmacGauntlet.Raceday
                         // than the tyres' grip with downforce, so the brakes' own limit stretches the distance.
                         float brakesOnly = mass * (currentSpeedSqr - allowedSpeedSqr) / (2f * (spec.BrakeDecel * G * mass + allowedSpeedSqr * cw));
                         brakeDist = Mathf.Max(brakeDist, brakesOnly);
-                        if (brakeDist > distance) Braking = true;
+                        // Not in the tutorial: only while closing. Inside the margin and already no faster
+                        // than the car ahead, the tutorial still brakes, to a stop, until the gap opens.
+                        if (brakeDist > distance && currentSpeedSqr > allowedSpeedSqr) Braking = true;
                     }
                 }
                 else if (distance > -sideCollDist && distance < sideCollDist)

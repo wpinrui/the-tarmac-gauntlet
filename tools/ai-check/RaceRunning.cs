@@ -76,21 +76,31 @@ static partial class Check
         Console.WriteLine($"scene: {swings} swings, {flips} dithers in {seconds:0} s");
     }
 
+    static readonly bool QuickestFirst = Environment.GetEnvironmentVariable("START_QUICKEST_FIRST") != null;
+
     static void RollingStartCheck(int cars, bool verbose, bool glide = false)
     {
-        var entries = SceneField().Take(cars).Select(m => (m, 1f)).ToList();
-        var s = new Session(circuit, line, entries, rolling: true, LineFor);
+        List<string> order = SceneField();
+        // As the game's scene: quickest first, the player's car (the quickest) at the back.
+        if (QuickestFirst) { order.Reverse(); order.Add(order[0]); order.RemoveAt(0); }
+        var entries = order.Take(cars).Select(m => (m, 1f)).ToList();
+        var s = new Session(circuit, line, entries, rolling: true, LineFor, int.TryParse(Environment.GetEnvironmentVariable("START_SEED"), out int startSeed) ? startSeed : 11);
         if (glide) Watch(s, s.Cars[s.Cars.Count - 1]);
         var watch = System.Diagnostics.Stopwatch.StartNew();
         float worstSlip = 0f;
         string worstCar = "";
         int contactsAtGreen = -1;
         float allRacing = -1f;
-        while (s.Time < 12f * 60f && allRacing < 0f)
+        SessionCar back = s.Cars[s.Cars.Count - 1];
+        float clearAt = -1f;
+        float runOn = float.TryParse(Environment.GetEnvironmentVariable("START_RUN_ON"), out float ro) ? ro : 0f;
+        while (s.Time < 12f * 60f && (allRacing < 0f || s.Time < allRacing + runOn))
         {
             if (allRacing < 0f && s.GreenTime >= 0f && !s.Cars.Any(c => s.Start.Holds(c.Laps))) allRacing = s.Time;
             bool before = s.GreenTime < 0f;
             s.Step();
+            if (clearAt < 0f && s.GreenTime >= 0f && s.Cars.Where(c => c.Model[0] == 'e' || c.Model[0] == 'f').All(c => c.Distance < back.Distance)) clearAt = s.Time;
+            if (QuickestFirst && clearAt >= 0f && runOn > 0f && s.Time > clearAt + 1f) break;
             if (before && s.GreenTime >= 0f)
             {
                 contactsAtGreen = s.Contacts.Count;
@@ -124,7 +134,7 @@ static partial class Check
             if (c.OffTime >= 0f) problems.Add($"{s.Name(c)} left the track at {Session.Clock(c.OffTime)} at {c.OffWhere:0} m");
         }
         float lastBack = s.Cars[0].Distance - s.Cars.Min(c => c.Distance);
-        Report($"{(glide ? "gliding rolling start" : "rolling start")} ({cars} cars{(glide ? $", {s.MostOnPhysics} on physics at most, {s.Cars.Sum(c => c.Handovers)} switches, {s.GhostOverlaps} overlaps while gliding" : "")}: green at {Session.Clock(Math.Max(s.GreenTime, 0f))}, worst place {worstSlip:0} m out, {s.Contacts.Count - Math.Max(contactsAtGreen, 0)} contacts from the green to {Session.Clock(Math.Max(s.Time, 0f))}, {s.Contacts.Count(c => c.Speed > 1f)} over 1 m/s, field {lastBack:0} m long, {watch.Elapsed.TotalSeconds:0} s to run)", problems);
+        Report($"{(glide ? "gliding rolling start" : "rolling start")} ({cars} cars{(glide ? $", {s.MostOnPhysics} on physics at most, {s.Cars.Sum(c => c.Handovers)} switches, {s.GhostOverlaps} overlaps while gliding" : "")}: green at {Session.Clock(Math.Max(s.GreenTime, 0f))}, worst place {worstSlip:0} m out, {s.Contacts.Count - Math.Max(contactsAtGreen, 0)} contacts from the green to {Session.Clock(Math.Max(s.Time, 0f))}, {s.Contacts.Count(c => c.Speed > 1f)} over 1 m/s, {(clearAt >= 0f ? $"{back.Model} at the back clear of E and F {clearAt - s.GreenTime:0} s after the green" : $"{back.Model} at the back not clear of E and F")}, {s.CrawlSteps * Session.Dt:0} s crawling on track, {s.CrawlBrakeSteps * Session.Dt:0} s of it braking for a car ahead, field {lastBack:0} m long, {watch.Elapsed.TotalSeconds:0} s to run)", problems);
         if (verbose) foreach (Contact c in s.Contacts) Console.WriteLine("  contact " + Describe(c));
     }
 

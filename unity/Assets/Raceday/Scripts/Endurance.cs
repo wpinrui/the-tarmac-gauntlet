@@ -10,16 +10,22 @@ namespace TarmacGauntlet.Raceday
     public static class Endurance
     {
         // Passing.
-        /// <summary>How fast a car moves across to pass, m/s. Tutorial: 5 (0.1 m every 0.02 s).</summary>
-        public const float OvertakeOffsetRate = 2.5f;
-        /// <summary>Passing uses the track's width over this either side of the middle. Tutorial: 3.</summary>
-        public const float OvertakeWidthDiv = 3f;
+        /// <summary>How fast a car moves across to pass, m/s: the tutorial's 0.1 m every 0.02 s.</summary>
+        public const float OvertakeOffsetRate = 5f;
+        /// <summary>
+        /// Passing uses the track's width over this either side of the middle. Tutorial: 3. At 3 three
+        /// slow cars side by side fill the room, and a quick car at the back of the grid queues behind them.
+        /// </summary>
+        public const float OvertakeWidthDiv = 2.5f;
 
         // Spacing, for a driver of middling safety: see MarginScale.
         /// <summary>Room kept to the car ahead on top of its length, m. Tutorial: 2.</summary>
         public const float LengthMargin = 4f;
-        /// <summary>Room kept beside the car ahead before braking for it, m. Tutorial: 1.</summary>
-        public const float WidthMargin = 2f;
+        /// <summary>
+        /// A car ahead nearer than this beside the car's path is in the way, m: the tutorial's. Any more
+        /// and a car in the next lane over holds up a car with a clear lane.
+        /// </summary>
+        public const float WidthMargin = 1f;
         /// <summary>Gap to a car alongside at which a car steers to run parallel to it, m. Tutorial: 2.</summary>
         public const float SideCollisionMargin = 3f;
 
