@@ -63,6 +63,9 @@ sealed class Session
     public Func<SessionCar, float> GlideStep = _ => 0.05f;
     /// <summary>Gliding cars overlapping another car: in the game they pass through it.</summary>
     public int GhostOverlaps;
+    /// <summary>Steps racing cars spent under 5 m/s on the track after the green, and of those, braking for the car ahead.</summary>
+    public int CrawlSteps, CrawlBrakeSteps;
+    static readonly bool StopLog = Environment.GetEnvironmentVariable("AI_STOPS") != null;
     /// <summary>Most cars on physics at once.</summary>
     public int MostOnPhysics;
     float lodClock = 1f;
@@ -205,6 +208,12 @@ sealed class Session
             r.Active.Towed = car.DragScale < 0.97f;
             AiPilot.Controls c = r.Step(car.Position, car.Forward, car.Velocity, car.YawRate, traffic[i], sorted, all, Racing && !held, car.Spec, Dt);
             car.Hold = r.Hold;
+            if (GreenTime >= 0f && Time > GreenTime + 5f && !s.InPitLane && !r.Pitting && !r.Rejoin.Busy && r.Active == r.Pilot && car.Speed < 5f)
+            {
+                CrawlSteps++;
+                if (r.Craft.Braking) CrawlBrakeSteps++;
+                if (StopLog) Console.WriteLine($"STOP {Clock(Time)} {Name(s)} at {r.Pilot.Index * circuit.Step:0} m {car.Speed * 3.6f:0} km/h {(r.Craft.Braking ? "BRK" : "")} {r.Craft.State} tspd {r.Pilot.TargetSpeed * 3.6f:0} cap {Math.Min(r.Pilot.SpeedCap, 99f) * 3.6f:0} scale {r.Pilot.SpeedScale:0.00} off {r.Pilot.Offset:0.0} shift {r.Pilot.Shift:0.0} lat {car.Lateral:0.0} side {(r.Pilot.SideFilter ? r.Pilot.SideWeight.ToString("0.00") : "-")} thr {c.Throttle:0.00} brk {c.Brake:0.00} str {c.Steer:0.00} hold {r.Craft.HoldingLine} def {r.Craft.Defending}");
+            }
             car.Reverse = c.Reverse;
             car.Step(Dt, c.Throttle, c.Brake, c.Steer);
 

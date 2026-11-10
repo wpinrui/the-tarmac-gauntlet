@@ -144,6 +144,9 @@ sealed class Race
     public readonly List<Contact> SpunOverlaps = new List<Contact>();
     /// <summary>Times a car became a ghost, and steps spent as one.</summary>
     public int GhostSpells, GhostSteps;
+    /// <summary>Steps a racing car spent under 5 m/s on the track, and of those, braking for the car ahead.</summary>
+    public int QueueStopSteps, QueueBrakeSteps;
+    static readonly bool StopLog = Environment.GetEnvironmentVariable("AI_STOPS") != null;
     float lodClock = 1f;
     /// <summary>Stopwatch ticks spent in racecraft and gliding for gliding cars.</summary>
     public long GlideTicks, ThinkTicks;
@@ -395,6 +398,12 @@ sealed class Race
                 continue;
             }
             r.Craft.Think(r.Pilot, field[i], sorted, Dt);
+            if (Time > 20f && !r.Rejoin.Busy && r.Car.Speed < 5f && r.Pilot.Index >= 0)
+            {
+                QueueStopSteps++;
+                if (r.Craft.Braking) QueueBrakeSteps++;
+                if (StopLog && r.Craft.Braking) Console.WriteLine($"STOP {Clock(Time)} {Name(r)} at {r.Pilot.Index * circuit.Step:0} m {r.Car.Speed * 3.6f:0} km/h");
+            }
             Etiquette(r);
             r.Rejoin.Prepare(r.Pilot);
             {
