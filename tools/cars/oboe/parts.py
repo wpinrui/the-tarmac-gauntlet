@@ -139,26 +139,24 @@ def lamp_parts(ref, cutters, out, sgn, which):
         wr = Wrap(sgn=sgn, **HEAD_WRAP)
         shp = wr.outline(R["head"])
         cutters += blend.lay(ref, f"cut_head_{side}", shp, wr, -0.0145, 0.006, "housing", 0.01, along_ray=True)
-        out += blend.lay(ref, f"head_housing_{side}", shp.buffer(-0.0015), wr, -0.0135, -0.0105, "housing", 0.01)
         for i, (x, y, z, r) in enumerate(R["head_lenses"]):
             c = Point(*wr.to_uv((x, y, z)))
-            keep = shp.buffer(-0.004)
-            out += blend.lay(ref, f"lamp_head_{side}{i}", c.buffer(r, 48).intersection(keep), wr, -0.0099, -0.006, "lamp_head", 0.004)
-            out += blend.lay(ref, f"head_reflector_{side}{i}", c.buffer(r + 0.011, 48).difference(c.buffer(r + 0.001, 48)).intersection(keep),
-                             wr, -0.0099, -0.0082, "reflector", 0.004)
-        out += blend.lay(ref, f"head_glass_{side}", shp.buffer(-0.0015), wr, -0.004, -0.0015, "head_glass", 0.01)
+            keep = shp.buffer(-0.008)
+            out += blend.lay(ref, f"lamp_head_{side}{i}", c.buffer(r, 48).intersection(keep), wr, -0.009, -0.006, "lamp_head", 0.004, along_ray=True)
+            out += blend.lay(ref, f"head_reflector_{side}{i}", c.buffer(r + 0.011, 48).difference(c.buffer(r + 0.002, 48)).intersection(keep),
+                             wr, -0.0088, -0.0075, "reflector", 0.004, along_ray=True)
+        out += blend.lay(ref, f"head_glass_{side}", shp.buffer(-0.003), wr, -0.004, -0.0015, "head_glass", 0.01, along_ray=True)
     else:
         wr = Wrap(sgn=sgn, **TAIL_WRAP)
         shp = wr.outline(R["tail"])
         cutters += blend.lay(ref, f"cut_tail_{side}", shp, wr, -0.0145, 0.006, "housing", 0.01, along_ray=True)
-        out += blend.lay(ref, f"tail_housing_{side}", shp.buffer(-0.0015), wr, -0.0135, -0.0105, "housing", 0.01)
         core = shp.buffer(-0.014)
         zmid = (shp.bounds[1] + shp.bounds[3]) / 2
         out += blend.lay(ref, f"lamp_tail_{side}", core.intersection(box(-5, zmid + 0.005, 5, 5)), wr,
-                         -0.0099, -0.007, "lamp_tail", 0.005)
+                         -0.0099, -0.007, "lamp_tail", 0.005, along_ray=True)
         out += blend.lay(ref, f"lamp_brake_{side}", core.intersection(box(-5, -5, 5, zmid - 0.005)), wr,
-                         -0.0099, -0.007, "lamp_brake", 0.005)
-        out += blend.lay(ref, f"tail_glass_{side}", shp.buffer(-0.0015), wr, -0.004, -0.0015, "tail_glass", 0.01)
+                         -0.0099, -0.007, "lamp_brake", 0.005, along_ray=True)
+        out += blend.lay(ref, f"tail_glass_{side}", shp.buffer(-0.003), wr, -0.004, -0.0015, "tail_glass", 0.01, along_ray=True)
 
 
 # the lower grille stops at the first height, the upper starts at the second; body colour between
@@ -170,27 +168,30 @@ def front_parts(ref, cutters, out):
     shield = poly(R["shield"])
     for name, (z0, z1) in (("grille_upper", GRILLE_SPLIT[1:]), ("grille_lower", (-5, GRILLE_SPLIT[0]))):
         part = shield.intersection(box(-5, z0, 5, z1)).buffer(-0.006, join_style=1).buffer(0.006, join_style=1)
-        out += blend.lay(ref, name, part, fr, -0.001, 0.004, "grille", 0.012)
+        out += blend.lay(ref, name, part, fr, 0.0015, 0.004, "grille", 0.012)
     bar = poly(R["shield_bar"])
     bar = translate(bar, 0, GRILLE_SPLIT[0] - 0.035 - bar.bounds[3])     # plate centred in the lower grille
-    out += blend.lay(ref, "shield_bar", bar, fr, 0.0044, 0.0074, "trim", 0.008)
-    w = R["wheel"]
-    clear = w["front_x"] + w["arch_r"] + 0.02                  # keep the lip ahead of the front wheels
-    out += blend.lay(ref, "chin", poly(R["chin"]), fr, -0.001, 0.004, "body", 0.008,
-                     accept=lambda loc: loc[0] > clear)
+    out += blend.lay(ref, "shield_bar", bar, fr, 0.0052, 0.008, "trim", 0.008)
     fy, fz, fr_r = R["fog"]
     for sgn, side in ((1, "l"), (-1, "r")):
         g = poly(R["intake"]).convex_hull.buffer(-0.01, join_style=1).buffer(0.01, join_style=1)
         g = g if sgn < 0 else flip(g)
         cutters += blend.lay(ref, f"cut_intake_{side}", g, fr, -0.025, 0.006, "grille", 0.012, along_ray=True)
-        out += blend.lay(ref, f"intake_{side}", g.buffer(-0.0015), fr, -0.0225, -0.0195, "grille", 0.012)
         c = Point(fy if sgn < 0 else -fy, fz)
-        out += blend.lay(ref, f"fog_ring_{side}", c.buffer(fr_r + 0.008, 40).difference(c.buffer(fr_r + 0.0005, 40)),
-                         fr, -0.0189, -0.014, "reflector", 0.004)
-        out += blend.lay(ref, f"lamp_head_fog_{side}", c.buffer(fr_r, 40), fr, -0.0189, -0.012, "lamp_head", 0.004)
+        inner = g.buffer(-0.008)
+        out += blend.lay(ref, f"fog_ring_{side}", c.buffer(fr_r + 0.008, 40).difference(c.buffer(fr_r + 0.0015, 40)).intersection(inner),
+                         fr, -0.0185, -0.014, "reflector", 0.004, along_ray=True)
+        out += blend.lay(ref, f"lamp_head_fog_{side}", c.buffer(fr_r, 40).intersection(inner), fr, -0.0189, -0.012, "lamp_head", 0.004, along_ray=True)
 
 
 # ---------------------------------------------------------------- glass and trim
+def arm_footprint():
+    """The mirror arm seen from the side, with a little room."""
+    m = R["mirror"]
+    xb = m["x_back"]
+    return box(xb + 0.015, m["z"] - 0.035, xb + MIRROR_D - 0.005, m["z"] + 0.005).buffer(0.004)
+
+
 def dlo_shapes():
     b0, b1 = sorted(R["b_pillar"])
     # the traced outline dips at the B-pillar top and bottom: run straight across it instead
@@ -210,7 +211,7 @@ def screen_shapes():
 
 def rear_shapes():
     rg = poly(R["rear_glass"])
-    rg = rg.intersection(box(-5, -5, 5, rg.bounds[3] - 0.015))    # clear of the spoiler's underside
+    rg = rg.intersection(box(-5, -5, 5, rg.bounds[3] - 0.03))     # clear of the spoiler's underside
     glass = rg.buffer(-0.022, join_style=1)
     return rg, glass, rg.difference(glass)
 
@@ -219,17 +220,17 @@ def glass_parts(ref0, cutters, out):
     _d, g, t = dlo_shapes()
     for sgn, side in ((1, "l"), (-1, "r")):
         fr = side_fr(sgn)
-        cutters += blend.lay(ref0, f"cut_side_{side}", g, fr, -0.08, 0.006, "trim", along_ray=True)
-        out += blend.lay(ref0, f"side_glass_{side}", g.buffer(-0.001), fr, -0.008, -0.004, "glass", 0.02)
-        out += blend.lay(ref0, f"window_trim_{side}", t, fr, -0.001, 0.0025, "trim", 0.01)
+        cutters += blend.lay(ref0, f"cut_side_{side}", g.buffer(-0.003), fr, -0.08, 0.006, "trim", along_ray=True)
+        out += blend.lay(ref0, f"side_glass_{side}", g.buffer(-0.006), fr, -0.008, -0.004, "glass", 0.02, along_ray=True)
+        out += blend.lay(ref0, f"window_trim_{side}", t.difference(arm_footprint()), fr, 0.0015, 0.0035, "trim", 0.01)
     _o, g, t = screen_shapes()
-    cutters += blend.lay(ref0, "cut_screen", g, top_fr(), -0.08, 0.006, "trim", along_ray=True)
-    out += blend.lay(ref0, "screen_glass", g.buffer(-0.001), top_fr(), -0.008, -0.004, "glass", 0.02)
-    out += blend.lay(ref0, "screen_trim", t, top_fr(), -0.001, 0.0025, "trim", 0.01)
+    cutters += blend.lay(ref0, "cut_screen", g.buffer(-0.003), top_fr(), -0.08, 0.006, "trim", along_ray=True)
+    out += blend.lay(ref0, "screen_glass", g.buffer(-0.006), top_fr(), -0.008, -0.004, "glass", 0.02, along_ray=True)
+    out += blend.lay(ref0, "screen_trim", t, top_fr(), 0.0015, 0.0035, "trim", 0.01)
     _o, g, t = rear_shapes()
-    cutters += blend.lay(ref0, "cut_rear", g, rear_fr(), -0.08, 0.004, "trim", along_ray=True)
-    out += blend.lay(ref0, "rear_glass", g.buffer(-0.001), rear_fr(), -0.008, -0.004, "glass", 0.02)
-    out += blend.lay(ref0, "rear_trim", t, rear_fr(), -0.001, 0.0025, "trim", 0.01)
+    cutters += blend.lay(ref0, "cut_rear", g.buffer(-0.003), rear_fr(), -0.08, 0.004, "trim", along_ray=True)
+    out += blend.lay(ref0, "rear_glass", g.buffer(-0.006), rear_fr(), -0.008, -0.004, "glass", 0.02, along_ray=True)
+    out += blend.lay(ref0, "rear_trim", t, rear_fr(), 0.0015, 0.0035, "trim", 0.01)
 
 
 def door_path():
@@ -366,12 +367,12 @@ def strips(ref):
     door = LineString(door_path()).buffer(0.0045)
     g = poly(R["strip"]).difference(door)
     for sgn, side in ((1, "l"), (-1, "r")):
-        obs += blend.lay(ref, f"side_strip_{side}", g, side_fr(sgn), 0.0, 0.004, "body", 0.006)
+        obs += blend.lay(ref, f"side_strip_{side}", g, side_fr(sgn), 0.0015, 0.004, "body", 0.006)
     return obs
 
 
 # ---------------------------------------------------------------- interior
-def _loft(name, x0, x1, clip, n=12, gap=0.0025, mat="interior"):
+def _loft(name, x0, x1, clip, n=12, gap=0.003, mat="interior"):
     rings = []
     for x in np.linspace(x0, x1, n):
         g = body.inside(CV, x, 0.035 + gap).intersection(clip(x))
@@ -398,18 +399,18 @@ def _rbox(name, x0, x1, y0, y1, z0, z1, r=0.03, lean=0.0):
 
 def interior(floor):
     x0 = R["screen"]["x_base"] + 0.08
-    obs = [_loft("firewall", x0 - 0.010, x0 - 0.004, lambda x: box(-2, floor + 0.002, 2, 3), n=2),
-           _loft("dash", x0 - 0.0125, 0.52, lambda x: box(-2, 0.80, 2, 0.80 + 0.19 * (1 - (x0 - x) / 0.6) + 0.03), n=10)]
+    obs = [_loft("firewall", x0 - 0.010, x0 - 0.004, lambda x: box(-0.5, floor + 0.002, 0.5, 3), n=2),
+           _loft("dash", x0 - 0.0125, 0.52, lambda x: box(-0.5, 0.80, 0.5, 0.80 + 0.19 * (1 - (x0 - x) / 0.6) + 0.03), n=10)]
     for sgn, side in ((1, "l"), (-1, "r")):
         clip = lambda x, s=sgn: (box(0.3, 0.46, 1.2, 0.97) if s > 0 else box(-1.2, 0.46, -0.3, 0.97)).intersection(
             body.inside(CV, x, 0.035 + 0.003)).difference(body.inside(CV, x, 0.035 + 0.025))
-        obs.append(_loft(f"door_card_{side}", -0.37, 0.76, clip, n=12))
+        obs.append(_loft(f"door_card_{side}", -0.37, 0.50, clip, n=12))
         yc = 0.37 * sgn
         obs.append(_rbox(f"seat_base_{side}", -0.36, 0.14, yc - 0.25, yc + 0.25, floor + 0.002, 0.52))
-        obs.append(_rbox(f"seat_back_{side}", -0.50, -0.38, yc - 0.24, yc + 0.24, 0.525, 1.15, lean=0.22))
-        obs.append(_rbox(f"headrest_{side}", -0.67, -0.57, yc - 0.13, yc + 0.13, 1.18, 1.31, r=0.035, lean=0.1))
+        obs.append(_rbox(f"seat_back_{side}", -0.50, -0.38, yc - 0.24, yc + 0.24, 0.521, 1.15, lean=0.22))
+        obs.append(_rbox(f"headrest_{side}", -0.67, -0.57, yc - 0.13, yc + 0.13, 1.151, 1.29, r=0.035, lean=0.1))
     obs.append(_rbox("bench_base", -1.06, -0.62, -0.49, 0.49, floor + 0.002, 0.53))
-    obs.append(_rbox("bench_back", -1.20, -1.08, -0.49, 0.49, 0.535, 1.04, lean=0.25))
+    obs.append(_rbox("bench_back", -1.20, -1.08, -0.49, 0.49, 0.531, 1.04, lean=0.25))
     xm = R["screen"]["x_top"] - 0.03
     roof_in = body.inside(CV, xm, 0.035).bounds[3]
     top = roof_in - 0.07
@@ -505,16 +506,16 @@ def options(ref):
             ob.name = f"opt_{group}_{n}_{i}"
             out.append(ob)
     # front: 1 on the grille (the reference), 2 on the bonnet
-    add("frontbadge", 1, _flat(ref, bdg, 0.08, front_fr(), 0, 0.6, up, "fb", 0.0045, 0.0075, "chrome"))
-    add("frontbadge", 2, _flat(ref, bdg, 0.08, top_fr(), sp["bonnet_x"], 0, fwd, "fb", 0.0, 0.003, "chrome"))
+    add("frontbadge", 1, _flat(ref, bdg, 0.08, front_fr(), 0, 0.6, up, "fb", 0.0055, 0.0085, "chrome"))
+    add("frontbadge", 2, _flat(ref, bdg, 0.08, top_fr(), sp["bonnet_x"], 0, fwd, "fb", 0.0012, 0.003, "chrome"))
     # rear: 1 tailgate centre (the reference), 2 lower on the tailgate
-    add("rearbadge", 1, _flat(ref, bdg, 0.10, rear_fr(), 0, sp["tailgate_z"], up, "rb", 0.0, 0.003, "chrome"))
-    add("rearbadge", 2, _flat(ref, bdg, 0.08, rear_fr(), 0, sp["tailgate_low_z"], up, "rb", 0.0, 0.003, "chrome"))
+    add("rearbadge", 1, _flat(ref, bdg, 0.10, rear_fr(), 0, sp["tailgate_z"], up, "rb", 0.0012, 0.003, "chrome"))
+    add("rearbadge", 2, _flat(ref, bdg, 0.08, rear_fr(), 0, sp["tailgate_low_z"], up, "rb", 0.0012, 0.003, "chrome"))
     cap = 0.03
-    add("name", 1, _flat(ref, nm, cap, rear_fr(), sp["name_y"], sp["name_z"], up, "nm", 0.0, 0.0025, "name"))
-    add("name", 2, _flat(ref, nm, cap, rear_fr(), -sp["name_y"], sp["name_z"], up, "nm", 0.0, 0.0025, "name"))
+    add("name", 1, _flat(ref, nm, cap, rear_fr(), sp["name_y"], sp["name_z"], up, "nm", 0.0012, 0.0025, "name"))
+    add("name", 2, _flat(ref, nm, cap, rear_fr(), -sp["name_y"], sp["name_z"], up, "nm", 0.0012, 0.0025, "name"))
     q = []
     for sgn in (1, -1):
-        q += _flat(ref, nm, cap, side_fr(sgn), sp["quarter_x"], sp["quarter_z"], up, "nm", 0.0, 0.0025, "name")
+        q += _flat(ref, nm, cap, side_fr(sgn), sp["quarter_x"], sp["quarter_z"], up, "nm", 0.0012, 0.0025, "name")
     add("name", 3, q)
     return out

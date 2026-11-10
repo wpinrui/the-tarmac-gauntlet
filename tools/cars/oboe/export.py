@@ -73,7 +73,7 @@ def build(game=False):
     print("laid", len(out), "parts,", len(cutters), "cutters")
 
     arch, tubs = parts.arches()
-    v, f = body.cavity(R["screen"]["x_base"] + 0.08, body.ROWS["stations"][0]["x"] - 0.0, FLOOR)
+    v, f = body.cavity(R["screen"]["x_base"] + 0.08, min(st["x"] for st in body.ROWS["stations"]), FLOOR)
     cab = blend.make("cabin", v, f, "interior")
     for t in tubs:
         blend.boolean(cab, t, "DIFFERENCE")
