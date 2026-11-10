@@ -149,11 +149,12 @@ namespace TarmacGauntlet.Raceday
                 float intake = Band(Noise(), intakeHz, 2.5f, ref intakeLow, ref intakeBand)
                                * s.IntakeLevel * (0.03f + (float)Math.Pow(load, 1.3)) * Math.Min(1f, envelope * 4f);
 
-                // Valvetrain: high-passed noise ticking twice per firing.
+                // Valvetrain: short ticks of high-passed noise, two per firing, as loud as the engine is working.
                 float noise = Noise();
                 mechLow += (noise - mechLow) * LowPassStep(2500f);
                 float tick = 0.5f + 0.5f * (float)Math.Sin(2.0 * Math.PI * cycles * cylinders * 2.0);
-                float mech = (noise - mechLow) * s.MechLevel * (0.25f + 0.75f * rev) * tick * tick;
+                tick *= tick * tick;
+                float mech = (noise - mechLow) * s.MechLevel * (0.25f + 0.75f * rev) * (0.1f + 0.9f * load) * tick * tick;
 
                 float engine = s.Drive * (body + intake + mech) * 0.9f;
                 float shaped = (float)Math.Tanh(engine) / (float)Math.Sqrt(s.Drive) + 0.6f * popLow;
@@ -215,7 +216,7 @@ namespace TarmacGauntlet.Raceday
                 Length = Math.Max(4, (int)(fs * Math.Max(0.0003f, s.PulseWidth * gap))),
                 Bank = bankOf[cylinder],
                 Amp = amp * (0.8f + 0.4f * rev),
-                Breath = s.Breath,
+                Breath = s.Breath * (0.4f + 0.6f * fuel),
                 Skew = 0.6f,
             });
         }
