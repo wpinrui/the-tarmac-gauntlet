@@ -24,7 +24,7 @@ namespace TarmacGauntlet.Raceday
         private static readonly float[] NearShifts = { 0f, -1.5f, 1.5f, -3f, 3f, -4.5f, 4.5f, -6f, 6f };
         private static readonly float[] FarShifts = { 0f, -3f, 3f };
         /// <summary>The waits before moving across that are tried, s.</summary>
-        private static readonly float[] Delays = { 1f, 2f };
+        private static readonly float[] Delays = Knob("HALF", 1f) > 0f ? new[] { 0.5f, 1f, 2f } : new[] { 1f, 2f };
         private const float CarL = Racecraft.CarLength, CarW = Racecraft.CarWidth;
         /// <summary>Room a car is owed beside it, on top of a car's width, m.</summary>
         private const float RoomMargin = 0.3f;
@@ -56,6 +56,8 @@ namespace TarmacGauntlet.Raceday
         public const float SideFilterGap = 2f;
         /// <summary>Seconds of score per second spent lifting or braking for a car ahead below its lane's speed.</summary>
         private static readonly float LiftCost = Knob("LIFT", 0.1f);
+        /// <summary>Score per second a pull-out waits: of two near-equal moves, the later one, so the car stays in the tow until it must move.</summary>
+        private static readonly float LateBonus = Knob("LATE", 0.1f);
         /// <summary>Side-to-side gap H1 keeps to a car alongside, m.</summary>
         private static readonly float AlongsideGap = Knob("SIDEGAP", 0.5f);
         /// <summary>Share of its lane's speed a car may carry towards a stopped car, as under a yellow flag.</summary>
@@ -203,6 +205,7 @@ namespace TarmacGauntlet.Raceday
                         else later.Rejected = cand.Rejected;
                         Simulate(pilot, me, later, ahead, nextTurn, margin, brakes, riskWeight, passCost, freeSpeed);
                         later.Score -= Hysteresis * Mathf.Abs(later.Shift - lastShift) + OffLineCost * Mathf.Abs(later.Shift);
+                        if (!defending && !zone) later.Score += LateBonus * wait;   // in the tow on a straight only
                         Candidates.Add(later);
                     }
                 }
