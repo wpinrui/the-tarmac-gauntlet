@@ -130,7 +130,11 @@ static partial class Check
                 if (g >= 0f && g < CarL && apart < reach) return $"{run.Name(i)} and {run.Name(j)} placed overlapping";
                 float dv = f.V[i] - f.V[j];
                 if (g <= 0f || apart >= reach + RoomMargin || dv <= 0f) continue;
-                float need = dv * dv / (2f * BrakingOf(run, i)) + StartReaction * dv;
+                // A car ahead that is braking for a corner already takes away most of the brakes' edge.
+                SpeedProfile pj = run.Race.Racers[j].Pilot.Profile;
+                bool braking = pj.Speed[circuit.Wrap(f.K[j] + (int)(Math.Max(f.V[j], 10f) / circuit.Step))] < f.V[j] - 5f;
+                float shed = braking ? Math.Max(BrakingOf(run, i) - BrakingOf(run, j), 2f) : BrakingOf(run, i);
+                float need = dv * dv / (2f * shed) + StartReaction * dv;
                 if (g - CarL - NoseMargin < need) return $"{run.Name(i)} can't brake for {run.Name(j)}: {g - CarL:0} m to shed {dv * 3.6f:0} km/h needs {need:0} m";
             }
         return null;

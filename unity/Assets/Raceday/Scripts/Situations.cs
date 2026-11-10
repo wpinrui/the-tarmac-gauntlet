@@ -139,10 +139,10 @@ namespace TarmacGauntlet.Raceday
             },
             new Situation
             {
-                Id = "H7", Title = "no dive into the corner", At = T7 - 180f, Seconds = 8f,
+                Id = "H7", Title = "no dive into the corner", At = T7 - 300f, Seconds = 9f,
                 Cars = new[]
                 {
-                    new SituationCar { Model = "a-29", Pace = 100f, Safety = 80f },
+                    new SituationCar { Model = "a-29", Pace = 100f, Safety = 80f, Speed = 285f },
                     new SituationCar { Model = "b-25", Ahead = 15f, Seed = 2 },
                 },
             },
@@ -170,7 +170,7 @@ namespace TarmacGauntlet.Raceday
                 Cars = new[]
                 {
                     new SituationCar { Model = "a-29", Speed = 250f },
-                    new SituationCar { Model = "a-28", Ahead = 1f, Off = -4f, Speed = 250f, Seed = 2 },
+                    new SituationCar { Model = "a-28", Ahead = -1f, Off = -4f, Speed = 250f, Seed = 2 },
                 },
             },
             new Situation
