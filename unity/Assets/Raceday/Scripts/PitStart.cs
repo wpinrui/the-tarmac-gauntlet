@@ -74,7 +74,16 @@ namespace TarmacGauntlet.Raceday
             d.Racer.InFormation = true;
             Vector3 at = d.Car.transform.position;
             float follow = PitPlan.Follow(route, at, Grid[place].Id, RaceCar.All, d.Racer.Pilot.Spec);
-            d.Racer.FormationCap = Queue.Cap(place, route.Index, at, follow);
+            d.Racer.FormationCap = Queue.Cap(place, route.Index, at, follow, Ahead(place, route.Index, at));
+        }
+
+        /// <summary>Middle to middle along the route to the next car up the queue, m, or infinity once it is out.</summary>
+        private float Ahead(int place, int k, Vector3 at)
+        {
+            if (place == 0 || k < 0 || gone[place - 1]) return float.PositiveInfinity;
+            AiDriver next = drivers[place - 1];
+            if (next == null || !routes.TryGetValue(next, out AiPilot theirs) || theirs.Index < 0) return float.PositiveInfinity;
+            return Queue.ToLine(k, at) - Queue.ToLine(theirs.Index, next.Car.transform.position);
         }
     }
 }
