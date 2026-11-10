@@ -24,6 +24,8 @@ sealed class Racer
     public AiPilot Pilot;
     public Racecraft Craft;
     public readonly Rejoin Rejoin = new Rejoin();
+    /// <summary>Spun and waiting on the track: other cars pass through it and ignore it.</summary>
+    public bool Ghost;
     /// <summary>Seconds the rejoin has driven the car without getting it back to racing.</summary>
     public float RejoinTime;
     public int Laps;
@@ -138,6 +140,10 @@ sealed class Race
     public Func<Racer, bool> Physics;
     /// <summary>Gliding cars overlapping another car: in the game they pass through it.</summary>
     public readonly List<Contact> GhostOverlaps = new List<Contact>();
+    /// <summary>Cars passing through a spun car waiting on the track, a ghost: in the game they pass through it.</summary>
+    public readonly List<Contact> SpunOverlaps = new List<Contact>();
+    /// <summary>Times a car became a ghost, and steps spent as one.</summary>
+    public int GhostSpells, GhostSteps;
     float lodClock = 1f;
     /// <summary>Stopwatch ticks spent in racecraft and gliding for gliding cars.</summary>
     public long GlideTicks, ThinkTicks;
@@ -188,6 +194,7 @@ sealed class Race
                 Braking = r.Car.Spec.BrakeDecel * 9.81f * AiPilot.LimitFor(r.Pilot.Pace),
                 Across = r.Car.Vx * circuit.Left[k].x + r.Car.Vz * circuit.Left[k].z,
                 Yaw = (float)Math.Atan2(r.Car.Forward.z, r.Car.Forward.x),
+                Ghost = r.Ghost && !r.Pilot.Gliding,
             });
         }
         sorted.Set(field, circuit.Lap);
@@ -405,6 +412,10 @@ sealed class Race
             AiPilot.Controls c = r.Pilot.Drive(r.Car.Position, r.Car.Forward, r.Car.Velocity, r.Car.YawRate);
             Rejoin.Stage was = r.Rejoin.State;
             c = r.Rejoin.Apply(r.Pilot, c, r.Car.Position, r.Car.Forward, r.Car.Velocity, r.Car.YawRate, field[i], sorted, Dt);
+            bool wasGhost = r.Ghost;
+            r.Ghost = Racecraft.Ghosted(r.Ghost, r.Rejoin, field[i], sorted, circuit.Lap);
+            if (r.Ghost && !wasGhost) GhostSpells++;
+            if (r.Ghost) GhostSteps++;
             OnRejoin?.Invoke(this, r, was);
             Feathering(r, c);
             OpenRoom(r);
@@ -590,6 +601,13 @@ sealed class Race
                 bool hit = dx * dx + dz * dz < 30f && Overlap(a, b, out nx, out nz, out depth);
                 var key = (i, j);
                 if (!hit) { touching.Remove(key); continue; }
+                if (Racers[i].Ghost || Racers[j].Ghost)
+                {
+                    float closing = Math.Max(-((b.Vx - a.Vx) * nx + (b.Vz - a.Vz) * nz), 0f);
+                    if (touching.Add(key))
+                        SpunOverlaps.Add(new Contact { Time = Time, Speed = closing, Where = Math.Max(a.TrackIndex, 0) * circuit.Step, A = Name(Racers[i]), B = Name(Racers[j]) });
+                    continue;
+                }
                 if (Racers[i].Pilot.Gliding || Racers[j].Pilot.Gliding)
                 {
                     // No bodies to bump: in the game a gliding car has no collider.

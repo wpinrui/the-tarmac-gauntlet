@@ -43,11 +43,15 @@ namespace TarmacGauntlet.Raceday
         private int id;
         private int index = -1;
         private Vector3 velocity;
+        private Collider body;
+        /// <summary>Whether this car's collisions with the others are switched off as a ghost.</summary>
+        private bool ghosted;
 
         private void Awake()
         {
             car = GetComponent<CarController>();
             driver = GetComponent<AiDriver>();
+            body = GetComponent<Collider>();
             id = nextId++;
         }
 
@@ -72,6 +76,7 @@ namespace TarmacGauntlet.Raceday
                 if (!r.InPitLane) onTrack.Add(r.Traffic);
             }
             if (cars.Count > 0) Field.Set(onTrack, cars[0].car.Circuit.Lap);
+            foreach (RaceCar r in cars) r.Haunt();
             foreach (RaceCar r in cars) r.ServePlayer();
             foreach (RaceCar r in cars)
                 if (!r.car.Asleep) r.car.DragScale = Racecraft.Slipstream(r.car.Circuit, r.Traffic, onTrack);
@@ -111,6 +116,16 @@ namespace TarmacGauntlet.Raceday
                 v.x * c.Left[k].x + v.z * c.Left[k].z, Mathf.Atan2(ahead.z, ahead.x));
         }
 
+        /// <summary>A ghost passes through every other car: its collisions with them are off while it is one.</summary>
+        private void Haunt()
+        {
+            bool ghost = Traffic.Ghost;
+            if (ghost == ghosted || body == null) return;
+            ghosted = ghost;
+            foreach (RaceCar o in cars)
+                if (o != this && o.body != null) Physics.IgnoreCollision(body, o.body, ghost || o.ghosted);
+        }
+
         /// <summary>Counts the laps as the car moves to sample k.</summary>
         private void Count(Circuit c, int k)
         {
@@ -130,6 +145,7 @@ namespace TarmacGauntlet.Raceday
             Braking = car.Spec.BrakeDecel * G * AiPilot.LimitFor(pilot != null ? pilot.Pace : 100f),
             Across = across,
             Yaw = yaw,
+            Ghost = driver != null && driver.isActiveAndEnabled && driver.Racer != null && driver.Racer.Ghost,
         };
 
         /// <summary>Takes one lap off every car's count, at the green: the formation lap doesn't count.</summary>
