@@ -98,3 +98,20 @@ red and white kerbs outside them, a 15 m wide start straight through turn 1, 30 
 outline open at the back, yellow front-wheel line sticking out sideways), safety car lines, and a
 12 m pit lane with a 3.5 m fast lane, speed limit lines, pit box outlines, red and white hatching at
 the entry and a solid white line along the exit. Everything beside the track is a placeholder.
+
+## Team HQ scene
+
+`Assets/TeamHq/TeamHq.unity` is the team's home workshop, where every management menu sits: four car bays,
+the office on the mezzanine behind glass, and the trophy room off the office. Like the circuit, it is built in
+code (`HqGeometry.cs`), with the layout and looks Ivan picked in the Team HQ viewer
+(https://claude.ai/artifact/N5rq4qwWEYVNA6X37nrZdf). Its numbers are in the viewer's frame and mirrored into
+Unity's at the end.
+
+Each menu screen has a camera shot, set by Ivan in that viewer and copied into `Resources/CameraPresets.json`
+(viewer frame: metres, +Z towards the bay doors, vertical field of view in degrees). `HqCamera.Show(screen)`
+glides to a shot in half a second. Nobody adjusts shots in the editor: when Ivan saves new ones in the viewer,
+copy them from the viewer's `presets` store into the JSON. Until the menus exist, the arrow keys step through
+the shots in Play.
+
+`bash tools/team-hq/geometry-check/run.sh [folder]` builds the building outside Unity and checks every part
+lies inside the shell with sound normals and winding. With a folder it also writes `hq.obj` there to look at.
