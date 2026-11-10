@@ -65,6 +65,8 @@ static partial class Check
         var data = JsonSerializer.Deserialize<CircuitData>(File.ReadAllText(args[0]), new JsonSerializerOptions { IncludeFields = true });
         circuit = new Circuit(data);
         line = new RacingLine(circuit);
+        // The experiment to run with, as the debug menu's switch: AI_EXPERIMENT=3 is E3.
+        if (int.TryParse(Environment.GetEnvironmentVariable("AI_EXPERIMENT"), out int experiment)) Experiments.On = experiment;
 
         if (args.Length > 2 && args[1] == "line")
         {
@@ -152,6 +154,7 @@ static partial class Check
             RollingStartCheck(args.Length > 2 ? int.Parse(args[2]) : 100, verbose: true);
             return failed ? 1 : 0;
         }
+        if (args.Length > 1 && args[1] == "situations") { RunSituations(args.Length > 2 ? args[2] : null); return 0; }
         if (args.Length > 1 && args[1] == "bvsa")
         {
             ClassRace();

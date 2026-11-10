@@ -9,7 +9,7 @@ namespace TarmacGauntlet.Raceday
     /// car, which starts last and has to carve through. Start picks how the race starts: from the
     /// grid at once, behind the pace car, or from the pit lane, where the cars queue in the fast lane
     /// and leave three seconds apart, moving up to the pit exit line (<see cref="PitLaneStart"/>). The pit lane start fast forwards
-    /// until the car ahead of the player's is about to leave. I hands the player's car to you and
+    /// until the car ahead of the player's is about to leave. Tab opens the AI debug menu (<see cref="SituationMenu"/>). I hands the player's car to you and
     /// back. V moves the cameras to the next car, and P to the next car making a pit stop. F steps
     /// the race through normal speed, 4x and 16x while the AI drives your car, and ends the pit lane
     /// start's fast forward. Cars away from the camera glide without physics (<see cref="PhysicsRange"/>).
@@ -33,6 +33,7 @@ namespace TarmacGauntlet.Raceday
         private const float SkipSpeed = 32f;
         private PitLaneStart pitLaneStart;
         private bool skipping;
+        private SituationMenu lab;
 
         private const string PlayerCar = "a-29";
         private const string PlayerModel = "Assets/Art/Vehicles/CheonmaCX24Si/CheonmaCX24Si.obj";
@@ -56,6 +57,9 @@ namespace TarmacGauntlet.Raceday
             new Color(0.85f, 0.15f, 0.12f), new Color(0.95f, 0.55f, 0.1f), new Color(0.95f, 0.85f, 0.2f),
             new Color(0.25f, 0.7f, 0.3f), new Color(0.2f, 0.45f, 0.9f), new Color(0.6f, 0.3f, 0.8f),
         };
+
+        /// <summary>The stand-in boxes' paint for a model, by its class.</summary>
+        internal static Color PaintFor(string id) => ClassPaint[Mathf.Clamp(id[0] - 'a', 0, ClassPaint.Length - 1)];
 
         private void Awake()
         {
@@ -101,7 +105,7 @@ namespace TarmacGauntlet.Raceday
             {
                 bool player = i == field.Length - 1;
                 string id = field[i];
-                Color paint = ClassPaint[Mathf.Clamp(id[0] - 'a', 0, ClassPaint.Length - 1)];
+                Color paint = PaintFor(id);
                 CarController car = CarBuilder.Spawn(id, player ? PlayerModel : null, circuit, player ? keys : null, paint);
                 if (pitLaneStart != null) car.PlaceAt(pitLaneStart.Place(i, out Vector3 forward), forward);
                 else
@@ -142,8 +146,17 @@ namespace TarmacGauntlet.Raceday
             range.Drivers = drivers;
             range.Player = ai.Car;
 
-            Camera(circuit, cars, keys);
-            Tower(circuit, grid, field, teams, starter);
+            RaceCameras views = Camera(circuit, cars, keys);
+            RaceTower tower = Tower(circuit, grid, field, teams, starter);
+            var hidden = new List<GameObject> { tower.gameObject };
+            foreach (CarController c in cars) hidden.Add(c.gameObject);
+            if (starter != null) hidden.Add(starter.gameObject);
+            lab = new GameObject("AI debug menu").AddComponent<SituationMenu>();
+            lab.Circuit = circuit;
+            lab.Keys = keys;
+            lab.Cameras = views;
+            lab.Range = range;
+            lab.Race = hidden.ToArray();
             if (start == StartMode.PitLane)
             {
                 var pitStart = (PitStart)starter;
@@ -161,6 +174,8 @@ namespace TarmacGauntlet.Raceday
             var rolling = (RaceStart)starter;
             rolling.Grid = grid;
             rolling.PaceCar = paceCar;
+            hidden.Add(paceCar.gameObject);
+            lab.Race = hidden.ToArray();
             rolling.Pits = pits;
         }
 
@@ -205,7 +220,7 @@ namespace TarmacGauntlet.Raceday
 
         private void Update()
         {
-            if (keys == null || ai == null) return;
+            if (keys == null || ai == null || lab.Running) return;   // a debug set-up runs instead of the race
             if (keys.Pressed(KeyCode.I)) ai.enabled = !ai.enabled;
             if (keys.Pressed(KeyCode.F))
             {
@@ -229,7 +244,7 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>The timing tower, its clock running from the green, or from the first car out of the pit lane.</summary>
-        private void Tower(Circuit circuit, RaceCar[] grid, string[] field, string[] teams, Starter starter)
+        private RaceTower Tower(Circuit circuit, RaceCar[] grid, string[] field, string[] teams, Starter starter)
         {
             RaceTower tower = new GameObject("Timing tower").AddComponent<RaceTower>();
             tower.Cars = grid;
@@ -247,6 +262,7 @@ namespace TarmacGauntlet.Raceday
             tower.Lap = circuit.Lap;
             if (starter is RaceStart rolling) tower.Racing = () => rolling.Racing;
             else if (pitLaneStart != null) tower.Racing = () => pitLaneStart.Gone(0);
+            return tower;
         }
 
         private static void Sun()
@@ -271,7 +287,7 @@ namespace TarmacGauntlet.Raceday
             QualitySettings.shadowDistance = 400f;
         }
 
-        private static void Camera(Circuit circuit, CarController[] cars, KeyboardState keys)
+        private static RaceCameras Camera(Circuit circuit, CarController[] cars, KeyboardState keys)
         {
             Camera cam = UnityEngine.Camera.main;
             if (cam == null)
@@ -297,6 +313,7 @@ namespace TarmacGauntlet.Raceday
             views.Hud = cam.gameObject.AddComponent<DriveHud>();
             views.Hud.Car = cars[cars.Length - 1];
             cam.gameObject.AddComponent<FpsCounter>();
+            return views;
         }
     }
 }

@@ -39,6 +39,8 @@ namespace TarmacGauntlet.Raceday
         public int Garage = -1;
         /// <summary>The start this car takes part in, if any.</summary>
         public Starter Starter;
+        /// <summary>A pilot built beforehand, on its tuned line: the car drives with it from the start, with no tuning.</summary>
+        [System.NonSerialized] public AiPilot Given;
 
         public AiPilot Pilot => Racer?.Pilot;
         public Racecraft Craft => Racer?.Craft;
@@ -66,10 +68,11 @@ namespace TarmacGauntlet.Raceday
         {
             race = GetComponent<RaceCar>();
             if (Line == null || car.Spec == null) return;
-            AiPilot pilot = NewPilot(Line);
+            AiPilot pilot = Given ?? NewPilot(Line);
             PitPlan pit = Pits != null && Garage >= 0 && car.Supplies != null ? new PitPlan(Pits, Garage, car.Supplies) : null;
             Racer = new AiRacer(pilot, new Racecraft(), car.Supplies, pit, Seed);
             Log(pilot);
+            if (Given != null) return;
             // The tuned line and the pilot's lanes beside it take a while: both are made off the main thread.
             Circuit circuit = Line.Circuit;
             CarSpec spec = car.Spec;
@@ -78,6 +81,12 @@ namespace TarmacGauntlet.Raceday
             // The line is queued first, so it is ready by the time the pilot is built on the same thread.
             Task<RacingLine> line = LineTuner.Line(circuit, spec);
             tuning = LineTuner.Run(() => new AiPilot(line.Result, spec, pace, consistency, safety, seed));
+        }
+
+        /// <summary>Sets the racer up now rather than on the first physics step, so the car is raced as an AI car even when someone else drives it.</summary>
+        public void Prepare()
+        {
+            if (Racer == null) Begin();
         }
 
         private void OnEnable()
