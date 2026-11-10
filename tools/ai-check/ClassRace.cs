@@ -6,7 +6,10 @@
 //   following      with a car within 2 s ahead: how far off its line a car runs, and how much of that
 //                  time it is in the tow
 //   tow before a pass  how long a car was in the tow before it pulled out
-//   braking with room  seconds the braking filter fired while the passing side had room
+//   braking with room  seconds the braking filter fired outside a braking zone while, by the check's own
+//                  reckoning (RoomBeside), there was a lane to pull out into beside the car braked for;
+//                  racecraft's own count is shown too. BVSA_WHY splits it by whether the car was pulling
+//                  out and which car it braked for.
 //   contacts, rear-ends over 2 m/s, pile-ups
 // Seeds: BVSA_SEEDS (default 11 12 13 14), race length BVSA_MINUTES (default 15).
 using System;
@@ -54,9 +57,11 @@ static partial class Check
         readonly Dictionary<Racer, int> seen = new Dictionary<Racer, int>();
         readonly Dictionary<Racer, float> spell = new Dictionary<Racer, float>();
         readonly Dictionary<Racer, bool> wasPulling = new Dictionary<Racer, bool>();
-        public float FollowTime, OffLine, TowTime, BrakeRoom, BrakeRoomPulling, HeldA, Dropped;
+        public readonly Dictionary<string, float> Why = new Dictionary<string, float>();
+        public float FollowTime, OffLine, TowTime, BrakeRoom, BrakeRoomPulling, ToolBrakeRoom, HeldA, Dropped;
         static readonly int TraceId = int.TryParse(Environment.GetEnvironmentVariable("BVSA_TRACE"), out int ti) ? ti : -1;
         static readonly float TraceFrom = float.TryParse(Environment.GetEnvironmentVariable("BVSA_TRACE_FROM"), out float tf) ? tf : 0f;
+        static readonly bool WhyLog = Environment.GetEnvironmentVariable("BVSA_WHYLOG") != null;
         static readonly bool BrakeLog = Environment.GetEnvironmentVariable("BVSA_LOG") != null;
         public readonly List<float> TowSpells = new List<float>();
         public float Cut;
@@ -81,7 +86,14 @@ static partial class Check
                 Racecraft k = x.Craft;
                 bool following = v > 10f && k.FrontGap < 2f * v;
                 if (x.Id == TraceId && r.Time > TraceFrom && r.Time < TraceFrom + 4f && (int)Math.Round(r.Time / Race.Dt) % 5 == 0)
-                    Console.WriteLine($"TRACE {Race.Clock(r.Time)} {v * 3.6f:0} km/h free {x.Pilot.FreeSpeed * 3.6f:0} gap {k.FrontGap:0.0} front #{k.FrontId} {(k.Braking ? $"BRK #{k.BrakeFor} {k.BrakeGap:0.0} short {k.BrakeSide:0.0} beside" : "")} pull {k.PullingOut} off {x.Pilot.Offset:0.0} lat {x.Car.Lateral:0.0} room-brake {k.BrakedWithRoom}");
+                    Console.WriteLine($"TRACE {Race.Clock(r.Time)} {v * 3.6f:0} km/h free {x.Pilot.FreeSpeed * 3.6f:0} gap {k.FrontGap:0.0} front #{k.FrontId} {(k.Braking ? $"BRK #{k.BrakeFor} {k.BrakeGap:0.0} short {k.BrakeSide:0.0} beside" : "")} pull {k.PullingOut} off {x.Pilot.Offset:0.0} lat {x.Car.Lateral:0.0}");
+                if (k.Braking && k.BrakeFor >= 0 && !InBrakingZone(x) && RoomBeside(r, x, k.BrakeFor))
+                {
+                    ToolBrakeRoom += Race.Dt;
+                    string why = (k.PullingOut ? "pulling" : "in line") + (k.BrakeFor == k.FrontId ? " behind the car it targets" : " behind another car") + (r.Time < 120f ? ", first 2 min" : ", later");
+                    Why[why] = (Why.TryGetValue(why, out float w0) ? w0 : 0f) + Race.Dt;
+                    if (WhyLog && r.Time > 120f && r.Time < 200f) { Racer o = r.Racers.First(y => y.Id == k.BrakeFor); Console.WriteLine($"TOOLBRK {Race.Clock(r.Time)} {r.Name(x)} {why} {v * 3.6f:0} vs {o.Car.Speed * 3.6f:0} km/h, {k.BrakeGap:0.0} m short, {k.BrakeSide:0.0} beside, off {x.Pilot.Offset:0.0} lat {x.Car.Lateral:0.0} its lat {o.Car.Lateral:0.0} across {o.Car.Vx * 0f:0}"); }
+                }
                 if (k.BrakedWithRoom)
                 {
                     BrakeRoom += Race.Dt;
@@ -104,6 +116,42 @@ static partial class Check
         }
     }
 
+    /// <summary>The car's speed profile falls over the next 20 m: it is braking for the corner.</summary>
+    static bool InBrakingZone(Racer x)
+    {
+        int k = x.Pilot.Index;
+        if (k < 0) return false;
+        float[] v = x.Pilot.Profile.Speed;
+        return v[circuit.Wrap(k + (int)Math.Round(20f / circuit.Step))] < v[k] - 1f;
+    }
+
+    /// <summary>
+    /// Whether there is a lane to pull out into beside the car braked for: on the side away from it,
+    /// a car's width and a metre clear of it, inside the track's width / 2.5, with no other car in that
+    /// lane from this car's tail to a car's length past the one braked for.
+    /// </summary>
+    static bool RoomBeside(Race r, Racer x, int forId)
+    {
+        Racer o = r.Racers.FirstOrDefault(y => y.Id == forId);
+        if (o == null) return false;
+        float clear = Racecraft.CarWidth + 1f;
+        float passAt = o.Car.Lateral + (o.Car.Lateral > 0f ? -clear : clear);
+        int k = Math.Max(o.Car.TrackIndex, 0);
+        if (Math.Abs(passAt) > circuit.Data.width[k] / 2.5f - 0.5f) return false;
+        float lo = Math.Min(passAt, x.Car.Lateral) - clear, hi = Math.Max(passAt, x.Car.Lateral) + clear;
+        float ahead = Gap(o.Distance - x.Distance);
+        foreach (Racer y in r.Racers)
+        {
+            if (y == x || y == o) continue;
+            float d = Gap(y.Distance - x.Distance);
+            if (d > -Racecraft.CarLength && d < ahead + Racecraft.CarLength && y.Car.Lateral > lo && y.Car.Lateral < hi && Math.Abs(y.Car.Lateral - x.Car.Lateral) > 0.5f * Racecraft.CarWidth)
+                return false;
+        }
+        return true;
+    }
+
+    static float Gap(float d) => d - circuit.Lap * (float)Math.Round(d / circuit.Lap);
+
     static void ClassRace()
     {
         int[] seeds = (Environment.GetEnvironmentVariable("BVSA_SEEDS") ?? "11 12 13 14").Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(int.Parse).ToArray();
@@ -120,6 +168,7 @@ static partial class Check
                 return false;
             }, minutes * 60f);
             List<float> all = watch.Clean.Values.SelectMany(l => l).ToList();
+            if (Environment.GetEnvironmentVariable("BVSA_WHY") != null) foreach (var kv in watch.Why.OrderByDescending(kv => kv.Value)) Console.WriteLine($"  why {kv.Key}: {kv.Value:0.0} s");
             Racer a = race.Racers.First(x => x.Entry.Model[0] == 'a');
             List<float> aLaps = watch.Clean[a];
             float bSolo = race.Racers.Where(x => x.Entry.Model[0] == 'b').Average(x => x.Pilot.Profile.LapTime);
@@ -127,7 +176,7 @@ static partial class Check
                 + $"A lap {(aLaps.Count > 0 ? aLaps.Average() : 0):0.00} s over {aLaps.Count} laps (solo {a.Pilot.Profile.LapTime:0.00} s), A laps {a.Laps}, A held up {watch.HeldA / Math.Max(a.Laps, 1):0.0} s a lap, "
                 + $"A place {race.Racers.Count(x => x.Distance > a.Distance) + 1}, "
                 + $"following {watch.FollowTime:0} s, off line {watch.OffLine / Math.Max(watch.FollowTime, 1e-3f):0.00} m, in tow {100f * watch.TowTime / Math.Max(watch.FollowTime, 1e-3f):0}%, "
-                + $"tow before a pull-out {(watch.TowSpells.Count > 0 ? watch.TowSpells.Average() : 0):0.0} s ({watch.TowSpells.Count} pull-outs), braking with room {watch.BrakeRoom:0.0} s ({watch.BrakeRoomPulling:0.0} s while pulling out), "
+                + $"tow before a pull-out {(watch.TowSpells.Count > 0 ? watch.TowSpells.Average() : 0):0.0} s ({watch.TowSpells.Count} pull-outs), braking with room {watch.ToolBrakeRoom:0.0} s (racecraft's own count {watch.BrakeRoom:0.0} s, {watch.BrakeRoomPulling:0.0} s of it while pulling out), "
                 + $"{race.Contacts.Count} contacts, {race.Contacts.Count(c => c.RearEnd && c.Speed > RearHit)} rear-ends, {piles.PileUps.Count} pile-ups, {race.PassCount} passes");
         }
     }
