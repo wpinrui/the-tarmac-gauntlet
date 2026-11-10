@@ -253,16 +253,19 @@ namespace TarmacGauntlet.Raceday
             // or overloaded tyres spin the car.
             if (held && SpeedCap <= 0f)
             {
-                // The tyres' grip includes the downforce at this speed.
-                float load = G + 0.5f * CarSpec.AirDensity * Spec.LiftArea * speed * speed / Spec.Mass;
-                float tyres = Spec.Grip * Mathf.Clamp(Grip, 0.3f, 1f) * load;
-                float cornering = speed * yawRate;
-                float spare = Mathf.Sqrt(Mathf.Max(tyres * tyres - cornering * cornering, 0f));
+                // filterBColl's full brakes, whatever the steering: the brakes take the tyres' grip
+                // (with the downforce at this speed), as far as they can use it. Not in the tutorial:
+                // the grip, not a locked wheel, is the limit, standing in for the robot's ABS.
+                float decel = Mathf.Min(Spec.BrakeDecel * G, TyreGrip(speed));
                 controls.Throttle = 0f;
-                controls.Brake = Mathf.Clamp01(spare / (Spec.BrakeDecel * G));
+                controls.Brake = decel / (Spec.BrakeDecel * G);
             }
             return controls;
         }
+
+        /// <summary>The tyres' grip at a speed, m/s², with the downforce and the tyres' wear.</summary>
+        public float TyreGrip(float speed) =>
+            Spec.Grip * Mathf.Clamp(Grip, 0.3f, 1f) * (G + 0.5f * CarSpec.AirDensity * Spec.LiftArea * speed * speed / Spec.Mass);
 
         /// <summary>The path is a blend of the two lanes either side of the offset.</summary>
         private void Blend(out int a, out int b, out float blend)

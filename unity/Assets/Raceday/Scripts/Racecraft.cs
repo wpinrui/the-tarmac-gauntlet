@@ -233,6 +233,14 @@ namespace TarmacGauntlet.Raceday
             float lineHere = line.Lateral[pilot.Index];
             float myOffset = lineHere + pilot.Offset;   // from the track middle
             float step = OvertakeOffsetRate * dt;
+            // Not in the tutorial: while braking for a car ahead, the offset steps only as fast as the
+            // grip the brakes leave over.
+            if (Braking)
+            {
+                float tyres = pilot.TyreGrip(mySpeed);
+                float decel = Mathf.Min(spec.BrakeDecel * G, tyres);
+                step *= Mathf.Sqrt(Mathf.Max(tyres * tyres - decel * decel, 0f)) / Mathf.Max(tyres, 0.1f);
+            }
             if (hasFront)
             {
                 State = Mode.Overtaking;
