@@ -77,7 +77,7 @@ static partial class Check
                 int k = Math.Max(x.Car.TrackIndex, 0);
                 float free = x.Pilot.Profile.Speed[k];
                 bool window = Environment.GetEnvironmentVariable("RACE_FROM") is string rf && r.Time >= float.Parse(rf);
-                if (window) Console.WriteLine($"   tspd {x.Pilot.TargetSpeed * 3.6f:0} cap {Math.Min(x.Pilot.SpeedCap, 99f) * 3.6f:0} off {x.Pilot.Offset:0.0} brk {x.Craft.Braking} scale {x.Pilot.SpeedScale:0.00}");
+                if (window) Console.WriteLine($"   tspd {x.Pilot.TargetSpeed * 3.6f:0} cap {Math.Min(x.Pilot.SpeedCap, 99f) * 3.6f:0} off {x.Pilot.Offset:0.0} brk {x.Craft.Braking} for {x.Craft.BrakeFor} gap {x.Craft.BrakeGap:0.0} side {x.Craft.BrakeSide:0.0} scale {x.Pilot.SpeedScale:0.00}");
                 if (!window && (x.Car.Speed > 0.92f * free || r.Time < 20f)) continue;
                 PathChooser pc = x.Craft.Chooser;
                 Racer ahead = r.Racers.Where(o => o != x && Gap(o.Distance - x.Distance) > 0f).OrderBy(o => Gap(o.Distance - x.Distance)).FirstOrDefault();

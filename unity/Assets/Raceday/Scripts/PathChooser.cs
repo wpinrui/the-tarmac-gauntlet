@@ -56,6 +56,10 @@ namespace TarmacGauntlet.Raceday
         public const float SideFilterGap = 2f;
         /// <summary>Seconds of score per second spent lifting or braking for a car ahead below its lane's speed.</summary>
         private static readonly float LiftCost = Knob("LIFT", 0.1f);
+        /// <summary>Deceleration, m/s², braking plans to open a short gap with.</summary>
+        private static readonly float BrakeOpen = Knob("BOPEN", 12f), BesideBrake = Knob("BESIDE", 2f), BesideDrop = Knob("BDROP", 6f);
+        /// <summary>The slowest car alongside this plan, m/s.</summary>
+        private float besideSpeed = float.PositiveInfinity;
         /// <summary>Score per second a pull-out waits: of two near-equal moves, the later one, so the car stays in the tow until it must move.</summary>
         private static readonly float LateBonus = Knob("LATE", 0.1f);
         /// <summary>Side-to-side gap H1 keeps to a car alongside, m.</summary>
@@ -147,6 +151,7 @@ namespace TarmacGauntlet.Raceday
             float aheadInLane = float.PositiveInfinity;
             int ahead = -1;
             float aheadGap = 60f;
+            besideSpeed = float.PositiveInfinity;
             float freeSpeed = Mathf.Max(mySpeed, pilot.FreeSpeed);
             for (int j = 0; j < others.Count; j++)
             {
@@ -159,6 +164,8 @@ namespace TarmacGauntlet.Raceday
                 if (g < -CarL && !lapping && closing > Endurance.NoDefendClosing && -g < closing * 2f) fastBehind = true;
                 if (g > CarL && g < mySpeed * 1f && o.Speed < freeSpeed) passing = true;
                 if (g > 0f && g < aheadGap && Mathf.Abs(o.Lateral - me.Lateral) < CarW + RoomMargin) { aheadGap = g; ahead = j; aheadInLane = o.Speed; }
+                // A car alongside and level or ahead: one this car drops back from. One behind drops back itself.
+                if (g > (BesideBrake >= 2f ? 0f : -CarL - 1f) && g < CarL + 1f && Mathf.Abs(o.Lateral - me.Lateral) < 2f * CarW) besideSpeed = Mathf.Min(besideSpeed, o.Speed);
             }
             bool exempt = defending && passing;
             bool zone = TurnAt(c, here) != 0 || BrakingZone(pilot);
@@ -205,9 +212,13 @@ namespace TarmacGauntlet.Raceday
                         else later.Rejected = cand.Rejected;
                         Simulate(pilot, me, later, ahead, nextTurn, margin, brakes, riskWeight, passCost, freeSpeed);
                         later.Score -= Hysteresis * Mathf.Abs(later.Shift - lastShift) + OffLineCost * Mathf.Abs(later.Shift);
-                        if (!defending && !zone) later.Score += LateBonus * wait;   // in the tow on a straight only
                         Candidates.Add(later);
                     }
+                    // In the tow on a straight, of near-equal moves the later one wins, while a still later one
+                    // is open too: the car moves out at its last safe moment with a step in hand, as it lags its plan.
+                    if (!defending && !zone)
+                        for (int i = Candidates.Count - Delays.Length; i < Candidates.Count - 1; i++)
+                            if (Candidates[i + 1].Rejected == null) Candidates[i].Score += LateBonus * Candidates[i].Delay;
                 }
 
             Candidate best = null;
@@ -259,7 +270,10 @@ namespace TarmacGauntlet.Raceday
         private float CapAt(Pedal pedal, int ahead, int s, float mySpeed, float d, float margin)
         {
             if (pedal == Pedal.Go) return float.PositiveInfinity;
-            if (ahead < 0) return pedal == Pedal.Lift || s * Tick > 1f ? mySpeed : Mathf.Max(mySpeed - 8f, 0f);
+            // With no car ahead, braking drops back from a car alongside: to a little under its speed, as
+            // hard as the brakes allow for a second, and never below what that takes.
+            if (ahead < 0) return pedal == Pedal.Lift || s * Tick > 1f ? mySpeed
+                : BesideBrake > 0f && (BesideBrake < 3f || besideSpeed < float.PositiveInfinity) ? Mathf.Clamp(besideSpeed - BesideDrop, Mathf.Max(mySpeed - 8f, 0f), mySpeed) : Mathf.Max(mySpeed - 8f, 0f);
             // Following: the speed of the car ahead, closing or opening the gap towards the one it keeps.
             // A queue then settles at the speed of its front instead of slowing a little more at every car.
             float v = ov[ahead, s];
@@ -271,8 +285,11 @@ namespace TarmacGauntlet.Raceday
             // never feathers the throttle on the way up to the car ahead (Ivan).
             float follow = gap >= keep ? Mathf.Sqrt(v * v + 2f * CloseDecel * (gap - keep))
                 : Mathf.Sqrt(Mathf.Max(v * v - 2f * OpenDecel * (keep - gap), 0f));
-            // Braking opens the gap harder for a second.
-            if (pedal == Pedal.Brake && s * Tick <= 1f) follow = Mathf.Min(follow, Mathf.Max(v - BrakeDrop, 0f));
+            // Braking opens a short gap harder, by as much as the gap is short: a fixed drop below the car
+            // ahead would add up along a queue until it stops.
+            if (pedal == Pedal.Brake && s * Tick <= 1f)
+                follow = BrakeOpen > 0f ? (gap >= keep ? follow : Mathf.Sqrt(Mathf.Max(v * v - 2f * BrakeOpen * (keep - gap), 0f)))
+                    : Mathf.Min(follow, Mathf.Max(v - BrakeDrop, 0f));
             return follow;
         }
 
