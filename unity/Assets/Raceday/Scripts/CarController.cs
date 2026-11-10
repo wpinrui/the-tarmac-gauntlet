@@ -50,6 +50,9 @@ namespace TarmacGauntlet.Raceday
         /// <summary>0 is reverse, 1 and up are forward gears.</summary>
         public int Gear { get; private set; } = 1;
         public float Speed { get; private set; }
+        /// <summary>The pedals as applied this step, 0 to 1, whoever is driving.</summary>
+        public float Throttle => throttle;
+        public float Brake => brake;
         public float EngineFraction { get; private set; }
         public Vector3 Velocity => body.GetPointVelocity(body.worldCenterOfMass);
         /// <summary>Turn rate about the car's up axis, rad/s, positive turning right.</summary>
