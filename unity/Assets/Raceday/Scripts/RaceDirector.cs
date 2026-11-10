@@ -7,8 +7,8 @@ namespace TarmacGauntlet.Raceday
     /// <summary>
     /// Keeps the race for the career (<see cref="RaceDay"/>). Each time a car crosses the line it
     /// logs the lap, which ages the car and may give it an issue or retire it: issues cut the car's
-    /// power, grip, fuel efficiency and tyre life until a stop fixes them, and a retired car leaves
-    /// the track. After a stop's driver change, the new driver drives at their own pace. When the
+    /// power, grip, fuel efficiency and tyre life until a stop fixes them, and a retired car limps to
+    /// its box, or stops beside the track after a fatal crash (<see cref="Retire"/>). After a stop's driver change, the new driver drives at their own pace. When the
     /// race clock runs out each car takes the flag the next time it crosses the line, and once all
     /// have, or <see cref="FlagWait"/> after the time ran out, the race is settled into the career
     /// (<see cref="RaceWeekend.Finish"/>).
@@ -17,6 +17,12 @@ namespace TarmacGauntlet.Raceday
     {
         /// <summary>The race is called this long after the time runs out, s, for cars that never come round.</summary>
         public const float FlagWait = 400f;
+        /// <summary>Share of its power a car limping back to the pits has.</summary>
+        public const float LimpPower = 0.6f;
+        /// <summary>Share of its racing speed a car limping back to the pits drives at.</summary>
+        public const float LimpSpeed = 0.45f;
+        /// <summary>How far beyond the track edge a car that crashed out comes to rest, m.</summary>
+        public const float OffTrack = 4f;
 
         /// <summary>The cars and their drivers, in the same order as the race day's.</summary>
         public RaceDay Day;
@@ -64,8 +70,6 @@ namespace TarmacGauntlet.Raceday
             {
                 CarRaceLog log = Day.Cars[i];
                 if (Cars[i] == null) continue;
-                // A retired car stays off the track, even after the debug menu shows the race again.
-                if (log.Retired && Cars[i].gameObject.activeSelf) Cars[i].gameObject.SetActive(false);
                 if (log.Retired || log.Flagged) continue;
                 Consumables supplies = controllers[i].Supplies;
                 log.FuelLeft = supplies.Fuel;
@@ -80,7 +84,7 @@ namespace TarmacGauntlet.Raceday
                     supplies.Effects = log.Effects;
                     if (log.Retired)
                     {
-                        Cars[i].gameObject.SetActive(false);
+                        Retire(i);
                         continue;
                     }
                 }
@@ -93,6 +97,34 @@ namespace TarmacGauntlet.Raceday
             }
 
             if (Day.AllFlagged || (timeUpAt >= 0f && Time.time - timeUpAt > FlagWait)) Finish();
+        }
+
+        /// <summary>
+        /// A car out of the race. A fatal crash leaves it stopped on the grass beside the track, out
+        /// of the race. Any other failure cuts its power, and it limps to its box at the next pit
+        /// entry, keeping its traffic manners, and parks there.
+        /// </summary>
+        private void Retire(int i)
+        {
+            CarController car = controllers[i];
+            AiDriver driver = Drivers[i];
+            if (Day.Cars[i].RetirementReason == FailureType.Crash)
+            {
+                Circuit c = car.Circuit;
+                int k = c.IndexOf(Mathf.Repeat(Cars[i].Traffic.Distance, c.Lap));
+                float side = Cars[i].Traffic.Lateral >= 0f ? 1f : -1f;
+                Vector3 ground = c.Surface(k, side * (c.HalfWidth(k) + OffTrack));
+                ground.y = c.TerrainHeight(ground.x, ground.z);
+                driver.enabled = false;
+                Cars[i].enabled = false;   // out of every other car's traffic
+                car.PlaceAt(ground, Quaternion.AngleAxis(side * 25f, Vector3.up) * c.Forward[k]);
+                car.Hold = true;
+                car.InputEnabled = false;
+                return;
+            }
+            car.Supplies.PowerTrim *= LimpPower;
+            driver.Limping = true;
+            if (driver.Pilot != null) driver.Pilot.Limp = LimpSpeed;
         }
 
         private void Finish()
