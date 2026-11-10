@@ -352,9 +352,9 @@ namespace TarmacGauntlet.Raceday
                 State = Mathf.Abs(pilot.Offset) > 0.5f ? Mode.Overtaking : Mode.Racing;
                 if (hasFront) { FrontGap = frontDistance; FrontId = front.Id; }
                 // The full brakes are the last resort: not for a car the chosen path, clear of every
-                // limit, is already moving out from behind.
+                // limit, moves out from behind, now or at its last safe moment.
                 if (Braking && chooser.Chosen != null && chooser.Chosen.Rejected == null
-                    && Mathf.Abs(brakeLateral - (line.Lateral[pilot.Index] + chooser.Target)) >= PathChooser.Clear(margin)) Braking = false;
+                    && Mathf.Abs(brakeLateral - (line.Lateral[pilot.Index] + chooser.Chosen.Shift)) >= PathChooser.Clear(margin)) Braking = false;
             }
             else V0Offset(pilot, me, line, c, lap, here, step, margin, hasFront, front, frontDistance, minCatch, inPath, inPathDistance, inPathCatch,
                 wantSpeed, mass, cm, ca, mu, cw, currentSpeedSqr, spec, behind, closeAhead, fastBehind);

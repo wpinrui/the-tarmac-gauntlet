@@ -132,6 +132,33 @@ namespace TarmacGauntlet.Raceday
             overcooked = new bool[corners.Length];
             rolled = new bool[corners.Length];
             for (int i = 0; i < corners.Length; i++) cornerScale[i] = 1f;
+            // How far each sample is from the next corner's arc, for lanes off the line on a straight.
+            Circuit cc = line.Circuit;
+            toArc = new float[cc.Count];
+            for (int k = 0; k < cc.Count; k++)
+            {
+                float here = k * cc.Step, best = cc.Lap;
+                foreach (CornerData cd in corners)
+                    foreach (ArcData arc in cd.arcs)
+                        best = Mathf.Min(best, cc.Ahead(arc.s, here) <= arc.e - arc.s ? 0f : cc.Ahead(here, arc.s));
+                toArc[k] = best;
+            }
+        }
+
+        private readonly float[] toArc;
+
+        /// <summary>
+        /// Under path choosing, a lane off the line on a straight goes at the line's speed while the car
+        /// has room to get back to the line before the next corner: its own slower speed there is for
+        /// staying off the line into the corner, which a pass doesn't (Ivan: never feather on a pass).
+        /// </summary>
+        private float StraightSpeed(float laneSpeed, int k, float offset)
+        {
+            if (!Experiments.Is(PathChooser.Experiment) || toArc == null) return laneSpeed;
+            float line = LaneProfiles[MiddleLane].Speed[k];
+            if (laneSpeed >= line) return laneSpeed;
+            float back = Mathf.Abs(offset) / Endurance.OvertakeOffsetRate * line + 20f;
+            return toArc[k] > back ? line : laneSpeed;
         }
 
         /// <summary>Target speed at a line sample for a path that far from the racing line, m/s.</summary>
@@ -141,7 +168,7 @@ namespace TarmacGauntlet.Raceday
             int a = 0;
             while (a < LaneShifts.Length - 2 && lane > LaneShifts[a + 1]) a++;
             float blend = (lane - LaneShifts[a]) / (LaneShifts[a + 1] - LaneShifts[a]);
-            return Mathf.Lerp(LaneProfiles[a].Speed[k], LaneProfiles[a + 1].Speed[k], blend);
+            return StraightSpeed(Mathf.Lerp(LaneProfiles[a].Speed[k], LaneProfiles[a + 1].Speed[k], blend), k, offset);
         }
 
         /// <summary>
@@ -230,7 +257,7 @@ namespace TarmacGauntlet.Raceday
             float lookahead = Index + Mathf.Max(speed, 5f) * Reaction / c.Step;
             int la = c.Wrap(Mathf.RoundToInt(lookahead));
             float scale = ScaleAt(la);
-            float laneSpeed = Mathf.Lerp(LaneProfiles[a].SpeedAt(lookahead), LaneProfiles[b].SpeedAt(lookahead), blend);
+            float laneSpeed = StraightSpeed(Mathf.Lerp(LaneProfiles[a].SpeedAt(lookahead), LaneProfiles[b].SpeedAt(lookahead), blend), la, Offset);
             float worn = Mathf.Sqrt(Mathf.Clamp(Grip, 0.3f, 1f));
             float target = laneSpeed * scale * SpeedScale * worn;
             // Held back by the car ahead: match the cap and drop the profile's own acceleration.
