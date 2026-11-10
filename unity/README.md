@@ -26,7 +26,8 @@ compiles in Unity.
 Cheonma CX-24Si. `I` hands the car to you, and pressing it again hands it back.
 
 Start on the scene's `CircuitScene` picks how the race starts. Pit Lane (the default): the 100 cars
-queue in the pit lane's fast lane, quickest first with the Cheonma last, and leave ten seconds apart
+queue in the pit lane's fast lane, quickest first with the Cheonma last, and leave three seconds apart
+from the pit exit line (the end of the limiter zone), the queue moving up behind each car that goes
 (`PitLaneStart.cs`). The scene fast forwards at 32x until just before the car ahead of the Cheonma
 leaves; `F` or `I` ends the fast forward early. Pit stops open once every car is out of the pit lane, and
 every car starts on a full tank. Rolling starts behind the pace car, and Grid races from the grid at once.

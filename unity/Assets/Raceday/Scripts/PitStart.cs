@@ -4,8 +4,8 @@ using UnityEngine;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// Runs the pit lane start (<see cref="PitLaneStart"/>): holds each AI car in its place in the
-    /// queue until its turn, then lets it drive out along the route, keeping a safe gap to anything
+    /// Runs the pit lane start (<see cref="PitLaneStart"/>): each AI car moves up the queue behind the
+    /// car ahead and waits at the pit exit line until its turn, then drives out along the route, keeping a safe gap to anything
     /// ahead on it, and hands it to its racing line once it has rejoined. Pit stops open once every
     /// AI car has left the pit lane.
     /// </summary>
@@ -72,9 +72,18 @@ namespace TarmacGauntlet.Raceday
             }
             d.Racer.Formation = route;
             d.Racer.InFormation = true;
-            d.Racer.FormationCap = Queue.Gone(place)
-                ? PitPlan.Follow(route, d.Car.transform.position, Grid[place].Id, RaceCar.All, d.Racer.Pilot.Spec)
-                : 0f;
+            Vector3 at = d.Car.transform.position;
+            float follow = PitPlan.Follow(route, at, Grid[place].Id, RaceCar.All, d.Racer.Pilot.Spec);
+            d.Racer.FormationCap = Queue.Cap(place, route.Index, at, follow, Ahead(place, route.Index, at));
+        }
+
+        /// <summary>Middle to middle along the route to the next car up the queue, m, or infinity once it is out.</summary>
+        private float Ahead(int place, int k, Vector3 at)
+        {
+            if (place == 0 || k < 0 || gone[place - 1]) return float.PositiveInfinity;
+            AiDriver next = drivers[place - 1];
+            if (next == null || !routes.TryGetValue(next, out AiPilot theirs) || theirs.Index < 0) return float.PositiveInfinity;
+            return Queue.ToLine(k, at) - Queue.ToLine(theirs.Index, next.Car.transform.position);
         }
     }
 }
