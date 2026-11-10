@@ -241,6 +241,9 @@ static partial class Check
                 string a = ahead == null ? "" : $"ahead #{ahead.Id} {ahead.Entry.Model} {ahead.Distance - x.Distance,5:0.0} m lat {ahead.Car.Lateral,5:0.0} {ahead.Car.Speed * 3.6f,4:0}";
                 Console.WriteLine($"{Race.Clock(r.Time)} {x.Car.TrackIndex * circuit.Step,5:0} m {x.Car.Speed * 3.6f,4:0} {x.Craft.State,-11} {(x.Craft.Braking ? "BRK" : "   ")} {(x.Craft.SideSteering ? $"SIDE {x.Pilot.SideWeight:0.0} {x.Pilot.SideSteer:0.00}" : "")} off {x.Pilot.Offset,5:0.0} lat {x.Car.Lateral,5:0.0} hw {circuit.HalfWidth(Math.Max(x.Car.TrackIndex,0)):0.0} err {x.Pilot.LateralError,5:0.0}  {a}");
             }
+            if (Environment.GetEnvironmentVariable("AI_FIELD") != null && Math.Abs(r.Time % 2f) < Race.Dt * 0.5f && r.Time < 60f)
+                foreach (Racer f in r.Racers.OrderByDescending(o => o.Distance))
+                    Console.WriteLine($"F {Race.Clock(r.Time)} #{f.Id,2} {f.Entry.Model} {f.Distance,7:0.0} lat {f.Car.Lateral,5:0.0} {f.Car.Speed * 3.6f,4:0} tspd {f.Pilot.TargetSpeed * 3.6f,4:0} {f.Craft.State,-11} {(f.Craft.Braking ? "BRK" : "   ")} off {f.Pilot.Offset,5:0.0}");
             if (pair == null) tick++;
             return r.Racers.Max(c => c.Laps) >= laps;
         }, 60f * 20f);

@@ -116,6 +116,11 @@ namespace TarmacGauntlet.Raceday
         private const float SideCollisionMargin = 2f;      // SIDE_COLLISION_MARGIN, m
         private const float BorderOvertakeMargin = 0.5f;   // BORDER_OVERTAKE_MARGIN, m
         private const float WidthDiv = 3f;                 // WIDTH_DIV
+        /// <summary>
+        /// Not in the tutorial: overtaking uses width / 2.5 either side of the middle, not width / 3.
+        /// At width / 3 three slow cars side by side fill the room, and a lap-1 pack queues behind them.
+        /// </summary>
+        private const float OvertakeWidthDiv = 2.5f;
         /// <summary>OVERTAKE_OFFSET_INCREMENT, 0.1 m per robot step, TORCS calling robots every 0.02 s: m/s.</summary>
         private const float OvertakeOffsetRate = 0.1f / 0.02f;
         private const float G = 9.81f;
@@ -245,7 +250,7 @@ namespace TarmacGauntlet.Raceday
             {
                 State = Mode.Overtaking;
                 int ko = c.IndexOf(Mathf.Repeat(front.Distance, lap));
-                float w = c.Data.width[ko] / WidthDiv - BorderOvertakeMargin;
+                float w = c.Data.width[ko] / OvertakeWidthDiv - BorderOvertakeMargin;
                 float otm = front.Lateral;
                 if (otm > 0f && myOffset > -w) myOffset -= step;
                 else if (otm < 0f && myOffset < w) myOffset += step;
