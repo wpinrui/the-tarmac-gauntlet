@@ -4,23 +4,34 @@ using UnityEngine;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// Builds the circuit, the sun, a grid of 100 AI cars from every class, the pace car and the
-    /// cameras when the scene starts. It is a test of the AI, so the race starts from the grid at
-    /// once; tick Rolling Start for the full game's pace car lap instead. The grid runs quickest to
-    /// slowest, except the player's car, which starts last and has to carve through. I hands it to you and back. V moves the
-    /// cameras to the next car, and P to the next car making a pit stop. F steps the race through
-    /// normal speed, 4x and 16x while the AI drives your car. Cars away from the camera glide
-    /// without physics (<see cref="PhysicsRange"/>).
+    /// Builds the circuit, the sun, a field of 100 AI cars from every class and the cameras when the
+    /// scene starts. It is a test of the AI. The field runs quickest to slowest, except the player's
+    /// car, which starts last and has to carve through. Start picks how the race starts: from the
+    /// grid at once, behind the pace car, or from the pit lane, where the cars queue in the fast lane
+    /// and leave ten seconds apart (<see cref="PitLaneStart"/>). The pit lane start fast forwards
+    /// until the car ahead of the player's is about to leave. I hands the player's car to you and
+    /// back. V moves the cameras to the next car, and P to the next car making a pit stop. F steps
+    /// the race through normal speed, 4x and 16x while the AI drives your car, and ends the pit lane
+    /// start's fast forward. Cars away from the camera glide without physics (<see cref="PhysicsRange"/>).
     /// </summary>
     public sealed class CircuitScene : MonoBehaviour
     {
-        /// <summary>Starts behind the pace car, as the full game will, instead of straight from the grid.</summary>
-        [SerializeField] private bool rollingStart;
+        public enum StartMode { Grid, Rolling, PitLane }
+
+        /// <summary>
+        /// How the race starts: from the grid at once, behind the pace car as the full game will, or
+        /// from the pit lane one car at a time.
+        /// </summary>
+        [SerializeField] private StartMode start = StartMode.PitLane;
 
         private KeyboardState keys;
         private AiDriver ai;
         private static readonly float[] Speeds = { 1f, 4f, 16f };
         private int speed;
+        /// <summary>Speed of the pit lane start's fast forward.</summary>
+        private const float SkipSpeed = 32f;
+        private PitLaneStart pitLaneStart;
+        private bool skipping;
 
         private const string PlayerCar = "a-29";
         private const string PlayerModel = "Assets/Art/Vehicles/CheonmaCX24Si/CheonmaCX24Si.obj";
@@ -73,15 +84,22 @@ namespace TarmacGauntlet.Raceday
             var cars = new CarController[field.Length];
             var grid = new RaceCar[field.Length];
             var drivers = new AiDriver[field.Length];
-            RaceStart start = rollingStart ? new GameObject("Race start").AddComponent<RaceStart>() : null;
+            if (start == StartMode.PitLane) pitLaneStart = new PitLaneStart(pits, line, field.Length);
+            Starter starter = start == StartMode.Rolling ? new GameObject("Race start").AddComponent<RaceStart>()
+                : start == StartMode.PitLane ? new GameObject("Pit lane start").AddComponent<PitStart>()
+                : (Starter)null;
             for (int i = 0; i < field.Length; i++)
             {
                 bool player = i == field.Length - 1;
                 string id = field[i];
                 Color paint = ClassPaint[Mathf.Clamp(id[0] - 'a', 0, ClassPaint.Length - 1)];
                 CarController car = CarBuilder.Spawn(id, player ? PlayerModel : null, circuit, player ? keys : null, paint);
-                GridPlace(circuit, i, out float d, out float lateral);
-                car.PlaceAt(circuit.IndexOf(d - 2.6f), lateral);   // front wheels just behind the line
+                if (pitLaneStart != null) car.PlaceAt(pitLaneStart.Place(i, out Vector3 forward), forward);
+                else
+                {
+                    GridPlace(circuit, i, out float d, out float lateral);
+                    car.PlaceAt(circuit.IndexOf(d - 2.6f), lateral);   // front wheels just behind the line
+                }
 
                 // Drivers differ: some quicker, some steadier, some more prone to overcooking a corner.
                 float pace = 70f + 30f * (float)rng.NextDouble();
@@ -89,7 +107,9 @@ namespace TarmacGauntlet.Raceday
                 float safety = 80f + 20f * (float)rng.NextDouble();
                 float smoothness = 30f + 60f * (float)rng.NextDouble();
                 car.Supplies = Consumables.For(car.Spec, new SpeedProfile(line, car.Spec, AiPilot.LimitFor(pace)), smoothness);
-                if (!player) car.Supplies.Fuel = car.Supplies.Capacity * Mathf.Lerp(StartFuelMin, 1f, (float)rng.NextDouble());
+                float share = Mathf.Lerp(StartFuelMin, 1f, (float)rng.NextDouble());
+                // From the pit lane every car starts full: the pits stay closed until the last car is out.
+                if (!player && pitLaneStart == null) car.Supplies.Fuel = car.Supplies.Capacity * share;
 
                 int garage = i % pits.Garages;
                 RaceCar race = car.gameObject.AddComponent<RaceCar>();
@@ -103,7 +123,7 @@ namespace TarmacGauntlet.Raceday
                 driver.Safety = safety;
                 driver.Pits = pits;
                 driver.Garage = garage;
-                driver.Starter = start;
+                driver.Starter = starter;
                 if (player) ai = driver;
                 cars[i] = car;
                 grid[i] = race;
@@ -114,15 +134,24 @@ namespace TarmacGauntlet.Raceday
             range.Player = ai.Car;
 
             Camera(circuit, cars, keys);
-            if (!rollingStart) return;
+            if (start == StartMode.PitLane)
+            {
+                var pitStart = (PitStart)starter;
+                pitStart.Grid = grid;
+                pitStart.Queue = pitLaneStart;
+                pitStart.Pits = pits;
+                skipping = true;
+            }
+            if (start != StartMode.Rolling) return;
 
             // The pace car waits ahead of pole, in pole's column.
             CarController paceCar = CarBuilder.Spawn(PaceCarModel, null, circuit, null, new Color(0.95f, 0.95f, 0.95f));
             paceCar.name = "Pace car";
             paceCar.PlaceAt(circuit.IndexOf(circuit.Data.grid.slots[0].d + 40f), RollingStart.ColumnOf(0));
-            start.Grid = grid;
-            start.PaceCar = paceCar;
-            start.Pits = pits;
+            var rolling = (RaceStart)starter;
+            rolling.Grid = grid;
+            rolling.PaceCar = paceCar;
+            rolling.Pits = pits;
         }
 
         /// <summary>The field, quickest first: classes fastest first, each cycling through its models.</summary>
@@ -169,14 +198,24 @@ namespace TarmacGauntlet.Raceday
         {
             if (keys == null || ai == null) return;
             if (keys.Pressed(KeyCode.I)) ai.enabled = !ai.enabled;
-            if (keys.Pressed(KeyCode.F)) speed = (speed + 1) % Speeds.Length;
-            // Fast forward is for watching: taking the wheel drops back to normal speed.
-            if (!ai.enabled) speed = 0;
-            if (Time.timeScale != Speeds[speed])
+            if (keys.Pressed(KeyCode.F))
             {
-                Time.timeScale = Speeds[speed];
+                if (skipping) skipping = false;
+                else speed = (speed + 1) % Speeds.Length;
+            }
+            // Fast forward is for watching: taking the wheel drops back to normal speed.
+            if (!ai.enabled)
+            {
+                speed = 0;
+                skipping = false;
+            }
+            if (skipping && pitLaneStart.Time >= pitLaneStart.FastForwardTo) skipping = false;
+            float scale = skipping ? SkipSpeed : Speeds[speed];
+            if (Time.timeScale != scale)
+            {
+                Time.timeScale = scale;
                 // Let a slow frame catch up with all its physics steps rather than fall behind the clock.
-                Time.maximumDeltaTime = Mathf.Max(1f / 3f, Speeds[speed] / 30f);
+                Time.maximumDeltaTime = Mathf.Max(1f / 3f, scale / 30f);
             }
         }
 

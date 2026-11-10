@@ -36,8 +36,8 @@ namespace TarmacGauntlet.Raceday
         /// <summary>The pit lane and this car's garage in it, for pit stops.</summary>
         public PitLane Pits;
         public int Garage = -1;
-        /// <summary>The rolling start this car takes part in, if any.</summary>
-        public RaceStart Starter;
+        /// <summary>The start this car takes part in, if any.</summary>
+        public Starter Starter;
 
         public AiPilot Pilot => Racer?.Pilot;
         public Racecraft Craft => Racer?.Craft;

@@ -111,6 +111,7 @@ static partial class Check
             if (only == null || only == "ff") FastForward();
             if (only == null || only == "pits") PitStopsCheck("gliding pit stops", i => i % 2 == 1, verbose: only != null, glide: true);
             if (only == null || only == "start") RollingStartCheck(100, verbose: false, glide: true);
+            if (only == null || only == "pitstart") PitLaneStartCheck(verbose: false);
             return failed ? 1 : 0;
         }
         if (args.Length > 1 && args[1] == "tuner")
@@ -139,6 +140,11 @@ static partial class Check
         {
             SceneTrace(args.Length > 2 ? float.Parse(args[2]) : 120f);
             return 0;
+        }
+        if (args.Length > 1 && args[1] == "pitstart")
+        {
+            PitLaneStartCheck(verbose: true);
+            return failed ? 1 : 0;
         }
         if (args.Length > 1 && args[1] == "start")
         {

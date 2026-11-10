@@ -9,7 +9,7 @@ namespace TarmacGauntlet.Raceday
     /// the line after the pace car has peeled off into the pit lane. Each car races once it crosses the line.
     /// </summary>
     [DefaultExecutionOrder(-15)]   // after the cars are measured, before the AI drivers think
-    public sealed class RaceStart : MonoBehaviour
+    public sealed class RaceStart : Starter
     {
         /// <summary>The cars in grid order, pole first.</summary>
         public RaceCar[] Grid;
@@ -19,7 +19,7 @@ namespace TarmacGauntlet.Raceday
         public bool Racing => start != null && start.State == RollingStart.Phase.Green;
 
         /// <summary>True once this AI car may race: after the green, once it has crossed the line.</summary>
-        public bool Released(AiDriver d) => Racing && (!slots.TryGetValue(d, out int slot) || !start.Holds(Grid[slot].Laps));
+        public override bool Released(AiDriver d) => Racing && (!slots.TryGetValue(d, out int slot) || !start.Holds(Grid[slot].Laps));
 
         private bool AnyHeld()
         {
@@ -85,7 +85,7 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>Puts an AI car in or out of the formation and passes it its speed limit. Called by the car each step.</summary>
-        public void Brief(AiDriver d)
+        public override void Brief(AiDriver d)
         {
             if (d.Racer == null) return;
             if (!slots.TryGetValue(d, out int slot) || caps == null || !start.Holds(Grid[slot].Laps))

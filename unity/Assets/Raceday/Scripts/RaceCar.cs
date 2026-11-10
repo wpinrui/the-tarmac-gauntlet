@@ -90,10 +90,10 @@ namespace TarmacGauntlet.Raceday
             AiPilot pilot = driver != null ? driver.Pilot : null;
             if (driver != null && driver.Gliding)
             {
-                // Gliding: racing or in the formation, on the track, never in the pit lane.
+                // Gliding: racing, or in a start, which may be in the pit lane. Never making a pit stop.
                 AiPilot active = driver.Racer.Active;
                 Count(c, active.Index);
-                InPitLane = false;
+                InPitLane = Pits != null && Pits.OffTrackInLane(active.Index, active.GlideLateral);
                 car.SpeedLimit = float.PositiveInfinity;
                 velocity = active.Line.Tangent[active.Index] * active.GlideSpeed;
                 active.GlidePose(0f, out _, out Vector3 heading, out _);

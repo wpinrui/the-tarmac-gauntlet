@@ -11,6 +11,12 @@
 //                   limiter, stops within a metre of its own box, leaves full, rejoins, and nobody touches
 //                   in the pit lane; the full cars don't stop
 //   crowded pits    the same with every car short of fuel, so the whole field is in the pit lane at once
+//   pit lane start  (run.sh pitstart) 100 cars, as in the raceday scene, queue in the fast lane quickest
+//                   first with the Cheonma last, and leave ten seconds apart, gliding until just before
+//                   the second-last car goes as the scene's fast forward, then with the nearest 24 to the
+//                   Cheonma on physics: no car moves before its turn, every car rejoins its racing line,
+//                   keeps to the limiter and the track on its way out, nobody touches in the pit lane,
+//                   there are no hard hits, and nobody pits until the whole field is out
 //   gliding         (run.sh glide) the rolling start and pit stops again with only the nearest 24 cars
 //                   within 300 m of the last car on physics, as PhysicsRange does: the far cars glide,
 //                   are called in to pit while gliding, and the same holds
@@ -120,6 +126,64 @@ static partial class Check
         float lastBack = s.Cars[0].Distance - s.Cars.Min(c => c.Distance);
         Report($"{(glide ? "gliding rolling start" : "rolling start")} ({cars} cars{(glide ? $", {s.MostOnPhysics} on physics at most, {s.Cars.Sum(c => c.Handovers)} switches, {s.GhostOverlaps} overlaps while gliding" : "")}: green at {Session.Clock(Math.Max(s.GreenTime, 0f))}, worst place {worstSlip:0} m out, {s.Contacts.Count - Math.Max(contactsAtGreen, 0)} contacts from the green to {Session.Clock(Math.Max(s.Time, 0f))}, {s.Contacts.Count(c => c.Speed > 1f)} over 1 m/s, field {lastBack:0} m long, {watch.Elapsed.TotalSeconds:0} s to run)", problems);
         if (verbose) foreach (Contact c in s.Contacts) Console.WriteLine("  contact " + Describe(c));
+    }
+
+    /// <summary>The raceday scene's field: quickest first, with the Cheonma moved from the front to the back.</summary>
+    static List<string> QueueField()
+    {
+        List<string> field = SceneField();
+        field.Reverse();
+        field.Add(field[0]);
+        field.RemoveAt(0);
+        return field;
+    }
+
+    static void PitLaneStartCheck(bool verbose)
+    {
+        var s = new Session(circuit, line, QueueField().Select(m => (m, 1f)).ToList(), rolling: false, LineFor, pitLane: true);
+        PitLaneStart start = s.PitStart;
+        SessionCar me = s.Cars[s.Cars.Count - 1];
+        Watch(s, me);
+        Func<SessionCar, bool> near = s.Physics;
+        // As the scene: everything glides through the fast forward, then PhysicsRange's rule.
+        s.Physics = c => start.Time >= start.FastForwardTo && near(c);
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        int lastLog = -1;
+        while (s.Time < 25f * 60f && !(s.PitsOpen && s.Time > me.Out + 30f))
+        {
+            s.Step();
+            int minute = (int)(s.Time / 60f);
+            if (verbose && minute != lastLog)
+            {
+                lastLog = minute;
+                int queued = s.Cars.Count(c => c.Moved < 0f), leaving = s.Cars.Count(c => c.Moved >= 0f && c.Out < 0f);
+                Console.WriteLine($"  {Session.Clock(s.Time)} {queued} queued, {leaving} on the way out, {s.Cars.Count(c => c.Out >= 0f)} racing, {s.Contacts.Count} contacts, {s.Cars.Sum(c => c.Stops.Count)} stops");
+            }
+        }
+        var problems = new List<string>();
+        float limit = new PitLane(circuit).LimitSpeed;
+        foreach (SessionCar c in s.Cars)
+        {
+            if (c.Moved >= 0f && c.Moved < PitLaneStart.LeavesAt(c.Slot) - 0.05f) problems.Add($"{s.Name(c)} moved at {Session.Clock(c.Moved)}, before its turn at {Session.Clock(PitLaneStart.LeavesAt(c.Slot))}");
+            if (c.Out < 0f) problems.Add($"{s.Name(c)} never got out of the pit lane");
+            if (c.LimitZoneTop > limit + 0.3f) problems.Add($"{s.Name(c)} did {c.LimitZoneTop * 3.6f:0.0} km/h in the limiter zone");
+            if (c.RanDry) problems.Add($"{s.Name(c)} ran out of fuel");
+            if (c.Recoveries > 0) problems.Add($"{s.Name(c)} got stuck {c.Recoveries} times");
+            // Leaving the track once racing is the racing's to check, not the start's.
+            if (c.OffTime >= 0f && (c.Out < 0f || c.OffTime < c.Out)) problems.Add($"{s.Name(c)} left the track at {Session.Clock(c.OffTime)} at {c.OffWhere:0} m on its way out");
+        }
+        int offRacing = s.Cars.Count(c => c.OffTime >= 0f && c.Out >= 0f && c.OffTime >= c.Out);
+        var lane = s.Contacts.Where(c => c.A.Contains("(pits)") || c.B.Contains("(pits)")).ToList();
+        if (lane.Count > 0) problems.Add($"{lane.Count} contacts in the pit lane: {Describe(lane[0])}");
+        var hard = s.Contacts.Where(c => c.Speed > HardHit).ToList();
+        if (hard.Count > 0) problems.Add($"{hard.Count} hard hits, worst {hard.Max(c => c.Speed):0.0} m/s: {Describe(hard[0])}");
+        int early = s.Cars.Sum(c => c.Stops.Count);
+        if (!s.PitsOpen) problems.Add("pit stops never opened");
+        var outTimes = s.Cars.Select(c => c.Out - PitLaneStart.LeavesAt(c.Slot)).Where(t => t > 0f).ToList();
+        Report($"pit lane start ({s.Cars.Count} cars: fast forward to {Session.Clock(start.FastForwardTo)}, last car out at {Session.Clock(me.Out)}, {(outTimes.Count > 0 ? outTimes.Min() : 0f):0.0} to {(outTimes.Count > 0 ? outTimes.Max() : 0f):0.0} s from going to racing, {s.Contacts.Count} contacts in all, {s.Contacts.Count(c => c.Speed > 1f)} over 1 m/s, {s.MostOnPhysics} on physics at most, {early} pit stops by {Session.Clock(s.Time)}, {offRacing} cars off the track while racing, {watch.Elapsed.TotalSeconds:0} s to run)", problems);
+        if (!verbose) return;
+        foreach (SessionCar c in s.Cars) Console.WriteLine($"  {s.Name(c)} went {Session.Clock(PitLaneStart.LeavesAt(c.Slot))}, moved {Session.Clock(c.Moved)}, racing {Session.Clock(c.Out)} ({c.Out - PitLaneStart.LeavesAt(c.Slot):0.0} s)");
+        foreach (Contact c in s.Contacts) Console.WriteLine("  contact " + Describe(c));
     }
 
     /// <summary>PhysicsRange's rule with the camera on one car: the nearest 24 within 300 m run physics, kept to 375 m.</summary>
