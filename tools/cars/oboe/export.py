@@ -34,6 +34,23 @@ def cut(target, cutters):
             raise RuntimeError(f"cutting {name} wrecked {target.name}")
 
 
+def join(shell, part):
+    """Union a part onto the body. Exact booleans can fail on near touching faces: then nudge
+    the part a fraction of a millimetre and try again."""
+    n0 = len(shell.data.polygons)
+    for k in range(4):
+        keep, extra = copy(shell, "keep"), copy(part, part.name + "_try")
+        blend.boolean(shell, extra, "UNION", tolerant=k > 0)
+        if len(shell.data.polygons) >= 0.6 * n0:
+            bpy.data.objects.remove(keep)
+            bpy.data.objects.remove(part)
+            return
+        shell.data = keep.data
+        bpy.data.objects.remove(keep)
+        part.location.x += 0.0003
+    raise RuntimeError(f"joining {part.name} wrecked the body")
+
+
 def build(game=False):
     blend.reset(MATERIALS)
     v, f = body.skin()
@@ -64,9 +81,8 @@ def build(game=False):
     blend.boolean(shell, cab, "DIFFERENCE")
     print("cabin cut")
     cut(shell, cutters)
-    print("openings cut")
-    for m in parts.mirrors():                      # after the glass, so no opening cuts them
-        blend.boolean(shell, m, "UNION")
+    print("openings cut, hollows dropped:", blend.drop_voids(shell))
+    join(shell, blend.union_all(parts.mirrors(), "mirrors"))   # after the glass, so no opening cuts them
     mcut, mglass = parts.mirror_recess()
     cut(shell, mcut)
     out += mglass

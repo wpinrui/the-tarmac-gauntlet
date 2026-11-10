@@ -261,6 +261,20 @@ def arches(sp, m, wheel_x):
 
 
 # ---------------------------------------------------------------- the rows
+def plain_tail(stations, length=0.22):
+    """Ivan wants no plate bulge under the tailgate: over the last stretch each section is the
+    section where it starts, shrunk to the measured size, so the tail rounds off plainly."""
+    st = sorted(stations, key=lambda t: t["x"])
+    x_end = st[0]["x"]
+    ref = min((t for t in st if t["x"] >= x_end + length), key=lambda t: t["x"])
+    r_ref = np.asarray(ref["r"])
+    for t in st:
+        if t["x"] < ref["x"]:
+            k = float(np.mean(t["r"]) / np.mean(r_ref))
+            t["r"] = [round(float(v), 4) for v in r_ref * k]
+    return stations
+
+
 def measure(path):
     from shapely.geometry import MultiPoint, Polygon, box
     from shapely.ops import unary_union
@@ -271,7 +285,7 @@ def measure(path):
     right = lambda t: t[t[:, :, 1].mean(1) < 0]
     wheel_x = [WHEELBASE / 2, -WHEELBASE / 2]
     arch = arches(sp, m, wheel_x)
-    stations = sections(sp, m, arch)
+    stations = plain_tail(sections(sp, m, arch))
 
     # glass: side (x, z), screen top (x, y), rear (y, z)
     door_g = project(left(T("w177_doorglass_FL_vivace_glass_0")), 0, 2)

@@ -40,9 +40,11 @@ def make(name, verts, faces, mat, recalc=True):
     return ob
 
 
-def boolean(target, other, op):
-    """Apply a boolean (UNION, DIFFERENCE, INTERSECT) and delete the other object."""
+def boolean(target, other, op, tolerant=False):
+    """Apply a boolean (UNION, DIFFERENCE, INTERSECT) and delete the other object.
+    tolerant: the slower hole tolerant mode, for a pair the plain mode mangles."""
     mod = target.modifiers.new("b", "BOOLEAN")
+    mod.use_hole_tolerant = tolerant
     mod.operation = op
     mod.object = other
     mod.solver = "EXACT"
@@ -71,6 +73,35 @@ def thin(ob, ratio):
     mod = ob.modifiers.new("thin", "DECIMATE")
     mod.ratio = ratio
     bpy.ops.object.modifier_apply(modifier=mod.name)
+
+
+def drop_voids(ob):
+    """Delete closed pieces facing inwards: hidden hollows sealed inside a solid, which confuse
+    later booleans."""
+    import bmesh
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    seen, doomed = set(), []
+    for f in bm.faces:
+        if f.index in seen:
+            continue
+        stack, piece = [f], []
+        seen.add(f.index)
+        while stack:
+            g = stack.pop()
+            piece.append(g)
+            for e in g.edges:
+                for h in e.link_faces:
+                    if h.index not in seen:
+                        seen.add(h.index)
+                        stack.append(h)
+        if sum(g.calc_area() * g.normal.dot(g.calc_center_median()) for g in piece) < 0:
+            doomed += piece
+    if doomed:
+        bmesh.ops.delete(bm, geom=doomed, context="FACES")
+        bm.to_mesh(ob.data)
+    bm.free()
+    return len(doomed)
 
 
 def union_all(obs, name):

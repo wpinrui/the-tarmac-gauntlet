@@ -23,7 +23,7 @@ W = R["wheel"]
 
 MATERIALS = {
     # name: (rgb, spec, alpha, emit)
-    "body": ((0.62, 0.64, 0.67), 0.75, 1.0, None),
+    "body": ((0.98, 0.58, 0.04), 0.75, 1.0, None),
     "trim": ((0.025, 0.025, 0.03), 0.65, 1.0, None),
     "grille": ((0.045, 0.045, 0.05), 0.25, 1.0, None),
     "glass": ((0.07, 0.09, 0.11), 0.92, 0.45, None),
@@ -286,6 +286,8 @@ def mirrors():
             ring = body._even(np.array(sh.exterior.coords)[:-1], 64)
             rings.append(np.column_stack([ring[:, 0], np.full(64, y * sgn), ring[:, 1]]))
         v, f = geom.close_rings(rings)
+        if sgn < 0:                                   # mirrored, so turn the faces back outwards
+            f = [tuple(reversed(q)) for q in f]
         obs.append(blend.make(f"mirror_{side}", v, f, "body"))
     return obs
 
