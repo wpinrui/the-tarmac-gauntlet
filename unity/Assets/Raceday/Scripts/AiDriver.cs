@@ -154,6 +154,9 @@ namespace TarmacGauntlet.Raceday
                 return;
             }
 
+            // On its roof or side for a moment: back on its wheels where it is, to rejoin from there.
+            if (Racer.Rejoin.Upturned(t.up.y, dt)) car.Upright();
+
             if (car.Crashed)
             {
                 // After a moment the car drives on from where it stopped, as one that lost control.

@@ -174,6 +174,7 @@ static partial class Check
             RejoinOffTrack(verbose: true);
             SpunCarTurnsRound(verbose: true);
             OutOfGravel(verbose: true);
+            FlippedCars(verbose: true);
             return failed ? 1 : 0;
         }
         if (args.Length > 1 && args[1] == "supplies")
@@ -207,6 +208,7 @@ static partial class Check
         RejoinOffTrack(verbose: false);
         SpunCarTurnsRound(verbose: false);
         OutOfGravel(verbose: false);
+        FlippedCars(verbose: false);
         SpunCarsRecover(Enumerable.Range(11, 8), verbose: false);
         RaceRunning(verbose: false);
         GlidePace();
@@ -258,6 +260,7 @@ static partial class Check
         int solo = int.TryParse(Environment.GetEnvironmentVariable("AI_SOLO"), out int so) ? so : -1;
         var unexplained = new List<string>();
         List<string> rejoins = null;
+        var piles = new PileWatch(reversed ? "reversed " : "");
         Race race = RunRace(Pack(reversed), r =>
         {
             if (pair != null && tick++ % 10 == 0)
@@ -279,9 +282,12 @@ static partial class Check
                 foreach (Racer f in r.Racers.OrderByDescending(o => o.Distance))
                     Console.WriteLine($"F {Race.Clock(r.Time)} #{f.Id,2} {f.Entry.Model} {f.Distance,7:0.0} lat {f.Car.Lateral,5:0.0} {f.Car.Speed * 3.6f,4:0} tspd {f.Pilot.TargetSpeed * 3.6f,4:0} {f.Craft.State,-11} {(f.Craft.Braking ? "BRK" : "   ")} off {f.Pilot.Offset,5:0.0}");
             if (pair == null) tick++;
+            piles.Step(r);
             return r.Racers.Max(c => c.Laps) >= laps;
         }, 60f * 20f, r => rejoins = WatchPackRejoins(r, unexplained));
         var problems = new List<string>();
+        problems.AddRange(piles.PileUps);
+        problems.AddRange(piles.LongGhosts);
         foreach (var w in race.OffWhy) Console.WriteLine($"  off the track while {w.Key}: {w.Value:0.0} s");
         foreach (string u in unexplained) problems.Add($"rejoin started without leaving the track or a spin: {u}");
         int hard = race.Contacts.Count(c => c.Speed > HardHit);

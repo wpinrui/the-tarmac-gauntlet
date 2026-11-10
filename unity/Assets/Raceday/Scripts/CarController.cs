@@ -495,6 +495,25 @@ namespace TarmacGauntlet.Raceday
             PlaceAt(best, 0f);
         }
 
+        /// <summary>
+        /// Sets a car that is on its roof or side back on its wheels where it is, facing the way its
+        /// nose points across the ground, at rest.
+        /// </summary>
+        public void Upright()
+        {
+            Vector3 f = transform.forward;
+            Vector3 flat = new Vector3(f.x, 0f, f.z);
+            // Nose straight up or down: the roof points the way the car was going.
+            if (flat.sqrMagnitude < 0.01f) flat = new Vector3(transform.up.x, 0f, transform.up.z);
+            if (flat.sqrMagnitude < 0.01f) flat = Vector3.forward;
+            // The ground under the car: the highest hit below that isn't a car (cars have bodies, the ground none).
+            Vector3 ground = transform.position;
+            float best = float.MaxValue;
+            foreach (RaycastHit hit in Physics.RaycastAll(ground + Vector3.up * 3f, Vector3.down, 10f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                if (hit.rigidbody == null && hit.distance < best) { best = hit.distance; ground = hit.point; }
+            PlaceAt(ground, flat);
+        }
+
         /// <summary>Puts the car at rest on the track at a sample and lateral offset, facing forwards.</summary>
         public void PlaceAt(int k, float lateral) => PlaceAt(Circuit.Surface(k, lateral), Circuit.Forward[k]);
 

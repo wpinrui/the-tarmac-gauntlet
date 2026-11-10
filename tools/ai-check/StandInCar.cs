@@ -30,6 +30,8 @@ sealed class StandInCar
     public bool Hold;
     /// <summary>In reverse gear, as CarController's gear 0 for the AI: engaged once the car is all but stopped.</summary>
     public bool Reverse;
+    /// <summary>Height of the car's up direction: 1 on its wheels, below Rejoin.FlippedUp on its roof or side. Set by a check; the stand-in never flips itself.</summary>
+    public float UpY = 1f;
     /// <summary>The pit lane, so its surface counts as tarmac.</summary>
     public PitLane Pits;
 

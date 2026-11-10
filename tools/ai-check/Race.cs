@@ -19,6 +19,8 @@ sealed class Entry
 sealed class Racer
 {
     public int Id;
+    /// <summary>Times the car was set back on its wheels.</summary>
+    public int Righted;
     public Entry Entry;
     public StandInCar Car;
     public AiPilot Pilot;
@@ -374,7 +376,7 @@ sealed class Race
             {
                 bool want = Physics(r);
                 if (want && r.Pilot.Gliding) Wake(r);
-                else if (!want && !r.Pilot.Gliding && !r.Rejoin.Busy) Sleep(r);
+                else if (!want && !r.Pilot.Gliding && !r.Rejoin.Busy && !r.Rejoin.Ghost) Sleep(r);
             }
         }
         for (int i = 0; i < Racers.Count; i++)
@@ -418,11 +420,14 @@ sealed class Race
             }
             r.Car.DragScale = Racecraft.Slipstream(circuit, field[i], field);
             r.Pilot.Towed = r.Car.DragScale < 0.97f;
+            // On its roof or side the car can't drive; after a moment it is set back on its wheels.
+            if (r.Rejoin.Upturned(r.Car.UpY, Dt)) { r.Car.UpY = 1f; r.Righted++; }
             AiPilot.Controls c = r.Pilot.Drive(r.Car.Position, r.Car.Forward, r.Car.Velocity, r.Car.YawRate);
             Rejoin.Stage was = r.Rejoin.State;
             c = r.Rejoin.Apply(r.Pilot, c, r.Car.Position, r.Car.Forward, r.Car.Velocity, r.Car.YawRate, field[i], sorted, Dt);
             bool wasGhost = r.Ghost;
-            r.Ghost = Racecraft.Ghosted(r.Ghost, r.Rejoin, field[i], sorted, circuit.Lap);
+            r.Rejoin.Haunt(r.Pilot, field[i], sorted, r.Car.Speed, Dt);
+            r.Ghost = r.Rejoin.Ghost;
             if (r.Ghost && !wasGhost) GhostSpells++;
             if (r.Ghost) GhostSteps++;
             OnRejoin?.Invoke(this, r, was);
@@ -430,6 +435,7 @@ sealed class Race
             OpenRoom(r);
             Queued(r);
             r.Car.Reverse = c.Reverse;
+            if (r.Car.UpY < Rejoin.FlippedUp) c = new AiPilot.Controls { Brake = 1f };
             r.Car.Step(Dt, c.Throttle, c.Brake, c.Steer);
             r.ModeTime[r.Craft.State] = (r.ModeTime.TryGetValue(r.Craft.State, out float t) ? t : 0f) + Dt;
         }
