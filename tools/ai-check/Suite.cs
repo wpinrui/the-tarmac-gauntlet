@@ -227,6 +227,15 @@ static partial class Check
     /// <summary>100 at or under good, 0 at or over bad, in a straight line between.</summary>
     static float Scale(float x, float good, float bad) => Clamp100(100f * (bad - x) / (bad - good));
 
+    /// <summary>Most a car rejoining from the grass may take to get back on once the track is clear, seconds.</summary>
+    const float GrassAfterClear = 1f;
+
+    /// <summary>
+    /// Car j is coming at car 0: solid, on the track and behind it, within <see cref="Rejoin.ComingSeconds"/>
+    /// at its speed, or alongside, unless already past and pulling away.
+    /// </summary>
+    static bool CarComing(SetupRun run, Frame f, int j) => CarComing(f.D[0], f.V[0], f.D[j], f.V[j], f.Ghost[j], run.OnTrack(f, j));
+
     static (float Score, string Why) Score(SetupRun run)
     {
         List<Frame> fs = run.Frames;
@@ -361,9 +370,16 @@ static partial class Check
             }
             case "T17":
             {
+                // Off on the grass with traffic coming: waits for it, then back on as soon as the runoff's
+                // grip allows. The shallow angle only counts with a car coming when it crosses.
                 Frame f = fs.FirstOrDefault(x => x.T > 0.1f && run.OnTrack(x, 0));
                 if (f == null) return (0f, "never back on the track");
-                return (Clamp100(Scale(f.Angle[0], 10f, 30f) - 50f * all), $"back on at {f.Angle[0]:0} degrees, {all} contacts");
+                bool coming = Enumerable.Range(1, run.N - 1).Any(j => CarComing(run, f, j));
+                Frame clear = fs.FirstOrDefault(x => !Enumerable.Range(1, run.N - 1).Any(j => CarComing(run, x, j))) ?? last;
+                float waited = f.T - clear.T;
+                float angle = coming ? Scale(f.Angle[0], 10f, 30f) : Scale(f.Angle[0], Rejoin.ClearEntryAngle, Rejoin.ClearEntryAngle + 15f);
+                return (Clamp100(Math.Min(angle, Scale(waited, GrassAfterClear, GrassAfterClear + 1.5f)) - 50f * all),
+                    $"on the grass {f.T:0.0} s, {waited:0.0} s of it with the track clear, back on at {f.Angle[0]:0} degrees{(coming ? " with a car coming" : "")}, {all} contacts");
             }
             case "T18":
             {

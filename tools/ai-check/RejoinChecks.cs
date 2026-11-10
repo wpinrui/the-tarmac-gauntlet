@@ -32,6 +32,8 @@ static partial class Check
         public string Name;
         public bool Rejoined, Stopped, Recovered;
         public float WorstOnTarmac, WorstEntry = -1f;
+        /// <summary>The same with the track clear (no car coming, <see cref="CarComing(Race, Racer)"/>), where the limit is <see cref="Rejoin.ClearEntryAngle"/>.</summary>
+        public float ClearOnTarmac, ClearEntry = -1f;
         public float WaitStart = -1f, WaitEnd = -1f, BackAt = -1f;
         public bool GhostWhenTurning;
         public readonly List<string> Touches = new List<string>();
@@ -78,6 +80,21 @@ static partial class Check
         car.Vz = car.Forward.z * speed;
     }
 
+    /// <summary>
+    /// A car is coming at <c>me</c>, from where the cars are: a solid car on the track alongside or behind
+    /// within <see cref="Rejoin.ComingSeconds"/> at its speed, unless already past and pulling away.
+    /// </summary>
+    static bool CarComing(Race race, Racer me) => race.Racers.Any(o => o != me && CarComing(me.Distance, me.Car.Speed, o.Distance, o.Car.Speed, o.Ghost,
+        o.Car.TrackIndex >= 0 && Math.Abs(o.Car.Lateral) <= circuit.HalfWidth(o.Car.TrackIndex) + Rejoin.OffTrackMargin));
+
+    static bool CarComing(float myDistance, float mySpeed, float distance, float speed, bool ghost, bool onTrack)
+    {
+        if (ghost || !onTrack) return false;
+        float behind = Gap(myDistance - distance);
+        bool gone = behind < -Racecraft.CarLength && speed > mySpeed + Rejoin.PullingAway;
+        return !gone && behind > -Rejoin.AlongsideMetres && behind < Rejoin.AlongsideMetres + Rejoin.ComingSeconds * Math.Max(speed, 0f);
+    }
+
     /// <summary>Traffic coming up behind a spot: one car at each gap, on the racing line at racing speed.</summary>
     static IEnumerable<Entry> Coming(float at, float[] gaps, int seed)
     {
@@ -105,8 +122,16 @@ static partial class Check
             float edge = j.PastEdge;
             if (j.State == Rejoin.Stage.Rejoining && edge <= 0f)
             {
-                run.WorstOnTarmac = Math.Max(run.WorstOnTarmac, Math.Abs(j.Heading));
-                if (lastEdge > 0f) run.WorstEntry = Math.Max(run.WorstEntry, Math.Abs(j.Heading));
+                if (CarComing(r, me))
+                {
+                    run.WorstOnTarmac = Math.Max(run.WorstOnTarmac, Math.Abs(j.Heading));
+                    if (lastEdge > 0f) run.WorstEntry = Math.Max(run.WorstEntry, Math.Abs(j.Heading));
+                }
+                else
+                {
+                    run.ClearOnTarmac = Math.Max(run.ClearOnTarmac, Math.Abs(j.Heading));
+                    if (lastEdge > 0f) run.ClearEntry = Math.Max(run.ClearEntry, Math.Abs(j.Heading));
+                }
             }
             lastEdge = edge;
             run.SpunTo = Math.Max(run.SpunTo, Math.Abs(j.Heading));
@@ -157,8 +182,8 @@ static partial class Check
     {
         var problems = new List<string>();
         int runs = 0, rejoined = 0, touches = 0;
-        float worst = 0f, worstEntry = 0f, slowest = 0f;
-        string worstLine = "", worstEntryLine = "";
+        float worst = 0f, worstEntry = 0f, clearEntry = 0f, slowest = 0f;
+        string worstLine = "", worstEntryLine = "", clearEntryLine = "";
         string[] models = { "f-01", "c-19", "a-29" };
         // Angle towards the track (negative: away), speed and how far past the tarmac edge: running
         // wide at speed, crossing the grass towards the track with room to slow, and stopped or crawling
@@ -195,12 +220,14 @@ static partial class Check
                     if (run.Recovered) problems.Add($"{what}: put back on the track");
                     if (run.WorstOnTarmac > worst) { worst = run.WorstOnTarmac; worstLine = what; }
                     if (run.WorstEntry > worstEntry) { worstEntry = run.WorstEntry; worstEntryLine = what; }
+                    if (run.ClearEntry > clearEntry) { clearEntry = run.ClearEntry; clearEntryLine = what; }
                     touches += run.Touches.Count;
                     foreach (string t in run.Touches) problems.Add($"{what}: touched {t}");
-                    if (verbose) Console.WriteLine($"    back racing {(run.Rejoined ? Race.Clock(run.BackAt) : "never")}, worst heading on the tarmac {run.WorstOnTarmac:0.0}°, at the edge {run.WorstEntry:0.0}°");
+                    if (verbose) Console.WriteLine($"    back racing {(run.Rejoined ? Race.Clock(run.BackAt) : "never")}, worst heading on the tarmac {run.WorstOnTarmac:0.0}°, at the edge {run.WorstEntry:0.0}° with a car coming, {run.ClearEntry:0.0}° clear");
                 }
-        if (worstEntry > Rejoin.MaxEntryAngle) problems.Insert(0, $"crossed the tarmac edge at {worstEntry:0.0}° from the track: {worstEntryLine}");
-        Report($"rejoin from off track ({runs} runs, {rejoined} back racing, slowest after {slowest:0} s, worst heading on the tarmac {worst:0.0}° ({worstLine}), crossing the edge {Math.Max(worstEntry, 0f):0.0}°, {touches} touches while rejoining)", problems);
+        if (worstEntry > Rejoin.MaxEntryAngle) problems.Insert(0, $"crossed the tarmac edge at {worstEntry:0.0}° from the track with a car coming: {worstEntryLine}");
+        if (clearEntry > Rejoin.ClearEntryAngle) problems.Insert(0, $"crossed the tarmac edge at {clearEntry:0.0}° from the track: {clearEntryLine}");
+        Report($"rejoin from off track ({runs} runs, {rejoined} back racing, slowest after {slowest:0} s, worst heading on the tarmac {worst:0.0}° ({worstLine}), crossing the edge {Math.Max(worstEntry, 0f):0.0}° with a car coming and {Math.Max(clearEntry, 0f):0.0}° clear, {touches} touches while rejoining)", problems);
     }
 
     /// <summary>
@@ -295,7 +322,8 @@ static partial class Check
                 if (run.Rejoined) { back++; slowest = Math.Max(slowest, run.BackAt); }
                 else problems.Add($"{what}: not back racing after 120 s ({race.Racers[0].Rejoin.State})");
                 if (run.Recovered) problems.Add($"{what}: put back on the track");
-                if (run.WorstOnTarmac > Rejoin.MaxEntryAngle) problems.Add($"{what}: heading {run.WorstOnTarmac:0.0}° on the tarmac while rejoining");
+                if (run.WorstOnTarmac > Rejoin.MaxEntryAngle) problems.Add($"{what}: heading {run.WorstOnTarmac:0.0}° on the tarmac while rejoining with a car coming");
+                if (run.ClearOnTarmac > Rejoin.ClearEntryAngle) problems.Add($"{what}: heading {run.ClearOnTarmac:0.0}° on the tarmac while rejoining");
                 worst = Math.Max(worst, run.WorstOnTarmac);
                 foreach (string t in run.Touches) problems.Add($"{what}: touched {t}");
                 stoppedTouches += run.TouchesStopped;
