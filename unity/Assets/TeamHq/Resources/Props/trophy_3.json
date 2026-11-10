@@ -1,0 +1,1 @@
+{"min": [-0.17721, 0.0, -0.11312], "max": [0.17721, 0.42, 0.11312], "mats": [{"col": "trophy_3_0_c.jpg", "nrm": "trophy_3_0_n.jpg", "ms": "trophy_3_0_s.png", "color": [1, 1, 1, 1], "metal": 1.0, "rough": 1.0, "cutout": false, "blend": false, "twoSided": false}], "parts": [{"mat": 0, "n": 6925, "i": 32928, "pos": 0, "nrm": 41552, "uv": 62328, "idx": 117728, "wide": false}]}

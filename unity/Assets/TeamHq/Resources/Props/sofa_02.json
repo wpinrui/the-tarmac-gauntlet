@@ -1,0 +1,1 @@
+{"min": [-0.90332, 0.00021, -0.4777], "max": [0.90385, 0.70969, 0.34005], "mats": [{"col": "sofa_02_0_c.jpg", "nrm": "sofa_02_0_n.jpg", "ms": "sofa_02_0_s.png", "color": [1, 1, 1, 1], "metal": 1.0, "rough": 1.0, "cutout": false, "blend": false, "twoSided": true}], "parts": [{"mat": 0, "n": 1828, "i": 8184, "pos": 0, "nrm": 10968, "uv": 16452, "idx": 31076, "wide": false}]}

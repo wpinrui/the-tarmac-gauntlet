@@ -1,0 +1,1 @@
+{"min": [-0.1143, -0.00254, -0.1778], "max": [0.1143, 0.03945, 0.15875], "mats": [{"col": "clipboard_0_c.jpg", "nrm": "clipboard_0_n.jpg", "ms": "clipboard_0_s.png", "color": [1, 1, 1, 1], "metal": 1.0, "rough": 1.0, "cutout": false, "blend": false, "twoSided": true}], "parts": [{"mat": 0, "n": 4608, "i": 18528, "pos": 0, "nrm": 27648, "uv": 41472, "idx": 78336, "wide": false}]}

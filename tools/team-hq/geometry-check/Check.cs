@@ -37,12 +37,19 @@ internal static class Check
                 Vector3 n = p.Normals[p.Triangles[i]] + p.Normals[p.Triangles[i + 1]] + p.Normals[p.Triangles[i + 2]];
                 if (Vector3.Dot(face, n) < 0) bad++;   // Unity's front faces wind clockwise: cross(b-a, c-a) points along the normal
             }
-            bool doubleSided = kv.Key == "gold" || kv.Key == "silver" || kv.Key == "bronze";
-            if (bad > 0 && !doubleSided) Fail($"{kv.Key}: {bad} triangles wound against their normals");
+            if (bad > 0) Fail($"{kv.Key}: {bad} triangles wound against their normals");
             tris += p.Triangles.Count / 3;
         }
         if (g.Bays.Count != 4) Fail("expected four bays");
-        Console.WriteLine($"{g.Parts.Count} parts, {tris} triangles, {g.Lights.Count} lights, {fails} failures");
+        // Every placed prop must have its packed files, and stand inside the building.
+        string props = Path.Combine("..", "..", "..", "unity", "Assets", "TeamHq", "Resources", "Props");
+        foreach (HqProp pr in g.Props)
+        {
+            if (!File.Exists(Path.Combine(props, pr.Id + ".json")) || !File.Exists(Path.Combine(props, pr.Id + "_mesh.bytes"))) Fail($"prop {pr.Id}: no packed files");
+            Vector3 v = pr.Position;
+            if (Math.Abs(v.x) > HqGeometry.W / 2 || v.y < 0 || v.y > HqGeometry.H || Math.Abs(v.z) > HqGeometry.D / 2) Fail($"prop {pr.Id}: outside the building");
+        }
+        Console.WriteLine($"{g.Parts.Count} parts, {tris} triangles, {g.Lights.Count} lights, {g.Props.Count} props, {fails} failures");
 
         if (args.Length > 0)
         {
@@ -70,6 +77,16 @@ internal static class Check
             Directory.CreateDirectory(args[0]);
             File.WriteAllText(Path.Combine(args[0], "hq.obj"), obj.ToString());
             File.WriteAllText(Path.Combine(args[0], "hq.mtl"), mtl.ToString());
+            // The props in the viewer's frame: id, x, y, z, yaw, scale.
+            var list = new StringBuilder("[");
+            foreach (HqProp pr in g.Props)
+                list.Append(string.Format(ci, "{0}[\"{1}\",{2},{3},{4},{5},{6}]", list.Length > 1 ? "," : "", pr.Id, pr.Position.x, pr.Position.y, -pr.Position.z, -pr.Yaw, pr.Scale));
+            File.WriteAllText(Path.Combine(args[0], "props.json"), list.Append(']').ToString());
+            // The lights in the viewer's frame: x, y, z, range, intensity.
+            var lights = new StringBuilder("[");
+            foreach (HqLight l in g.Lights)
+                lights.Append(string.Format(ci, "{0}[{1},{2},{3},{4},{5}]", lights.Length > 1 ? "," : "", l.Position.x, l.Position.y, -l.Position.z, l.Range, l.Intensity));
+            File.WriteAllText(Path.Combine(args[0], "lights.json"), lights.Append(']').ToString());
         }
         return fails == 0 ? 0 : 1;
     }
