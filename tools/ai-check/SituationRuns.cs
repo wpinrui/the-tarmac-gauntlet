@@ -57,17 +57,19 @@ static partial class Check
         if (only != null && only.StartsWith("race"))
         {
             // A Race A field with one car traced while it runs well under its line's speed: "race:51:120" traces car 50 (the A car) for 120 s.
+            static string Parts(PathChooser.Candidate c) => c == null ? "-" : $"{c.Shift:0.#}{(c.Delay > 0 ? "d" + c.Delay : "")} S{c.Score:0.00}=g{c.Gain:0.00}-r{c.Risk:0.00}-s{c.Stuck:0.00}";
             string[] parts = only.Split(':');
             int id = parts.Length > 1 ? int.Parse(parts[1]) : 50;
             float until = parts.Length > 2 ? float.Parse(parts[2]) : 120f;
             Race r = new Race(circuit, ClassField(11), LineFor);
+            float JamFrom = float.TryParse(Environment.GetEnvironmentVariable("JAM_FROM"), out float jf) ? jf : 700f;
             int tick = 0;
             while (r.Time < until)
             {
                 r.Step();
                 if (Environment.GetEnvironmentVariable("JAM_AT") is string ja && Math.Abs(r.Time - float.Parse(ja)) < 0.005f)
                     foreach (Racer o in r.Racers.OrderByDescending(o => o.Distance))
-                        if (o.Car.TrackIndex * circuit.Step > 700f && o.Car.TrackIndex * circuit.Step < 1100f)
+                        if (o.Car.TrackIndex * circuit.Step > JamFrom && o.Car.TrackIndex * circuit.Step < JamFrom + 400f)
                             Console.WriteLine($"JAM {r.Name(o)} {o.Car.TrackIndex * circuit.Step:0} m lat {o.Car.Lateral:0.0} {o.Car.Speed * 3.6f:0} km/h ghost {o.Ghost} busy {o.Rejoin.Busy} {o.Rejoin.State} brk {o.Craft.Braking} cap {Math.Min(o.Pilot.SpeedCap, 99f) * 3.6f:0} {o.Craft.Chooser?.Reason} {o.Craft.Chooser?.Chosen?.Pedal} {o.Craft.Chooser?.Chosen?.Rejected}@{o.Craft.Chooser?.Chosen?.BrokeBy}");
                 if (tick++ % 25 != 0) continue;
                 Racer x = r.Racers[id];
@@ -79,9 +81,10 @@ static partial class Check
                 PathChooser pc = x.Craft.Chooser;
                 Racer ahead = r.Racers.Where(o => o != x && Gap(o.Distance - x.Distance) > 0f).OrderBy(o => Gap(o.Distance - x.Distance)).FirstOrDefault();
                 string a = ahead == null ? "" : $"ahead {r.Name(ahead)} {Gap(ahead.Distance - x.Distance):0.0} m lat {ahead.Car.Lateral:0.0} {ahead.Car.Speed * 3.6f:0}";
-                Console.WriteLine($"{r.Time,6:0.0} {k * circuit.Step,5:0} m {x.Car.Speed * 3.6f:0}/{free * 3.6f:0} lat {x.Car.Lateral,5:0.0} {(x.Craft.Braking ? "BRK" : "   ")} {a} [{pc?.Reason} -> {pc?.Chosen?.Shift:0.0}{(pc?.Chosen?.Delay > 0 ? "d" + pc.Chosen.Delay : "")} {pc?.Chosen?.Pedal} | "
+                Console.WriteLine($"{r.Time,6:0.0} {k * circuit.Step,5:0} m {x.Car.Speed * 3.6f:0}/{free * 3.6f:0} lat {x.Car.Lateral,5:0.0} {(x.Craft.Braking ? "BRK" : "   ")} {a} [{pc?.Reason} -> {pc?.Chosen?.Shift:0.0}{(pc?.Chosen?.Delay > 0 ? "d" + pc.Chosen.Delay : "")} {pc?.Chosen?.Pedal} {Parts(pc?.Chosen)} best go {Parts(pc?.Candidates.Where(c => c.Pedal == PathChooser.Pedal.Go && c.Rejected == null).OrderByDescending(c => c.Score).FirstOrDefault())} | "
                     + (pc == null ? "" : string.Join(" ", pc.Candidates.Where(c => c.Pedal == PathChooser.Pedal.Go && c.Delay == 0).Select(c => $"{c.Shift:0.#}:{(c.Rejected != null ? c.Rejected + (c.BrokeBy >= 0 ? "@" + c.BrokeBy + "s" + c.BrokeAt : "") : c.Score.ToString("0.00"))}"))) + "]");
             }
+            foreach (Contact x in r.Contacts) Console.WriteLine($"CONTACT {x.Time:0.00} s {x.A} {x.B} {x.Speed:0.0} m/s{(x.RearEnd ? " rear-end" : "")} at {x.Where:0} m");
             return;
         }
         foreach (Situation s in Situations.All)

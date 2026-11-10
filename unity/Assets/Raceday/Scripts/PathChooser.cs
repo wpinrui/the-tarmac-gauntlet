@@ -38,6 +38,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Seconds of the car's own speed kept as a gap nose to tail, on top of the margin.</summary>
         private static readonly float Headway = Knob("HEAD", 0.15f);
         private static readonly float RiskScale = Knob("RISK", 1f), PassScale = Knob("PASS", 1f), Hysteresis = Knob("HYST", 0.02f), StuckScale = Knob("STUCK", 1f);
+        private static readonly float SideRisk = Knob("SIDE", 1f), CloseRisk = Knob("CLOSE", 1f);
 
         /// <summary>A weight, from AI_E1_<name> when it is set (for tuning runs), else its default.</summary>
         private static float Knob(string name, float value) =>
@@ -45,7 +46,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Seconds of the car's speed a following car keeps on top of <see cref="Headway"/>, so following never breaks H1.</summary>
         private const float FollowExtra = 0.1f;
         /// <summary>How fast a following car closes the gap to the one it keeps, per second.</summary>
-        private static readonly float FollowGain = Knob("GAIN", 0.5f), BrakeDrop = Knob("DROP", 3f), CapTrust = Knob("CAPT", 1f);
+        private static readonly float FollowGain = Knob("GAIN", 0.5f), BrakeDrop = Knob("DROP", 3f), OpenDecel = Knob("OPEN", 6f), CapTrust = Knob("CAPT", 1f);
         private float lapLength;
         /// <summary>Below this speed a ghost is a stopped car on the track: an obstacle to slow for and go round, m/s.</summary>
         private const float StoppedSpeed = 10f;
@@ -69,6 +70,8 @@ namespace TarmacGauntlet.Raceday
             public bool Stay;
             public string Rejected;
             public float Score;
+            /// <summary>What the score is made of, in seconds: ground covered, closeness to cars, time stuck behind one.</summary>
+            public float Gain, Risk, Stuck;
             /// <summary>Step at which it first broke its limit, for when every path breaks one.</summary>
             public int BrokeAt;
             /// <summary>The car whose limit it broke, or -1.</summary>
@@ -240,7 +243,10 @@ namespace TarmacGauntlet.Raceday
             float v = ov[ahead, s];
             float gap = Road(od[ahead, s] - d, others.Count > 0 ? lapLength : 1f) - CarL;
             float keep = margin + (Headway + FollowExtra) * Mathf.Max(v, 0f);
-            float follow = Mathf.Max(v + FollowGain * (gap - keep), 0f);
+            // Too close, it drops back gently, as a gap a little short of the one it keeps is no danger:
+            // a queue into a slow corner then doesn't fall further below the corner's speed at every car.
+            float follow = gap >= keep ? v + FollowGain * (gap - keep)
+                : Mathf.Sqrt(Mathf.Max(v * v - 2f * OpenDecel * (keep - gap), 0f));
             // Braking opens the gap harder for a second.
             if (pedal == Pedal.Brake && s * Tick <= 1f) follow = Mathf.Min(follow, Mathf.Max(v - BrakeDrop, 0f));
             return follow;
@@ -326,10 +332,10 @@ namespace TarmacGauntlet.Raceday
                     // H8: at turn-in, overlapped or backed out, never alongside short of it.
                     if (broke == null && crossing && g > 0.9f * CarL && g < CarL + 15f && apart > 1.2f && apart < 4f) broke = "H8";
                     // Risk: how close the path runs to each car.
-                    if (Mathf.Abs(g) < CarL + 3f && apart - CarW < 2f) risk += Mathf.Exp(-(apart - CarW) / 0.5f) * Tick;
+                    if (Mathf.Abs(g) < CarL + 3f && apart - CarW < 2f) risk += SideRisk * Mathf.Exp(-(apart - CarW) / 0.5f) * Tick;
                     // Closing on a car in its lane: the sooner it would reach it, the riskier. Following at its speed is not.
                     float closing = v - ov[j, s];
-                    if (g > 0f && apart < CarW + RoomMargin && closing > 0.5f) risk += Mathf.Exp(-Mathf.Max(g - CarL, 0f) / closing) * Tick;
+                    if (g > 0f && apart < CarW + RoomMargin && closing > 0.5f) risk += CloseRisk * Mathf.Exp(-Mathf.Max(g - CarL, 0f) / closing) * Tick;
                     // A stopped car ahead: slow as under a yellow flag.
                     if (stopped[j] && g > -CarL && g < YellowReach) yellow += Mathf.Max(v / Mathf.Max(lane, 1f) - YellowShare, 0f) * Tick;
                 }
@@ -344,10 +350,21 @@ namespace TarmacGauntlet.Raceday
             // The lane it ends in, over the next stretch, against the racing line.
             int kEnd = c.IndexOf(Mathf.Repeat(d, lap));
             float offEnd = lat - line.Lateral[kEnd];
+            // It goes back to the line from there, unless a car beside it on the line's side keeps it out.
+            bool heldOut = false;
+            for (int j = 0; j < others.Count && !heldOut; j++)
+            {
+                float g = Road(od[j, Steps] - d, lap);
+                float toCar = ol[j, Steps] - lat;
+                heldOut = !stopped[j] && Mathf.Abs(g) < 2f * CarL && Mathf.Sign(toCar) == -Mathf.Sign(offEnd) && Mathf.Abs(toCar) < Mathf.Abs(offEnd) + CarW;
+            }
+            float back = heldOut ? 0f : Endurance.OvertakeOffsetRate / Mathf.Max(v, 10f);
             for (float x = 0f; x < TailLook; x += 10f)
             {
                 int k = c.IndexOf(Mathf.Repeat(d + x, lap));
-                score -= 0.5f * 10f * (1f / Mathf.Max(pilot.LaneSpeed(k, offEnd), 1f) - 1f / Mathf.Max(pilot.LaneSpeed(k, 0f), 1f));
+                float off = Mathf.Sign(offEnd) * Mathf.Max(Mathf.Abs(offEnd) - back * x, 0f);
+                if (off == 0f) break;
+                score -= 0.5f * 10f * (1f / Mathf.Max(pilot.LaneSpeed(k, off), 1f) - 1f / Mathf.Max(pilot.LaneSpeed(k, 0f), 1f));
             }
             // Ending behind a slower car, in its lane or beside it but not yet by, with too little of
             // the straight left to get by before braking: the time lost staying there until the next
@@ -357,7 +374,9 @@ namespace TarmacGauntlet.Raceday
             for (int j = 0; j < others.Count; j++)
             {
                 float g = Road(od[j, Steps] - d, lap);
-                if (!stopped[j] && g > 0f && g < 2f * Mathf.Max(v, 10f) && ov[j, Steps] < freeSpeed - 1f)
+                // Judged from where the car was at the start, so dropping back from a slow car doesn't hide it.
+                float from = Road(od[j, 0] - me.Distance, lap);
+                if (!stopped[j] && g > 0f && from > 0f && from < 2f * Mathf.Max(me.Speed, 10f) && ov[j, Steps] < freeSpeed - 1f)
                 {
                     float closing = Mathf.Max(v - ov[j, Steps], 0.1f);
                     float needs = (g + CarL + 1f) / closing;
@@ -366,6 +385,7 @@ namespace TarmacGauntlet.Raceday
                 }
                 if (!stopped[j] && Road(od[j, 0] - me.Distance, lap) > 0f && g < 0f) score -= passCost;
             }
+            cand.Gain = score; cand.Risk = riskWeight * risk; cand.Stuck = stuck;
             cand.Score = score - stuck - riskWeight * risk - YellowWeight * yellow;
         }
 
