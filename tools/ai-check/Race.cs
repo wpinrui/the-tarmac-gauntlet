@@ -152,6 +152,29 @@ sealed class Race
     float lodClock = 1f;
     /// <summary>Stopwatch ticks spent in racecraft and gliding for gliding cars.</summary>
     public long GlideTicks, ThinkTicks;
+    static readonly bool DecisionStats = Environment.GetEnvironmentVariable("E1_STATS") == "1";
+    static readonly Dictionary<string, long> Stats = new();
+    static readonly double[] Gains = new double[4];
+    static Race() { if (DecisionStats) AppDomain.CurrentDomain.ProcessExit += (_, _) => { foreach (var kv in Stats.OrderByDescending(k => k.Value)) Console.WriteLine($"STAT {kv.Key} {kv.Value}"); }; }
+    static void Tally(PathChooser ch)
+    {
+        void Add(string k) => Stats[k] = (Stats.TryGetValue(k, out long n) ? n : 0) + 1;
+        var best = ch.Chosen;
+        Add("pick " + best.Pedal + (best.Rejected != null ? " fallback" : ""));
+        if (best.Pedal == PathChooser.Pedal.Go) return;
+        PathChooser.Candidate go = null;
+        foreach (var k in ch.Candidates) if (k.Pedal == PathChooser.Pedal.Go && k.Rejected == null && (go == null || k.Score > go.Score)) go = k;
+        if (go != null)
+        {
+            Add($"  {best.Pedal}: free go scored lower{(Math.Abs(go.Shift - best.Shift) < 0.1f ? " same lane" : "")}");
+            string why = go.Gain - best.Gain < go.Risk - best.Risk && go.Risk - best.Risk > go.Stuck - best.Stuck ? "risk" : go.Stuck - best.Stuck > 0.01f ? "stuck" : "other";
+            Add($"  {best.Pedal}: go lost on {why}");
+            Gains[0] += go.Gain - best.Gain; Gains[1] += go.Risk - best.Risk; Gains[2] += go.Stuck - best.Stuck; Gains[3]++;
+            if (Gains[3] % 100000 == 0) Console.WriteLine($"STATAVG gain {Gains[0] / Gains[3]:0.000} risk {Gains[1] / Gains[3]:0.000} stuck {Gains[2] / Gains[3]:0.000}");
+            return;
+        }
+        foreach (var k in ch.Candidates) if (k.Pedal == PathChooser.Pedal.Go) Add($"  {best.Pedal}: go rejected {k.Rejected}{(k.Delay > 0 ? " delayed" : k.Shift == 0 ? " line" : "")}");
+    }
 
     public Race(Circuit circuit, IEnumerable<Entry> entries, Func<string, RacingLine> lineFor)
     {
@@ -201,6 +224,9 @@ sealed class Race
                 Yaw = (float)Math.Atan2(r.Car.Forward.z, r.Car.Forward.x),
                 Ghost = r.Ghost && !r.Pilot.Gliding,
                 Profile = r.Pilot.Profile,
+                Planned = true,
+                Aim = r.Craft.Target,
+                Cap = r.Pilot.SpeedCap,
             });
         }
         sorted.Set(field, circuit.Lap);
@@ -401,6 +427,7 @@ sealed class Race
                 continue;
             }
             r.Craft.Think(r.Pilot, field[i], sorted, Dt);
+            if (DecisionStats && Time > 20f && r.Craft.Chooser?.Chosen != null && !r.Rejoin.Busy) Tally(r.Craft.Chooser);
             if (Time > 20f && !r.Rejoin.Busy && r.Car.Speed < 5f && r.Pilot.Index >= 0)
             {
                 QueueStopSteps++;

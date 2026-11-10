@@ -199,7 +199,7 @@ namespace TarmacGauntlet.Raceday
             {
                 if (GUILayout.Button("E0", Experiments.On == 0 ? on : button)) Experiments.On = 0;
                 for (int e = 1; e <= Experiments.All.Length; e++)
-                    if (GUILayout.Button($"E{e} {Experiments.All[e - 1]}", Experiments.On == e ? on : button)) Experiments.On = e;
+                    if (GUILayout.Button($"E{e}.{Experiments.Revisions[e - 1]} {Experiments.All[e - 1]}", Experiments.On == e ? on : button)) Experiments.On = e;
             }
             GUILayout.Space(8f * scale);
             scroll = GUILayout.BeginScrollView(scroll);

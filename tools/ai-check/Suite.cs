@@ -130,7 +130,11 @@ static partial class Check
                 if (g >= 0f && g < CarL && apart < reach) return $"{run.Name(i)} and {run.Name(j)} placed overlapping";
                 float dv = f.V[i] - f.V[j];
                 if (g <= 0f || apart >= reach + RoomMargin || dv <= 0f) continue;
-                float need = dv * dv / (2f * BrakingOf(run, i)) + StartReaction * dv;
+                // A car ahead that is braking for a corner already takes away most of the brakes' edge.
+                SpeedProfile pj = run.Race.Racers[j].Pilot.Profile;
+                bool braking = pj.Speed[circuit.Wrap(f.K[j] + (int)(Math.Max(f.V[j], 10f) / circuit.Step))] < f.V[j] - 5f;
+                float shed = braking ? Math.Max(BrakingOf(run, i) - BrakingOf(run, j), 2f) : BrakingOf(run, i);
+                float need = dv * dv / (2f * shed) + StartReaction * dv;
                 if (g - CarL - NoseMargin < need) return $"{run.Name(i)} can't brake for {run.Name(j)}: {g - CarL:0} m to shed {dv * 3.6f:0} km/h needs {need:0} m";
             }
         return null;
@@ -812,7 +816,7 @@ static partial class Check
         foreach (string m in BModels.Concat(new[] { "a-29" })) LineFor(m);
         if (full) foreach (Entry e in GameField(0)) LineFor(e.Model);
 
-        Situation[] ready = Situations.All.Where(x => x.Ready).ToArray();
+        Situation[] ready = Situations.All.Where(x => x.Ready && Environment.GetEnvironmentVariable("SUITE_NO_SETUPS") == null).ToArray();
         var runs = new SetupRun[ready.Length];
         Parallel.For(0, ready.Length, i => runs[i] = RunSetup(ready[i]));
         var limits = new List<(string Id, bool Pass, string Why)>();
@@ -855,7 +859,7 @@ static partial class Check
         int fails = limits.Count(l => !l.Pass);
         Console.WriteLine($"Hard limits: {limits.Count - fails} of {limits.Count} pass{(fails > 0 ? "  RED" : "")}");
         foreach (var l in limits) Console.WriteLine($"  {l.Id,-5} {(l.Pass ? "pass" : "FAIL")}  {l.Why}");
-        float behaviourScore = behaviour.Average(b => b.Score);
+        float behaviourScore = behaviour.Count > 0 ? behaviour.Average(b => b.Score) : 0f;
         Console.WriteLine($"Behaviour: {behaviourScore:0.0}");
         foreach (var b in behaviour) Console.WriteLine($"  {b.Id,-5} {b.Score,5:0}  {b.Why}");
         foreach (RaceScore r in races)

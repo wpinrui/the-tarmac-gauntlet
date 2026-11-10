@@ -9,14 +9,17 @@ namespace TarmacGauntlet.Raceday
     public static class Experiments
     {
         /// <summary>What each experiment tries, E1 first.</summary>
-        public static readonly string[] All = { };
+        public static readonly string[] All = { "path choosing" };
+
+        /// <summary>Each experiment's revision, raised each time a better one is merged.</summary>
+        public static readonly int[] Revisions = { 1 };
 
         /// <summary>The experiment switched on, or 0 for none.</summary>
         public static int On;
 
         public static bool Is(int experiment) => On == experiment;
 
-        /// <summary>The label for the experiment switched on, e.g. "E3".</summary>
-        public static string Label => $"E{On}";
+        /// <summary>The label for the experiment switched on, e.g. "E3.2".</summary>
+        public static string Label => On == 0 ? "E0" : $"E{On}.{Revisions[On - 1]}";
     }
 }

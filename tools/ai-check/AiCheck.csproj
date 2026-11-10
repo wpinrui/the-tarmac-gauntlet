@@ -30,6 +30,7 @@
     <Compile Include="../../unity/Assets/Raceday/Scripts/Standings.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/Situations.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/Experiments.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/PathChooser.cs" />
     <Compile Include="../../unity/Assets/Simulation/**/*.cs" />
   </ItemGroup>
 </Project>

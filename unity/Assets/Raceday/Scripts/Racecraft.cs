@@ -25,6 +25,12 @@ namespace TarmacGauntlet.Raceday
         public bool Ghost;
         /// <summary>The speeds the car's driver runs on its line, for predicting it, or null.</summary>
         public SpeedProfile Profile;
+        /// <summary>True when the car's driver says where it is heading: <see cref="Aim"/> and <see cref="Cap"/>.</summary>
+        public bool Planned;
+        /// <summary>The offset from its own racing line the car is heading for, m, positive left.</summary>
+        public float Aim;
+        /// <summary>The speed its driver holds it to, m/s, or infinity.</summary>
+        public float Cap;
     }
 
     /// <summary>
@@ -305,7 +311,7 @@ namespace TarmacGauntlet.Raceday
                         brakeDist = Mathf.Max(brakeDist, brakesOnly);
                         // Not in the tutorial: only while closing. Inside the margin and already no faster
                         // than the car ahead, the tutorial still brakes, to a stop, until the gap opens.
-                        if (brakeDist > distance && currentSpeedSqr > allowedSpeedSqr) { Braking = true; BrakeFor = o.Id; BrakeGap = distance; BrakeSide = carDist; }
+                        if (brakeDist > distance && currentSpeedSqr > allowedSpeedSqr) { Braking = true; BrakeFor = o.Id; BrakeGap = distance; BrakeSide = carDist; brakeLateral = o.Lateral; }
                     }
                 }
                 else if (distance > -sideCollDist && distance < sideCollDist)
@@ -324,8 +330,6 @@ namespace TarmacGauntlet.Raceday
             // getOvertakeOffset. The tutorial's car drives the track middle, and its offset is where
             // it runs across the track. Here the same offset is held across the track, and with no car
             // in front it steps back to the racing line where the tutorial's steps back to the middle.
-            float lineHere = line.Lateral[pilot.Index];
-            float myOffset = lineHere + pilot.Offset;   // from the track middle
             float step = Endurance.OvertakeOffsetRate * dt;
             // Not in the tutorial: while braking for a car ahead, the offset steps only as fast as the
             // grip the brakes leave over.
@@ -335,6 +339,45 @@ namespace TarmacGauntlet.Raceday
                 float decel = Mathf.Min(spec.BrakeDecel * G, tyres);
                 step *= Mathf.Sqrt(Mathf.Max(tyres * tyres - decel * decel, 0f)) / Mathf.Max(tyres, 0.1f);
             }
+            bool e1 = Experiments.Is(PathChooser.Experiment);
+            if (e1)
+            {
+                // Path choosing: the chooser picks where to head and how fast, and the car moves across
+                // towards it. TORCS's full braking and side steering stay underneath, below.
+                chooser ??= new PathChooser();
+                chooser.Plan(pilot, me, field, dt);
+                pilot.Offset = Mathf.Clamp(Mathf.MoveTowards(pilot.Offset, chooser.Target, step), AiPilot.LaneShifts[0], AiPilot.LaneShifts[AiPilot.LaneShifts.Length - 1]);
+                Target = chooser.Target;
+                pilot.SpeedCap = chooser.Cap;
+                State = Mathf.Abs(pilot.Offset) > 0.5f ? Mode.Overtaking : Mode.Racing;
+                if (hasFront) { FrontGap = frontDistance; FrontId = front.Id; }
+                // The full brakes are the last resort: not for a car the chosen path, clear of every
+                // limit, is already moving out from behind.
+                if (Braking && chooser.Chosen != null && chooser.Chosen.Rejected == null
+                    && Mathf.Abs(brakeLateral - (line.Lateral[pilot.Index] + chooser.Target)) >= PathChooser.Clear(margin)) Braking = false;
+            }
+            else V0Offset(pilot, me, line, c, lap, here, step, margin, hasFront, front, frontDistance, minCatch, inPath, inPathDistance, inPathCatch,
+                wantSpeed, mass, cm, ca, mu, cw, currentSpeedSqr, spec, behind, closeAhead, fastBehind);
+
+            // filterBColl's full brakes: nothing it may go faster than.
+            if (Braking) pilot.SpeedCap = 0f;
+            SideAndRoom(pilot, me, line, c, lap, here, margin, hasSide, side, minSide, roomLeft && !e1, roomRight && !e1);
+        }
+
+        /// <summary>The path chooser, made when experiment E1 is first switched on.</summary>
+        private PathChooser chooser;
+        private float brakeLateral;
+        /// <summary>The path chooser while experiment E1 is on, else null.</summary>
+        public PathChooser Chooser => Experiments.Is(PathChooser.Experiment) ? chooser : null;
+
+        /// <summary>Today's overtake offset (v0): getOvertakeOffset with the tow and pull-out, and the etiquette.</summary>
+        private void V0Offset(AiPilot pilot, TrafficCar me, RacingLine line, Circuit c, float lap, float here, float step, float margin,
+            bool hasFront, TrafficCar front, float frontDistance, float minCatch, TrafficCar inPath, float inPathDistance, float inPathCatch,
+            float wantSpeed, float mass, float cm, float ca, float mu, float cw, float currentSpeedSqr, CarSpec spec,
+            bool behind, bool closeAhead, bool fastBehind)
+        {
+            float lineHere = line.Lateral[pilot.Index];
+            float myOffset = lineHere + pilot.Offset;   // from the track middle
             bool pull = false;
             if (hasFront)
             {
@@ -415,10 +458,12 @@ namespace TarmacGauntlet.Raceday
             }
             pilot.Offset = newOffset;
             Target = pilot.Offset;
+        }
 
-            // filterBColl's full brakes: nothing it may go faster than.
-            if (Braking) pilot.SpeedCap = 0f;
-
+        /// <summary>filterSColl's side steering, then the room owed to a car alongside.</summary>
+        private void SideAndRoom(AiPilot pilot, TrafficCar me, RacingLine line, Circuit c, float lap, float here, float margin,
+            bool hasSide, TrafficCar side, float minSide, bool roomLeft, bool roomRight)
+        {
             // filterSColl: near a car alongside and heading towards it, blend the steering towards
             // running parallel to it, and take the overtake offset from where the car is now.
             if (hasSide)
