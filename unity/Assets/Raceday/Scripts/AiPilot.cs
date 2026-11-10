@@ -38,8 +38,8 @@ namespace TarmacGauntlet.Raceday
         private const float WindowOut = 60f;
 
         /// <summary>How far each lane sits from the racing line, metres, positive left. The middle one is the line itself.</summary>
-        public static readonly float[] LaneShifts = { -6f, -3f, 0f, 3f, 6f };
-        private const int MiddleLane = 2;
+        public static readonly float[] LaneShifts = { -12f, -6f, -3f, 0f, 3f, 6f, 12f };
+        private const int MiddleLane = 3;
 
         public readonly RacingLine Line;
         public readonly SpeedProfile Profile;
@@ -231,11 +231,15 @@ namespace TarmacGauntlet.Raceday
             }
             else
                 controls.Brake = Mathf.Clamp01(-needed / (Spec.BrakeDecel * G));
-            // Faster than the car ahead allows: the gap is closing, so brake as hard as the car can.
+            // Faster than the car ahead allows: the gap is closing, so brake as hard as the tyres can
+            // take on top of the corner. Full brakes mid-corner run the car wide.
             if (held && speed > target + 1f)
             {
+                float tyres = Spec.Grip * G * Mathf.Clamp(Grip, 0.3f, 1f);
+                float cornering = speed * yawRate;
+                float spare = Mathf.Sqrt(Mathf.Max(tyres * tyres - cornering * cornering, 0f));
                 controls.Throttle = 0f;
-                controls.Brake = 1f;
+                controls.Brake = Mathf.Max(controls.Brake, Mathf.Clamp(spare / (Spec.BrakeDecel * G), 0.5f, 1f));
             }
             return controls;
         }

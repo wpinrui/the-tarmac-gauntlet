@@ -177,7 +177,7 @@ namespace TarmacGauntlet.Raceday
             float lateral = k >= 0 ? Active.Line.Lateral[k] + Active.Shift : 0f;
             to.Lost();
             if (k >= 0) to.Relocate(k);
-            to.Offset = to == Pilot && k >= 0 ? Mathf.Clamp(lateral - Pilot.Line.Lateral[k], -5f, 5f) : 0f;
+            to.Offset = to == Pilot && k >= 0 ? Mathf.Clamp(lateral - Pilot.Line.Lateral[k], AiPilot.LaneShifts[0], AiPilot.LaneShifts[AiPilot.LaneShifts.Length - 1]) : 0f;
             Active = to;
         }
     }
