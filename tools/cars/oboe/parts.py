@@ -174,7 +174,10 @@ def front_parts(ref, cutters, out):
     bar = poly(R["shield_bar"])
     bar = translate(bar, 0, GRILLE_SPLIT[0] - 0.035 - bar.bounds[3])     # plate centred in the lower grille
     out += blend.lay(ref, "shield_bar", bar, fr, 0.0044, 0.0074, "trim", 0.008)
-    out += blend.lay(ref, "chin", poly(R["chin"]), fr, -0.001, 0.004, "body", 0.008)
+    w = R["wheel"]
+    clear = w["front_x"] + w["arch_r"] + 0.02                  # keep the lip ahead of the front wheels
+    out += blend.lay(ref, "chin", poly(R["chin"]), fr, -0.001, 0.004, "body", 0.008,
+                     accept=lambda loc: loc[0] > clear)
     fy, fz, fr_r = R["fog"]
     for sgn, side in ((1, "l"), (-1, "r")):
         g = poly(R["intake"]).convex_hull.buffer(-0.01, join_style=1).buffer(0.01, join_style=1)
@@ -274,7 +277,9 @@ def _mirror_root():
 
 
 MIRROR_H = 0.10      # housing height
-MIRROR_W = 0.19      # housing width, out from the arm
+MIRROR_W = 0.16      # housing width, out from the arm
+MIRROR_OUT = 0.96    # outer end, out from the centre line
+MIRROR_SWEEP = 0.30  # radians the housing turns back from square to the car
 MIRROR_D = 0.06      # housing depth front to back
 MIRROR_R = 0.025     # corner rounding
 
@@ -290,7 +295,16 @@ def _rounded_bar(name, y0, y1, z0, z1, x0, x1, r, sgn, mat="body"):
 def _housing():
     """(y0, y1, z0, z1) of the housing seen from behind."""
     m = R["mirror"]
-    return m["y_out"] - MIRROR_W, m["y_out"], m["z"] - MIRROR_H / 2, m["z"] + MIRROR_H / 2
+    return MIRROR_OUT - MIRROR_W, MIRROR_OUT, m["z"] - MIRROR_H / 2, m["z"] + MIRROR_H / 2
+
+
+def _sweep(ob, sgn):
+    """Turn a mirror piece about its root, so the outer end sits further back."""
+    from mathutils import Matrix
+    m = R["mirror"]
+    p = Matrix.Translation((m["x_back"] + MIRROR_D / 2, sgn * _mirror_root(), 0))
+    ob.data.transform(p @ Matrix.Rotation(sgn * MIRROR_SWEEP, 4, "Z") @ p.inverted())
+    return ob
 
 
 def mirrors():
@@ -304,7 +318,7 @@ def mirrors():
         arm = _rounded_bar(f"mirror_arm_{side}", _mirror_root(), y0 + 0.03, m["z"] - 0.035, m["z"] + 0.005,
                            xb + 0.015, xb + MIRROR_D - 0.005, 0.012, sgn)
         blend.boolean(house, arm, "UNION")
-        obs.append(house)
+        obs.append(_sweep(house, sgn))
     return obs
 
 
@@ -314,10 +328,10 @@ def mirror_recess():
     y0, y1, z0, z1 = _housing()
     cut, glass = [], []
     for sgn, side in ((1, "l"), (-1, "r")):
-        cut.append(_rounded_bar(f"cut_mirror_{side}", y0 + 0.01, y1 - 0.01, z0 + 0.01, z1 - 0.01,
-                                m["x_back"] - 0.03, m["x_back"] + 0.006, MIRROR_R - 0.01, sgn, "trim"))
-        glass.append(_rounded_bar(f"mirror_glass_{side}", y0 + 0.0115, y1 - 0.0115, z0 + 0.0115, z1 - 0.0115,
-                                  m["x_back"] + 0.002, m["x_back"] + 0.005, MIRROR_R - 0.0115, sgn, "mirror_glass"))
+        cut.append(_sweep(_rounded_bar(f"cut_mirror_{side}", y0 + 0.01, y1 - 0.01, z0 + 0.01, z1 - 0.01,
+                                m["x_back"] - 0.03, m["x_back"] + 0.006, MIRROR_R - 0.01, sgn, "trim"), sgn))
+        glass.append(_sweep(_rounded_bar(f"mirror_glass_{side}", y0 + 0.0115, y1 - 0.0115, z0 + 0.0115, z1 - 0.0115,
+                                  m["x_back"] + 0.002, m["x_back"] + 0.005, MIRROR_R - 0.0115, sgn, "mirror_glass"), sgn))
     return cut, glass
 
 
