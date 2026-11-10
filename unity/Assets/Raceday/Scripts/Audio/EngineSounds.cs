@@ -12,13 +12,13 @@ namespace TarmacGauntlet.Raceday
         /// <summary>The package for a class: the sound every car in it starts from.</summary>
         public static EngineSound Tier(CarClass carClass) => carClass switch
         {
-            // Small, tired economy fours: buzzy, thin and well silenced.
+            // Small, tired economy fours: weak, dull and strangled by a cheap silencer.
             CarClass.F => new EngineSound
             {
-                Layout = EngineLayout.Inline4, IdleRpm = 850f, RedlineRpm = 6200f,
-                HeaderLength = 0.45f, PipeLength = 2.4f, PipeResonance = 0.45f, Muffler = 0.8f, Brightness = 0.85f,
-                PulseWidth = 0.55f, Breath = 0.4f, Roughness = 0.14f, Asymmetry = 0.1f, Drive = 1.4f,
-                IntakeLevel = 0.3f, IntakePitch = 380f, MechLevel = 0.14f, Volume = 0.6f,
+                Layout = EngineLayout.Inline4, IdleRpm = 850f, RedlineRpm = 5800f,
+                HeaderLength = 0.45f, PipeLength = 2.6f, PipeResonance = 0.25f, Muffler = 0.95f, Brightness = 0.6f,
+                PulseWidth = 0.65f, Breath = 0.3f, Roughness = 0.16f, Asymmetry = 0.12f, Drive = 1.05f,
+                IntakeLevel = 0.12f, IntakePitch = 340f, MechLevel = 0.16f, Volume = 0.5f,
             },
             // Modern family fours, mostly small turbos: smooth and quiet.
             CarClass.E => new EngineSound
@@ -61,13 +61,13 @@ namespace TarmacGauntlet.Raceday
                 IntakeLevel = 0.35f, IntakePitch = 650f, MechLevel = 0.1f, GearWhine = 0.18f,
                 Turbo = 0.5f, TurboPitch = 5200f, Hybrid = 0.4f, Volume = 0.8f,
             },
-            // The Formula One car: a 19,000 rpm V8 shriek.
+            // The Formula One car: a high-revving V8, well above the prototypes but not a shriek.
             _ => new EngineSound
             {
-                Layout = EngineLayout.V8Flatplane, IdleRpm = 4000f, RedlineRpm = 19000f,
-                HeaderLength = 0.4f, PipeLength = 0.9f, BankSplit = 1.03f, PipeResonance = 0.6f, Muffler = 0.1f, Brightness = 1.3f,
-                PulseWidth = 0.4f, Breath = 0.2f, Roughness = 0.03f, Asymmetry = 0.02f, Drive = 2.6f, Crackle = 0.25f,
-                IntakeLevel = 0.5f, IntakePitch = 900f, MechLevel = 0.12f, GearWhine = 0.2f, GearWhinePitch = 26f, Volume = 0.85f,
+                Layout = EngineLayout.V8Flatplane, IdleRpm = 3500f, RedlineRpm = 15000f,
+                HeaderLength = 0.45f, PipeLength = 1.0f, BankSplit = 1.05f, PipeResonance = 0.45f, Muffler = 0.15f, Brightness = 1.05f,
+                PulseWidth = 0.5f, Breath = 0.3f, Roughness = 0.04f, Asymmetry = 0.03f, Drive = 2.4f, Crackle = 0.25f,
+                IntakeLevel = 0.4f, IntakePitch = 750f, MechLevel = 0.1f, GearWhine = 0.07f, GearWhinePitch = 22f, Volume = 0.8f,
             },
         };
 
@@ -95,11 +95,11 @@ namespace TarmacGauntlet.Raceday
         {
             // F
             ["f-01"] = s => { s.Roughness = 0.22f; s.Asymmetry = 0.16f; s.RedlineRpm = 5800f; s.MechLevel = 0.2f; },          // Nusa Carrier: old and rough
-            ["f-02"] = s => { s.PipeLength = 2.0f; s.Brightness = 1f; s.RedlineRpm = 6600f; s.IntakePitch = 430f; },         // Liberty Omaha: small and buzzy
-            ["f-03"] = s => { s.Roughness = 0.07f; s.Asymmetry = 0.05f; s.Muffler = 0.9f; s.MechLevel = 0.08f; },            // Tora Daruma: smooth and quiet
-            ["f-04"] = s => { s.IdleRpm = 800f; s.RedlineRpm = 5600f; s.PipeLength = 2.8f; s.PulseWidth = 0.65f; s.Brightness = 0.75f; }, // Kaiser Firefly: big lazy four
-            ["f-05"] = s => { s.Brightness = 0.95f; s.Muffler = 0.75f; },                                                       // Liberty Collier
-            ["f-06"] = s => { s.Muffler = 0.6f; s.RedlineRpm = 6800f; s.Drive = 1.7f; s.IntakeLevel = 0.4f; },               // Nusa Fox: the sporty one
+            ["f-02"] = s => { s.PipeLength = 2.2f; s.Brightness = 0.7f; s.RedlineRpm = 6200f; s.IntakePitch = 380f; },         // Liberty Omaha: small and buzzy
+            ["f-03"] = s => { s.Roughness = 0.07f; s.Asymmetry = 0.05f; s.Muffler = 0.97f; s.MechLevel = 0.08f; },           // Tora Daruma: smooth and quiet
+            ["f-04"] = s => { s.IdleRpm = 800f; s.RedlineRpm = 5400f; s.PipeLength = 3.0f; s.PulseWidth = 0.7f; s.Brightness = 0.5f; }, // Kaiser Firefly: big lazy four
+            ["f-05"] = s => { s.Brightness = 0.65f; s.RedlineRpm = 6000f; },                                                       // Liberty Collier
+            ["f-06"] = s => { s.Muffler = 0.88f; s.Brightness = 0.7f; s.RedlineRpm = 6300f; s.Drive = 1.2f; s.IntakeLevel = 0.18f; },               // Nusa Fox: a little livelier
 
             // E
             ["e-07"] = s => { s.Layout = EngineLayout.Inline3; s.Asymmetry = 0.06f; s.Turbo = 0.45f; s.PipeLength = 2.3f; },  // Liberty Fantasy: small turbo triple

@@ -147,7 +147,7 @@ namespace TarmacGauntlet.Raceday
                 // Induction roar: band-passed noise in time with the firings.
                 float intakeHz = s.IntakePitch * (0.7f + 1.6f * rev);
                 float intake = Band(Noise(), intakeHz, 2.5f, ref intakeLow, ref intakeBand)
-                               * s.IntakeLevel * (0.15f + (float)Math.Pow(load, 1.3)) * Math.Min(1f, envelope * 4f);
+                               * s.IntakeLevel * (0.03f + (float)Math.Pow(load, 1.3)) * Math.Min(1f, envelope * 4f);
 
                 // Valvetrain: high-passed noise ticking twice per firing.
                 float noise = Noise();
@@ -190,10 +190,9 @@ namespace TarmacGauntlet.Raceday
         private void Fire(int cylinder, float rev)
         {
             firings++;
-            // Fuel: the throttle, or what the idle needs to keep running. Off the throttle above idle there is
-            // no fuel at all (overrun cut), only the weaker push of air.
-            float fuel = Math.Max(load, 0.12f * idleBlend);
-            float amp = fuel > 0.02f ? 0.12f + 0.88f * fuel : 0.2f;
+            // Off the throttle the engine keeps the same tone, as weak as at idle.
+            float fuel = Math.Max(load, 0.12f);
+            float amp = 0.12f + 0.88f * fuel;
             amp *= cylinderGain[cylinder] * (1f + s.Roughness * Noise());
 
             bool limiter = rpm > s.RedlineRpm * 0.985f && firings % 2 == 0;
@@ -204,7 +203,7 @@ namespace TarmacGauntlet.Raceday
             if (popChance > 0f && Uniform() < popChance)
                 Add(new Pulse
                 {
-                    Wait = headerDelay[cylinder], Bank = 2, Breath = 0.85f, Skew = 0.5f,
+                    Wait = headerDelay[cylinder], Bank = 2, Breath = 0.45f, Skew = 0.5f,
                     Length = (int)(fs * (0.003f + 0.006f * Uniform())),
                     Amp = 0.6f + 0.9f * Uniform(),
                 });
@@ -216,7 +215,7 @@ namespace TarmacGauntlet.Raceday
                 Length = Math.Max(4, (int)(fs * Math.Max(0.0003f, s.PulseWidth * gap))),
                 Bank = bankOf[cylinder],
                 Amp = amp * (0.8f + 0.4f * rev),
-                Breath = s.Breath * (fuel > 0.02f ? 1f : 1.5f),
+                Breath = s.Breath,
                 Skew = 0.6f,
             });
         }
