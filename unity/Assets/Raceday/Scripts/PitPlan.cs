@@ -65,7 +65,8 @@ namespace TarmacGauntlet.Raceday
     /// When an AI car pits and how it drives the stop, with no Unity objects so it can be tested
     /// outside Unity. Each lap, a little before the pit entry, it checks whether the fuel or the tyres
     /// will last another lap. If not, the car takes its pit route, slows to the limiter, stops in its
-    /// own box, is serviced, waits for the fast lane to be clear and rejoins.
+    /// own box, is serviced, waits for the fast lane to be clear and rejoins. A retired car comes in
+    /// at the first pit entry and parks in its box for good.
     /// </summary>
     public sealed class PitPlan
     {
@@ -127,6 +128,8 @@ namespace TarmacGauntlet.Raceday
             }
             lapFuel = s.Fuel;
             lapWear = s.Wear;
+            // A retired car limps in at the first chance and stays.
+            if (s.Retired) return true;
             // Another lap must leave a fifth of a lap's fuel spare, and the tyres short of worn out.
             // With no tyre sets left a stop can't change them, so only the fuel brings the car in.
             return s.Fuel < FuelPerLap * 1.2f + 0.5f || (s.TyresLeft && s.Wear + WearPerLap > WearLimit);
@@ -170,6 +173,7 @@ namespace TarmacGauntlet.Raceday
                     if (toBox < 0.5f || (toBox < 1.5f && speed < 0.5f))
                     {
                         State = Stage.Stopped;
+                        if (s.Retired) return true;   // parked for good: no service
                         Service = new PitService(s, spec);
                         Stops++;
                         lapFuel = -1f;
@@ -178,6 +182,7 @@ namespace TarmacGauntlet.Raceday
                     return false;
                 }
                 case Stage.Stopped:
+                    if (s.Retired || Service == null) return true;
                     Service.Step(dt);
                     if (Service.Done && FastLaneClear(id, cars)) State = Stage.Leaving;
                     return State == Stage.Stopped;

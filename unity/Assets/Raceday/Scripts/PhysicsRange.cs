@@ -74,7 +74,7 @@ namespace TarmacGauntlet.Raceday
             foreach (int i in order)
             {
                 AiDriver d = Drivers[i];
-                bool human = !d.enabled;   // the player has the car: it needs its physics
+                bool human = !d.enabled || d.Limping;   // the player has the car, or it limps on its cut power: it needs its physics
                 float reach = d.Gliding ? range : range * Leave;
                 bool want = human || (onPhysics < most && distance[i] < reach);
                 if (want) onPhysics++;

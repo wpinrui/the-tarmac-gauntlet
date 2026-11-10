@@ -39,6 +39,8 @@ namespace TarmacGauntlet.Raceday
         /// them down, and its upgrades lift them. The physics car is the model's, so the tuned lines are shared.
         /// </summary>
         public float PowerTrim = 1f, GripTrim = 1f;
+        /// <summary>True once the car is out of the race: it limps to its box and parks there.</summary>
+        public bool Retired => Log != null && Log.Retired;
         /// <summary>False once the team has no tyre sets left, so a stop can't change them.</summary>
         public bool TyresLeft => Log == null || Log.TyreSets > 0;
 
