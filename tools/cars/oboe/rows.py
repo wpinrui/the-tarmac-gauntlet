@@ -410,7 +410,7 @@ def measure(path):
         "tailgate": r4(tailgate),
         "spots": spots,
         # Ivan's picks from the viewer.
-        "picks": {"frontbadge": 1, "rearbadge": 1, "name": 1},
+        "picks": {"frontbadge": 1, "rearbadge": 1, "name": 2},
     }
 
 

@@ -192,6 +192,8 @@ def dlo_shapes():
     b0, b1 = sorted(R["b_pillar"])
     # the traced outline dips at the B-pillar top and bottom: run straight across it instead
     dlo = poly([p for p in R["dlo"] if not b0 + 0.003 < p[0] < b1 - 0.003])
+    # the window stops just behind the mirror: the corner ahead of it is body colour, for the stalk
+    dlo = dlo.intersection(box(-5, -5, R["mirror"]["x_back"] + 0.02, 5))
     glass = dlo.buffer(-0.018, join_style=1).difference(box(b0, -1, b1, 3))
     trim = dlo.difference(glass)
     return dlo, glass, trim
@@ -216,7 +218,7 @@ def glass_parts(ref0, cutters, out):
         fr = side_fr(sgn)
         cutters += blend.lay(ref0, f"cut_side_{side}", g, fr, -0.08, 0.006, "trim", along_ray=True)
         out += blend.lay(ref0, f"side_glass_{side}", g.buffer(-0.001), fr, -0.008, -0.004, "glass", 0.02)
-        out += blend.lay(ref0, f"window_trim_{side}", t.union(poly(R["sail"])), fr, -0.001, 0.0025, "trim", 0.01)
+        out += blend.lay(ref0, f"window_trim_{side}", t, fr, -0.001, 0.0025, "trim", 0.01)
     _o, g, t = screen_shapes()
     cutters += blend.lay(ref0, "cut_screen", g, top_fr(), -0.08, 0.006, "trim", along_ray=True)
     out += blend.lay(ref0, "screen_glass", g.buffer(-0.001), top_fr(), -0.008, -0.004, "glass", 0.02)
@@ -266,44 +268,46 @@ def spoiler():
     return sp
 
 
-def mirrors():
+def _mirror_root():
     m = R["mirror"]
+    return body.y_at(CV, m["x_back"] + m["length"] / 2, m["z"]) - 0.025     # sunk into the door
+
+
+MIRROR_H = 0.13      # housing height
+MIRROR_R = 0.03      # corner rounding
+
+
+def _mirror_face():
+    """The housing seen from behind, in (y, z): a plain rounded box."""
+    m = R["mirror"]
+    return box(_mirror_root(), m["z"] - MIRROR_H / 2, m["y_out"], m["z"] + MIRROR_H / 2).buffer(
+        -MIRROR_R, join_style=1).buffer(MIRROR_R, join_style=1)
+
+
+def mirrors():
+    """Plain rounded boxes: the face shape carried from the back to the front of the mirror."""
+    m = R["mirror"]
+    ring = body._even(np.array(_mirror_face().exterior.coords)[:-1], 96)
     obs = []
     for sgn, side in ((1, "l"), (-1, "r")):
-        rings = []
-        x_mid = m["x_back"] + m["length"] / 2
-        y0 = body.y_at(body.curves(body.ROWS["stations"])[1], x_mid, m["z"]) - 0.025   # sunk into the door
-        for y in np.linspace(y0, m["y_out"], 18):
-            t = max(0.0, (y - m["y_in"]) / (m["y_out"] - m["y_in"]))
-            h = m["h_in"] + (m["h_out"] - m["h_in"]) * np.sin(t * np.pi / 2)
-            ln = m["length"] * (0.75 + 0.25 * np.sin(t * np.pi / 2))
-            if t > 0.8:                               # round off the outer end
-                k = np.sqrt(1 - ((t - 0.8) / 0.2) ** 2 * 0.85)
-                h, ln = h * k, ln * k
-            r = min(h, ln) * 0.45
-            sh = box(m["x_back"], m["z"] - h / 2, m["x_back"] + ln, m["z"] + h / 2)
-            sh = sh.buffer(-r, join_style=1).buffer(r, join_style=1)
-            ring = body._even(np.array(sh.exterior.coords)[:-1], 64)
-            rings.append(np.column_stack([ring[:, 0], np.full(64, y * sgn), ring[:, 1]]))
+        rings = [np.column_stack([np.full(96, x), ring[:, 0] * sgn, ring[:, 1]])
+                 for x in (m["x_back"], m["x_back"] + m["length"] * 0.7)]
         v, f = geom.close_rings(rings)
-        if sgn < 0:                                   # mirrored, so turn the faces back outwards
-            f = [tuple(reversed(q)) for q in f]
         obs.append(blend.make(f"mirror_{side}", v, f, "body"))
     return obs
 
 
 def mirror_recess():
+    """A shallow recess in each housing's back, with the glass inside."""
     m = R["mirror"]
+    face = _mirror_face().intersection(box(m["y_in"] + 0.02, -5, 5, 5)).buffer(-0.01, join_style=1)
     cut, glass = [], []
-    y0, y1 = m["y_in"] + 0.035, m["y_out"] - 0.03
-    h = m["h_out"] * 0.72
     for sgn, side in ((1, "l"), (-1, "r")):
         for name, (xa, xb), pad, mat, store in (
-                ("cut_mirror", (m["x_back"] - 0.02, m["x_back"] + 0.012), 0.0, "trim", cut),
-                ("mirror_glass", (m["x_back"] + 0.006, m["x_back"] + 0.009), 0.0015, "mirror_glass", glass)):
-            sh = box(y0 + pad, m["z"] - h / 2 + pad, y1 - pad, m["z"] + h / 2 - pad).buffer(-0.012, join_style=1).buffer(0.012, join_style=1)
-            ring = body._even(np.array(sh.exterior.coords)[:-1], 48)
-            rings = [np.column_stack([np.full(48, x), ring[:, 0] * sgn, ring[:, 1]]) for x in (xa, xb)]
+                ("cut_mirror", (m["x_back"] - 0.03, m["x_back"] + 0.008), 0.0, "trim", cut),
+                ("mirror_glass", (m["x_back"] + 0.003, m["x_back"] + 0.006), 0.0015, "mirror_glass", glass)):
+            ring = body._even(np.array(face.buffer(-pad).exterior.coords)[:-1], 96)
+            rings = [np.column_stack([np.full(96, x), ring[:, 0] * sgn, ring[:, 1]]) for x in (xa, xb)]
             v, f = geom.close_rings(rings)
             store.append(blend.make(f"{name}_{side}", v, f, mat))
     return cut, glass
