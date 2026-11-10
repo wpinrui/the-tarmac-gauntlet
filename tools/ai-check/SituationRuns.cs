@@ -9,6 +9,8 @@ using TarmacGauntlet.Raceday;
 static partial class Check
 {
     /// <summary>Builds the race for a set-up, with every car where and as fast as the set-up says.</summary>
+    static string Parts(PathChooser.Candidate c) => c == null ? "-" : $"{c.Shift:0.#}{(c.Delay > 0 ? "d" + c.Delay : "")} S{c.Score:0.00}=g{c.Gain:0.00}-r{c.Risk:0.00}-s{c.Stuck:0.00}";
+
     static Race SituationRace(Situation s)
     {
         var entries = new List<Entry>();
@@ -57,7 +59,6 @@ static partial class Check
         if (only != null && only.StartsWith("race"))
         {
             // A Race A field with one car traced while it runs well under its line's speed: "race:51:120" traces car 50 (the A car) for 120 s.
-            static string Parts(PathChooser.Candidate c) => c == null ? "-" : $"{c.Shift:0.#}{(c.Delay > 0 ? "d" + c.Delay : "")} S{c.Score:0.00}=g{c.Gain:0.00}-r{c.Risk:0.00}-s{c.Stuck:0.00}";
             string[] parts = only.Split(':');
             int id = parts.Length > 1 ? int.Parse(parts[1]) : 50;
             float until = parts.Length > 2 ? float.Parse(parts[2]) : 120f;
@@ -103,10 +104,10 @@ static partial class Check
                     foreach (Racer r in race.Racers)
                     {
                         float gap = r.Distance - lead.Distance;
-                        line.Append($" | {r.Entry.Model} {(r == lead ? r.Car.TrackIndex * circuit.Step : gap),6:0.0} lat {r.Car.Lateral,5:0.0} {r.Car.Speed * 3.6f,3:0} {r.Craft.State,-11}{(r.Craft.Braking ? " BRK" : "    ")}{(r.Ghost ? " G" : "  ")}");
+                        line.Append($" | {r.Entry.Model} {(r == lead ? r.Car.TrackIndex * circuit.Step : gap),6:0.0} lat {r.Car.Lateral,5:0.0} {r.Car.Speed * 3.6f,3:0} {r.Craft.State,-11} po {r.Pilot.Offset:0.0} tg {r.Craft.Target:0.0} side {r.Craft.SideSteering}{(r.Craft.Braking ? " BRK" : "    ")}{(r.Ghost ? " G" : "  ")}");
                         PathChooser pc = r.Craft.Chooser;
                         if (pc?.Chosen != null && r == race.Racers[Environment.GetEnvironmentVariable("TRACE_CAR") is string tc ? int.Parse(tc) : 0])
-                            line.Append($" [{pc.Reason} -> {pc.Chosen.Shift:0.0}{(pc.Chosen.Delay > 0 ? "d" + pc.Chosen.Delay : "")} {pc.Chosen.Pedal} {pc.Chosen.Score:0.00} | " + string.Join(" ", pc.Candidates.Where(x => x.Pedal == PathChooser.Pedal.Go).Select(x => $"{x.Shift:0.#}{(x.Delay > 0 ? "d" + x.Delay : "")}:{x.Rejected ?? x.Score.ToString("0.00")}")) + "]");
+                            line.Append($" [{pc.Reason} -> {pc.Chosen.Pedal} {Parts(pc.Chosen)} owe {string.Join(",", pc.Candidates.Where(c => c.Owe).Select(c => c.Pedal + ":" + (c.Rejected ?? c.Score.ToString("0.00")) + "@" + c.SoonOff.ToString("0.0")))} | " + string.Join(" ", pc.Candidates.Where(x => x.Pedal == PathChooser.Pedal.Go).Select(x => $"{x.Shift:0.#}{(x.Delay > 0 ? "d" + x.Delay : "")}:{x.Rejected ?? x.Score.ToString("0.00")}")) + "]");
                     }
                     Console.WriteLine(line);
                 }

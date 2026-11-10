@@ -50,6 +50,8 @@ namespace TarmacGauntlet.Raceday
         private float lapLength;
         /// <summary>Below this speed a ghost is a stopped car on the track: an obstacle to slow for and go round, m/s.</summary>
         private const float StoppedSpeed = 10f;
+        /// <summary>Gap to a car alongside, side to side, inside which TORCS's parallel steering still takes over, m (spec: 2 m).</summary>
+        public const float SideFilterGap = 2f;
         /// <summary>Share of its lane's speed a car may carry towards a stopped car, as under a yellow flag.</summary>
         private const float YellowShare = 0.7f;
         /// <summary>How far ahead a stopped car slows the cars coming, m.</summary>
@@ -68,6 +70,10 @@ namespace TarmacGauntlet.Raceday
             public float Delay;
             /// <summary>Keeps where it is across the track, whatever the racing line does.</summary>
             public bool Stay;
+            /// <summary>Takes its line, but no nearer the inside than leaves a car alongside there exactly the width it is owed (H2).</summary>
+            public bool Owe;
+            /// <summary>How far its offset from the racing line moves in the first step: where an owing path steers now.</summary>
+            public float SoonOff;
             public string Rejected;
             public float Score;
             /// <summary>What the score is made of, in seconds: ground covered, closeness to cars, time stuck behind one.</summary>
@@ -123,7 +129,7 @@ namespace TarmacGauntlet.Raceday
             float here = Mathf.Repeat(me.Distance, lap);
             lapLength = lap;
             Gather(c, me, field);
-            Predict(c);
+            Predict(c, me);
 
             // What the cars around ask of this one, from where they are now.
             float mySpeed = me.Speed;
@@ -159,11 +165,16 @@ namespace TarmacGauntlet.Raceday
             Candidates.Clear();
             float[] shifts = pilot.Gliding ? FarShifts : NearShifts;
             int pedals = pilot.Gliding ? 2 : 3;
-            for (int s = -2; s < shifts.Length; s++)
+            // A car alongside on the inside into the corner: also the line that leaves it exactly its width.
+            bool owedNear = false;
+            if (nextTurn != 0)
+                foreach (TrafficCar o in others)
+                    if (Mathf.Abs(Road(o.Distance - me.Distance, lap)) < 2f * CarL && Mathf.Sign(o.Lateral - me.Lateral) == -nextTurn && Mathf.Abs(o.Speed) >= StoppedSpeed) owedNear = true;
+            for (int s = owedNear ? -3 : -2; s < shifts.Length; s++)
                 for (int p = 0; p < pedals; p++)
                 {
                     // -2 stays where it is across the track, -1 holds where it was heading.
-                    var cand = new Candidate { Shift = s == -2 ? myOffset : s < 0 ? Target : shifts[s], Stay = s == -2, Pedal = pilot.Gliding && p == 1 ? Pedal.Brake : (Pedal)p };
+                    var cand = new Candidate { Shift = s == -3 ? 0f : s == -2 ? myOffset : s < 0 ? Target : shifts[s], Stay = s == -2, Owe = s == -3, Pedal = pilot.Gliding && p == 1 ? Pedal.Brake : (Pedal)p };
                     if (s == -1 && Mathf.Abs(Target - shifts[0]) < 0.01f) continue;   // holding is heading for the line
                     bool away = !cand.Stay && Mathf.Abs(cand.Shift) > Mathf.Abs(myOffset) + 0.3f;
                     // A defensive move goes off the line towards the attacker's side: moving away from it leaves room.
@@ -202,7 +213,8 @@ namespace TarmacGauntlet.Raceday
                 }
             if (best == null) best = Candidates[0];
             Chosen = best;
-            Target = best.Shift;
+            // The pilot's own offset, not where the car is, as the car lags what its pilot steers.
+            Target = best.Owe ? pilot.Offset + best.SoonOff : best.Shift;
             Cap = CapAt(best.Pedal, ahead, 0, mySpeed, me.Distance, margin);
             lastShift = best.Shift;
             lastPedal = best.Pedal;
@@ -260,7 +272,7 @@ namespace TarmacGauntlet.Raceday
             SpeedProfile prof = pilot.Profile;
             float lap = c.Lap;
             float d = me.Distance, lat = me.Lateral, v = me.Speed;
-            float holdOffset = me.Lateral - line.Lateral[c.IndexOf(Mathf.Repeat(d, lap))];
+            float holdOffset = me.Lateral - line.Lateral[c.IndexOf(Mathf.Repeat(d, lap))], off = holdOffset;
             float over = 0f, risk = 0f, yellow = 0f;
             bool onTrack = OnTrack(c, me.Lateral, me.Distance);
             float turnIn = NextCornerStart(c, Mathf.Repeat(d, lap));
@@ -272,8 +284,24 @@ namespace TarmacGauntlet.Raceday
                 int k = c.IndexOf(Mathf.Repeat(d, lap));
                 // Paths keep to the lanes the pilot steers, which stay clear of the edge.
                 float edge = Mathf.Max(c.HalfWidth(k) - RacingLine.EdgeMargin, 0f);
-                float want = Mathf.Clamp(cand.Stay ? me.Lateral : line.Lateral[k] + (s * Tick <= cand.Delay ? holdOffset : cand.Shift), -edge, edge);
-                lat = Mathf.MoveTowards(lat, want, Endurance.OvertakeOffsetRate * Tick);
+                // The pilot steers the line plus an offset, and the offset is what moves at the overtake rate.
+                float wantOff = cand.Stay ? me.Lateral - line.Lateral[k] : s * Tick <= cand.Delay ? holdOffset : cand.Shift;
+                off = Mathf.MoveTowards(off, wantOff, Endurance.OvertakeOffsetRate * Tick);
+                lat = Mathf.Clamp(line.Lateral[k] + off, -edge, edge);
+                if (cand.Owe && nextTurn != 0)
+                {
+                    // Its width from the edge, and clear of the car there now, wherever that car has got to.
+                    float ins = -nextTurn;
+                    float bound = c.HalfWidth(k) - 1.5f * CarW - RoomMargin - 0.15f;
+                    for (int j = 0; j < others.Count; j++)
+                    {
+                        float gj = Road(od[j, s] - d, lap);
+                        if (stopped[j] || Mathf.Abs(gj) > CarL + 2f || ins * (ol[j, s] - lat) <= 0f) continue;
+                        bound = Mathf.Min(bound, ins * ol[j, s] - (Clear(margin) + reach[j] - 0.5f * CarW + 0.1f));
+                    }
+                    if (ins * lat > bound) { lat = ins * bound; off = lat - line.Lateral[k]; }
+                }
+                if (s == 1) cand.SoonOff = off - holdOffset;
                 float lane = pilot.LaneSpeed(k, lat - line.Lateral[k]);
                 float limit = Mathf.Min(lane, CapAt(cand.Pedal, ahead, s, me.Speed, d, margin));
                 if (v < limit)
@@ -332,7 +360,10 @@ namespace TarmacGauntlet.Raceday
                     // H8: at turn-in, overlapped or backed out, never alongside short of it.
                     if (broke == null && crossing && g > 0.9f * CarL && g < CarL + 15f && apart > 1.2f && apart < 4f) broke = "H8";
                     // Risk: how close the path runs to each car.
-                    if (Mathf.Abs(g) < CarL + 3f && apart - CarW < 2f) risk += SideRisk * Mathf.Exp(-(apart - CarW) / 0.5f) * Tick;
+                    // A car alongside on its inside into a corner is owed a car's width (H2) and no more:
+                    // running close to it there is no risk to weigh, or the car would back off and wave it by.
+                    bool owedInside = nextTurn != 0 && !stopped[j] && Mathf.Abs(g) < CarL && Mathf.Sign(side) == -nextTurn;
+                    if (!owedInside && Mathf.Abs(g) < CarL + 3f && apart - CarW < 2f) risk += SideRisk * Mathf.Exp(-(apart - CarW) / 0.5f) * Tick;
                     // Closing on a car in its lane: the sooner it would reach it, the riskier. Following at its speed is not.
                     float closing = v - ov[j, s];
                     if (g > 0f && apart < CarW + RoomMargin && closing > 0.5f) risk += CloseRisk * Mathf.Exp(-Mathf.Max(g - CarL, 0f) / closing) * Tick;
@@ -359,12 +390,14 @@ namespace TarmacGauntlet.Raceday
                 heldOut = !stopped[j] && Mathf.Abs(g) < 2f * CarL && Mathf.Sign(toCar) == -Mathf.Sign(offEnd) && Mathf.Abs(toCar) < Mathf.Abs(offEnd) + CarW;
             }
             float back = heldOut ? 0f : Endurance.OvertakeOffsetRate / Mathf.Max(v, 10f);
-            for (float x = 0f; x < TailLook; x += 10f)
+            // Up to the same point for every path, so one that gets further isn't charged for more of the corner.
+            float tail = me.Distance + Mathf.Max(me.Speed, 10f) * Steps * Tick + TailLook - d;
+            for (float x = 0f; x < tail; x += 10f)
             {
                 int k = c.IndexOf(Mathf.Repeat(d + x, lap));
-                float off = Mathf.Sign(offEnd) * Mathf.Max(Mathf.Abs(offEnd) - back * x, 0f);
-                if (off == 0f) break;
-                score -= 0.5f * 10f * (1f / Mathf.Max(pilot.LaneSpeed(k, off), 1f) - 1f / Mathf.Max(pilot.LaneSpeed(k, 0f), 1f));
+                float tailOff = Mathf.Sign(offEnd) * Mathf.Max(Mathf.Abs(offEnd) - back * x, 0f);
+                if (tailOff == 0f) break;
+                score -= 0.5f * 10f * (1f / Mathf.Max(pilot.LaneSpeed(k, tailOff), 1f) - 1f / Mathf.Max(pilot.LaneSpeed(k, 0f), 1f));
             }
             // Ending behind a slower car, in its lane or beside it but not yet by, with too little of
             // the straight left to get by before braking: the time lost staying there until the next
@@ -432,7 +465,7 @@ namespace TarmacGauntlet.Raceday
         /// Where each car near will be at each step: at the speeds its own line gives, slowing for a
         /// car ahead of it in its lane, and drifting across as it is now for a second.
         /// </summary>
-        private void Predict(Circuit c)
+        private void Predict(Circuit c, TrafficCar me)
         {
             int n = others.Count;
             if (od.GetLength(0) < n) { od = new float[n, Steps + 1]; ol = new float[n, Steps + 1]; ov = new float[n, Steps + 1]; }
@@ -470,9 +503,13 @@ namespace TarmacGauntlet.Raceday
                     float lat;
                     if (o.Planned && o.Profile != null)
                     {
+                        // Its offset from its own line moves at the overtake rate, as its pilot steers.
                         float edge = Mathf.Max(c.HalfWidth(k) - RacingLine.EdgeMargin, 0f);
-                        float aim = Mathf.Clamp(o.Profile.Line.Lateral[k] + o.Aim, -edge, edge);
-                        lat = Mathf.MoveTowards(ol[j, s - 1], aim, Endurance.OvertakeOffsetRate * Tick);
+                        float was = ol[j, s - 1] - o.Profile.Line.Lateral[k];
+                        lat = Mathf.Clamp(o.Profile.Line.Lateral[k] + Mathf.MoveTowards(was, o.Aim, Endurance.OvertakeOffsetRate * Tick), -edge, edge);
+                        // A car alongside doesn't close in on this one: its own limits keep it off, as this car's keep it off that one.
+                        float g0 = Road(od[j, 0] - me.Distance, lap);
+                        if (Mathf.Abs(g0) < CarL + 2f && Mathf.Abs(lat - me.Lateral) < Mathf.Abs(ol[j, s - 1] - me.Lateral)) lat = ol[j, s - 1];
                     }
                     else lat = o.Lateral + o.Across * Mathf.Min(t, 1f);
                     float d = od[j, s - 1] + v * Tick;
