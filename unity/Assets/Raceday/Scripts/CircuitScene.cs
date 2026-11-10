@@ -222,6 +222,7 @@ namespace TarmacGauntlet.Raceday
             views.Keys = keys;
             views.Hud = cam.gameObject.AddComponent<DriveHud>();
             views.Hud.Car = cars[cars.Length - 1];
+            cam.gameObject.AddComponent<FpsCounter>();
         }
     }
 }
