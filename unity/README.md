@@ -23,7 +23,13 @@ compiles in Unity.
 ## Raceday scene
 
 `Assets/Raceday/Raceday.unity` opens when the editor starts. Press Play and the AI drives the Seorak
-Cheonma CX-24Si from pole. `I` hands the car to you, and pressing it again hands it back.
+Cheonma CX-24Si. `I` hands the car to you, and pressing it again hands it back.
+
+Start on the scene's `CircuitScene` picks how the race starts. Pit Lane (the default): the 100 cars
+queue in the pit lane's fast lane, quickest first with the Cheonma last, and leave ten seconds apart
+(`PitLaneStart.cs`). The scene fast forwards at 32x until just before the car ahead of the Cheonma
+leaves; `F` or `I` ends the fast forward early. Pit stops open once every car is out of the pit lane, and
+every car starts on a full tank. Rolling starts behind the pace car, and Grid races from the grid at once.
 
 AI driver (`AiDriver` on the car): Pace, Consistency and Safety (0 to 100) can be changed in the
 inspector during Play. Pace sets how much of the car's grip and braking it uses (86% at 0, 98% at 100),
@@ -47,7 +53,8 @@ leaving the track and within 5% of its predicted time, that Pace, Consistency an
 say, and that overcooked corners cost time. `run.sh glide` checks gliding: every model's gliding lap
 is within 1.5% of its driven one, a gliding mistake costs about what a driven one does, cars switch
 between gliding and physics without leaving the track or touching, 100 gliding cars at 16x keep their
-pace, and gliding cars still pit and start rolling with the pack. `StandInCar.cs` copies `CarController`'s formulas, so keep
+pace, gliding cars still pit and start rolling with the pack, and the pit lane start sends all 100
+cars out cleanly (`run.sh pitstart` for the same with a line per car). `StandInCar.cs` copies `CarController`'s formulas, so keep
 it in step when those change.
 
 Driving: left and right arrows steer, up accelerates, down brakes (hold it at a standstill to

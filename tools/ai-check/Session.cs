@@ -1,6 +1,7 @@
 // A race session in StandInCar run the way the raceday scene runs it: the rolling start behind the
-// pace car, then racing with fuel, tyre wear and AI pit stops. RaceCar, RaceStart and AiDriver's
-// glue is copied here; the deciding is done by the same AiRacer, PitPlan, RollingStart and PitLane.
+// pace car or the pit lane start, then racing with fuel, tyre wear and AI pit stops. RaceCar, RaceStart and AiDriver's
+// glue (and PitStart's) is copied here; the deciding is done by the same AiRacer, PitPlan, RollingStart,
+// PitLaneStart and PitLane.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -36,6 +37,8 @@ sealed class SessionCar
     /// <summary>Time since the gliding car last stepped, and how many times it switched to or from gliding.</summary>
     public float GlideClock;
     public int Handovers;
+    /// <summary>Pit lane start: when the car first moved, and when it rejoined its racing line.</summary>
+    public float Moved = -1f, Out = -1f;
     /// <summary>Pit stops booked while gliding.</summary>
     public int GlidingStops;
 }
@@ -48,6 +51,12 @@ sealed class Session
     public readonly List<SessionCar> Cars = new List<SessionCar>();
     public readonly List<Contact> Contacts = new List<Contact>();
     public readonly RollingStart Start;
+    /// <summary>The pit lane start, or null.</summary>
+    public readonly PitLaneStart PitStart;
+    /// <summary>Pit lane start: true once every car is out of the pit lane, and pit stops are open.</summary>
+    public bool PitsOpen;
+    AiPilot[] routes;
+    float[] laneLimits;
     public StandInCar PaceCar;
     public bool PaceCarGone;
     public float Time, GreenTime = -1f;
@@ -85,13 +94,14 @@ sealed class Session
 
     static readonly int TraceEvery = int.TryParse(Environment.GetEnvironmentVariable("PIT_EVERY"), out int te) ? te : 50;
 
-    public bool Racing => Start == null || Start.State == RollingStart.Phase.Green;
+    public bool Racing => PitStart != null ? PitsOpen : Start == null || Start.State == RollingStart.Phase.Green;
 
     /// <summary>
     /// The field from its grid places, pole first, each car with its share of a tank. With
-    /// <c>rolling</c> it starts behind the pace car; otherwise it races from the grid at once.
+    /// <c>rolling</c> it starts behind the pace car; with <c>pitLane</c> it queues in the pit lane
+    /// and leaves a car at a time; otherwise it races from the grid at once.
     /// </summary>
-    public Session(Circuit circuit, RacingLine minimum, IList<(string Model, float Fuel)> entries, bool rolling, Func<string, RacingLine> lineFor, int seed = 11)
+    public Session(Circuit circuit, RacingLine minimum, IList<(string Model, float Fuel)> entries, bool rolling, Func<string, RacingLine> lineFor, int seed = 11, bool pitLane = false)
     {
         this.circuit = circuit;
         pits = new PitLane(circuit);
@@ -124,6 +134,19 @@ sealed class Session
             car.Last = k;
             car.Laps = k * circuit.Step > circuit.Lap * 0.5f ? -1 : 0;
             Cars.Add(car);
+        }
+        if (pitLane)
+        {
+            PitStart = new PitLaneStart(pits, minimum, Cars.Count);
+            routes = new AiPilot[Cars.Count];
+            laneLimits = pits.Limits();
+            foreach (SessionCar c in Cars)
+            {
+                c.Car.Wake(PitStart.Place(c.Slot, out Vector3 forward), forward, 0f, 0f, 0f);
+                int k = Math.Max(c.Car.TrackIndex, 0);
+                c.Last = k;
+                c.Laps = k * circuit.Step > circuit.Lap * 0.5f ? -1 : 0;
+            }
         }
         if (!rolling) return;
         var specs = new List<CarSpec>();
@@ -176,7 +199,8 @@ sealed class Session
             AiRacer r = s.Racer;
             StandInCar car = s.Car;
             bool held = caps != null && Start.Holds(s.Laps);
-            if (held)
+            if (PitStart != null) BriefPitStart(s);
+            else if (held)
             {
                 if (!formation.TryGetValue(s.Id, out AiPilot f))
                     formation[s.Id] = f = new AiPilot(columns[s.Slot % 2], car.Spec, r.Pilot.Pace, 100f, 100f, s.Id + 1, lanes: false);
@@ -212,6 +236,11 @@ sealed class Session
             Watch(s, c);
         }
         MostInLane = Math.Max(MostInLane, inLane);
+        if (PitStart != null)
+        {
+            PitStart.Tick(Dt);
+            if (!PitsOpen) PitsOpen = Cars.All(c => c.Out >= 0f);
+        }
         if (PaceCar != null && !PaceCarGone)
         {
             AiPilot.Controls pc = paceDriver.Drive(PaceCar.Position, PaceCar.Forward, PaceCar.Velocity, PaceCar.YawRate);
@@ -220,6 +249,28 @@ sealed class Session
         }
         Collide();
         Time += Dt;
+    }
+
+    /// <summary>PitStart's part: held in the queue until its turn, then out along the route behind anything ahead on it.</summary>
+    void BriefPitStart(SessionCar s)
+    {
+        AiRacer r = s.Racer;
+        if (s.Out >= 0f)
+        {
+            r.InFormation = false;
+            return;
+        }
+        AiPilot route = routes[s.Slot] ??= new AiPilot(PitStart.Route, s.Car.Spec, r.Pilot.Pace, 100f, 100f, s.Id + 1, lanes: false, maxSpeed: laneLimits);
+        if (route.Index >= 0 && PitStart.Out(route.Index))
+        {
+            s.Out = Time;
+            r.InFormation = false;
+            return;
+        }
+        if (s.Moved < 0f && s.Car.Speed > 1f) s.Moved = Time;
+        r.Formation = route;
+        r.InFormation = true;
+        r.FormationCap = PitStart.Gone(s.Slot) ? PitPlan.Follow(route, s.Car.Position, s.Id, all, s.Car.Spec) : 0f;
     }
 
     /// <summary>PhysicsRange taking a car off physics: it glides on from where it is.</summary>

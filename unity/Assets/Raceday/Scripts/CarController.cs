@@ -496,10 +496,13 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>Puts the car at rest on the track at a sample and lateral offset, facing forwards.</summary>
-        public void PlaceAt(int k, float lateral)
+        public void PlaceAt(int k, float lateral) => PlaceAt(Circuit.Surface(k, lateral), Circuit.Forward[k]);
+
+        /// <summary>Puts the car at rest with its wheels on the ground at a point, facing a direction.</summary>
+        public void PlaceAt(Vector3 ground, Vector3 forward)
         {
-            Vector3 p = Circuit.Surface(k, lateral) + Vector3.up * 0.05f;
-            Quaternion r = Quaternion.LookRotation(Circuit.Forward[k], Vector3.up);
+            Vector3 p = ground + Vector3.up * 0.05f;
+            Quaternion r = Quaternion.LookRotation(new Vector3(forward.x, 0f, forward.z), Vector3.up);
             body.position = p;
             body.rotation = r;
             transform.SetPositionAndRotation(p, r);

@@ -153,7 +153,7 @@ namespace TarmacGauntlet.Raceday
                 case Stage.ToBox:
                 {
                     float toBox = ToBox(position, p.Index);
-                    p.SpeedCap = Mathf.Min(Follow(position, velocity, id, cars, spec), Mathf.Sqrt(2f * StopBraking * Mathf.Max(toBox - 0.3f, 0f)));
+                    p.SpeedCap = Mathf.Min(Follow(p, position, id, cars, spec), Mathf.Sqrt(2f * StopBraking * Mathf.Max(toBox - 0.3f, 0f)));
                     if (toBox < 0.5f || (toBox < 1.5f && speed < 0.5f))
                     {
                         State = Stage.Stopped;
@@ -169,7 +169,7 @@ namespace TarmacGauntlet.Raceday
                     if (Service.Done && FastLaneClear(id, cars)) State = Stage.Leaving;
                     return State == Stage.Stopped;
                 case Stage.Leaving:
-                    p.SpeedCap = Follow(position, velocity, id, cars, spec);
+                    p.SpeedCap = Follow(p, position, id, cars, spec);
                     int past = c.Wrap(p.Index - boxSample);
                     if (past < c.Count / 2 && past >= c.Wrap(rejoinSample - boxSample)) State = Stage.Racing;
                     return false;
@@ -189,13 +189,15 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>
-        /// Fastest the car may go to keep a safe gap to the nearest car ahead on its route, m/s:
-        /// it could stop in its own braking distance if that car stopped as hard as it can.
+        /// Fastest a car driving a route may go to keep a safe gap to the nearest car ahead on it, m/s:
+        /// it could stop in its own braking distance if that car stopped as hard as it can. A car
+        /// standing still beside the route, as in a box, is passed.
         /// </summary>
-        private float Follow(Vector3 position, Vector3 velocity, int id, IReadOnlyList<CarState> cars, CarSpec spec)
+        public static float Follow(AiPilot route, Vector3 position, int id, IReadOnlyList<CarState> cars, CarSpec spec)
         {
-            RacingLine line = Route.Line;
-            int k = Route.Index;
+            RacingLine line = route.Line;
+            int k = route.Index;
+            if (k < 0) return float.PositiveInfinity;
             Vector3 t = line.Tangent[k];
             float brake = spec.BrakeDecel * 9.81f * 0.8f;
             float cap = float.PositiveInfinity;
