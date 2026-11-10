@@ -1005,20 +1005,106 @@ namespace TarmacGauntlet.Raceday
 
         // ---------------------------------------------------------------- ground
 
+        /// <summary>Ground cells per side of a ground tile.</summary>
+        private const int GroundTile = 16;
+
+        /// <summary>
+        /// The ground in square tiles. Tiles near anything laid on the ground keep every point. Farther out
+        /// they keep every second, then every fourth. Points on a tile's edge sit on the straight line between
+        /// the coarser neighbour's points, so tiles meet without cracks, and normals come from the full grid
+        /// so the shading has no seams.
+        /// </summary>
         private void Ground()
         {
             GroundData t = c.Data.terrain;
-            var rows = new List<Vector3[]>(t.countZ);
-            for (int z = 0; z < t.countZ; z++)
+            int lastX = t.countX - 1, lastZ = t.countZ - 1;
+            int tilesX = (lastX + GroundTile - 1) / GroundTile, tilesZ = (lastZ + GroundTile - 1) / GroundTile;
+
+            // Tiles away from the nearest tile with something laid on it.
+            var away = new int[tilesX, tilesZ];
+            for (int i = 0; i < tilesX; i++) for (int j = 0; j < tilesZ; j++) away[i, j] = int.MaxValue;
+            var queue = new Queue<(int, int)>();
+            foreach (CircuitPart part in parts)
+                foreach (Vector3 v in part.Kit.Vertices)
+                {
+                    int i = Mathf.Clamp(Mathf.FloorToInt((v.x - t.originX) / t.spacing / GroundTile), 0, tilesX - 1);
+                    int j = Mathf.Clamp(Mathf.FloorToInt((v.z - t.originZ) / t.spacing / GroundTile), 0, tilesZ - 1);
+                    if (away[i, j] == 0) continue;
+                    away[i, j] = 0;
+                    queue.Enqueue((i, j));
+                }
+            while (queue.Count > 0)
             {
-                var row = new Vector3[t.countX];
-                for (int x = 0; x < t.countX; x++)
-                    row[x] = new Vector3(t.originX + x * t.spacing, c.TerrainHeightAt(x, z), t.originZ + z * t.spacing);
-                rows.Add(row);
+                var (i, j) = queue.Dequeue();
+                for (int di = -1; di <= 1; di++)
+                    for (int dj = -1; dj <= 1; dj++)
+                    {
+                        int a = i + di, b = j + dj;
+                        if (a < 0 || b < 0 || a >= tilesX || b >= tilesZ || away[a, b] <= away[i, j] + 1) continue;
+                        away[a, b] = away[i, j] + 1;
+                        queue.Enqueue((a, b));
+                    }
             }
+            int Stride(int i, int j) =>
+                i < 0 || j < 0 || i >= tilesX || j >= tilesZ ? 1 : away[i, j] <= 1 ? 1 : away[i, j] <= 3 ? 2 : 4;
+
+            float H(int x, int z) => c.TerrainHeightAt(x, z);
+            // Height along a grid line, on the straight line between points a stride apart.
+            float Along(int at, int stride, int last, Func<int, float> h)
+            {
+                int a = at / stride * stride, b = Mathf.Min(a + stride, last);
+                return a == at || b == a ? h(at) : Mathf.Lerp(h(a), h(b), (at - a) / (float)(b - a));
+            }
+            float Height(int x, int z)
+            {
+                bool onX = x % GroundTile == 0, onZ = z % GroundTile == 0;
+                if (onX && onZ) return H(x, z);
+                int ti = x / GroundTile, tj = z / GroundTile;
+                if (onX)
+                {
+                    int s = Mathf.Max(Stride(ti - 1, tj), Stride(ti, tj));
+                    return Along(z, s, lastZ, zz => H(x, zz));
+                }
+                if (onZ)
+                {
+                    int s = Mathf.Max(Stride(ti, tj - 1), Stride(ti, tj));
+                    return Along(x, s, lastX, xx => H(xx, z));
+                }
+                return H(x, z);
+            }
+            Vector3 NormalAt(Vector3 p)
+            {
+                int x = Mathf.Clamp(Mathf.RoundToInt((p.x - t.originX) / t.spacing), 0, lastX);
+                int z = Mathf.Clamp(Mathf.RoundToInt((p.z - t.originZ) / t.spacing), 0, lastZ);
+                int x0 = Mathf.Max(x - 1, 0), x1 = Mathf.Min(x + 1, lastX), z0 = Mathf.Max(z - 1, 0), z1 = Mathf.Min(z + 1, lastZ);
+                float dx = (H(x1, z) - H(x0, z)) / ((x1 - x0) * t.spacing);
+                float dz = (H(x, z1) - H(x, z0)) / ((z1 - z0) * t.spacing);
+                return new Vector3(-dx, 1f, -dz).normalized;
+            }
+            Vector2 UvAt(Vector3 p) => new Vector2(p.x / 8f, p.z / 8f);
+
             var kit = new MeshKit();
-            kit.Strip(rows, 8f, 8f);
+            for (int i = 0; i < tilesX; i++)
+                for (int j = 0; j < tilesZ; j++)
+                {
+                    int s = Stride(i, j);
+                    var xs = Steps(i * GroundTile, Mathf.Min((i + 1) * GroundTile, lastX), s);
+                    var zs = Steps(j * GroundTile, Mathf.Min((j + 1) * GroundTile, lastZ), s);
+                    var rows = new List<Vector3[]>(zs.Count);
+                    foreach (int z in zs)
+                        rows.Add(xs.ConvertAll(x => new Vector3(t.originX + x * t.spacing, Height(x, z), t.originZ + z * t.spacing)).ToArray());
+                    kit.Strip(rows, 8f, 8f, false, NormalAt, UvAt);
+                }
             Emit("Ground", kit, m?.Terrain, true);
+        }
+
+        /// <summary>Grid indices from one to another a stride apart, always ending on the last.</summary>
+        private static List<int> Steps(int from, int to, int stride)
+        {
+            var list = new List<int>();
+            for (int v = from; v < to; v += stride) list.Add(v);
+            list.Add(to);
+            return list;
         }
 
         private static readonly HashSet<string> Standing = new HashSet<string> { "Armco", "Tyre walls", "Pit wall", "Pit entry bollard" };
@@ -1083,34 +1169,56 @@ namespace TarmacGauntlet.Raceday
             sign > 0 ? new[] { Mathf.Max(a, b), Mathf.Min(a, b) } : new[] { -Mathf.Min(a, b), -Mathf.Max(a, b) };
 
         /// <summary>
-        /// Runoff between two distances from the centre along a run, in columns about a metre apart so it
-        /// can follow the ground. Where the column count changes from one row to the next, the two rows are
-        /// zipped together as they are, so every point is laid by <see cref="Point"/> and the rows meet
-        /// the strips either side exactly.
+        /// Runoff between two distances from the centre along a run. Where it eases off the road it has
+        /// columns a metre apart on every row. Once settled on the ground, where <see cref="Conform"/> cuts it
+        /// along the ground's folds anyway, its columns are a ground cell apart.
         /// </summary>
         private void Band(MeshKit kit, List<int> run, float sign, Func<int, float> inner, Func<int, float> outer, float lift, float tile)
         {
-            int Cols(int k) => Mathf.Max(2, Mathf.CeilToInt(Mathf.Abs(outer(k) - inner(k))) + 1);
-            Vector3[] Row(int k, int cols)
+            int side = sign > 0 ? 0 : 1;
+            float Lo(int k) => Mathf.Min(inner(k), outer(k));
+            float Hi(int k) => Mathf.Max(inner(k), outer(k));
+            // Where the runoff has settled onto the ground, as a distance from the centre.
+            float Settled(int k) => level[side][k] > 0f ? Hi(k) : Mathf.Clamp(c.HalfWidth(k) + Verge + EaseLength(side, k), Lo(k), Hi(k));
+            // A point at a distance from the centre, on the band's side.
+            Vector3 At(int k, float d) => Point(k, sign * d, lift, true);
+            // Rows run left to right: outermost first on the left side, innermost first on the right.
+            Vector3[] LeftToRight(List<Vector3> innerFirst)
             {
-                var row = new Vector3[cols];
-                float lo = Mathf.Min(inner(k), outer(k)), hi = Mathf.Max(inner(k), outer(k));
-                for (int j = 0; j < cols; j++)
-                {
-                    float t = j / (float)(cols - 1);
-                    // Ordered left to right: outermost first on the left side, innermost first on the right.
-                    row[j] = Point(k, sign > 0 ? hi - (hi - lo) * t : -(lo + (hi - lo) * t), lift, true);
-                }
-                return row;
+                if (sign > 0) innerFirst.Reverse();
+                return innerFirst.ToArray();
+            }
+
+            // Easing part: every row, a metre between columns.
+            Vector3[] EaseRow(int k)
+            {
+                float lo = Lo(k), hi = Settled(k);
+                int n = Mathf.Max(1, Mathf.CeilToInt(hi - lo - 1e-3f));
+                var pts = new List<Vector3>();
+                for (int j = 0; j <= n; j++) pts.Add(At(k, lo + (hi - lo) * j / n));
+                return LeftToRight(pts);
             }
             int from = 0;
             for (int r = 1; r <= run.Count; r++)
             {
-                if (r < run.Count && Cols(run[r]) == Cols(run[from])) continue;
-                if (r - from > 1) kit.Strip(run.GetRange(from, r - from).ConvertAll(k => Row(k, Cols(k))), tile, tile);
-                if (r < run.Count) kit.Zip(Row(run[r - 1], Cols(run[r - 1])), Row(run[r], Cols(run[r])), tile);
+                if (r < run.Count && EaseRow(run[r]).Length == EaseRow(run[from]).Length) continue;
+                if (r - from > 1) kit.Strip(run.GetRange(from, r - from).ConvertAll(EaseRow), tile, tile);
+                if (r < run.Count) kit.Zip(EaseRow(run[r - 1]), EaseRow(run[r]), tile);
                 from = r;
             }
+
+            // Settled part, from the settled line out to the band's outer edge.
+            float widest = 0f;
+            foreach (int k in run) widest = Mathf.Max(widest, Hi(k) - Settled(k));
+            if (widest < 0.05f) return;
+            int cols = Mathf.Max(1, Mathf.CeilToInt(widest / c.Data.terrain.spacing));
+            Vector3 Across(int k, float u) => At(k, Mathf.Lerp(Settled(k), Hi(k), u));
+            kit.Strip(run.ConvertAll(k =>
+            {
+                var pts = new List<Vector3>();
+                for (int j = 0; j <= cols; j++) pts.Add(Across(k, j / (float)cols));
+                return LeftToRight(pts);
+            }), tile, tile);
         }
 
         /// <summary>Rows of surface points at the given lateral offsets (left positive, ordered left to right).</summary>
@@ -1157,11 +1265,7 @@ namespace TarmacGauntlet.Raceday
                     // A narrow unfenced runoff eases over its own width, so its outer edge still lands on the
                     // ground. Against armco it needn't, and stays near the road's plane instead of dropping
                     // steeply over a strip too narrow to ease across.
-                    int side = lateral > 0 ? 0 : 1;
-                    float reach = barrier[side]?[k] ?? 0f;
-                    bool armco = (fenced[side]?[k] ?? false) && !(pitWall[side]?[k] ?? false);
-                    if (armco) reach = float.MaxValue;
-                    float ease = Mathf.Clamp(Mathf.Min(reach - Verge, endEase[side]?[k] ?? RunoffEase), 0.25f, RunoffEase);
+                    float ease = EaseLength(lateral > 0 ? 0 : 1, k);
                     float t = Mathf.Clamp01((beyond - Verge) / ease + 1e-4f);   // the outer edge itself counts as settled
                     p.y = Settle(p, t);
                 }
@@ -1169,6 +1273,15 @@ namespace TarmacGauntlet.Raceday
                 if (flat > 0f) p.y = Mathf.Lerp(p.y, c.Surface(k, lateral).y + 0.01f, flat);
             }
             return p + Vector3.up * lift;
+        }
+
+        /// <summary>How far past the verge the runoff on one side at sample k takes to settle onto the ground.</summary>
+        private float EaseLength(int side, int k)
+        {
+            float reach = barrier[side]?[k] ?? 0f;
+            bool armco = (fenced[side]?[k] ?? false) && !(pitWall[side]?[k] ?? false);
+            if (armco) reach = float.MaxValue;
+            return Mathf.Clamp(Mathf.Min(reach - Verge, endEase[side]?[k] ?? RunoffEase), 0.25f, RunoffEase);
         }
 
         /// <summary>Height to lay runoff at: just over the ground. <see cref="Conform"/> then makes it follow
@@ -1257,10 +1370,16 @@ namespace TarmacGauntlet.Raceday
             return o;
         }
 
+        /// <summary>Cells the circuit's meshes are cut into, so the camera skips whatever is off screen.</summary>
+        private const float ChunkSize = 200f;
+
         private void Emit(string name, MeshKit kit, Material material, bool solid = false)
         {
-            if (Draped.Contains(name)) kit = Conform(kit);
-            if (!kit.IsEmpty) parts.Add(new CircuitPart(name, kit, material, solid));
+            if (Draped.Contains(name)) kit = Conform(kit).Welded();
+            // Only things standing up cast a shadow worth drawing; flat cover just receives them.
+            bool shadows = Standing.Contains(name) || name.StartsWith("Garage");
+            foreach (MeshKit chunk in kit.Chunks(ChunkSize))
+                if (!chunk.IsEmpty) parts.Add(new CircuitPart(name, chunk, material, solid, shadows));
         }
 
         /// <summary>Surfaces laid over the ground rather than at a height of their own.</summary>

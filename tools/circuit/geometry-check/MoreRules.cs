@@ -288,4 +288,40 @@ static partial class Check
             yield return (e.b, outward);
         }
     }
+
+    /// <summary>
+    /// The circuit stays cheap to draw: at most 400k triangles and 300k vertices in all, and no mesh wider
+    /// than 300 m across, so the camera skips whatever is off screen instead of drawing the whole lap.
+    /// </summary>
+    static void Budget(List<CircuitPart> parts)
+    {
+        // The whole circuit, any one mesh, and how wide one mesh may spread so unseen ones are culled.
+        const int MaxTriangles = 1_000_000, MaxVertices = 600_000, MaxMeshTriangles = 40_000;
+        const float MaxSpan = 300f;
+        int tris = 0, verts = 0, biggest = 0;
+        var bad = new List<(float, Vector3, string)>();
+        var byPart = new Dictionary<string, (int t, int v, int meshes)>();
+        foreach (CircuitPart p in parts)
+        {
+            int t = p.Kit.Triangles.Count / 3, v = p.Kit.Vertices.Count;
+            tris += t;
+            verts += v;
+            byPart.TryGetValue(p.Name, out var e);
+            byPart[p.Name] = (e.t + t, e.v + v, e.meshes + 1);
+            float x0 = float.MaxValue, x1 = float.MinValue, z0 = float.MaxValue, z1 = float.MinValue;
+            foreach (Vector3 q in p.Kit.Vertices) { x0 = Math.Min(x0, q.x); x1 = Math.Max(x1, q.x); z0 = Math.Min(z0, q.z); z1 = Math.Max(z1, q.z); }
+            float span = Math.Max(x1 - x0, z1 - z0);
+            var middle = new Vector3((x0 + x1) / 2, 0, (z0 + z1) / 2);
+            if (span > MaxSpan) bad.Add((span - MaxSpan, middle, p.Name));
+            if (t > MaxMeshTriangles) bad.Add((t - MaxMeshTriangles, middle, $"{p.Name} mesh of {t} triangles"));
+            biggest = Math.Max(biggest, t);
+        }
+        if (Environment.GetEnvironmentVariable("GC_KINDS") != null)
+            foreach (var kv in byPart.OrderByDescending(kv => kv.Value.t))
+                Console.WriteLine($"  budget: {kv.Key} {kv.Value.t} triangles {kv.Value.v} vertices in {kv.Value.meshes} meshes");
+        if (Environment.GetEnvironmentVariable("GC_KINDS") != null) Console.WriteLine($"  budget: biggest mesh {biggest} triangles");
+        if (tris > MaxTriangles) bad.Add((tris - MaxTriangles, default, $"{tris} triangles in all"));
+        if (verts > MaxVertices) bad.Add((verts - MaxVertices, default, $"{verts} vertices in all"));
+        Report("cheap to draw", bad, parts.Count, $"meshes, {tris} triangles, {verts} vertices", "over");
+    }
 }

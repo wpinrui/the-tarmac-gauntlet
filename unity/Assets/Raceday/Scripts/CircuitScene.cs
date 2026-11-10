@@ -50,7 +50,9 @@ namespace TarmacGauntlet.Raceday
                 go.transform.SetParent(track.transform, false);
                 Mesh mesh = part.Kit.ToMesh(part.Name);
                 go.AddComponent<MeshFilter>().sharedMesh = mesh;
-                go.AddComponent<MeshRenderer>().sharedMaterial = part.Material;
+                var renderer = go.AddComponent<MeshRenderer>();
+                renderer.sharedMaterial = part.Material;
+                if (!part.CastsShadows) renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 if (part.Solid)
                 {
                     go.AddComponent<MeshCollider>().sharedMesh = mesh;
