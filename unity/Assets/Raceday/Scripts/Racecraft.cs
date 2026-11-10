@@ -96,8 +96,10 @@ namespace TarmacGauntlet.Raceday
     /// 3. Braking: for each car on a collision course, brake fully when the distance needed to slow to
     ///    its speed is longer than the gap to it (filterBColl).
     /// 4. Side collisions: when the nearest car alongside is within 2 m and this car is heading towards
-    ///    it, the steering is blended towards running parallel to it, applied by
-    ///    <see cref="AiPilot.Drive"/>, and the overtake offset restarts from where the car is (filterSColl).
+    ///    it, the steering is blended towards running parallel to it (1.5 or 2 times the heading
+    ///    difference, by who is nearer the middle or on the outside of the turn), unless the car's own
+    ///    steering already turns harder the same way. Applied by <see cref="AiPilot.Drive"/>; the
+    ///    overtake offset restarts from where the car is (filterSColl, as in TORCS bt's driver.cpp).
     ///
     /// The tutorial's constants are kept. The only scaling is the overtake offset step, given per
     /// TORCS robot step (0.1 m every 0.02 s), which becomes a rate over this car's step.
@@ -143,6 +145,7 @@ namespace TarmacGauntlet.Raceday
         {
             pilot.SpeedCap = float.PositiveInfinity;
             pilot.SpeedScale = 1f;
+            pilot.SideFilter = false;
             pilot.SideWeight = 1f;
             pilot.SideSteer = 0f;
             State = Mode.Racing;
@@ -264,12 +267,33 @@ namespace TarmacGauntlet.Raceday
                     pilot.Offset = Mathf.Clamp(myToMiddle - line.Lateral[pilot.Index], AiPilot.LaneShifts[0], AiPilot.LaneShifts[AiPilot.LaneShifts.Length - 1]);
                     Target = pilot.Offset;
                     pilot.SideWeight = d / cc;
-                    // TORCS steers positive to the left, the pilot positive to the right. In radians the
-                    // tutorial's 2 * (diffangle / steerLock), scaled back by the steer lock, is 2 * diffangle.
-                    pilot.SideSteer = -2f * diffAngle;
+                    // psteer: TORCS steers positive to the left, the pilot positive to the right, and
+                    // the pilot's steering is in radians, so diffangle / steerLock becomes -diffangle.
+                    pilot.SideSteer = -diffAngle;
+                    // On a straight the car nearer the middle corrects more (2), the other less (1.5).
+                    // In a turn the car on the outside corrects less.
+                    int turn = TurnAt(c, here);
+                    if (turn == 0)
+                        pilot.SideFactor = Mathf.Abs(me.Lateral) > Mathf.Abs(side.Lateral) ? 1.5f : 2f;
+                    else
+                    {
+                        float outside = me.Lateral - side.Lateral;
+                        float sign = turn > 0 ? 1f : -1f;   // TR_RGT: +1
+                        pilot.SideFactor = outside * sign > 0f ? 1.5f : 2f;
+                    }
+                    pilot.SideFilter = true;
                     SideSteering = true;
                 }
             }
+        }
+
+        /// <summary>The bend at a lap distance: +1 a right-hander, -1 a left-hander, 0 on a straight.</summary>
+        private static int TurnAt(Circuit c, float here)
+        {
+            foreach (CornerData k in c.Data.corners)
+                foreach (ArcData arc in k.arcs)
+                    if (c.Ahead(arc.s, here) <= arc.e - arc.s) return arc.dir;
+            return 0;
         }
 
         /// <summary>

@@ -53,10 +53,12 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Share of the target speed to drive at.</summary>
         public float SpeedScale = 1f;
         /// <summary>
-        /// The side collision filter, set by racecraft: the share of the pilot's own steering kept,
-        /// and the steering the rest is made of, radians, positive to the right.
+        /// The side collision filter (TORCS filterSColl), set by racecraft for this step: whether it
+        /// acts, the share d/c of the pilot's own steering kept, the steering that runs parallel to the
+        /// car alongside (psteer, radians, positive to the right), and its factor, 1.5 or 2.
         /// </summary>
-        public float SideWeight = 1f, SideSteer;
+        public bool SideFilter;
+        public float SideWeight = 1f, SideSteer, SideFactor = 2f;
         /// <summary>
         /// True while the car is in another's slipstream: with less drag it outruns the target speeds
         /// on the straights, so it keeps its foot down instead of lifting back to them.
@@ -199,7 +201,12 @@ namespace TarmacGauntlet.Raceday
             Vector3 right = new Vector3(flatForward.z, 0f, -flatForward.x);
             float slide = speed > 5f ? Mathf.Atan2(Vector3.Dot(flatVelocity, right), Vector3.Dot(flatVelocity, flatForward)) : 0f;
             steer += YawGain * (speed * kappa - yawRate) + SlideGain * slide;
-            steer = steer * SideWeight + SideSteer * (1f - SideWeight);
+            if (SideFilter)
+            {
+                float p = steer * SideWeight + SideFactor * SideSteer * (1f - SideWeight);
+                // Keep the car's own steering when it already turns harder the same way.
+                steer = p * steer > 0f && Mathf.Abs(steer) > Mathf.Abs(p) ? steer : p;
+            }
             steer = Mathf.Clamp(steer, -Spec.SteerLock, Spec.SteerLock);
 
             // Speed: read the target a reaction time ahead, follow its acceleration, and close the gap.
