@@ -128,6 +128,7 @@ namespace TarmacGauntlet.Raceday
 
         private void Use(AiPilot pilot)
         {
+            pilot.Limp = Pilot.Limp;   // a limping car keeps limping on its new pilot
             Racer.UsePilot(pilot);
             Line = pilot.Line;
             Log(pilot);

@@ -18,7 +18,9 @@ namespace TarmacGauntlet.Raceday
         /// <summary>The race is called this long after the time runs out, s, for cars that never come round.</summary>
         public const float FlagWait = 400f;
         /// <summary>Share of its power a car limping back to the pits has.</summary>
-        public const float LimpPower = 0.3f;
+        public const float LimpPower = 0.6f;
+        /// <summary>Share of its racing speed a car limping back to the pits drives at.</summary>
+        public const float LimpSpeed = 0.45f;
         /// <summary>How far beyond the track edge a car that crashed out comes to rest, m.</summary>
         public const float OffTrack = 4f;
 
@@ -122,6 +124,7 @@ namespace TarmacGauntlet.Raceday
             }
             car.Supplies.PowerTrim *= LimpPower;
             driver.Limping = true;
+            if (driver.Pilot != null) driver.Pilot.Limp = LimpSpeed;
         }
 
         private void Finish()

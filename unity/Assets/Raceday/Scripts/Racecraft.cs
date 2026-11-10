@@ -362,6 +362,25 @@ namespace TarmacGauntlet.Raceday
             // filterBColl's full brakes: nothing it may go faster than.
             if (Braking) pilot.SpeedCap = 0f;
             SideAndRoom(pilot, me, line, c, lap, here, margin, hasSide, side, minSide, roomLeft && !e1, roomRight && !e1);
+            if (pilot.Limp > 0f) Limp(pilot, line, c, step);
+        }
+
+        /// <summary>Which side of the track a limping car keeps to: 1 left, -1 right, 0 not chosen yet.</summary>
+        private float limpSide;
+
+        /// <summary>
+        /// A car out of the race limping to the pits: slow, and on the side of the track the racing
+        /// line isn't using, changing sides only where the line is well over on the car's side.
+        /// </summary>
+        private void Limp(AiPilot pilot, RacingLine line, Circuit c, float step)
+        {
+            int k = pilot.Index;
+            pilot.SpeedScale *= pilot.Limp;
+            if (k < 0) return;
+            float lineLateral = line.Lateral[k];
+            if (limpSide == 0f || lineLateral * limpSide > 2f) limpSide = lineLateral >= 0f ? -1f : 1f;
+            float target = limpSide * (c.HalfWidth(k) - 2f) - lineLateral;
+            pilot.Offset = Mathf.Clamp(Mathf.MoveTowards(pilot.Offset, target, step), AiPilot.LaneShifts[0], AiPilot.LaneShifts[AiPilot.LaneShifts.Length - 1]);
         }
 
         /// <summary>The path chooser, made when experiment E1 is first switched on.</summary>
