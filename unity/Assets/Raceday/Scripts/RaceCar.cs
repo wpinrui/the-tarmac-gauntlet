@@ -35,6 +35,8 @@ namespace TarmacGauntlet.Raceday
         /// <summary>The pit lane, and this car's garage in it, or -1 for none.</summary>
         public PitLane Pits;
         public int Garage = -1;
+        /// <summary>The lap count the car starts on, instead of guessing it from the grid: a set-up's lapped car.</summary>
+        [System.NonSerialized] public int? FirstLap;
         /// <summary>The player's stop in progress, or null.</summary>
         public PitService Service { get; private set; }
 
@@ -129,7 +131,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Counts the laps as the car moves to sample k.</summary>
         private void Count(Circuit c, int k)
         {
-            if (index < 0) Laps = k * c.Step > c.Lap * 0.5f ? -1 : 0;   // on the grid, behind the line
+            if (index < 0) Laps = FirstLap ?? (k * c.Step > c.Lap * 0.5f ? -1 : 0);   // on the grid, behind the line
             else if (index > c.Count - 50 && k < 50) Laps++;
             else if (index < 50 && k > c.Count - 50) Laps--;
             index = k;

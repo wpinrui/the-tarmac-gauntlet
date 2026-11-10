@@ -514,6 +514,14 @@ namespace TarmacGauntlet.Raceday
             PlaceAt(ground, flat);
         }
 
+        /// <summary>Sets a car just placed rolling straight ahead at a speed, in the gear the automatic would hold.</summary>
+        public void Launch(float speed)
+        {
+            body.linearVelocity = transform.forward * speed;
+            Speed = speed;
+            Gear = Spec.GearFor(speed);
+        }
+
         /// <summary>Puts the car at rest on the track at a sample and lateral offset, facing forwards.</summary>
         public void PlaceAt(int k, float lateral) => PlaceAt(Circuit.Surface(k, lateral), Circuit.Forward[k]);
 

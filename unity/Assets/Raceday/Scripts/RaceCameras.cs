@@ -51,7 +51,7 @@ namespace TarmacGauntlet.Raceday
             }
         }
 
-        private void Watch(CarController next)
+        public void Watch(CarController next)
         {
             // Only the car being watched shows its speed and takes the driving keys.
             if (Car != null) Car.InputEnabled = false;
