@@ -113,6 +113,15 @@ namespace TarmacGauntlet.Raceday
             if (Racer != null && (Pilot.Pace != Pace || Pilot.Consistency != Consistency || Pilot.Safety != Safety)) Use(NewPilot(Pilot.Line));
         }
 
+        /// <summary>A new driver takes the wheel, as at a driver change: the car drives at their pace from now on.</summary>
+        public void SetDriver(float pace, float consistency, float safety)
+        {
+            Pace = pace;
+            Consistency = consistency;
+            Safety = safety;
+            if (Racer != null && (Pilot.Pace != Pace || Pilot.Consistency != Consistency || Pilot.Safety != Safety)) Use(NewPilot(Pilot.Line));
+        }
+
         private AiPilot NewPilot(RacingLine line) => new AiPilot(line, car.Spec, Pace, Consistency, Safety, Seed);
 
         private void Use(AiPilot pilot)

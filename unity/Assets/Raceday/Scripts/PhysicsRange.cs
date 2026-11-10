@@ -60,7 +60,7 @@ namespace TarmacGauntlet.Raceday
             for (int i = 0; i < Drivers.Length; i++)
             {
                 AiDriver d = Drivers[i];
-                if (d == null || d.Car == null) continue;
+                if (d == null || d.Car == null || !d.gameObject.activeInHierarchy) continue;   // a retired car is off the track
                 Vector3 p = d.Car.transform.position;
                 float near = (p - eye).magnitude;
                 if (playerDriving) near = Mathf.Min(near, (p - player).magnitude);

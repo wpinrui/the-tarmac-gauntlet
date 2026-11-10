@@ -116,6 +116,17 @@ namespace TarmacGauntlet.Simulation
         }
 
         /// <summary>
+        /// How much the crew and the player's Engineer skill scale a stop's work:
+        /// crew 16 and no skill 1.0, crew 0 <see cref="SoloCrewMultiplier"/>, skill 20 a quarter off.
+        /// </summary>
+        public static double CrewMultiplier(int crewSize, int engineerSkill)
+        {
+            double crewMultiplier = 1 + (1 - crewSize / MaxCrewSize) * (SoloCrewMultiplier - 1);
+            double engineerMultiplier = 1 - (engineerSkill / MaxEngineerSkill) * MaxEngineerPitReduction;
+            return crewMultiplier * engineerMultiplier;
+        }
+
+        /// <summary>
         /// Processes a pit stop and returns the resulting car/driver state.
         ///
         /// Duration formula (GDD §2):

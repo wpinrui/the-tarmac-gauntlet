@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TarmacGauntlet.Simulation;
 using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
@@ -13,7 +14,9 @@ namespace TarmacGauntlet.Raceday
 
     /// <summary>
     /// A stop in the box: refuelling to full, then a new set of tyres, with the clock running. The
-    /// car's Pit Stop Time stat makes the crew quicker or slower.
+    /// car's Pit Stop Time stat makes the crew quicker or slower. In a career race the car's
+    /// <see cref="CarRaceLog"/> decides the rest: tyres only while a set is left, the next driver in,
+    /// the active issues fixed while the spares last, and the crew's size and Engineer skill scale the work.
     /// </summary>
     public sealed class PitService
     {
@@ -27,6 +30,7 @@ namespace TarmacGauntlet.Raceday
 
         private readonly Consumables supplies;
         private readonly float startFuel, litres, scale;
+        private readonly bool tyres;
 
         public PitService(Consumables supplies, CarSpec spec)
         {
@@ -34,9 +38,14 @@ namespace TarmacGauntlet.Raceday
             startFuel = supplies.Fuel;
             litres = Mathf.Max(supplies.Capacity - supplies.Fuel, 0f);
             scale = 0.85f + 0.3f * (float)spec.Stats.PitStopTime / 100f;
-            Duration = (Settle + litres / RefuelRate + TyreChange) * scale;
+            PitWork work = supplies.Log?.Pit(true);
+            tyres = work == null || work.ChangeTyres;
+            if (work != null) scale *= (float)work.CrewMultiplier;
+            float extra = work != null ? (float)work.ExtraSeconds : 0f;
+            Duration = (Settle + litres / RefuelRate + (tyres ? TyreChange : 0f)) * scale + extra;
             // A stop resets the engine map to Normal, so a driver chooses Push or Conserve again.
             supplies.Map = EngineMap.Normal;
+            if (supplies.Log != null) supplies.Effects = supplies.Log.Effects;
         }
 
         public void Step(float dt)
@@ -45,7 +54,10 @@ namespace TarmacGauntlet.Raceday
             Elapsed += dt;
             float refuel = Mathf.Clamp01((Elapsed / scale - Settle) / Mathf.Max(litres / RefuelRate, 0.01f));
             supplies.Fuel = startFuel + litres * refuel;
-            if (Done) supplies.Wear = 0f;
+            if (!Done) return;
+            supplies.Fuel = startFuel + litres;
+            if (tyres) supplies.Wear = 0f;
+            supplies.Log?.PitDone(Duration, litres);
         }
     }
 
@@ -116,7 +128,8 @@ namespace TarmacGauntlet.Raceday
             lapFuel = s.Fuel;
             lapWear = s.Wear;
             // Another lap must leave a fifth of a lap's fuel spare, and the tyres short of worn out.
-            return s.Fuel < FuelPerLap * 1.2f + 0.5f || s.Wear + WearPerLap > WearLimit;
+            // With no tyre sets left a stop can't change them, so only the fuel brings the car in.
+            return s.Fuel < FuelPerLap * 1.2f + 0.5f || (s.TyresLeft && s.Wear + WearPerLap > WearLimit);
         }
 
         /// <summary>Takes the pit route this lap: a pilot that drives it, built from the car's racing line.</summary>
