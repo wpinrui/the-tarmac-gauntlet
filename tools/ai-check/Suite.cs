@@ -39,6 +39,8 @@ static partial class Check
         public readonly List<Frame> Frames = new List<Frame>();
         /// <summary>The first car run alone from the same start: how far it got at each step.</summary>
         public readonly List<float> Solo = new List<float>();
+        /// <summary>Seconds each car braked with room, from positions.</summary>
+        public float[] BrakeRoom;
 
         public int N => S.Cars.Length;
         public string Name(int i) => Race.Name(Race.Racers[i]);
@@ -72,9 +74,11 @@ static partial class Check
     {
         var run = new SetupRun { S = s, Race = SituationRace(s) };
         Race race = run.Race;
+        var braking = new PositionBraking();
         while (race.Time < s.Seconds)
         {
             race.Step();   // a car's place across the track is only known once it has stepped
+            braking.Step(race);
             var f = new Frame { T = race.Time, D = new float[run.N], L = new float[run.N], V = new float[run.N], Off = new float[run.N], Angle = new float[run.N], K = new int[run.N], Ghost = new bool[run.N] };
             for (int i = 0; i < run.N; i++)
             {
@@ -92,6 +96,7 @@ static partial class Check
             }
             run.Frames.Add(f);
         }
+        run.BrakeRoom = race.Racers.Select(r => braking.Seconds.TryGetValue(r, out float b) ? b : 0f).ToArray();
         var alone = new Situation { Id = s.Id, At = s.At, Seconds = s.Seconds, Cars = new[] { s.Cars[0] } };
         Race solo = SituationRace(alone);
         while (solo.Time < s.Seconds) { solo.Step(); run.Solo.Add(solo.Racers[0].Distance); }
@@ -226,11 +231,13 @@ static partial class Check
     {
         List<Frame> fs = run.Frames;
         int hits = run.Contacts(0);
+        int all = run.Race.Contacts.Count;
         Frame last = fs[fs.Count - 1];
         switch (run.S.Id)
         {
             case "T1":
             {
+                // Catching a slower car: stays on the line in the slipstream.
                 int follow = 0, onLine = 0;
                 foreach (Frame f in fs)
                 {
@@ -245,8 +252,15 @@ static partial class Check
             case "T2":
             case "T12":
             {
+                // Pulls out at the last safe moment instead of braking: no braking with room, a late
+                // pull-out, and little time lost.
+                float room = run.BrakeRoom[0];
                 float lost = run.Lost();
-                return (Clamp100(Scale(lost, 0.2f, 1.5f) - 50f * hits), $"lost {lost:0.00} s, {hits} contacts");
+                Frame pullAt = fs.FirstOrDefault(f => Math.Abs(f.Off[0]) > 1f && run.Gap(f, 0, 1) > 0f);
+                Frame level = fs.FirstOrDefault(f => run.Gap(f, 0, 1) < CarL);
+                float early = pullAt != null && level != null ? level.T - pullAt.T : 0f;
+                float score = Math.Min(Math.Min(Scale(room, 0f, 1f), Scale(lost, 0.2f, 1.5f)), Scale(early, 2f, 5f));
+                return (Clamp100(score - 50f * hits), $"braked with room {room:0.00} s, pulled out {early:0.0} s before drawing level, lost {lost:0.00} s, {hits} contacts");
             }
             case "T3":
             {
@@ -275,15 +289,27 @@ static partial class Check
             }
             case "T5":
             {
+                // Squeezed on the outside: cuts back or backs out before it is forced wide, to the edge
+                // of the track with the inside car beside it.
+                bool forced = fs.Any(f => Math.Abs(run.Gap(f, 0, 1)) < CarL && Math.Abs(f.L[1] - f.L[0]) < CarW + 1f
+                    && circuit.HalfWidth(f.K[0]) - (Math.Abs(f.L[0]) + 0.5f * CarW) < 0.3f);
                 bool off = fs.Any(f => !run.OnTrack(f, 0));
-                return (Clamp100(100f - 50f * hits - (off ? 50f : 0f)), $"{hits} contacts, {(off ? "forced off the track" : "kept on the track")}");
+                return (hits > 0 || off || forced ? 0f : 100f, $"{(forced ? "forced to the edge alongside" : off ? "off the track" : "cut back or backed out in time")}, {hits} contacts");
             }
             case "T6":
-            case "T18":
+            case "T6b":
+            case "T6c":
             {
+                // Outbrakes only a car with worse braking, and never goes three wide into a corner.
+                float brake = run.BrakeAt(0);
+                bool threeWide = ThreeWide(run, brake);
                 Frame f = fs.FirstOrDefault(x => run.At(x, 0) >= T7End + 30f) ?? last;
-                bool ahead = run.Gap(f, 0, 1) < 0f;
-                return (hits > 0 ? 0f : ahead ? 100f : 40f, $"{(ahead ? "ahead" : "behind")} out of the corner, {hits} contacts");
+                Frame atBrake = fs.FirstOrDefault(x => run.At(x, 0) >= brake) ?? fs[0];
+                var passed = Enumerable.Range(1, run.N - 1).Where(j => run.Gap(atBrake, 0, j) > -CarL * 0.5f && run.Gap(f, 0, j) < 0f).ToList();
+                bool wrong = passed.Any(j => run.Race.Racers[j].Entry != null && BrakingOf(run, j) >= BrakingOf(run, 0));
+                bool worseAlongside = Enumerable.Range(1, run.N - 1).Any(j => BrakingOf(run, j) < BrakingOf(run, 0) && run.Gap(atBrake, 0, j) > -CarL && run.Gap(atBrake, 0, j) < 2f * CarL);
+                float score = hits > 0 || threeWide || wrong ? 0f : worseAlongside ? (passed.Count > 0 ? 100f : 0f) : 100f;
+                return (score, $"{(threeWide ? "three wide into the corner, " : "")}outbraked {passed.Count}{(wrong ? " including a car that brakes as well or better" : "")}{(worseAlongside && passed.Count == 0 ? ", left a worse braker alongside unpassed" : "")}, {hits} contacts");
             }
             case "T7":
             {
@@ -296,39 +322,65 @@ static partial class Check
             }
             case "T8":
             {
+                // After a pass, moves back as soon as its rear is past the other car's front; never swipes.
                 bool swiped = fs.Any(f => Math.Abs(run.Gap(f, 0, 1)) < CarL && Math.Abs(f.L[1] - f.L[0]) < CarW + 0.2f);
                 Frame clear = fs.FirstOrDefault(f => -run.Gap(f, 0, 1) > CarL);
                 if (clear == null) return (0f, "never cleared the other car");
-                Frame back = fs.FirstOrDefault(f => f.T >= clear.T && Math.Abs(f.Off[0]) < 1f);
-                float took = back == null ? 99f : back.T - clear.T;
-                return (hits > 0 || swiped ? 0f : Scale(took, 1.5f, 5f), $"back on the line {(back == null ? "never" : $"{took:0.0} s after clearing")}, {(swiped ? "swiped across" : "no swipe")}, {hits} contacts");
+                Frame turn = fs.FirstOrDefault(f => f.T >= clear.T && Math.Abs(f.Off[0]) < Math.Abs(clear.Off[0]) - 0.3f);
+                float took = turn == null ? 99f : turn.T - clear.T;
+                return (hits > 0 || swiped ? 0f : Scale(took, 0.3f, 2f), $"started back {(turn == null ? "never" : $"{took:0.0} s after clearing")}, {(swiped ? "swiped across" : "no swipe")}, {hits} contacts");
             }
             case "T9":
             {
+                // Passes as many as it can; at its braking point it is outbraking the car level with
+                // it, in a gap on the line big enough for a car and a margin, or behind. Never three wide into the corner.
                 int passed = Enumerable.Range(1, run.N - 1).Count(j => run.Gap(last, 0, j) < 0f);
-                bool threeWide = fs.Any(f =>
+                float brake = run.BrakeAt(0);
+                bool threeWide = ThreeWide(run, brake);
+                Frame f = fs.FirstOrDefault(x => run.At(x, 0) >= brake);
+                string at = "never reached its braking point";
+                bool sorted = false;
+                if (f != null)
                 {
-                    float at = run.At(f, 0);
-                    return at > run.BrakeAt(0) && at < T7End && Enumerable.Range(0, run.N).Count(j => Math.Abs(run.Gap(f, 0, j)) < CarL) >= 3;
-                });
-                return (Clamp100((100f * passed / (run.N - 1) - 20f * hits) * (threeWide ? 0.5f : 1f)), $"passed {passed} of {run.N - 1}, {hits} contacts{(threeWide ? ", three wide into a corner" : "")}");
+                    int level = Enumerable.Range(1, run.N - 1).Count(j => Math.Abs(run.Gap(f, 0, j)) < CarL);
+                    float ahead = Enumerable.Range(1, run.N - 1).Where(j => run.Gap(f, 0, j) >= CarL && Math.Abs(f.L[j] - f.L[0]) < CarW).Select(j => run.Gap(f, 0, j) - CarL).DefaultIfEmpty(99f).Min();
+                    float behind = Enumerable.Range(1, run.N - 1).Where(j => run.Gap(f, j, 0) >= CarL && Math.Abs(f.L[j] - f.L[0]) < CarW).Select(j => run.Gap(f, j, 0) - CarL).DefaultIfEmpty(99f).Min();
+                    bool onLine = Math.Abs(f.Off[0]) < 1.5f;
+                    sorted = level == 1 || (onLine && level == 0 && ahead >= NoseMargin && behind >= NoseMargin) || (level == 0 && ahead >= NoseMargin);
+                    at = level == 1 ? "level with one car" : level == 0 ? $"in a gap ({Math.Min(ahead, behind):0.0} m)" : $"level with {level} cars";
+                }
+                float score = (100f * passed / (run.N - 1) - 20f * hits) * (threeWide || !sorted ? 0.5f : 1f);
+                return (Clamp100(score), $"passed {passed} of {run.N - 1}, at its braking point {at}{(threeWide ? ", three wide into the corner" : "")}, {hits} contacts");
             }
             case "T11":
             {
-                int all = run.Race.Contacts.Count;
+                // Lap one: no braking with room, no pile-ups.
                 int stopped = Enumerable.Range(0, run.N).Count(j => fs.Any(f => f.T > 8f && f.V[j] < 5f));
-                return (Clamp100(100f - 20f * all - 50f * stopped), $"{all} contacts, {stopped} cars stopped after the start");
+                float room = run.BrakeRoom.Sum();
+                return (Clamp100(Scale(room, 0f, 3f) - 20f * all - 50f * stopped), $"braked with room {room:0.0} s over all cars, {all} contacts, {stopped} cars stopped after the start");
             }
             case "T17":
             {
                 Frame f = fs.FirstOrDefault(x => x.T > 0.1f && run.OnTrack(x, 0));
                 if (f == null) return (0f, "never back on the track");
-                int all = run.Race.Contacts.Count;
                 return (Clamp100(Scale(f.Angle[0], 10f, 30f) - 50f * all), $"back on at {f.Angle[0]:0} degrees, {all} contacts");
+            }
+            case "T18":
+            {
+                // The car ahead brakes earlier: outbrake it.
+                float brake = run.BrakeAt(0);
+                Frame f = fs.FirstOrDefault(x => run.At(x, 0) >= T7End + 30f) ?? last;
+                Frame pass = fs.FirstOrDefault(x => run.Gap(x, 0, 1) < -CarL);
+                bool ahead = run.Gap(f, 0, 1) < 0f;
+                bool inZone = pass != null && run.At(pass, 0) >= brake - 50f;
+                float score = hits > 0 ? 0f : !ahead ? 0f : inZone ? 100f : 70f;
+                return (score, $"{(!ahead ? "stayed behind" : inZone ? "outbraked it" : "passed before the braking zone")}, {hits} contacts");
             }
             case "T18b":
             case "T19":
             {
+                // Blocked from outbraking (T18b) or on worn tyres (T19): brakes with a margin, never a
+                // rear-end, never off the track, and not so early it drops far back.
                 float closest = float.MaxValue;
                 foreach (Frame f in fs)
                     for (int j = 1; j < run.N; j++)
@@ -336,10 +388,60 @@ static partial class Check
                         float g = run.Gap(f, 0, j);
                         if (g > 0f && g < 30f && Math.Abs(f.L[j] - f.L[0]) < CarW) closest = Math.Min(closest, g - CarL);
                     }
-                return (hits > 0 ? 0f : Scale(-closest, -1f, 0f), $"closest nose to tail {closest:0.0} m, {hits} contacts");
+                bool off = fs.Any(f => !run.OnTrack(f, 0));
+                Frame turnIn = fs.FirstOrDefault(x => run.At(x, 0) >= T7Start);
+                float gapIn = turnIn == null ? 99f : Enumerable.Range(1, run.N - 1).Where(j => run.Gap(turnIn, 0, j) > 0f).Select(j => run.Gap(turnIn, 0, j) - CarL).DefaultIfEmpty(99f).Min();
+                float score = hits > 0 || off ? 0f : Math.Min(Scale(-closest, -NoseMargin, 0f), Scale(gapIn, 15f, 40f));
+                return (score, $"closest nose to tail {closest:0.0} m, {gapIn:0.0} m behind at turn-in, {(off ? "off the track, " : "")}{hits} contacts");
             }
         }
         return (0f, "no score");
+    }
+
+    /// <summary>The braking a car has, m/s², as the others see it.</summary>
+    static float BrakingOf(SetupRun run, int i)
+    {
+        Racer r = run.Race.Racers[i];
+        return r.Car.Spec.BrakeDecel * 9.81f * AiPilot.LimitFor(r.Pilot.Pace);
+    }
+
+    /// <summary>Three or more cars level with each other from the first car's braking point to the corner.</summary>
+    static bool ThreeWide(SetupRun run, float brake) => run.Frames.Any(f =>
+    {
+        float at = run.At(f, 0);
+        return at > brake && at < T7End && Enumerable.Range(0, run.N).Count(j => Math.Abs(run.Gap(f, 0, j)) < CarL) >= 3;
+    });
+
+    /// <summary>
+    /// Seconds each car braked for the car ahead while there was room to pull out, from where the cars
+    /// are: slowing faster than 4 m/s² outside its own braking zone, with a car within 2 s ahead in its
+    /// lane and a free lane beside that car.
+    /// </summary>
+    sealed class PositionBraking
+    {
+        public readonly Dictionary<Racer, float> Seconds = new Dictionary<Racer, float>();
+        readonly Dictionary<Racer, float> was = new Dictionary<Racer, float>();
+
+        public void Step(Race r)
+        {
+            foreach (Racer x in r.Racers)
+            {
+                int k = Math.Max(x.Car.TrackIndex, 0);
+                float v = x.Car.Vx * circuit.Forward[k].x + x.Car.Vz * circuit.Forward[k].z;
+                bool slowing = was.TryGetValue(x, out float v0) && (v0 - v) / Race.Dt > 4f;
+                was[x] = v;
+                if (!slowing || x.Ghost || x.Rejoin.Busy || InBrakingZone(x)) continue;
+                Racer ahead = null;
+                float best = 2f * Math.Max(v, 10f);
+                foreach (Racer o in r.Racers)
+                {
+                    if (o == x || o.Ghost) continue;
+                    float g = Gap(o.Distance - x.Distance);
+                    if (g > 0f && g < best && Math.Abs(o.Car.Lateral - x.Car.Lateral) < CarW + 0.5f) { best = g; ahead = o; }
+                }
+                if (ahead != null && RoomBeside(r, x, ahead.Id)) Seconds[x] = (Seconds.TryGetValue(x, out float s) ? s : 0f) + Race.Dt;
+            }
+        }
     }
 
     // ---------------------------------------------------------------- races
@@ -400,8 +502,10 @@ static partial class Check
         var watch = new ClassWatch();
         var piles = new PileWatch($"seed {seed} ");
         var loss = new TrafficLoss();
+        var braking = new PositionBraking();
         Race race = RunRace(field, r =>
         {
+            braking.Step(r);
             if (watch.Cut == 0f) watch.Cut = 1.3f * r.Racers.Max(x => x.Pilot.Profile.LapTime);
             watch.Step(r);
             piles.Step(r);
@@ -429,7 +533,7 @@ static partial class Check
             aOver,
             (loss.Lost.TryGetValue(a, out float aLost) ? aLost : 0f) / Math.Max(a.Laps, 1),
             loss.Lost.Values.Sum() / laps,
-            watch.ToolBrakeRoom / carHours,
+            braking.Seconds.Values.Sum() / carHours,
             race.Contacts.Count / carHours,
             race.Contacts.Count(c => c.RearEnd && c.Speed > RearHit) / carHours,
             piles.PileUps.Count,

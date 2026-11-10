@@ -247,6 +247,25 @@ namespace TarmacGauntlet.Raceday
             },
             new Situation
             {
+                Id = "T6b", Title = "alongside a better braker", At = T7 - 220f, Seconds = 8f,
+                Cars = new[]
+                {
+                    new SituationCar { Model = "b-25", Off = -4f, Speed = 285f },
+                    new SituationCar { Model = "a-29", Ahead = 6f, Speed = 285f, Seed = 2 },
+                },
+            },
+            new Situation
+            {
+                Id = "T6c", Title = "two slow cars abreast into the corner", At = T7 - 250f, Seconds = 8f,
+                Cars = new[]
+                {
+                    new SituationCar { Model = "a-29" },
+                    new SituationCar { Model = "f-01", Ahead = 40f, Seed = 2 },
+                    new SituationCar { Model = "f-02", Ahead = 40f, Off = -4.5f, Seed = 3 },
+                },
+            },
+            new Situation
+            {
                 Id = "T7", Title = "lapping a slow car", At = 3000f, Seconds = 20f,
                 Cars = new[]
                 {
