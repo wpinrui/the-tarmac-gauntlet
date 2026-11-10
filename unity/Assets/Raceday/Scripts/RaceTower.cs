@@ -109,8 +109,11 @@ namespace TarmacGauntlet.Raceday
             return Mathf.Max(1, Mathf.FloorToInt(room / RowHeight));
         }
 
+        /// <summary>The whole tower is drawn at this share of the design's size.</summary>
+        private const float Scale = 0.7f;
+
         /// <summary>One design unit in pixels.</summary>
-        private static float Unit() => Screen.height / 1080f * 19.2f;
+        private static float Unit() => Screen.height / 1080f * 19.2f * Scale;
 
         private void OnGUI()
         {
