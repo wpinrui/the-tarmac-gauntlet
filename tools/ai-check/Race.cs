@@ -64,6 +64,12 @@ sealed class Contact
     /// <summary>Within sight of the camera: under 500 m from the watched car.</summary>
     public bool Seen;
     public string A, B;
+    /// <summary>One car's nose into the other's tail: the push between them runs along both cars.</summary>
+    public bool RearEnd;
+
+    /// <summary>A push along n between two cars is nose to tail when it runs along both of them.</summary>
+    public static bool NoseToTail(StandInCar a, StandInCar b, float nx, float nz) =>
+        Math.Abs(a.Forward.x * nx + a.Forward.z * nz) > 0.8f && Math.Abs(b.Forward.x * nx + b.Forward.z * nz) > 0.8f;
 }
 
 sealed class Race
@@ -472,7 +478,7 @@ sealed class Race
                     b.Vx += jn * nx / mb; b.Vz += jn * nz / mb;
                 }
                 if (touching.Add(key))
-                    Contacts.Add(new Contact { Time = Time, Speed = Math.Max(-vn, 0f), Where = Math.Max(a.TrackIndex, 0) * circuit.Step, A = Name(Racers[i]), B = Name(Racers[j]) });
+                    Contacts.Add(new Contact { Time = Time, Speed = Math.Max(-vn, 0f), RearEnd = Contact.NoseToTail(a, b, nx, nz), Where = Math.Max(a.TrackIndex, 0) * circuit.Step, A = Name(Racers[i]), B = Name(Racers[j]) });
             }
     }
 
