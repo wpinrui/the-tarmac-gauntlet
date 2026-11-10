@@ -12,9 +12,9 @@
 //                   in the pit lane; the full cars don't stop
 //   crowded pits    the same with every car short of fuel, so the whole field is in the pit lane at once
 //   pit lane start  (run.sh pitstart) 100 cars, as in the raceday scene, queue in the fast lane quickest
-//                   first with the Cheonma last, and leave ten seconds apart, gliding until just before
+//                   first with the Cheonma last, move up to the pit exit line and leave three seconds apart, gliding until just before
 //                   the second-last car goes as the scene's fast forward, then with the nearest 24 to the
-//                   Cheonma on physics: no car moves before its turn, every car rejoins its racing line,
+//                   Cheonma on physics: no car crosses the line before its turn, every car rejoins its racing line,
 //                   keeps to the limiter and the track on its way out, nobody touches in the pit lane,
 //                   there are no hard hits, and nobody pits until the whole field is out
 //   gliding         (run.sh glide) the rolling start and pit stops again with only the nearest 24 cars
@@ -174,7 +174,7 @@ static partial class Check
         float limit = new PitLane(circuit).LimitSpeed;
         foreach (SessionCar c in s.Cars)
         {
-            if (c.Moved >= 0f && c.Moved < PitLaneStart.LeavesAt(c.Slot) - 0.05f) problems.Add($"{s.Name(c)} moved at {Session.Clock(c.Moved)}, before its turn at {Session.Clock(PitLaneStart.LeavesAt(c.Slot))}");
+            if (c.Moved >= 0f && c.Moved < PitLaneStart.LeavesAt(c.Slot)) problems.Add($"{s.Name(c)} crossed the pit exit line at {Session.Clock(c.Moved)}, before its turn at {Session.Clock(PitLaneStart.LeavesAt(c.Slot))}");
             if (c.Out < 0f) problems.Add($"{s.Name(c)} never got out of the pit lane");
             if (c.LimitZoneTop > limit + 0.3f) problems.Add($"{s.Name(c)} did {c.LimitZoneTop * 3.6f:0.0} km/h in the limiter zone");
             if (c.RanDry) problems.Add($"{s.Name(c)} ran out of fuel");
@@ -182,6 +182,8 @@ static partial class Check
             // Leaving the track once racing is the racing's to check, not the start's.
             if (c.OffTime >= 0f && (c.Out < 0f || c.OffTime < c.Out)) problems.Add($"{s.Name(c)} left the track at {Session.Clock(c.OffTime)} at {c.OffWhere:0} m on its way out");
         }
+        float worstGap = s.Cars.Max(c => c.GapAtTurn);
+        if (worstGap > 6f) problems.Add($"{s.Name(s.Cars.First(c => c.GapAtTurn == worstGap))} was {worstGap:0.0} m back from the pit exit line at its turn");
         int offRacing = s.Cars.Count(c => c.OffTime >= 0f && c.Out >= 0f && c.OffTime >= c.Out);
         var lane = s.Contacts.Where(c => c.A.Contains("(pits)") || c.B.Contains("(pits)")).ToList();
         if (lane.Count > 0) problems.Add($"{lane.Count} contacts in the pit lane: {Describe(lane[0])}");
@@ -190,9 +192,9 @@ static partial class Check
         int early = s.Cars.Sum(c => c.Stops.Count);
         if (!s.PitsOpen) problems.Add("pit stops never opened");
         var outTimes = s.Cars.Select(c => c.Out - PitLaneStart.LeavesAt(c.Slot)).Where(t => t > 0f).ToList();
-        Report($"pit lane start ({s.Cars.Count} cars: fast forward to {Session.Clock(start.FastForwardTo)}, last car out at {Session.Clock(me.Out)}, {(outTimes.Count > 0 ? outTimes.Min() : 0f):0.0} to {(outTimes.Count > 0 ? outTimes.Max() : 0f):0.0} s from going to racing, {s.Contacts.Count} contacts in all, {s.Contacts.Count(c => c.Speed > 1f)} over 1 m/s, {s.MostOnPhysics} on physics at most, {early} pit stops by {Session.Clock(s.Time)}, {offRacing} cars off the track while racing, {watch.Elapsed.TotalSeconds:0} s to run)", problems);
+        Report($"pit lane start ({s.Cars.Count} cars: middles {s.Cars.Min(c => c.GapAtTurn):0.0} to {worstGap:0.0} m from the line at their turn, fast forward to {Session.Clock(start.FastForwardTo)}, last car out at {Session.Clock(me.Out)}, {(outTimes.Count > 0 ? outTimes.Min() : 0f):0.0} to {(outTimes.Count > 0 ? outTimes.Max() : 0f):0.0} s from going to racing, {s.Contacts.Count} contacts in all, {s.Contacts.Count(c => c.Speed > 1f)} over 1 m/s, {s.MostOnPhysics} on physics at most, {early} pit stops by {Session.Clock(s.Time)}, {offRacing} cars off the track while racing, {watch.Elapsed.TotalSeconds:0} s to run)", problems);
         if (!verbose) return;
-        foreach (SessionCar c in s.Cars) Console.WriteLine($"  {s.Name(c)} went {Session.Clock(PitLaneStart.LeavesAt(c.Slot))}, moved {Session.Clock(c.Moved)}, racing {Session.Clock(c.Out)} ({c.Out - PitLaneStart.LeavesAt(c.Slot):0.0} s)");
+        foreach (SessionCar c in s.Cars) Console.WriteLine($"  {s.Name(c)} went {Session.Clock(PitLaneStart.LeavesAt(c.Slot))}, over the line {Session.Clock(c.Moved)}, racing {Session.Clock(c.Out)} ({c.Out - PitLaneStart.LeavesAt(c.Slot):0.0} s)");
         foreach (Contact c in s.Contacts) Console.WriteLine("  contact " + Describe(c));
     }
 

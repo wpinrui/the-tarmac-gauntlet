@@ -37,8 +37,10 @@ sealed class SessionCar
     /// <summary>Time since the gliding car last stepped, and how many times it switched to or from gliding.</summary>
     public float GlideClock;
     public int Handovers;
-    /// <summary>Pit lane start: when the car first moved, and when it rejoined its racing line.</summary>
+    /// <summary>Pit lane start: when the car crossed the pit exit line, and when it rejoined its racing line.</summary>
     public float Moved = -1f, Out = -1f;
+    /// <summary>Pit lane start: how far the car's middle was from the pit exit line at its turn, m.</summary>
+    public float GapAtTurn = -1f;
     /// <summary>Pit stops booked while gliding.</summary>
     public int GlidingStops;
 }
@@ -260,7 +262,7 @@ sealed class Session
         Time += Dt;
     }
 
-    /// <summary>PitStart's part: held in the queue until its turn, then out along the route behind anything ahead on it.</summary>
+    /// <summary>PitStart's part: up the queue to the pit exit line, held there until its turn, then out along the route behind anything ahead on it.</summary>
     void BriefPitStart(SessionCar s)
     {
         AiRacer r = s.Racer;
@@ -276,10 +278,11 @@ sealed class Session
             r.InFormation = false;
             return;
         }
-        if (s.Moved < 0f && s.Car.Speed > 1f) s.Moved = Time;
+        if (s.GapAtTurn < 0f && route.Index >= 0 && PitStart.Gone(s.Slot)) s.GapAtTurn = PitStart.ToLine(route.Index, s.Car.Position);
+        if (s.Moved < 0f && route.Index >= 0 && PitStart.ToLine(route.Index, s.Car.Position) < 0f) s.Moved = Time;
         r.Formation = route;
         r.InFormation = true;
-        r.FormationCap = PitStart.Gone(s.Slot) ? PitPlan.Follow(route, s.Car.Position, s.Id, all, s.Car.Spec) : 0f;
+        r.FormationCap = PitStart.Cap(s.Slot, route.Index, s.Car.Position, PitPlan.Follow(route, s.Car.Position, s.Id, all, s.Car.Spec));
     }
 
     /// <summary>PhysicsRange taking a car off physics: it glides on from where it is.</summary>
