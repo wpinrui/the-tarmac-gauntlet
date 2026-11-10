@@ -9,8 +9,9 @@ def monotone(points):
     return PchipInterpolator(np.array(t, float), np.array(v, float), extrapolate=True)
 
 
-def close_rings(rings, cap=True):
+def close_rings(rings, cap=True, centres=None):
     """Join equal-length rings into a closed solid: quads between rings, a fan over each end.
+    centres: the two fan centres, for end rings whose mean point lies outside them.
     Returns (verts, faces)."""
     m = len(rings[0])
     verts = [np.asarray(r, float) for r in rings]
@@ -22,9 +23,10 @@ def close_rings(rings, cap=True):
             faces.append((a + j, a + k, b + k, b + j))
     verts = np.concatenate(verts)
     if cap:
-        for idx, flip in ((0, True), (len(rings) - 1, False)):
+        for e, (idx, flip) in enumerate(((0, True), (len(rings) - 1, False))):
             c = len(verts)
-            verts = np.vstack([verts, np.asarray(rings[idx]).mean(0)])
+            mid = np.asarray(rings[idx]).mean(0) if centres is None else centres[e]
+            verts = np.vstack([verts, mid])
             base = idx * m
             for j in range(m):
                 k = (j + 1) % m
