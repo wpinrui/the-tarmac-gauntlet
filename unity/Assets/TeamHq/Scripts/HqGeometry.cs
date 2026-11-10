@@ -20,17 +20,25 @@ namespace TarmacGauntlet.TeamHq
         public bool Warm;
     }
 
-    /// <summary>A car bay: where the car stands, and the stand-in paint when no model is loaded.</summary>
+    /// <summary>A car bay: where the car stands, and its paint (the stand-in's when no model is loaded). No paint: the bay holds a prop.</summary>
     public struct HqBay
     {
         public Vector3 Position;
         public string Paint;
     }
 
+    /// <summary>A placed copy of a prop from Resources/Props: where it stands, its turn about Y in degrees, and its size.</summary>
+    public struct HqProp
+    {
+        public string Id;
+        public Vector3 Position;
+        public float Yaw, Scale;
+    }
+
     /// <summary>
     /// The team's home workshop as triangles, built in code like the circuit. Layout and looks match
     /// the approved viewer (Team HQ Blockout) with Ivan's picks: grey epoxy floor, painted block walls
-    /// with a dark dado, charcoal trim, rolling tool chests, jacks and stands, round high-bay lamps,
+    /// with a dark dado, charcoal trim, rolling tool chests, round high-bay lamps,
     /// glazed bay doors, walnut office furniture and glass trophy cabinets.
     ///
     /// Everything is laid out in the viewer's frame (right-handed, +Z towards the bay doors) and
@@ -42,6 +50,14 @@ namespace TarmacGauntlet.TeamHq
         public readonly Dictionary<string, HqPart> Parts = new Dictionary<string, HqPart>();
         public readonly List<HqLight> Lights = new List<HqLight>();
         public readonly List<HqBay> Bays = new List<HqBay>();
+        public readonly List<HqProp> Props = new List<HqProp>();
+
+        /// <summary>Metres per texture repeat on the textured surfaces, for boxes and untiled planes.</summary>
+        private static readonly Dictionary<string, float> Tile = new Dictionary<string, float>
+        {
+            { "floor", 2f }, { "wall", 2f }, { "dado", 2f }, { "ceiling", 2.7f }, { "slab", 2f }, { "partition", 2f },
+            { "walnut", 1f }, { "carpet", 0.6f }, { "parquet", 1.7f }, { "tread", 0.5f }, { "door", 2f },
+        };
 
         // Footprint 26 x 14 m, ceiling 7.5 m, office floor 3.5 m.
         public const float W = 26f, D = 14f, H = 7.5f, MZ = 3.5f;
@@ -132,7 +148,7 @@ namespace TarmacGauntlet.TeamHq
             const int steps = 18;
             const float run = 6.5f, sx = 11.4f;
             float rise = MZ / steps, tread = run / steps;
-            for (int i = 0; i < steps; i++) Box("steel", 1.5f, 0.05f, tread - 0.02f, V(sx, (i + 1) * rise - 0.025f, 4 - (i + 0.5f) * tread));
+            for (int i = 0; i < steps; i++) Box("tread", 1.5f, 0.05f, tread - 0.02f, V(sx, (i + 1) * rise - 0.025f, 4 - (i + 0.5f) * tread));
             float len = Mathf.Sqrt(run * run + MZ * MZ), pitch = Mathf.Atan2(MZ, run) * Mathf.Rad2Deg;
             foreach (float x in new[] { sx - 0.8f, sx + 0.8f })
             {
@@ -148,32 +164,31 @@ namespace TarmacGauntlet.TeamHq
             foreach (float x in PostX) Box("line", 0.1f, 0.004f, 8.6f, V(x, 0.002f, 2.2f));
             foreach (float b in BayX) Box("line", 4.8f, 0.004f, 0.1f, V(b, 0.002f, 6.4f));
 
-            // Rolling tool chests under the mezzanine, three per bay.
-            foreach (float b in BayX)
-                for (int k = 0; k < 3; k++)
-                {
-                    float x = b + (k - 1) * 1.2f;
-                    Box("trim", 1.05f, 0.85f, 0.5f, V(x, 0.5f, Z0 + 0.4f));
-                    for (int d = 0; d < 5; d++) Box("dark", 0.95f, 0.012f, 0.01f, V(x, 0.2f + d * 0.15f, Z0 + 0.655f));
-                    Box("chrome", 0.6f, 0.025f, 0.03f, V(x, 0.8f, Z0 + 0.67f));
-                    if (k != 1)
-                    {
-                        Box("trim", 1.05f, 0.4f, 0.48f, V(x, 1.15f, Z0 + 0.4f));
-                        Box("chrome", 0.6f, 0.025f, 0.03f, V(x, 1.2f, Z0 + 0.66f));
-                    }
-                    foreach (float o in new[] { -0.45f, 0.45f }) Cylinder("rubber", 0.04f, 0.04f, 0.03f, V(x + o, 0.04f, Z0 + 0.6f), Rot.Z(90), 10);
-                }
-
-            // A trolley jack and two axle stands in front of every car.
+            // Under the mezzanine, per bay: a rolling tool chest with its top box, and a shelf unit.
             foreach (float b in BayX)
             {
-                Box("trim", 0.35f, 0.18f, 1.1f, V(b + 1.3f, 0.14f, CarZ + 3));
-                Box("chrome", 0.06f, 0.06f, 0.9f, V(b + 1.3f, 0.45f, CarZ + 3.6f), Rot.X(28.6f));
-                foreach (float s in new[] { -1f, 1f })
+                float x = b - 1.0f;
+                Box("chest", 0.72f, 0.82f, 0.46f, V(x, 0.51f, Z0 + 0.33f));
+                for (int d = 0; d < 5; d++)
                 {
-                    Cylinder("chrome", 0.025f, 0.025f, 0.42f, V(b + s * 1.15f, 0.21f, CarZ + 1.4f), Rot.None, 8);
-                    Cylinder("trim", 0.05f, 0.11f, 0.22f, V(b + s * 1.15f, 0.11f, CarZ + 1.4f), Rot.None, 4);
+                    Box("dark", 0.66f, 0.01f, 0.01f, V(x, 0.22f + d * 0.15f, Z0 + 0.565f));
+                    Box("chrome", 0.4f, 0.02f, 0.025f, V(x, 0.27f + d * 0.15f, Z0 + 0.575f));
                 }
+                foreach (float o in new[] { -0.3f, 0.3f })
+                    foreach (float dz in new[] { 0.15f, 0.5f })
+                        Cylinder("rubber", 0.05f, 0.05f, 0.04f, V(x + o, 0.05f, Z0 + dz), Rot.Z(90), 12);
+                Prop("metal_tool_chest", x, 0.92f, Z0 + 0.33f);
+                Prop("steel_frame_shelves_03", b + 0.85f, 0, Z0 + 0.4f);
+                float sx = b + 0.98f;
+                Prop("cardboard_box_01", sx - 0.6f, 0.03f, Z0 + 0.4f, 90);
+                Prop("plastic_crate_01", sx + 0.1f, 0.03f, Z0 + 0.4f);
+                Prop("plastic_crate_01", sx + 0.5f, 0.03f, Z0 + 0.4f);
+                Prop("multi_cleaner_5_litre", sx - 0.7f, 0.83f, Z0 + 0.4f, 10);
+                Prop("lubricant_spray", sx - 0.3f, 0.83f, Z0 + 0.4f);
+                Prop("spray_paint_bottles", sx + 0.1f, 0.83f, Z0 + 0.4f);
+                Prop("small_oil_can_01", sx + 0.6f, 0.83f, Z0 + 0.4f, 90);
+                Prop("cardboard_box_01", sx - 0.4f, 1.6f, Z0 + 0.4f, 90);
+                Prop("cardboard_box_01", sx + 0.3f, 1.6f, Z0 + 0.4f, 85);
             }
 
             // Round high-bay lamps over the garage floor, discs in the office ceiling.
@@ -181,42 +196,58 @@ namespace TarmacGauntlet.TeamHq
                 for (int i = 0; i < 5; i++)
                 {
                     float x = -10 + i * 5;
-                    Box("dark", 0.02f, 0.9f, 0.02f, V(x, H - 0.45f, z));
-                    Cylinder("dark", 0.12f, 0.36f, 0.3f, V(x, H - 1.05f, z), Rot.None, 24);
-                    Cylinder("lamp", 0.34f, 0.34f, 0.02f, V(x, H - 1.21f, z), Rot.None, 24);
+                    Prop("hanging_industrial_lamp", x, H - 0.02f, z);
+                    Cylinder("lamp", 0.16f, 0.16f, 0.01f, V(x, H - 1.3f, z), Rot.None, 24);
                 }
             foreach (float x in new[] { -4f, 1f, 6f }) Cylinder("lamp", 0.25f, 0.25f, 0.04f, V(x, H - 0.05f, -4.6f), Rot.None, 24);
+            foreach (float x in new[] { -4f, 1f, 6f }) Lights.Add(new HqLight { Position = V(x, H - 0.6f, -4.6f), Range = 7, Intensity = 0.5f, Warm = true });
             foreach (float z in new[] { 0.5f, 4.5f })
                 foreach (float x in new[] { -7f, 0f, 7f })
                     Lights.Add(new HqLight { Position = V(x, H - 1.4f, z), Range = 14, Intensity = 0.6f, Warm = true });
 
-            // Crew corner: workbench, tool board, lockers and three crew.
+            // Crew corner: workbench with its tools, tool board, lockers and three crew.
             Box("walnut", 0.8f, 0.08f, 4.5f, V(X0 + 0.5f, 0.9f, 1.5f));
             Box("cabinet", 0.7f, 0.85f, 4.4f, V(X0 + 0.48f, 0.43f, 1.5f));
             Plane("dark", 4.5f, 1.4f, V(X0 + 0.02f, 1.85f, 1.5f), Rot.Y(90), 0);
             var rng = new System.Random(7);
             for (int i = 0; i < 14; i++)
                 Box("chrome", 0.02f, 0.18f + (float)rng.NextDouble() * 0.25f, 0.05f, V(X0 + 0.05f, 1.6f + (float)rng.NextDouble() * 0.6f, -0.5f + i * 0.3f));
+            const float bench = 0.94f;
+            Prop("bench_vice_01", X0 + 0.55f, bench + 0.09f, 3.3f, 90);
+            Prop("drill_press_01", X0 + 0.45f, bench, -0.3f, 90);
+            Prop("metal_toolbox", X0 + 0.45f, bench, 1.0f, 90);
+            Prop("Drill_01", X0 + 0.6f, bench, 2.2f, 120);
+            Prop("combination_wrench", X0 + 0.65f, bench, 2.6f, 15);
+            Prop("measuring_tape_01", X0 + 0.5f, bench, 2.75f, 70);
+            Prop("wall_clock", X0, 2.85f, 1.5f, 90);
             for (float z = -5.9f; z <= -3.4f; z += 0.55f)
             {
                 Box("trim", 0.5f, 1.9f, 0.5f, V(X0 + 0.3f, 0.95f, z));
                 Box("dark", 0.01f, 0.25f, 0.12f, V(X0 + 0.555f, 1.5f, z + 0.12f));
             }
-            Person(-11.6f, 0.4f, 90);
-            Person(-11.9f, 2.8f, 75);
-            Person(-10.9f, -1.6f, 126);
+            Prop("crew_suit", -11.5f, 0, 0.4f, 90);
+            Prop("crew_overalls", -11.6f, 0, 2.6f, 105);
+            Prop("crew_vest", -10.9f, 0, -1.4f, 126);
 
-            string[] paint = { "owned", "race", "owned2", "spare" };
+            // Around the bays: the race car's tool cart, tyres, the compressor and the walls' fittings.
+            Prop("tool_cart", BayX[1] + 1.55f, 0, CarZ - 1.2f, -90);
+            for (int i = 0; i < 8; i++) Prop("old_tyre", X1 - 0.35f, 0.3f, -6.6f + i * 0.19f, 90);
+            Prop("old_military_compressor", 11, 0, -4.4f, 180);
+            Prop("tire_pump", 11.9f, 0, -2.9f, -90);
+            Prop("power_box_01", X1 - 0.05f, 1.5f, -1.2f, -90);
+            Prop("utility_box_01", X1 - 0.25f, 0, 0.4f, -90);
+            Prop("ladder_sectioned_01", X1 - 0.12f, 0, 2.4f, -90);
+            Prop("korean_fire_extinguisher_01", -5.5f, 0, Z1 - 0.3f, 180);
+            Prop("korean_fire_extinguisher_01", 4.5f, 0, Z1 - 0.3f, 180);
+            Prop("fire_alarm", -0.5f, 1.5f, Z1, 180);
+            Prop("covered_car", BayX[2], 0, CarZ);
+
+            // A soft shadow under every car, where the floor meets the tyres.
+            foreach (float b in BayX) Plane("blob", 2.7f, 5.6f, V(b, 0.004f, CarZ), Rot.X(-90), 0);
+
+            // Bay 3 holds the covered car, a prop; the dealer's bay shows a repainted car.
+            string[] paint = { "owned", "race", "", "spare" };
             for (int i = 0; i < BayX.Length; i++) Bays.Add(new HqBay { Position = V(BayX[i], 0, CarZ), Paint = paint[i] });
-        }
-
-        /// <summary>A crew stand-in: two legs, a body and a head.</summary>
-        private void Person(float x, float z, float yaw)
-        {
-            Rot r = Rot.Y(yaw);
-            foreach (float dx in new[] { -0.14f, 0.14f }) Capsule("legs", 0.08f, 0.78f, V(x, 0, z) + r.Apply(V(dx, 0.42f, 0)));
-            Capsule("overalls", 0.2f, 0.8f, V(x, 1.15f, z), 0.65f, r);
-            Sphere("skin", 0.12f, V(x, 1.62f, z));
         }
 
         private void Office()
@@ -226,19 +257,25 @@ namespace TarmacGauntlet.TeamHq
 
             // Drivers desk, looking out over the race car.
             Desk(-3, -4.4f, 1.8f, 0.8f);
-            Chair(-3, -5.1f, 0);
+            Prop("office_chair", -3, f, -5.15f);
             Box("paper", 0.24f, 0.06f, 0.32f, V(-3.5f, f + 0.81f, -4.3f));
             Box("folder", 0.24f, 0.04f, 0.32f, V(-3.45f, f + 0.85f, -4.32f));
             Box("screen", 0.5f, 0.32f, 0.03f, V(-2.5f, f + 0.95f, -4.6f));
             Box("dark", 0.04f, 0.18f, 0.04f, V(-2.5f, f + 0.85f, -4.62f));
 
-            // Standings screen on the back wall.
+            // Standings screen on the back wall, over a low cabinet.
+            Prop("modern_wooden_cabinet", 1, f, Z0 + 0.28f);
+            Prop("potted_plant_04", 2.0f, f + 0.68f, Z0 + 0.28f);
+            Prop("drawer_cabinet", -1.6f, f, Z0 + 0.26f);
+            Prop("wall_clock", -4.6f, f + 2.3f, Z0);
             Box("dark", 3.3f, 1.9f, 0.06f, V(1, f + 1.9f, Z0 + 0.04f));
             Box("screen", 3.15f, 1.75f, 0.01f, V(1, f + 1.9f, Z0 + 0.075f));
 
             // Finances desk with two monitors.
             Desk(5, -6.35f, 2.2f, 0.8f);
-            Chair(5, -5.6f, 180);
+            Prop("office_chair", 5, f, -5.55f, 180);
+            Prop("desk_lamp_arm_01", 5.85f, f + 0.775f, -6.45f, 200);
+            Prop("clipboard", 4.2f, f + 0.775f, -6.2f, 10);
             foreach (float x in new[] { 4.55f, 5.25f })
             {
                 Box("screen", 0.62f, 0.38f, 0.03f, V(x, f + 1.05f, -6.55f));
@@ -250,24 +287,20 @@ namespace TarmacGauntlet.TeamHq
             Box("cork", 2.2f, 1.3f, 0.01f, V(8.5f, f + 1.7f, Z0 + 0.06f));
             for (int i = 0; i < 8; i++) Box("paper", 0.32f, 0.24f, 0.005f, V(7.8f + (i % 4) * 0.48f, f + 1.95f - (i / 4) * 0.5f, Z0 + 0.068f));
 
-            // Sofa and coffee table with the newspaper, facing the glass.
-            Box("fabric", 2.2f, 0.42f, 0.9f, V(8, f + 0.21f, -4.7f));
-            Box("fabric", 2.2f, 0.5f, 0.22f, V(8, f + 0.6f, -5.05f));
-            foreach (float s in new[] { -1f, 1f }) Box("fabric", 0.2f, 0.55f, 0.9f, V(8 + s * 1.1f, f + 0.28f, -4.7f));
-            Box("walnut", 1.1f, 0.05f, 0.6f, V(8, f + 0.4f, -3.4f));
-            foreach (float s in new[] { -1f, 1f }) Box("dark", 0.04f, 0.38f, 0.5f, V(8 + s * 0.5f, f + 0.19f, -3.4f));
-            Box("paper", 0.45f, 0.01f, 0.32f, V(8.1f, f + 0.43f, -3.4f));
-
-            // A plant by the trophy room door.
-            Cylinder("pot", 0.18f, 0.14f, 0.4f, V(-6.4f, f + 0.2f, -6.5f), Rot.None, 20);
-            Sphere("leaves", 0.4f, V(-6.4f, f + 0.75f, -6.5f));
+            // Sofa, armchair and coffee table with the newspaper, facing the glass.
+            Prop("sofa_02", 8, f, -4.75f);
+            Prop("modern_arm_chair_01", 6.1f, f, -3.7f, 70);
+            Prop("modern_coffee_table_01", 8, f, -3.4f, 90);
+            Box("paper", 0.45f, 0.01f, 0.32f, V(8.1f, f + 0.395f, -3.4f));
+            Prop("potted_plant_01", -6.4f, f, -6.5f);
+            Prop("korean_fire_extinguisher_01", 9.3f, f, Z0 + 0.25f);
 
             // Race history photos on the office side of the trophy room wall.
             for (int r = 0; r < 2; r++)
                 for (int c = 0; c < 3; c++)
                 {
                     Box("frame", 0.04f, 0.55f, 0.75f, V(-6.91f, f + 1.3f + r * 0.8f, -6.2f + c * 0.95f));
-                    Box("paper", 0.01f, 0.47f, 0.67f, V(-6.885f, f + 1.3f + r * 0.8f, -6.2f + c * 0.95f));
+                    Box("photo" + (r * 3 + c + 1), 0.01f, 0.47f, 0.67f, V(-6.885f, f + 1.3f + r * 0.8f, -6.2f + c * 0.95f));
                 }
         }
 
@@ -275,21 +308,6 @@ namespace TarmacGauntlet.TeamHq
         {
             Box("walnut", w, 0.05f, d, V(x, MZ + 0.75f, z));
             foreach (float s in new[] { -1f, 1f }) Box("dark", 0.05f, 0.72f, d - 0.1f, V(x + s * (w / 2 - 0.08f), MZ + 0.37f, z));
-        }
-
-        private void Chair(float x, float z, float yaw)
-        {
-            Rot r = Rot.Y(yaw);
-            Vector3 o = V(x, MZ, z);
-            Box("leather", 0.5f, 0.08f, 0.5f, o + V(0, 0.48f, 0), r);
-            Box("leather", 0.48f, 0.6f, 0.06f, o + r.Apply(V(0, 0.82f, -0.24f)), r);
-            Cylinder("chrome", 0.03f, 0.03f, 0.42f, o + V(0, 0.24f, 0), Rot.None, 8);
-            for (int i = 0; i < 5; i++)
-            {
-                float a = i * 72;
-                Rot leg = Rot.Y(yaw + a);
-                Box("chrome", 0.03f, 0.03f, 0.32f, o + leg.Apply(V(0, 0.04f, 0.16f)), leg);
-            }
         }
 
         private void TrophyRoom()
@@ -300,10 +318,10 @@ namespace TarmacGauntlet.TeamHq
             Box("partition", 0.15f, H - f, 0.2f, V(-7, f + (H - f) / 2, MZF - 0.1f));
             Box("partition", 0.15f, H - f - 2.1f, 1, V(-7, f + 2.1f + (H - f - 2.1f) / 2, -3.2f));
             Box("partition", 6, H - f, 0.15f, V(-10, f + (H - f) / 2, MZF));
-            Plane("velvet", 6, 4.5f, V(-10, f + 0.006f, -4.75f), Rot.X(-90), 0);
+            Plane("parquet", 6, 4.5f, V(-10, f + 0.006f, -4.75f), Rot.X(-90), 1.7f);
 
-            string[] metal = { "gold", "silver", "gold", "bronze" };
-            // Glass cabinets along the back wall.
+            // Glass cabinets along the back wall, two cups to a shelf.
+            float[] shelf = { 0.5f, 1.08f, 1.66f };
             for (int i = 0; i < 5; i++)
             {
                 float x = -12.4f + i * 1.1f;
@@ -312,9 +330,9 @@ namespace TarmacGauntlet.TeamHq
                 GlassBox(1, 1.74f, 0.5f, V(x, f + 1.4f, Z0 + 0.3f));
                 for (int s = 0; s < 3; s++)
                 {
-                    Box("glass", 0.96f, 0.02f, 0.46f, V(x, f + 0.9f + s * 0.5f, Z0 + 0.3f));
-                    Trophy(x - 0.25f + s * 0.12f, f + 0.5f + s * 0.5f, Z0 + 0.3f, 0.9f, metal[(i + s) % 4]);
-                    Trophy(x + 0.22f, f + 0.5f + s * 0.5f, Z0 + 0.3f, 0.7f, metal[(i + s + 1) % 4]);
+                    if (s > 0) Box("glass", 0.96f, 0.02f, 0.46f, V(x, f + shelf[s] - 0.01f, Z0 + 0.3f));
+                    Cup(i * 3 + s, x - 0.22f, f + shelf[s], Z0 + 0.3f, 0);
+                    Cup(i * 3 + s + 7, x + 0.22f, f + shelf[s], Z0 + 0.3f, 0);
                 }
                 Box("lamp", 0.9f, 0.02f, 0.02f, V(x, f + 2.24f, Z0 + 0.5f));
             }
@@ -324,7 +342,11 @@ namespace TarmacGauntlet.TeamHq
                 float z = -6 + i * 1.1f;
                 Box("plinth", 0.5f, 0.5f, 1, V(X0 + 0.3f, f + 0.25f, z));
                 GlassBox(0.5f, 1.74f, 1, V(X0 + 0.3f, f + 1.4f, z));
-                for (int s = 0; s < 3; s++) Trophy(X0 + 0.3f, f + 0.5f + s * 0.5f, z, 0.85f, metal[(i + s) % 4]);
+                for (int s = 0; s < 3; s++)
+                {
+                    if (s > 0) Box("glass", 0.46f, 0.02f, 0.96f, V(X0 + 0.3f, f + shelf[s] - 0.01f, z));
+                    Cup(i * 5 + s * 2 + 1, X0 + 0.3f, f + shelf[s], z, 90);
+                }
             }
             Box("leather", 1.4f, 0.45f, 0.5f, V(-10, f + 0.225f, -4.2f));
             // Press clippings above the cabinets.
@@ -337,17 +359,26 @@ namespace TarmacGauntlet.TeamHq
             Lights.Add(new HqLight { Position = V(-10, f + 2.2f, -6.2f), Range = 3.5f, Intensity = 0.7f, Warm = true });
         }
 
+        /// <summary>A glass case with thin dark metal edges.</summary>
         private void GlassBox(float w, float h, float d, Vector3 c)
         {
             Box("glass", w, h, d, c);
+            const float e = 0.025f;
+            foreach (float sx in new[] { -1f, 1f })
+                foreach (float sz in new[] { -1f, 1f })
+                    Box("frame", e, h, e, c + V(sx * (w - e) / 2, 0, sz * (d - e) / 2));
+            foreach (float sy in new[] { -1f, 1f })
+            {
+                foreach (float sz in new[] { -1f, 1f }) Box("frame", w, e, e, c + V(0, sy * (h - e) / 2, sz * (d - e) / 2));
+                foreach (float sx in new[] { -1f, 1f }) Box("frame", e, e, d, c + V(sx * (w - e) / 2, sy * (h - e) / 2, 0));
+            }
         }
 
-        /// <summary>A cup on a stem and a black base, s times the standard size.</summary>
-        private void Trophy(float x, float y, float z, float s, string metal)
+        /// <summary>One of the three trophy models, picked and sized by n so neighbouring cups differ.</summary>
+        private void Cup(int n, float x, float y, float z, float yaw)
         {
-            Cylinder("plinth", 0.07f * s, 0.1f * s, 0.08f * s, V(x, y + 0.04f * s, z), Rot.None, 12);
-            Cylinder(metal, 0.025f * s, 0.03f * s, 0.15f * s, V(x, y + 0.155f * s, z), Rot.None, 10);
-            Lathe(metal, new[] { 0f, 0.06f, 0.11f, 0.13f, 0.12f }, new[] { 0f, 0f, 0.06f, 0.16f, 0.22f }, s, V(x, y + 0.23f * s, z), 20);
+            float[] size = { 1f, 0.82f, 0.9f, 0.75f };
+            Prop("trophy_" + (n % 3 + 1), x, y, z, yaw + (n % 2 == 0 ? 0 : 180), size[n % 4]);
         }
 
         // ---------- Primitives (viewer frame) ----------
@@ -360,12 +391,16 @@ namespace TarmacGauntlet.TeamHq
             return p;
         }
 
-        /// <summary>A one-sided rectangle facing local +Z. Tile is metres per texture repeat; 0 stretches it once.</summary>
+        private void Prop(string id, float x, float y, float z, float yaw = 0, float scale = 1) =>
+            Props.Add(new HqProp { Id = id, Position = V(x, y, z), Yaw = yaw, Scale = scale });
+
+        /// <summary>A one-sided rectangle facing local +Z. Tile is metres per texture repeat; 0 uses the surface's own, or stretches it once.</summary>
         private void Plane(string key, float w, float h, Vector3 c, Rot r, float tile)
         {
             HqPart p = Part(key);
             int s = p.Vertices.Count;
             Vector3 n = r.Apply(V(0, 0, 1));
+            if (tile <= 0) Tile.TryGetValue(key, out tile);
             float u = tile > 0 ? w / tile : 1, v = tile > 0 ? h / tile : 1;
             p.Vertices.Add(c + r.Apply(V(-w / 2, -h / 2, 0))); p.Uvs.Add(new Vector2(0, 0));
             p.Vertices.Add(c + r.Apply(V(w / 2, -h / 2, 0))); p.Uvs.Add(new Vector2(u, 0));
@@ -433,87 +468,6 @@ namespace TarmacGauntlet.TeamHq
             }
         }
 
-        /// <summary>A surface of revolution about local Y through (radius, height) points, scaled by s. Seen from both sides.</summary>
-        private void Lathe(string key, float[] radius, float[] height, float s, Vector3 c, int seg)
-        {
-            HqPart p = Part(key);
-            int rows = radius.Length, start = p.Vertices.Count;
-            for (int i = 0; i <= seg; i++)
-            {
-                float a = i * 2 * Mathf.PI / seg, sin = Mathf.Sin(a), cos = Mathf.Cos(a);
-                for (int k = 0; k < rows; k++)
-                {
-                    int k0 = Mathf.Max(k - 1, 0), k1 = Mathf.Min(k + 1, rows - 1);
-                    float dr = radius[k1] - radius[k0], dh = height[k1] - height[k0];
-                    p.Vertices.Add(c + V(radius[k] * s * sin, height[k] * s, radius[k] * s * cos));
-                    p.Normals.Add(V(dh * sin, -dr, dh * cos).normalized);
-                    p.Uvs.Add(new Vector2((float)i / seg, (float)k / (rows - 1)));
-                }
-            }
-            for (int i = 0; i < seg; i++)
-                for (int k = 0; k < rows - 1; k++)
-                {
-                    int a = start + i * rows + k, b = a + 1, e = a + rows, g = e + 1;
-                    p.Triangles.Add(a); p.Triangles.Add(e); p.Triangles.Add(g);
-                    p.Triangles.Add(a); p.Triangles.Add(g); p.Triangles.Add(b);
-                    p.Triangles.Add(a); p.Triangles.Add(g); p.Triangles.Add(e);
-                    p.Triangles.Add(a); p.Triangles.Add(b); p.Triangles.Add(g);
-                }
-        }
-
-        private void Sphere(string key, float radius, Vector3 c) => Ellipsoid(key, radius, radius, radius, c, Rot.None);
-
-        private void Ellipsoid(string key, float rx, float ry, float rz, Vector3 c, Rot r)
-        {
-            HqPart p = Part(key);
-            const int seg = 16, rings = 10;
-            int s = p.Vertices.Count;
-            for (int j = 0; j <= rings; j++)
-            {
-                float t = j * Mathf.PI / rings, st = Mathf.Sin(t), ct = Mathf.Cos(t);
-                for (int i = 0; i <= seg; i++)
-                {
-                    float a = i * 2 * Mathf.PI / seg;
-                    Vector3 unit = V(st * Mathf.Sin(a), ct, st * Mathf.Cos(a));
-                    p.Vertices.Add(c + r.Apply(V(unit.x * rx, unit.y * ry, unit.z * rz)));
-                    p.Normals.Add(r.Apply(V(unit.x / rx, unit.y / ry, unit.z / rz).normalized));
-                    p.Uvs.Add(new Vector2((float)i / seg, 1 - (float)j / rings));
-                }
-            }
-            for (int j = 0; j < rings; j++)
-                for (int i = 0; i < seg; i++)
-                {
-                    int a = s + j * (seg + 1) + i, b = a + 1, e = a + seg + 1, g = e + 1;
-                    p.Triangles.Add(a); p.Triangles.Add(e); p.Triangles.Add(b);
-                    p.Triangles.Add(b); p.Triangles.Add(e); p.Triangles.Add(g);
-                }
-        }
-
-        /// <summary>A capsule standing on local Y: a cylinder with half-sphere ends, flattened front to back by depth.</summary>
-        private void Capsule(string key, float radius, float length, Vector3 c, float depth = 1, Rot? rot = null)
-        {
-            Rot r = rot ?? Rot.None;
-            float mid = Mathf.Max(length - 2 * radius, 0.01f);
-            HqPart p = Part(key);
-            const int seg = 16;
-            int s = p.Vertices.Count;
-            for (int i = 0; i <= seg; i++)
-            {
-                float a = i * 2 * Mathf.PI / seg, sin = Mathf.Sin(a), cos = Mathf.Cos(a) * depth;
-                Vector3 n = r.Apply(V(sin, 0, cos).normalized);
-                p.Vertices.Add(c + r.Apply(V(radius * sin, mid / 2, radius * cos))); p.Normals.Add(n); p.Uvs.Add(new Vector2((float)i / seg, 1));
-                p.Vertices.Add(c + r.Apply(V(radius * sin, -mid / 2, radius * cos))); p.Normals.Add(n); p.Uvs.Add(new Vector2((float)i / seg, 0));
-            }
-            for (int i = 0; i < seg; i++)
-            {
-                int a = s + i * 2, b = a + 1, e = a + 2, g = a + 3;
-                p.Triangles.Add(a); p.Triangles.Add(b); p.Triangles.Add(g);
-                p.Triangles.Add(a); p.Triangles.Add(g); p.Triangles.Add(e);
-            }
-            Ellipsoid(key, radius, radius, radius * depth, c + r.Apply(V(0, mid / 2, 0)), r);
-            Ellipsoid(key, radius, radius, radius * depth, c + r.Apply(V(0, -mid / 2, 0)), r);
-        }
-
         /// <summary>Flips Z and the winding, so the building reads the same in Unity's left-handed frame.</summary>
         private void MirrorIntoUnity()
         {
@@ -534,6 +488,7 @@ namespace TarmacGauntlet.TeamHq
             }
             for (int i = 0; i < Lights.Count; i++) { HqLight l = Lights[i]; l.Position = V(l.Position.x, l.Position.y, -l.Position.z); Lights[i] = l; }
             for (int i = 0; i < Bays.Count; i++) { HqBay b = Bays[i]; b.Position = V(b.Position.x, b.Position.y, -b.Position.z); Bays[i] = b; }
+            for (int i = 0; i < Props.Count; i++) { HqProp p = Props[i]; p.Position = V(p.Position.x, p.Position.y, -p.Position.z); p.Yaw = -p.Yaw; Props[i] = p; }
         }
 
         /// <summary>A rotation as a 3x3 matrix, in degrees, with the viewer's (three.js) sense of positive angles.</summary>

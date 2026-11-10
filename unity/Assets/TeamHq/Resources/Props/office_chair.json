@@ -1,0 +1,1 @@
+{"min": [-0.31908, 0.0, -0.29914], "max": [0.31908, 1.12, 0.29914], "mats": [{"col": "office_chair_0_c.jpg", "nrm": "", "ms": "", "color": [1, 1, 1, 1], "metal": 0, "rough": 0.6384615302085876, "cutout": false, "blend": false, "twoSided": true}], "parts": [{"mat": 0, "n": 8409, "i": 31521, "pos": 0, "nrm": 50456, "uv": 75684, "idx": 142956, "wide": false}]}

@@ -113,7 +113,15 @@ glides to a shot in half a second. Nobody adjusts shots in the editor: when Ivan
 copy them from the viewer's `presets` store into the JSON.
 
 `bash tools/team-hq/geometry-check/run.sh [folder]` builds the building outside Unity and checks every part
-lies inside the shell with sound normals and winding. With a folder it also writes `hq.obj` there to look at.
+lies inside the shell with sound normals and winding. It also checks every placed prop has its files. With a folder it writes `hq.obj`, `props.json` and
+`lights.json` there, which the viewer reads.
+
+The props (tool chests, lamps, furniture, the crew, the trophies) are real models: Poly Haven (CC0) and
+Sketchfab (CC BY, credited in `Assets/TeamHq/CREDITS.md`). `tools/team-hq/props/pack_props.py` packs each one
+into `Resources/Props` as `<id>.json`, `<id>_mesh.bytes` and its textures; `HqGeometry` places them and
+`HqProps.cs` builds them, so the scene needs no import packages. The viewer reads the same files.
+`tools/team-hq/props/props.json` holds each model's height, pose and simplification, and `props.txt` the list.
+`make_textures.py` turns Poly Haven photo textures into the building's surfaces in `Resources/Textures`.
 
 ## Menus and saving
 
