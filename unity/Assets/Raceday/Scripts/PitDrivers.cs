@@ -7,7 +7,7 @@ namespace TarmacGauntlet.Raceday
 {
     /// <summary>
     /// The race drivers of every box whose car has more than one: the crew's body in a race suit, without its cap and
-    /// glasses, with a helmet on (tools/pit-crew/helmet.py). They change over at the stops in step with the stop's
+    /// glasses, with a racing helmet on (tools/pit-crew/helmet.py). They change over at the stops in step with the stop's
     /// clock (<see cref="DriverSwap"/>). Drawn the crew's way: still figures far off, live rigs in the boxes played
     /// live, and nobody while the car is away.
     /// </summary>
