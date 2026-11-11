@@ -55,6 +55,8 @@ namespace TarmacGauntlet.Management
         private readonly HashSet<VisualElement> shown = new HashSet<VisualElement>();
 
         private VisualElement root, mainColumn, continueItem, gameLayer, top, hubMenu, strip, tag, tagFill, race, panel, panelBody, panelButton;
+        private VisualElement catcher, lineup, lineupBody;
+        private Label tagClass;
         private VisualElement dimmer, pauseLayer, settingsLayer, settingsPanel;
         private Label continueSub, teamName, year, money, tagName, tagPercent;
         private readonly Dictionary<string, VisualElement> hubItems = new Dictionary<string, VisualElement>(), stripIcons = new Dictionary<string, VisualElement>();
@@ -107,6 +109,7 @@ namespace TarmacGauntlet.Management
             Build();
             gameObject.AddComponent<DriversPanel>();
             gameObject.AddComponent<CrewPanel>();
+            gameObject.AddComponent<LineupPanel>();
 
             GameSession.Changed += OnGameChanged;
             if (GameSession.State != null) OnGameChanged(GameSession.State);
@@ -140,6 +143,11 @@ namespace TarmacGauntlet.Management
 
             // The game: top bar, hub menu, icon strip, car tag, Race and the docked panel.
             gameLayer = Layer();
+            // Under everything in the game layer: a click on the scene closes the lineup.
+            catcher = new VisualElement();
+            catcher.AddToClassList("layer");
+            catcher.RegisterCallback<ClickEvent>(_ => { if (mode == Mode.Lineup) Go(Mode.Hub); });
+            gameLayer.Add(catcher);
             top = new VisualElement();
             top.AddToClassList("top");
             top.AddToClassList("fade");
@@ -189,8 +197,13 @@ namespace TarmacGauntlet.Management
             gameLayer.Add(strip);
 
             tag = glass.Make("tag", "fade");
+            var tagTop = new VisualElement();
+            tagTop.AddToClassList("tag-top");
+            tagClass = ClassLabels.Make(CarClass.F, "cls-sm", bold);
+            tagTop.Add(tagClass);
             tagName = Text("", "tag-name", true);
-            tag.Add(tagName);
+            tagTop.Add(tagName);
+            tag.Add(tagTop);
             var condition = new VisualElement();
             condition.AddToClassList("condition");
             var bar = new VisualElement();
@@ -216,6 +229,12 @@ namespace TarmacGauntlet.Management
             panel.Add(panelButton);
             gameLayer.Add(panel);
 
+            // The lineup: a small panel where the Race button was.
+            lineup = glass.Make("lineup", "fade");
+            lineupBody = new VisualElement();
+            lineup.Add(lineupBody);
+            gameLayer.Add(lineup);
+
             // A second pane left of the docked panel, for screens that show a selected item beside a long list.
             side = glass.Make("side", "fade");
             SideBody = new VisualElement();
@@ -239,7 +258,7 @@ namespace TarmacGauntlet.Management
             settingsPanel = glass.Make("settings");
             settingsLayer.Add(settingsPanel);
 
-            foreach (VisualElement e in new[] { mainColumn, top, hubMenu, strip, tag, race, panel, side, dimmer, pauseLayer, settingsLayer })
+            foreach (VisualElement e in new[] { mainColumn, top, hubMenu, strip, tag, race, panel, side, catcher, lineup, dimmer, pauseLayer, settingsLayer })
                 e.style.display = DisplayStyle.None;
 
             tipLayer = Layer();
@@ -420,7 +439,7 @@ namespace TarmacGauntlet.Management
         private static Texture2D redGradient;
 
         /// <summary>#ff2b22 at the top to #e10600 at the bottom.</summary>
-        private static Texture2D RedGradient
+        internal static Texture2D RedGradient
         {
             get
             {
@@ -549,12 +568,17 @@ namespace TarmacGauntlet.Management
             HideTooltip();
             mode = next;
             screen = next == Mode.Screen ? slug : null;
-            if (next == Mode.Screen || next == Mode.Lineup || next == Mode.NewGame)
+            if (next == Mode.Screen || next == Mode.NewGame)
             {
                 panelBody.Clear();
                 SideBody.Clear();
-                panel.name = next == Mode.Screen ? slug : next == Mode.Lineup ? LineupSlug : NewGameSlug;
+                panel.name = next == Mode.Screen ? slug : NewGameSlug;
                 ScreenOpened?.Invoke(panel.name, panelBody);
+            }
+            else if (next == Mode.Lineup)
+            {
+                lineupBody.Clear();
+                ScreenOpened?.Invoke(LineupSlug, lineupBody);
             }
             hqCamera.Show(next == Mode.Main || next == Mode.NewGame ? MainShot : next == Mode.Screen ? slug : HubShot);
             Render();
@@ -626,7 +650,9 @@ namespace TarmacGauntlet.Management
             Show(hubMenu, mode == Mode.Hub && !covered);
             Show(strip, (mode == Mode.Screen || mode == Mode.Lineup) && !covered);
             Show(race, mode == Mode.Hub && !covered);
-            Show(panel, (mode == Mode.Screen || mode == Mode.Lineup || mode == Mode.NewGame) && !covered);
+            Show(panel, (mode == Mode.Screen || mode == Mode.NewGame) && !covered);
+            Show(lineup, mode == Mode.Lineup && !covered);
+            Show(catcher, mode == Mode.Lineup && !covered);
             Show(side, mode == Mode.Screen && SideBody.childCount > 0 && !covered);
             panelButton.style.display = mode == Mode.NewGame ? DisplayStyle.Flex : DisplayStyle.None;
             Show(dimmer, covered);
@@ -690,6 +716,8 @@ namespace TarmacGauntlet.Management
             {
                 CarModel model = CarModels.All.FirstOrDefault(m => m.Id == car.ModelId);
                 tagName.text = (model?.Name ?? car.ModelId).ToUpperInvariant();
+                if (model != null) ClassLabels.Paint(tagClass, model.CarClass);
+                tagClass.style.display = model != null ? DisplayStyle.Flex : DisplayStyle.None;
                 double c = Math.Max(0, Math.Min(100, car.Condition));
                 tagFill.style.width = Length.Percent((float)c);
                 tagPercent.text = Math.Round(c).ToString(CultureInfo.InvariantCulture) + "%";

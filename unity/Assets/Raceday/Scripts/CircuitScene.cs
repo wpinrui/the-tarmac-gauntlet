@@ -38,6 +38,7 @@ namespace TarmacGauntlet.Raceday
         private bool skipping;
         private SituationMenu lab;
         private RaceDay day;
+        private RaceDirector director;
 
         private const string PlayerCar = "a-29";
         private const string PlayerModel = "Assets/Art/Vehicles/CheonmaCX24Si/CheonmaCX24Si.obj";
@@ -146,7 +147,7 @@ namespace TarmacGauntlet.Raceday
 
             RaceCameras views = Camera(circuit, cars, watched, keys);
             RaceTower tower = Tower(circuit, racing, field, teams, watched, starter);
-            RaceDirector director = new GameObject("Race director").AddComponent<RaceDirector>();
+            director = new GameObject("Race director").AddComponent<RaceDirector>();
             director.Day = day;
             director.Cars = racing;
             director.Drivers = drivers;
@@ -217,6 +218,7 @@ namespace TarmacGauntlet.Raceday
         private void Update()
         {
             if (keys == null || ai == null || lab.Running) return;   // a debug set-up runs instead of the race
+            if (director.Finished) return;   // the race summary is up, at normal speed
             if (keys.Pressed(KeyCode.I)) ai.enabled = !ai.enabled;
             if (keys.Pressed(KeyCode.F))
             {
