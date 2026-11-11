@@ -3,7 +3,8 @@ using UnityEngine;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// C cycles the TV view, then the chase, bonnet and bumper views of the car, then the free camera.
+    /// C cycles the TV view, then the chase, bonnet and bumper views of the car, then the free camera, then the
+    /// free camera that follows the car.
     /// The TV view is the broadcast while the AI drives your car (<see cref="BroadcastDirector"/>), and
     /// the bonnet view while you drive it. V moves to the next car, and P to the next car making a pit
     /// stop, both in the chase view if the TV view was on.
@@ -11,7 +12,7 @@ namespace TarmacGauntlet.Raceday
     [RequireComponent(typeof(Camera))]
     public sealed class RaceCameras : MonoBehaviour
     {
-        private enum View { Tv, Chase, Bonnet, Bumper, Free }
+        private enum View { Tv, Chase, Bonnet, Bumper, Free, Follow }
 
         public CarController Car;
         /// <summary>The cars V steps through, if more than one.</summary>
@@ -41,7 +42,7 @@ namespace TarmacGauntlet.Raceday
         {
             if (Keys != null && Keys.Pressed(KeyCode.C))
             {
-                view = (View)(((int)view + 1) % 5);
+                view = (View)(((int)view + 1) % 6);
                 Apply();
             }
             if (Keys != null && Keys.Pressed(KeyCode.V) && Cars != null && Cars.Length > 1)
@@ -77,17 +78,23 @@ namespace TarmacGauntlet.Raceday
 
         private void Apply()
         {
-            bool isFree = view == View.Free;
-            if (free != null) free.enabled = isFree;
+            bool isFree = view == View.Free || view == View.Follow;
+            if (free != null)
+            {
+                // Re-enabled so a new car or a switch between the two starts from its own pose.
+                free.enabled = false;
+                free.Target = view == View.Follow && Car != null ? Car.transform : null;
+                free.enabled = isFree;
+            }
             if (Car != null) Car.InputEnabled = !isFree;
-            cam.fieldOfView = view == View.Chase ? 60f : 70f;
+            cam.fieldOfView = view == View.Chase || view == View.Follow ? 60f : 70f;
             if (Hud != null) Hud.Hidden = false;
             chaseSettled = false;
         }
 
         private void LateUpdate()
         {
-            if (Car == null || view == View.Free) return;
+            if (Car == null || view == View.Free || view == View.Follow) return;
             Transform t = Car.transform;
             bool tv = view == View.Tv;
             // The broadcast while the AI drives; the HUD is for driving.
