@@ -103,6 +103,8 @@ namespace TarmacGauntlet.Raceday
         private static readonly float OweTight = Knob("OWETIGHT", 0.7f);
         /// <summary>Score for covering the inside of the next corner with a car close behind (H4), s; how far across counts as covering it, m; and how close behind, s, but no closer than a car it has just passed, m.</summary>
         private static readonly float Defend = Knob("DEFEND", 0.3f), DefendCover = Knob("DCOVER", 3f), DefendWithin = Knob("DWITHIN", 0.45f), DefendFrom = Knob("DFROM", 10f);
+        /// <summary>H4: the defensive move waits until the attacker would be on the tail within the move's time plus this, s.</summary>
+        private static readonly float DefendLate = Knob("DLATE", 1f), DefendSlack = Knob("DSLACK", 0.5f);
         /// <summary>Gap kept nose to tail when moving across in front of a car behind, m: never across its nose (T8).</summary>
         private static readonly float SwipeGap = Knob("SWIPE", 1f);
         /// <summary>How far ahead of where the car is the line leaving a car its width may aim, m (H2).</summary>
@@ -225,7 +227,7 @@ namespace TarmacGauntlet.Raceday
             float mySpeed = me.Speed;
             bool lapOne = me.Distance < lap;
             bool defending = false, fastBehind = false, lapped = false, passing = false;
-            float lappingLateral = 0f, attackerGap = float.NegativeInfinity, attackerLateral = 0f;
+            float lappingLateral = 0f, attackerGap = float.NegativeInfinity, attackerLateral = 0f, attackerClosing = 0f;
             float aheadInLane = float.PositiveInfinity;
             int ahead = -1;
             float aheadGap = 60f;
@@ -246,7 +248,7 @@ namespace TarmacGauntlet.Raceday
                 float threat = RealPace && o.LapPace > 0f ? Mathf.Max(closing, mySpeed * (pilot.Profile.LapTime / o.LapPace - 1f)) : closing;
                 // Only a car with a real attacker behind defends: a train of equal cars doesn't all chop (T9).
                 bool attacker = !RealPace || threat > DefendThreat;
-                if (g < -CarL && !lapping && -g < mySpeed * 1f && o.Speed > mySpeed - 5f && attacker && (!defending || g > attackerGap)) { defending = true; attackerGap = g; attackerLateral = o.Lateral; }
+                if (g < -CarL && !lapping && -g < mySpeed * 1f && o.Speed > mySpeed - 5f && attacker && (!defending || g > attackerGap)) { defending = true; attackerGap = g; attackerLateral = o.Lateral; attackerClosing = threat; }
                 if (g < -CarL && !lapping && threat > Endurance.NoDefendClosing && -g < threat * 2f) fastBehind = true;
                 if (g > CarL && g < mySpeed * 1f && o.Speed < freeSpeed) passing = true;
                 if (g > 0f && g < aheadGap && Mathf.Abs(o.Lateral - me.Lateral) < CarW + RoomMargin && !(stopped[j] && mySpeed < GhostCrawl + 1f)) { aheadGap = g; ahead = j; aheadInLane = o.Speed; }
@@ -292,7 +294,12 @@ namespace TarmacGauntlet.Raceday
                     if (Mathf.Abs(Road(o.Distance - me.Distance, lap)) < (OweTrack ? CarL : 2f * CarL) && Mathf.Sign(o.Lateral - me.Lateral) == -nextTurn && Mathf.Abs(o.Speed) >= StoppedSpeed) owedNear = true;
             // H4: with a car close behind on a straight, one move to cover the inside of the next corner is worth something (Ivan).
             int coverTurn = NextTurn(c, here, float.PositiveInfinity);
-            bool cover = Defend > 0f && defending && !exempt && !zone && movePhase != 2 && coverTurn != 0 && -attackerGap < DefendWithin * Mathf.Max(mySpeed, 1f) && -attackerGap > DefendFrom;
+            // H4: the move as late as it can be while the attacker still needn't brake for it: once the attacker,
+            // closing as it is, would be on this car's tail within the time the move takes plus DefendSlack (Ivan).
+            float tail = CarL + margin + headway * mySpeed, catchIn = (-attackerGap - tail) / Mathf.Max(attackerClosing, 0.1f);
+            bool late = DefendLate <= 0f || movePhase == 1 || catchIn < DefendCover / Endurance.OvertakeOffsetRate + DefendSlack;
+            bool far = DefendLate > 0f ? movePhase == 1 || -attackerGap > tail : -attackerGap < DefendWithin * Mathf.Max(mySpeed, 1f) && -attackerGap > DefendFrom;
+            bool cover = Defend > 0f && defending && !exempt && !zone && movePhase != 2 && coverTurn != 0 && late && far;
             float CoverBonus(float shift) => cover ? Defend * Mathf.Clamp01(-coverTurn * shift / DefendCover) : 0f;
             for (int s = owedNear ? -3 : -2; s < shifts.Length; s++)
                 for (int p = 0; p < pedals; p++)
