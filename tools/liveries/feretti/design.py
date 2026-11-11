@@ -12,6 +12,7 @@ BRAND = HERE.parents[2] / "src" / "renderer" / "assets" / "brands" / "feretti"
 WORDMARK = BRAND / "feretti-wordmark-colour.svg"
 BADGE = BRAND / "feretti-badge-colour.svg"
 TRICOLORE = ["#009246", "#f1f2f1", "#ce2b37"]
+GOLD = "#c9a227"  # the badge's laurels
 sys.path.insert(0, str(HERE.parent / "common"))
 from livery import Livery  # noqa: E402
 
@@ -37,12 +38,6 @@ def common(lv, roof_x):
     lv.number("top", (roof_x, 0, -0.08), 0.56, 0.34, WHITE, rotate=180)  # reads from the car's left
 
 
-def puro(views):
-    lv = Livery(views, ROSSO)
-    common(lv, 0.0)
-    return lv
-
-
 def stripes(views):
     lv = Livery(views, ROSSO)
     lv.band_x(0.08, 0.34, BONE)
@@ -58,13 +53,13 @@ def bonnet(angle):
     (0 reads from the car's left, -90 from the nose)."""
     def make(views):
         lv = stripes(views)
-        lv.mark("top", WORDMARK, (-0.36, 0, 1.55), 0.17, WHITE, rotate=angle, underline=TRICOLORE)
-        lv.side_mark(BADGE, -0.72, 0.74, 0.22)
+        lv.mark("top", WORDMARK, (-0.36, 0, 1.55), 0.17, WHITE, rotate=angle, underline=TRICOLORE, edge=GOLD)
+        lv.side_mark(BADGE, -0.76, 0.70, 0.32)
         return lv
     return make
 
 
-OPTIONS = {"puro": puro, "stripes": stripes, "bonnet-a": bonnet(-35), "bonnet-b": bonnet(-60), "bonnet-c": bonnet(-145)}
+OPTIONS = {"feretti": bonnet(-60)}
 
 if __name__ == "__main__":
     views = HERE / "out" / "views" / "views.json"

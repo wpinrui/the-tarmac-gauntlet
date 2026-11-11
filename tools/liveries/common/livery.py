@@ -53,10 +53,10 @@ class Livery:
             f'letter-spacing="{spacing * height:.4f}" fill="{fill}" text-anchor="middle" dominant-baseline="central" '
             f'transform="rotate({rotate} {u:.4f} {v:.4f})">{s}</text>')
 
-    def mark(self, view, svg_path, p, height, ink=None, rotate=0, underline=None):
+    def mark(self, view, svg_path, p, height, ink=None, rotate=0, underline=None, edge=None):
         """An existing brand mark (SVG file), height metres tall, centred on p. ink recolours
         every fill, for a mark that would vanish on the paint. underline: colours of equal
-        bars laid side by side under the mark, turning with it."""
+        bars laid side by side under the mark, turning with it; edge outlines them in a colour."""
         src = Path(svg_path).read_text()
         vb = [float(x) for x in re.search(r'viewBox="([^"]+)"', src).group(1).split()]
         inner = re.search(r"<svg[^>]*>(.*)</svg>", src, re.S).group(1)
@@ -67,6 +67,8 @@ class Livery:
         self.art[view].append(
             f'<g transform="translate({u:.4f} {v:.4f}) rotate({rotate})"><svg x="{-w / 2:.4f}" y="{-height / 2:.4f}" '
             f'width="{w:.4f}" height="{height:.4f}" viewBox="{" ".join(map(str, vb))}">{inner}</svg>'
+            + (f'<rect x="{-w / 2:.4f}" y="{height * 0.52:.4f}" width="{w:.4f}" height="{height * 0.13:.4f}" fill="none" '
+               f'stroke="{edge}" stroke-width="{height * 0.06:.4f}" stroke-linejoin="round"/>' if underline and edge else "")
             + "".join(f'<rect x="{-w / 2 + i * w / len(underline):.4f}" y="{height * 0.52:.4f}" width="{w / len(underline):.4f}" '
                       f'height="{height * 0.13:.4f}" fill="{c}"/>' for i, c in enumerate(underline or []))
             + "</g>")
