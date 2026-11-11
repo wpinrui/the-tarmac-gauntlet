@@ -120,6 +120,14 @@ outline open at the back, yellow front-wheel line sticking out sideways), safety
 12 m pit lane with a 3.5 m fast lane, speed limit lines, pit box outlines, red and white hatching at
 the entry and a solid white line along the exit. Everything beside the track is a placeholder.
 
+Grandstands (`Grandstands.cs`, materials in `StandMaterials.cs`) stand on the main straight opposite the pits and at
+turns 1, 7, 10 and 12, each a walkway behind the furthest armco along its stretch, with a modest seated crowd of about
+3,800 fans and catch fencing behind the armco in front. `Grandstands.Sites` places them from the corners and the start
+line, so they follow the layout, and `Footprints` gives the ground they take for other scenery to keep off. Nothing in them
+is solid. `StandLook` holds the stand shapes and colours Ivan picked. `bash tools/grandstands/run.sh [folder]` (needs the
+.NET 8 SDK) builds every stand shape and checks they stand clear of the track and the pits, nothing is buried, every
+stand is fenced, the crowd is modest and the meshes are cheap to draw. With a folder it writes the look preview there.
+
 ## Team HQ scene
 
 `Assets/TeamHq/TeamHq.unity` is the team's home workshop, where every management menu sits: four car bays,
