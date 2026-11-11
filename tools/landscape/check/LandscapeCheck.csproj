@@ -13,6 +13,7 @@
     <Compile Include="../../../unity/Assets/Raceday/Scripts/Circuit.cs" />
     <Compile Include="../../../unity/Assets/Raceday/Scripts/CircuitData.cs" />
     <Compile Include="../../../unity/Assets/Raceday/Scripts/CircuitBuilder.cs" />
+    <Compile Include="../../../unity/Assets/Raceday/Scripts/PitComplex.cs" />
     <Compile Include="../../../unity/Assets/Raceday/Scripts/CircuitPart.cs" />
     <Compile Include="../../../unity/Assets/Raceday/Scripts/MeshKit.cs" />
     <Compile Include="../../../unity/Assets/Raceday/Scripts/SkyClock.cs" />
