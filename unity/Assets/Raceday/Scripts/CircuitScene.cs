@@ -75,7 +75,7 @@ namespace TarmacGauntlet.Raceday
             Complex = new PitComplex(circuit, builder.GarageFloors);
             var pitMaterials = new PitMaterials();
             var buildings = new GameObject("Pit complex");
-            foreach (CircuitPart part in new PitComplexBuilder(Complex, pitMaterials, PitLook.GlassBand, TeamWall.Full).Build())
+            foreach (CircuitPart part in new PitComplexBuilder(Complex, pitMaterials).Build())
                 AddPart(buildings.transform, part);
             TimeOfDay sky = new GameObject("Sky").AddComponent<TimeOfDay>();
             PitComplexView view = buildings.AddComponent<PitComplexView>();

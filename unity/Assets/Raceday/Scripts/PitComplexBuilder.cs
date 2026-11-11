@@ -4,20 +4,6 @@ using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
 {
-    /// <summary>How the pit building over the garages looks.</summary>
-    public enum PitLook
-    {
-        /// <summary>One storey of hospitality glass under a deep roof, a railed roof terrace on top.</summary>
-        GlassBand,
-        /// <summary>Two storeys behind tall concrete fins, the older look.</summary>
-        ConcreteFins,
-        /// <summary>One storey of glass with open spectator terraces on its roof under a steel canopy.</summary>
-        RoofTerrace,
-    }
-
-    /// <summary>How much of each garage's back wall is in the team's colour.</summary>
-    public enum TeamWall { Full, Band }
-
     /// <summary>A Poly Haven prop placed in every garage with a car: where in the garage's frame and which way it faces.</summary>
     public readonly struct GarageProp
     {
@@ -66,20 +52,16 @@ namespace TarmacGauntlet.Raceday
 
         private readonly PitComplex pc;
         private readonly PitMaterials m;
-        private readonly PitLook look;
-        private readonly TeamWall wall;
         private readonly List<CircuitPart> parts = new List<CircuitPart>();
 
         private readonly MeshKit concrete = new MeshKit(), glass = new MeshKit(), steel = new MeshKit();
         private readonly MeshKit team = new MeshKit(), fit = new MeshKit(), metal = new MeshKit(), rubber = new MeshKit(), lamps = new MeshKit();
 
         /// <param name="materials">May be null outside Unity (tests and previews).</param>
-        public PitComplexBuilder(PitComplex complex, PitMaterials materials, PitLook look, TeamWall wall)
+        public PitComplexBuilder(PitComplex complex, PitMaterials materials)
         {
             pc = complex;
             m = materials;
-            this.look = look;
-            this.wall = wall;
         }
 
         public List<CircuitPart> Build()
@@ -109,55 +91,15 @@ namespace TarmacGauntlet.Raceday
         private void Building(int from, int to)
         {
             if (to <= from) return;
-            switch (look)
-            {
-                case PitLook.GlassBand:
-                    Storey(from, to, 7.9f, 10.5f);
-                    Extrude(concrete, from, to, Rect(-8.4f, 9.6f, 10.5f, 10.9f), 4f, 4f);
-                    Extrude(concrete, from, to, Rect(-8.4f, -8.05f, 10.9f, 11.3f), 4f, 4f);
-                    Railing(from, to, 9.4f, 10.9f);
-                    break;
-                case PitLook.ConcreteFins:
-                    Extrude(concrete, from, to, Rect(-7.6f, 7.95f, 7.15f, 14.0f), 4f, 4f);
-                    Extrude(concrete, from, to, Rect(-8.15f, -7.6f, 6.9f, 14.0f), 4f, 4f);
-                    Face(glass, from, to, new Vector2(8.0f, 7.9f), new Vector2(8.0f, 14.0f), 3.05f, true);
-                    Face(glass, from, to, new Vector2(-8.2f, 8.6f), new Vector2(-8.2f, 9.8f), 3.05f, false);
-                    Face(glass, from, to, new Vector2(-8.2f, 11.6f), new Vector2(-8.2f, 12.8f), 3.05f, false);
-                    Extrude(concrete, from, to, Rect(7.9f, 9.3f, 10.85f, 11.25f), 4f, 4f);
-                    Extrude(concrete, from, to, Rect(-8.4f, 9.4f, 14.0f, 14.9f), 4f, 4f);
-                    Repeat(from, to, 8.65f, 2.8f, (p, al, o) => concrete.Box(p + Vector3.up * 3.05f, al, o, new Vector3(0.3f, 6.1f, 1.3f)), 1.4f, 7.9f);
-                    break;
-                case PitLook.RoofTerrace:
-                    Storey(from, to, 7.9f, 10.5f);
-                    Extrude(concrete, from, to, Rect(-8.4f, 9.15f, 10.5f, 10.9f), 4f, 4f);
-                    // Six rows of terrace stepping up away from the lane, the walkway along the front.
-                    for (int k = 0; k < 6; k++)
-                        Extrude(concrete, from, to, Rect(6.9f - (k + 1) * 0.85f, 6.9f - k * 0.85f, 10.9f, 11.32f + 0.42f * k), 4f, 4f);
-                    Extrude(concrete, from, to, Rect(-8.4f, 1.8f, 10.9f, 13.9f), 4f, 4f);
-                    Railing(from, to, 9.0f, 10.9f);
-                    // The canopy over the terraces, on a column every half bay at the back.
-                    Extrude(steel, from, to, new[] { new Vector2(0.2f, 15.85f), new Vector2(9.6f, 15.25f), new Vector2(9.6f, 15.4f), new Vector2(0.2f, 16.05f) }, 4f, 4f);
-                    Repeat(from, to, 0.8f, pc.Width * 0.5f, (p, al, o) => steel.Box(p + Vector3.up * 14.9f, al, o, new Vector3(0.25f, 2.1f, 0.25f)), 2.1f);
-                    break;
-            }
-        }
-
-        /// <summary>A glass storey on the garages: concrete body and back wall, glass front with steel mullions, a window strip at the back.</summary>
-        private void Storey(int from, int to, float y0, float y1)
-        {
-            Extrude(concrete, from, to, Rect(-7.6f, 8.2f, 7.15f, y1), 4f, 4f);
-            Extrude(concrete, from, to, Rect(-8.15f, -7.6f, 6.9f, y1), 4f, 4f);
-            Face(glass, from, to, new Vector2(8.25f, y0), new Vector2(8.25f, y1), y1 - y0, true);
-            Face(glass, from, to, new Vector2(-8.2f, y0 + 0.9f), new Vector2(-8.2f, y1 - 0.5f), y1 - y0, false);
-            Repeat(from, to, 8.31f, WindowPitch, (p, al, o) => steel.Box(p + Vector3.up * ((y1 - y0) * 0.5f), al, o, new Vector3(0.08f, y1 - y0, 0.12f)), 0f, y0);
-        }
-
-        /// <summary>A steel railing at the edge of a roof: posts every window, a top rail and a mid rail.</summary>
-        private void Railing(int from, int to, float z, float floor)
-        {
-            Extrude(steel, from, to, Rect(z - 0.05f, z + 0.05f, floor + 1.0f, floor + 1.08f), 4f, 4f);
-            Extrude(steel, from, to, Rect(z - 0.03f, z + 0.03f, floor + 0.5f, floor + 0.55f), 4f, 4f);
-            Repeat(from, to, z, WindowPitch, (p, al, o) => steel.Box(p + Vector3.up * 0.5f, al, o, new Vector3(0.06f, 1.0f, 0.06f)), 0.3f, floor);
+            // Two storeys behind tall concrete fins: glass front and back strips, a floor band, a deep roof.
+            Extrude(concrete, from, to, Rect(-7.6f, 7.95f, 7.15f, 14.0f), 4f, 4f);
+            Extrude(concrete, from, to, Rect(-8.15f, -7.6f, 6.9f, 14.0f), 4f, 4f);
+            Face(glass, from, to, new Vector2(8.0f, 7.9f), new Vector2(8.0f, 14.0f), 3.05f, true);
+            Face(glass, from, to, new Vector2(-8.2f, 8.6f), new Vector2(-8.2f, 9.8f), 3.05f, false);
+            Face(glass, from, to, new Vector2(-8.2f, 11.6f), new Vector2(-8.2f, 12.8f), 3.05f, false);
+            Extrude(concrete, from, to, Rect(7.9f, 9.3f, 10.85f, 11.25f), 4f, 4f);
+            Extrude(concrete, from, to, Rect(-8.4f, 9.4f, 14.0f, 14.9f), 4f, 4f);
+            Repeat(from, to, 8.65f, 2.8f, (p, al, o) => concrete.Box(p + Vector3.up * 3.05f, al, o, new Vector3(0.3f, 6.1f, 1.3f)), 1.4f, 7.9f);
         }
 
         /// <summary>
@@ -189,9 +131,8 @@ namespace TarmacGauntlet.Raceday
             Vector2 flat = PaletteUv(g);
             Func<Vector3, Vector2> paint = _ => flat;
 
-            // Team colour on the back wall: all of it to door height, or a band above the cabinets.
-            if (wall == TeamWall.Full) Span(team, f, left + 0.05f, pc.RightWall(g, back) - 0.05f, back + 0.04f, 0.08f, 0.05f, 5.0f, paint);
-            else Span(team, f, left + 0.05f, pc.RightWall(g, back) - 0.05f, back + 0.04f, 0.08f, 3.1f, 4.3f, paint);
+            // A band of team colour across the back wall, above the cabinets.
+            Span(team, f, left + 0.05f, pc.RightWall(g, back) - 0.05f, back + 0.04f, 0.08f, 3.1f, 4.3f, paint);
 
             // The door, rolled up to just under the fascia, in the team's colour, its bottom rail in steel.
             float doorRight = pc.RightWall(g, door) + 0.1f;

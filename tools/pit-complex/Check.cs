@@ -1,13 +1,15 @@
-// Builds the pit complex exactly as the game does (CircuitBuilder, then PitComplexBuilder in every look) and checks
+// Builds the pit complex exactly as the game does (CircuitBuilder, then PitComplexBuilder) and checks
 // it. Each rule prints one line: ok, or FAIL with the worst spots. Exit code 1 if any rule fails.
 //
 // Rules:
-//   cheap to draw      in every look the pit complex is at most 250k triangles and 300k vertices, 40k triangles in any
+//   cheap to draw      the pit complex is at most 250k triangles and 300k vertices, 40k triangles in any
 //                      one mesh, and no mesh spread wider than 300 m, so the meshes out of view are culled
 //   closed solids      every part but the glass is closed: every edge of every face meets another face, so nothing
 //                      shows a hole from any side
-//   crew front clear   inside every garage the front ClearDepth metres between x = -5.5 and 5.5 hold no fit-out below
+//   crew front clear   inside every garage the front ClearDepth metres between x = -5.5 and 5.5 (or 1.1 m short of the +x wall at the door) hold no fit-out below
 //                      2.2 m, so the crew can stand there and run out to the box
+//   clear of the walls nothing in a garage stands in its side walls, which round the bend sit well inside half the
+//                      width
 //   on the garages     the pit building's lowest corners reach into the garage roof slabs, never floating over them
 //                      or hanging far below them
 //
@@ -41,9 +43,7 @@ static class Check
         List<CircuitPart> track = builder.Build();
         var pc = new PitComplex(circuit, builder.GarageFloors);
         var looks = new Dictionary<string, List<CircuitPart>>();
-        foreach (PitLook look in Enum.GetValues(typeof(PitLook)))
-            foreach (TeamWall wall in Enum.GetValues(typeof(TeamWall)))
-                looks[$"{look} {wall}"] = new PitComplexBuilder(pc, null, look, wall).Build();
+        looks["Pit complex"] = new PitComplexBuilder(pc, null).Build();
 
         Cheap(looks);
         Closed(looks);
@@ -90,7 +90,7 @@ static class Check
         int edges = 0;
         foreach (var (name, parts) in looks)
         {
-            // Every look's parts are merged by name: a solid split across two chunks still closes.
+            // Parts are merged by name: a solid split across two chunks still closes.
             foreach (var group in parts.Where(p => p.Name != "Pit building glass").GroupBy(p => p.Name))
             {
                 var count = new Dictionary<(long, long, long, long, long, long), int>();
@@ -213,7 +213,7 @@ static class Check
     }
 }
 
-/// <summary>Writes the preview's meshes: the track and pit complex round the start line, every look, in Unity's frame.</summary>
+/// <summary>Writes the preview's meshes: the track and pit complex round the start line, in Unity's frame.</summary>
 static class Preview
 {
     const float Radius = 230f;
@@ -267,16 +267,9 @@ static class Preview
         foreach (string part in track.Select(p => p.Name).Distinct()) Add("track", part, track);
         foreach (var (name, parts) in looks)
         {
-            string[] split = name.Split(' ');
             foreach (string part in parts.Select(p => p.Name).Distinct())
             {
-                // The building depends on the look, the team colours on the wall, the rest on neither.
-                bool building = part.StartsWith("Pit building");
-                bool colours = part == "Garage team colours";
-                if (building && split[1] != "Full") continue;
-                if (colours && split[0] != "GlassBand") continue;
-                if (!building && !colours && name != "GlassBand Full") continue;
-                Add(building ? split[0] : colours ? split[1] : "fit", part, parts);
+                Add(part.StartsWith("Pit building") ? "building" : "fit", part, parts);
             }
         }
 
