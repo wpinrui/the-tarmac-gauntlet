@@ -17,7 +17,7 @@ from livery import Livery  # noqa: E402
 livery.FONTS["Marker"] = HERE / "fonts" / "PermanentMarker-Regular.ttf"
 livery.FONTS["Caveat"] = HERE / "fonts" / "Caveat.ttf"
 LOGO = HERE / "logo.svg"
-TAGLINE = "frequent visitors to the run-off area"
+BOOT_LINE = "oh no we did it again"
 
 INK = "#1d1b17"
 WHITE = "#f6f3ea"
@@ -25,22 +25,12 @@ MUD = ["#5b4630", "#7a6040", "#3f3123", "#8a7556"]
 
 # Collier landmarks in OBJ metres: z along the car (+ nose), y up. Read off the true-scale views.
 FRONT_AXLE, REAR_AXLE, WHEEL_R = 1.268, -1.27, 0.34
-# The door, as its own mesh outlines it, frame included.
-DOOR = [(-0.436, 0.95), (-0.414, 1.383), (-0.25, 1.391), (-0.096, 1.391), (0.188, 1.354), (0.28, 1.32),
-        (0.427, 1.248), (0.721, 1.088), (0.812, 1.019), (0.83, 0.925), (0.854, 0.783), (0.869, 0.596),
-        (0.838, 0.347), (0.792, 0.199), (0.736, 0.18), (-0.321, 0.18), (-0.402, 0.193), (-0.418, 0.41)]
-# Front wing: door front edge forward to the headlamp, down past the arch.
-WING = [(0.83, 1.0), (0.854, 0.783), (0.869, 0.596), (0.838, 0.347), (0.792, 0.13), (1.62, 0.13),
-        (1.62, 0.68), (1.50, 0.76), (1.39, 0.86), (1.20, 1.06)]
-# Rear quarter: door rear edge back to the tail lamp and bumper.
-QUARTER = [(-0.42, 0.19), (-0.43, 0.96), (-1.0, 0.99), (-1.47, 0.99), (-1.607, 0.677), (-1.75, 0.47),
-           (-1.75, 0.13), (-0.42, 0.13)]
 # Bonnet seen from above (z, x) and from the front (x, y).
 BONNET_TOP = [(0.87, 0.66), (1.38, 0.66), (1.55, 0.60), (1.70, 0.47), (1.80, 0.25), (1.82, 0.0),
               (1.80, -0.25), (1.70, -0.47), (1.55, -0.60), (1.38, -0.66), (0.87, -0.66)]
 BONNET_FRONT = [(-0.68, 1.06), (0.68, 1.06), (0.64, 0.85), (0.45, 0.75), (-0.45, 0.75), (-0.64, 0.85)]
-# Tailgate below the rear window (x, y).
-TAILGATE = [(0.595, 1.01), (-0.595, 1.01), (-0.47, 0.515), (0.47, 0.515)]
+# Boot lid below the rear window (x, y).
+BOOT_LID = [(0.60, 1.01), (-0.60, 1.01), (-0.50, 0.46), (0.50, 0.46)]
 
 # Door: team logo above, race number below. Bonnet number reads from the nose.
 LOGO_Z, LOGO_Y, LOGO_H = 0.22, 0.73, 0.32
@@ -107,55 +97,15 @@ def debris_flag(views):
         lv.poly("rear", [(x, 0.47, 0), (x + 0.12, 0.47, 0), (x + 0.12, 1.7, 0), (x, 1.7, 0)], R)
     lv.poly("top", [(x, 0, z) for z, x in BONNET_TOP], K)
     lv.poly("front", [(x, y, 0) for x, y in BONNET_FRONT], K)
-    lv.text("rear", TAGLINE, (0, 0.37, 0), 0.06, INK, font="Caveat")
+    lv.poly("rear", [(x, y, 0) for x, y in BOOT_LID], Y)  # stripes stop at the boot lid
+    lv.mark("rear", LOGO, (0, 0.72, 0), 0.24)
+    lv.text("rear", BOOT_LINE, (0, 0.565, 0), 0.042, INK, font="Marker")
     mud(lv, 11)
     marks(lv)
     return lv
 
 
-def spare_parts(views):
-    """A white car rebuilt from whatever was in the shed: blue doors, red-oxide bonnet, a primer
-    wing on the left and a primer quarter on the right, tape on the knocked corners, the crew's
-    names on the back."""
-    Wt, P, B, OX, T, TE = "#f2efe6", "#8e8d84", "#5b86b0", "#9a4a34", "#b9bab4", "#8f908a"
-    lv = Livery(views, Wt)
-    lv.side_poly(DOOR, B)
-    one_side(lv, "left", WING, P)
-    one_side(lv, "right", QUARTER, P)
-    lv.poly("top", [(x, 0, z) for z, x in BONNET_TOP], OX)
-    lv.poly("front", [(x, y, 0) for x, y in BONNET_FRONT], OX)
-    lv.poly("rear", [(x, y, 0) for x, y in TAILGATE], P)
-    lv.text("rear", TAGLINE, (0, 0.60, 0), 0.05, INK, font="Marker")
-
-    def tape(view, cx, cy, ang, length=0.36, w=0.075):
-        c, s = math.cos(math.radians(ang)), math.sin(math.radians(ang))
-        pts = [(cx + dx * c - dy * s, cy + dx * s + dy * c) for dx, dy in
-               ((-length / 2, -w / 2), (length / 2, -w / 2), (length / 2, w / 2), (-length / 2, w / 2))]
-        edge = [(cx + dx * c - dy * s, cy + dx * s + dy * c) for dx, dy in
-                ((-length / 2, -w / 2 - 0.006), (length / 2, -w / 2 - 0.006), (length / 2, w / 2 + 0.006), (-length / 2, w / 2 + 0.006))]
-        if view in ("left", "right"):
-            one_side(lv, view, edge, TE)
-            one_side(lv, view, pts, T)
-        else:
-            lv.poly(view, [(u, v, 0) for u, v in edge], TE)
-            lv.poly(view, [(u, v, 0) for u, v in pts], T)
-
-    for view in ("left", "right"):
-        tape(view, 1.93, 0.36, 50)
-        tape(view, -1.86, 0.33, -45)
-    tape("front", 0.78, 0.33, -55)
-    tape("front", -0.78, 0.33, 55)
-    tape("rear", -0.78, 0.33, -55)
-    crew = [("Dee", -0.80, 0.80), ("Big Sal", -1.15, 0.66), ("Moss", -0.75, 0.52), ("Jojo", -1.25, 0.86)]
-    for view, ink in (("left", "#2d4a6e"), ("right", INK)):
-        for name, z, y in crew:
-            lv.text(view, name, lv._side(view, z, y), 0.055, ink, rotate=-6, font="Caveat")
-    mud(lv, 21, 0.8)
-    marks(lv, door_ink=WHITE)
-    return lv
-
-
-OPTIONS = {"debris-flag": debris_flag, "spare-parts": spare_parts}
+OPTIONS = {"debris-flag": debris_flag}
 
 if __name__ == "__main__":
     views = HERE / "out" / "views" / "views.json"
