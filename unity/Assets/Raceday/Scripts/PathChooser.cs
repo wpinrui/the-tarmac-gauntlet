@@ -64,7 +64,7 @@ namespace TarmacGauntlet.Raceday
         private float besideSpeed = float.PositiveInfinity;
         /// <summary>The nearest car ahead not quite in this car's lane, which braking slows for when none is.</summary>
         private int aheadWide = -1;
-        private static readonly float WideAhead = Knob("WIDE", 3f), ZoneSwitch = Knob("ZSWITCH", 0f);
+        private static readonly float WideAhead = Knob("WIDE", 3f), ZoneSwitch = Knob("ZSWITCH", 0f), SideSwitch = Knob("SSWITCH", 0f);
         /// <summary>Score per second a pull-out waits: of two near-equal moves, the later one, so the car stays in the tow until it must move.</summary>
         private static readonly float LateBonus = Knob("LATE", 0.1f);
         /// <summary>Side-to-side gap H1 keeps to a car alongside, m.</summary>
@@ -210,6 +210,8 @@ namespace TarmacGauntlet.Raceday
                     Simulate(pilot, me, cand, ahead, nextTurn, margin, brakes, riskWeight, passCost, freeSpeed);
                     // A little against changing its mind, so it doesn't dither between two near-equal paths.
                     cand.Score -= Hysteresis * Mathf.Abs(cand.Shift - lastShift) + (cand.Pedal != lastPedal ? 0.01f : 0f) + OffLineCost * Mathf.Abs(cand.Shift);
+                    // Changing sides of the car ahead mid-move weaves across the cars behind: only for a clearly better path.
+                    if (Mathf.Abs(cand.Shift) > 1f && Mathf.Abs(lastShift) > 1f && Mathf.Sign(cand.Shift) != Mathf.Sign(lastShift)) cand.Score -= SideSwitch;
                     // Once braking for a car in the braking zone, it stays on the brakes rather than flick back on the throttle.
                     if (zone && lastPedal == Pedal.Brake && cand.Pedal == Pedal.Go) cand.Score -= ZoneSwitch;
                     Candidates.Add(cand);
