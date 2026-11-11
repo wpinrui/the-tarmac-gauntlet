@@ -229,6 +229,47 @@ static partial class Check
     /// Whether the set-up kept its hard limit, and what decided it. Each set-up must make its limit
     /// bind: a limit never put to the test is a fail of the set-up, not a pass.
     /// </summary>
+    /// <summary>
+    /// Seconds car 0 spends short of its own lane's speed and not gaining, with a car just ahead and a gap
+    /// that fits it open beside or between the cars ahead (Ivan: pick a side and go flat). Not braking for a
+    /// corner; with exitOnly, only on a corner's exit, where its speeds rise.
+    /// </summary>
+    static float HeldWithRoom(SetupRun run, List<Frame> fs, bool exitOnly)
+    {
+        float held = 0f, was = float.MaxValue;
+        int si = 0;
+        AiPilot r = run.Race.Racers[0].Pilot;
+        int ahead20 = Math.Max(1, (int)(20f / circuit.Step));
+        foreach (Frame f in fs)
+        {
+            int k = f.K[0];
+            // Gaining speed is going flat, at whatever the tyres allow: only not gaining counts.
+            bool gaining = f.V[0] > was + 1f * Race.Dt;
+            was = f.V[0];
+            if (gaining) continue;
+            if (r.Profile.Speed[circuit.Wrap(k + ahead20)] < r.Profile.Speed[k] - 1f) continue;
+            if (exitOnly && r.Profile.Speed[circuit.Wrap(k + 5)] <= r.Profile.Speed[k]) continue;
+            if (f.V[0] >= 0.95f * r.LaneSpeed(k, f.L[0] - r.Line.Lateral[k])) continue;
+            // As quick as it is alone at the same place: it is on the tyres' limit, not held up.
+            while (si + 1 < run.Solo.Count && run.Solo[si + 1] < f.D[0]) si++;
+            if (si + 1 < run.Solo.Count && f.V[0] >= 0.95f * (run.Solo[si + 1] - run.Solo[si]) / Race.Dt) continue;
+            float hw = circuit.HalfWidth(k);
+            var taken = new List<(float lo, float hi)>();
+            for (int j = 1; j < run.N; j++)
+            {
+                float g = run.Gap(f, 0, j);
+                if (g > -CarL && g < 30f) taken.Add((f.L[j] - 0.5f * CarW, f.L[j] + 0.5f * CarW));
+            }
+            if (taken.Count == 0) continue;
+            taken.Sort((x, y) => x.lo.CompareTo(y.lo));
+            float edge = -hw, widest = 0f;
+            foreach (var t in taken) { widest = Math.Max(widest, t.lo - edge); edge = Math.Max(edge, t.hi); }
+            widest = Math.Max(widest, hw - edge);
+            if (widest >= CarW + 2f * RoomMargin) held += Race.Dt;
+        }
+        return held;
+    }
+
     static (bool Pass, string Why) Judge(SetupRun run)
     {
         List<Frame> fs = run.Frames;
@@ -245,7 +286,11 @@ static partial class Check
                         if (g > 0f && g < 30f && Math.Abs(f.L[j] - f.L[0]) < CarW) closest = Math.Min(closest, g - CarL);
                     }
                 if (nearest > 1f) return (false, $"never closed within 1 s of the cars ahead: did not bind");
-                return (closest >= NoseMargin, $"closest nose to tail {(closest == float.MaxValue ? "none in line" : $"{closest:0.0} m")}");
+                // On the corner's exit, short of its own lane's speed while a gap that fits it is open beside or
+                // between the cars ahead (Ivan: pick a side and go flat).
+                float slowWithRoom = HeldWithRoom(run, fs, true);
+                if (slowWithRoom > 0.5f) return (false, $"held up on the exit {slowWithRoom:0.0} s with room beside, closest nose to tail {(closest == float.MaxValue ? "none in line" : $"{closest:0.0} m")}");
+                return (closest >= NoseMargin, $"closest nose to tail {(closest == float.MaxValue ? "none in line" : $"{closest:0.0} m")}, held up on the exit {slowWithRoom:0.0} s");
             }
             case "H2":
             {
@@ -464,6 +509,9 @@ static partial class Check
                 // Once past, back on the line.
                 Frame past = fs.FirstOrDefault(f => run.Gap(f, 0, 1) < 0f);
                 float offClear = past == null ? 0f : run.OffLineClear(0, past.T);
+                // Off full throttle behind it with a lane open beside: it should have pulled out (Ivan).
+                float heldRoom = HeldWithRoom(run, fs, false);
+                if (heldRoom > 0.5f) return (0f, $"held up behind {heldRoom:0.0} s with room beside, on the line {100f * share:0}% of {follow * Race.Dt:0.0} s following, {hits} contacts");
                 return (Clamp100(Math.Min(Math.Min(100f * share, Scale(lifted, 0.3f, 2f)), Scale(offClear, 0.5f, 3f)) - 25f * hits), $"on the line {100f * share:0}% of {follow * Race.Dt:0.0} s following, lifted behind it {lifted:0.0} s, off the line once past and clear {offClear:0.0} s, {hits} contacts");
             }
             case "T2":
