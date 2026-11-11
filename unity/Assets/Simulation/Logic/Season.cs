@@ -9,7 +9,7 @@ namespace TarmacGauntlet.Simulation
     {
         /// <summary>
         /// Ends the year after its race: runs <see cref="YearAdvance.AdvanceYear"/>, moves to the next year and back to
-        /// the pre-race phase. It only acts in the post-race phase, so a year advances exactly once per race. Contracts
+        /// the pre-race phase, with fresh race numbers. It only acts in the post-race phase, so a year advances exactly once per race. Contracts
         /// of drivers who retire are dropped.
         /// </summary>
         public static GameState AdvanceYear(GameState game, Func<double>? random = null)
@@ -37,7 +37,7 @@ namespace TarmacGauntlet.Simulation
                 Phase = GamePhase.PreRace,
                 Drivers = next.Drivers,
                 Contracts = next.Contracts.Where(c => !retired.Contains(c.DriverId)).ToArray(),
-                Teams = next.Teams,
+                Teams = RaceNumbers.Assign(next.Teams, RaceNumbers.WinnerOf(game.RaceHistory, game.CurrentYear)),
                 CarMarket = game.CarMarket with { UsedListings = next.UsedListings },
                 RaceHistory = next.RaceHistory,
             };

@@ -30,6 +30,8 @@ namespace TarmacGauntlet.Simulation
         public IReadOnlyList<CarInstance> Cars { get; init; } = Array.Empty<CarInstance>();
         public IReadOnlyList<Contract> Contracts { get; init; } = Array.Empty<Contract>();
         public string? EnteredCarId { get; init; } // Which car is entered for the next/current race
+        /// <summary>1 to 100, redone each season by <see cref="RaceNumbers"/>. Every car the team runs carries it.</summary>
+        public int RaceNumber { get; init; }
     }
 
     // --- Player Team ---

@@ -20,7 +20,8 @@ static partial class Check
         public int Lap1Contacts, RestContacts, Lap1Hard, RestHard, Lap1Multi, RestMulti, Lap1Offs, RestOffs, Piles, Stuck;
         public List<string> Multi = new List<string>(), PileList = new List<string>();
         /// <summary>Part-throttle seconds on the free stretch behind a slower car, with a lane beside open or not.</summary>
-        public float HeldOpen, HeldShut, Hours;
+        public float HeldOpen, HeldShut, HeldFlat, Hours;
+        public float[] HeldGap = new float[3];
         public List<(float Seconds, string Line)> Spells = new List<(float, string)>();
     }
 
@@ -38,7 +39,8 @@ static partial class Check
             if (Environment.GetEnvironmentVariable("PACK_LOG") == "1") foreach (string s in p.Multi.Concat(p.PileList)) Console.WriteLine("  " + s);
         }
         float hrs = results.Sum(p => p.Hours);
-        Console.WriteLine($"HELD part-throttle behind a slower car on the free stretch: {results.Sum(p => p.HeldOpen) / hrs:0.0} s/car-hour with a lane beside open, {results.Sum(p => p.HeldShut) / hrs:0.0} with none");
+        Console.WriteLine($"HELD part-throttle behind a slower car on the free stretch: {results.Sum(p => p.HeldOpen) / hrs:0.0} s/car-hour with a lane beside open, {results.Sum(p => p.HeldShut) / hrs:0.0} with none; {results.Sum(p => p.HeldFlat) / hrs:0.0} of it with a legal flat-out path");
+        Console.WriteLine($"HELD with the widest free gap beside over 2 m {results.Sum(p => p.HeldGap[0]) / hrs:0.0}, over 4 m {results.Sum(p => p.HeldGap[1]) / hrs:0.0}, over 6 m {results.Sum(p => p.HeldGap[2]) / hrs:0.0} s/car-hour");
         if (Environment.GetEnvironmentVariable("PACK_HELD") != null)
             foreach (var sp in results.SelectMany(p => p.Spells).OrderByDescending(x => x.Seconds).Take(int.Parse(Environment.GetEnvironmentVariable("PACK_HELD"))))
                 Console.WriteLine($"  {sp.Seconds,5:0.0} s {sp.Line}");
@@ -180,7 +182,7 @@ static partial class Check
     /// </summary>
     sealed class HeldWatch
     {
-        sealed class Spell { public float Start, Open, Shut; public string Why, Who; public int At; }
+        sealed class Spell { public float Start, Open, Shut, Gap; public string Why, Who; public int At; }
         readonly Dictionary<Racer, Spell> open = new Dictionary<Racer, Spell>();
 
         public void Step(Race r, PackResult p)
@@ -196,8 +198,13 @@ static partial class Check
                 }
                 bool room = RoomBeside(r, x, ahead.Id);
                 if (room) p.HeldOpen += Race.Dt; else p.HeldShut += Race.Dt;
+                var chooser = x.Craft.Chooser;
+                if (chooser != null && chooser.Candidates.Any(k => k.Pedal == TarmacGauntlet.Raceday.PathChooser.Pedal.Go && k.Rejected == null)) p.HeldFlat += Race.Dt;
                 if (sp == null) open[x] = sp = new Spell { Start = r.Time, At = Math.Max(x.Car.TrackIndex, 0) };
                 if (room) sp.Open += Race.Dt; else sp.Shut += Race.Dt;
+                float wide = WidestGap(r, x, ahead);
+                for (int i = 0; i < 3; i++) if (wide > 2f * (i + 1)) p.HeldGap[i] += Race.Dt;
+                sp.Gap = Math.Max(sp.Gap, wide);
                 // Why, sampled half a second in.
                 if (sp.Why == null && r.Time - sp.Start >= 0.5f) { sp.Why = Why(r, x); sp.Who = $"{r.Name(ahead)} {ahead.Car.Speed * 3.6f:0} km/h {Gap(ahead.Distance - x.Distance):0} m ahead, {ahead.Car.Lateral - x.Car.Lateral:0.0} m across"; }
             }
@@ -209,16 +216,39 @@ static partial class Check
         {
             float s = sp.Open + sp.Shut;
             if (s < 0.5f) return;
-            p.Spells.Add((s, $"seed {p.Seed} {r.Name(x)} at {Race.Clock(sp.Start)} from {sp.At * circuit.Step:0} m, open {sp.Open:0.0} s: behind {sp.Who} | {sp.Why}"));
+            p.Spells.Add((s, $"seed {p.Seed} {r.Name(x)} at {Race.Clock(sp.Start)} from {sp.At * circuit.Step:0} m, open {sp.Open:0.0} s, gap {sp.Gap:0.0} m: behind {sp.Who} | {sp.Why}"));
+        }
+
+        /// <summary>The widest stretch across the track, edge to edge, with no car in it from alongside this one to a car's length past the car ahead, m.</summary>
+        static float WidestGap(Race r, Racer x, Racer ahead)
+        {
+            int k = Math.Max(x.Car.TrackIndex, 0);
+            float half = circuit.Data.width[k] / 2f, reach = Gap(ahead.Distance - x.Distance) + CarL;
+            var taken = new List<(float lo, float hi)>();
+            foreach (Racer y in r.Racers)
+            {
+                if (y == x || y.Ghost) continue;
+                float d = Gap(y.Distance - x.Distance);
+                if (d > -CarL && d < reach) taken.Add((y.Car.Lateral - 0.5f * CarW, y.Car.Lateral + 0.5f * CarW));
+            }
+            taken.Sort((a, b) => a.lo.CompareTo(b.lo));
+            float at = -half, widest = 0f;
+            foreach (var t in taken)
+            {
+                widest = Math.Max(widest, Math.Min(t.lo, half) - at);
+                at = Math.Max(at, t.hi);
+            }
+            return Math.Max(widest, half - at);
         }
 
         static bool Held(Race r, Racer x, out Racer ahead)
         {
             ahead = null;
-            if (x.Pilot.Gliding || x.Rejoin.Busy || x.Ghost || x.Pilot.Index < 0 || x.Throttle > 0.95f) return false;
+            if (x.Pilot.Gliding || x.Rejoin.Busy || x.Ghost || x.Pilot.Index < 0) return false;
             if (!TarmacGauntlet.Raceday.PathChooser.FreeStretchAt(x.Pilot)) return false;
             // Held back by the car ahead, below the speed its own lane would give it: racecraft's cap under that speed.
-            if (x.Pilot.HeldBy < 0.5f) return false;
+            // Off its own desired throttle for the grip: the cap binds, not the lane's speed or traction.
+            if (x.Pilot.HeldBy < 0.5f || x.Car.Speed < x.Pilot.SpeedCap - 1f) return false;
             float free = x.Pilot.FreeSpeed;
             float best = 2f * Math.Max(x.Car.Speed, 10f);
             foreach (Racer o in r.Racers)
@@ -238,7 +268,7 @@ static partial class Check
             var go = ch.Candidates.Where(k => k.Pedal == TarmacGauntlet.Raceday.PathChooser.Pedal.Go).ToList();
             var bestGo = go.Where(k => k.Rejected == null).OrderByDescending(k => k.Score).FirstOrDefault();
             string tally = string.Join(" ", go.Where(k => k.Rejected != null).GroupBy(k => k.Rejected + (k.BrokeBy >= 0 ? "@" + k.BrokeBy : "")).OrderByDescending(g => g.Count()).Select(g => $"{g.Key}x{g.Count()}"));
-            return $"chose {c.Pedal} {c.Shift:0.0}{(c.Delay > 0 ? "d" + c.Delay : "")}{(c.Fixed ? "f" : "")}{(c.Follow ? "F" : "")} {(c.Rejected ?? "")} S{c.Score:0.00}=g{c.Gain:0.00}-r{c.Risk:0.00}-s{c.Stuck:0.00} [{ch.Reason}] {x.Car.Speed * 3.6f:0} km/h, free {x.Pilot.FreeSpeed * 3.6f:0}, cap {x.Pilot.SpeedCap * 3.6f:0}{(x.Craft.Braking ? " BRK" : "")}; best legal Go {(bestGo == null ? "none" : $"{bestGo.Shift:0.0}{(bestGo.Delay > 0 ? "d" + bestGo.Delay : "")}{(bestGo.Fixed ? "f" : "")} S{bestGo.Score:0.00}=g{bestGo.Gain:0.00}-r{bestGo.Risk:0.00}-s{bestGo.Stuck:0.00}")}; follow {string.Join(" ", ch.Candidates.Where(k => k.Follow).Select(k => $"{k.Shift:0.0}:{(k.Rejected != null ? k.Rejected + "@" + k.BrokeBy + "s" + k.BrokeAt : k.Score.ToString("0.00"))}"))}; Go rejected {tally}";
+            return $"chose {c.Pedal} {c.Shift:0.0}{(c.Delay > 0 ? "d" + c.Delay : "")}{(c.Fixed ? "f" : "")}{(c.Follow ? "F" : "")} {(c.Rejected ?? "")} S{c.Score:0.00}=g{c.Gain:0.00}-r{c.Risk:0.00}-s{c.Stuck:0.00} [{ch.Reason}] {x.Car.Speed * 3.6f:0} km/h, free {x.Pilot.FreeSpeed * 3.6f:0}, cap {x.Pilot.SpeedCap * 3.6f:0}{(x.Craft.Braking ? " BRK" : "")}; best legal Go {(bestGo == null ? "none" : $"{bestGo.Shift:0.0}{(bestGo.Delay > 0 ? "d" + bestGo.Delay : "")}{(bestGo.Fixed ? "f" : "")} S{bestGo.Score:0.00}=g{bestGo.Gain:0.00}-r{bestGo.Risk:0.00}-s{bestGo.Stuck:0.00}")}; follow {string.Join(" ", ch.Candidates.Where(k => k.Follow).Select(k => $"{k.Shift:0.0}:{(k.Rejected != null ? k.Rejected + "@" + k.BrokeBy + "s" + k.BrokeAt : k.Score.ToString("0.00"))}"))}; Go rejected {tally}; latest {string.Join(" ", go.Where(k => k.Rejected != null).OrderByDescending(k => k.BrokeAt).Take(3).Select(k => $"{k.Shift:0.0}{(k.Fixed ? "f" : "")}{(k.Delay > 0 ? "d" + k.Delay : "")}:{k.Rejected}@{k.BrokeBy}s{k.BrokeAt}"))}";
         }
     }
 }

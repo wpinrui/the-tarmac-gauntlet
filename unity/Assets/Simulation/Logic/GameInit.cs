@@ -309,6 +309,7 @@ namespace TarmacGauntlet.Simulation
         ///
         /// - Seeds 310 drivers with age distribution
         /// - Creates 99 AI teams across all tiers, each with 1 car, 3 contracted drivers and a crew sized by prestige (AiCrew)
+        /// - Gives every team its race number (RaceNumbers)
         /// - Creates the player team: $1,000 budget, plot armour car, no drivers, 0 crew
         /// - Generates the car market (new + used)
         /// - Year 1, newGame phase
@@ -357,8 +358,8 @@ namespace TarmacGauntlet.Simulation
                 options.TeamColour,
                 options.Skills);
 
-            // 4. All teams, AI crews sized by prestige
-            var teams = AiCrew.Assign(new BaseTeam[] { playerTeam }.Concat(aiTeams));
+            // 4. All teams, AI crews sized by prestige, numbered by prestige (no winner yet)
+            var teams = RaceNumbers.Assign(AiCrew.Assign(new BaseTeam[] { playerTeam }.Concat(aiTeams)), null);
 
             // 5. Car market
             var carModels = CarModels.All;
