@@ -257,7 +257,8 @@ namespace TarmacGauntlet.Raceday
                     }
                     // In the tow on a straight, of near-equal moves the later one wins, while a still later one
                     // is open too: the car moves out at its last safe moment with a step in hand, as it lags its plan.
-                    if (!defending && !zone)
+                    // Only a move off the line waits: a move back to it is made at once.
+                    if (!defending && !zone && Mathf.Abs(cand.Shift) > Mathf.Abs(myOffset))
                         for (int i = Candidates.Count - Delays.Length; i < Candidates.Count - 1; i++)
                             if (Candidates[i + 1].Rejected == null) Candidates[i].Score += LateBonus * Candidates[i].Delay;
                 }
