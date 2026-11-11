@@ -5,11 +5,16 @@ using System.Linq;
 namespace TarmacGauntlet.Simulation
 {
     /// <summary>
-    /// The 3D model a car is drawn with. For now every car of a class borrows that class's one
-    /// finished model.
+    /// The 3D model a car is drawn with: its own model once it has one, otherwise the one
+    /// finished model of its class.
     /// </summary>
     public static class CarArt
     {
+        private static readonly Dictionary<string, string> ById = new Dictionary<string, string>
+        {
+            { "b-22", "Assets/Art/Vehicles/ArcherTachyon/ArcherTachyon.obj" },
+        };
+
         private static readonly Dictionary<CarClass, string> ByClass = new Dictionary<CarClass, string>
         {
             { CarClass.F, "Assets/Art/Vehicles/LibertyCollier/LibertyCollier.obj" },
@@ -25,7 +30,8 @@ namespace TarmacGauntlet.Simulation
         public static string? ModelPath(string modelId)
         {
             CarModel? model = CarModels.All.FirstOrDefault(c => c.Id == modelId);
-            return model == null ? null : ByClass[model.CarClass];
+            if (model == null) return null;
+            return ById.TryGetValue(model.Id, out string? own) ? own : ByClass[model.CarClass];
         }
     }
 }
