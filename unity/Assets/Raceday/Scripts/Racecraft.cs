@@ -202,6 +202,7 @@ namespace TarmacGauntlet.Raceday
             pilot.SpeedCap = float.PositiveInfinity;
             pilot.SpeedScale = 1f;
             pilot.SideFilter = false;
+            pilot.SideHold = false;
             pilot.SideWeight = 1f;
             pilot.SideSteer = 0f;
             float margin = Endurance.MarginScale(pilot.Safety);
@@ -532,6 +533,9 @@ namespace TarmacGauntlet.Raceday
                         pilot.SideFactor = outside * sign > 0f ? 1.5f : 2f;
                     }
                     pilot.SideFilter = true;
+                    // Only the outside car level with the inside one: everywhere else the filter is the last resort against a contact.
+                    pilot.SideHold = Experiments.Is(PathChooser.Experiment) && PathChooser.SideNoReverse && outsideCar
+                        && Mathf.Abs(Mathf.Repeat(side.Distance - me.Distance + 0.5f * lap, lap) - 0.5f * lap) < CarLength;
                     SideSteering = true;
                     // The filter's new offset is where the car is: it counts towards the one move.
                     if (Defending && !Exempt) OneMove(was, pilot.Offset, false);
