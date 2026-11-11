@@ -58,6 +58,9 @@ namespace TarmacGauntlet.Raceday
         private const float StoppedSpeed = 10f;
         /// <summary>Speed below which a car may pass through a stopped ghost it can't get round, m/s.</summary>
         private static readonly float GhostCrawl = Knob("CRAWL", 6f);
+        /// <summary>A moving ghost this close to the track, m, is planned round like any car (T17).</summary>
+        private static readonly float GhostNear = Knob("GHOSTNEAR", 3f);
+        private static readonly bool AvoidGhosts = Knob("AVOIDGHOSTS", 1f) > 0f;
         /// <summary>Gap to a car alongside, side to side, inside which TORCS's parallel steering still takes over, m (spec: 2 m).</summary>
         public const float SideFilterGap = 2f;
         /// <summary>Seconds of score per second spent lifting or braking for a car ahead below its lane's speed.</summary>
@@ -568,7 +571,10 @@ namespace TarmacGauntlet.Raceday
                 // A ghost is left out, unless it is stopped on the track: then it is an obstacle.
                 bool still = o.Ghost && !me.Ghost && Mathf.Abs(o.Speed) < StoppedSpeed
                     && Mathf.Abs(o.Lateral) < c.HalfWidth(c.IndexOf(Mathf.Repeat(o.Distance, lap)));
-                if (o.Ghost && !me.Ghost && !still) continue;
+                // A ghost getting back into the race is a car to plan round too, once near the track: the
+                // ghosting is only the safety net (Ivan, T17).
+                bool rejoining = AvoidGhosts && o.Ghost && !me.Ghost && Mathf.Abs(o.Lateral) < c.HalfWidth(c.IndexOf(Mathf.Repeat(o.Distance, lap))) + GhostNear;
+                if (o.Ghost && !me.Ghost && !still && !rejoining) continue;
                 float g = Road(o.Distance - me.Distance, lap);
                 if (g <= -50f || g >= 200f) continue;
                 others.Add(o);
