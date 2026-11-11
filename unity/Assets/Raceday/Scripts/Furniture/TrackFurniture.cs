@@ -66,16 +66,11 @@ namespace TarmacGauntlet.Raceday
         public const float GantryReach = 9f;
         /// <summary>A gantry foot by the pit wall stands this far in front of where the runoff meets it, clear of the wall.</summary>
         public const float PitWallClearance = 1.8f;
+        /// <summary>A gantry foot behind the armco stands this far back, between a grandstand's catch fence and its front wall.</summary>
+        public const float BehindArmco = 1.9f;
 
-        /// <summary>
-        /// Stretches behind the barrier taken by the grandstands, as (side, from, to) in lap metres: posts there move
-        /// to the other side of the track.
-        /// </summary>
+        /// <summary>Posts keep this far, along the track, from either end of a grandstand.</summary>
         public const float StandMargin = 10f;
-        public static readonly (int side, float from, float to)[] Stands =
-        {
-            (1, 7150f, 150f), (1, 380f, 620f), (0, 3920f, 4080f), (0, 4980f, 5180f), (1, 6620f, 6880f),
-        };
 
         public readonly List<MarshalPost> Posts = new List<MarshalPost>();
         public readonly List<DistanceBoard> Boards = new List<DistanceBoard>();
@@ -85,11 +80,14 @@ namespace TarmacGauntlet.Raceday
 
         private readonly Circuit c;
         private readonly CircuitBuilder b;
+        private readonly IReadOnlyList<StandFootprint> stands;
 
-        public TrackFurniture(Circuit circuit, CircuitBuilder built)
+        /// <param name="stands">The ground the grandstands take. Posts that would stand there move to the other side.</param>
+        public TrackFurniture(Circuit circuit, CircuitBuilder built, IReadOnlyList<StandFootprint> stands)
         {
             c = circuit;
             b = built;
+            this.stands = stands;
             PlaceBoards();
             PlacePosts();
             PlaceGantry();
@@ -132,7 +130,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>A post near lap distance d, behind the barrier on the preferred side if it fits, else nearby.</summary>
         private MarshalPost PlacePost(float d, int side)
         {
-            foreach (float shift in new[] { 0f, -10f, 10f, -20f, 20f, -30f, 30f, -45f, 45f, -60f, 60f, -80f, 80f })
+            foreach (float shift in new[] { 0f, -10f, 10f, -20f, 20f, -30f, 30f, -45f, 45f, -60f, 60f, -80f, 80f, -110f, 110f, -140f, 140f })
                 foreach (int s in new[] { side, 1 - side })
                 {
                     float at = Mathf.Repeat(d + shift, c.Lap);
@@ -158,8 +156,8 @@ namespace TarmacGauntlet.Raceday
 
         private bool InStand(int side, float d)
         {
-            foreach (var (s, from, to) in Stands)
-                if (s == side && c.Ahead(from - StandMargin, d) <= c.Ahead(from - StandMargin, to + StandMargin)) return true;
+            foreach (StandFootprint stand in stands)
+                if (stand.Side == side && c.Ahead(stand.From - StandMargin, d) <= c.Ahead(stand.From - StandMargin, stand.To + StandMargin)) return true;
             return false;
         }
 
@@ -241,7 +239,7 @@ namespace TarmacGauntlet.Raceday
             float edge = c.HalfWidth(k);
             float reach = b.RunoffReach(side, k);
             if (b.PitWallAt(side, k)) return edge + reach - PitWallClearance;
-            if (b.Fenced(side, k) && reach + 1.2f <= GantryReach) return edge + reach + 1.2f;
+            if (b.Fenced(side, k) && reach + BehindArmco <= GantryReach) return edge + reach + BehindArmco;
             return edge + Mathf.Min(Mathf.Max(reach, 2f), GantryReach - 1f);
         }
 

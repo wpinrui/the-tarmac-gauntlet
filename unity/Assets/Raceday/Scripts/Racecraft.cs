@@ -161,6 +161,8 @@ namespace TarmacGauntlet.Raceday
         public float Target { get; private set; }
         /// <summary>True on a step the braking filter called for full brakes.</summary>
         public bool Braking { get; private set; }
+        /// <summary>Where across the track the car is heading for a fixed place from, or NaN when it isn't.</summary>
+        private float fixedWas = float.NaN;
         /// <summary>True on a step the side collision filter changed the steering.</summary>
         public bool SideSteering { get; private set; }
         /// <summary>True while a car behind is closing on this one: it may make one move.</summary>
@@ -360,7 +362,18 @@ namespace TarmacGauntlet.Raceday
                     // T9: not braking after all, so it moves out at the full rate, not the rate the brakes would leave (Ivan).
                     if (PathChooser.PullOutFree) step = Endurance.OvertakeOffsetRate * dt;
                 }
-                pilot.Offset = Mathf.Clamp(Mathf.MoveTowards(pilot.Offset, chooser.Target, step), AiPilot.LaneShifts[0], AiPilot.LaneShifts[AiPilot.LaneShifts.Length - 1]);
+                // H1: heading for a fixed place across the track, it moves across at the overtake rate whatever the line does (Ivan).
+                if (PathChooser.FixedAbs && chooser.FixedOn)
+                {
+                    float fromLat = float.IsNaN(fixedWas) ? line.Lateral[pilot.Index] + pilot.Offset : fixedWas;
+                    fixedWas = Mathf.MoveTowards(fromLat, chooser.FixedLat, step);
+                    pilot.Offset = Mathf.Clamp(fixedWas - line.Lateral[pilot.Index], AiPilot.LaneShifts[0], AiPilot.LaneShifts[AiPilot.LaneShifts.Length - 1]);
+                }
+                else
+                {
+                    fixedWas = float.NaN;
+                    pilot.Offset = Mathf.Clamp(Mathf.MoveTowards(pilot.Offset, chooser.Target, step), AiPilot.LaneShifts[0], AiPilot.LaneShifts[AiPilot.LaneShifts.Length - 1]);
+                }
                 pilot.Offset = chooser.HoldOwe(pilot.Offset, line.Lateral[pilot.Index], me.Across);
                 Target = chooser.Target;
                 pilot.SpeedCap = chooser.Cap;

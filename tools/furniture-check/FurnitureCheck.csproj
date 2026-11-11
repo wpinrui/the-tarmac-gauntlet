@@ -9,12 +9,13 @@
     <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)../../out/furniture-check/obj/</BaseIntermediateOutputPath>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Check.cs;Export.cs;Stubs.cs;../circuit/geometry-check/UnityStubs.cs" />
+    <Compile Include="Check.cs;Export.cs;Stubs.cs;../grandstands/Stubs.cs;../circuit/geometry-check/UnityStubs.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/Circuit.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/CircuitData.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/CircuitBuilder.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/CircuitPart.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/MeshKit.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Grandstands.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/Furniture/TrackFurniture.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/Furniture/FurnitureBuilder.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/Furniture/RaceFlags.cs" />

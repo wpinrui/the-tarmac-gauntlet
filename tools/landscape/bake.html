@@ -1,0 +1,180 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+</head><body><script type="module">
+// Renders one tree into a hemi-octahedral impostor atlas: N x N frames, each an orthographic view of
+// the tree from a direction on the upper hemisphere. One pass writes colour with a little baked
+// shading in the canopy, the other the normal in the frame's own axes (x right, y up, z towards
+// the viewer), which is the impostor quad's tangent space in the game.
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const vert = `
+  uniform mat3 uvMat;
+  varying vec2 vUv; varying vec3 vN; varying vec3 vW;
+  void main() {
+    vUv = (uvMat * vec3(uv, 1.0)).xy;
+    vN = normalize(normalMatrix * normal);
+    vec4 w = modelMatrix * vec4(position, 1.0);
+    vW = w.xyz;
+    gl_Position = projectionMatrix * viewMatrix * w;
+  }`;
+const frag = `
+  uniform sampler2D map; uniform bool hasMap; uniform vec3 tint; uniform int mode;
+  uniform vec3 centre; uniform vec3 radii; uniform float trunkShade; uniform bool leaf;
+  varying vec2 vUv; varying vec3 vN; varying vec3 vW;
+  void main() {
+    vec4 c = hasMap ? texture2D(map, vUv) : vec4(1.0);
+    if (c.a < 0.5) discard;
+    if (mode == 1) {
+      vec3 n = normalize(vN);
+      if (!gl_FrontFacing) n = -n;
+      if (n.z < 0.0) n.z = -n.z * 0.3;     // a card seen edge-on still faces the viewer a little
+      // Leaves take most of their normal from the crown's round shape, so the crown shades as one
+      // mass: lit on the sun's side and on top, darker underneath, as a real tree is.
+      if (leaf) n = mix(normalize(n), normalize((viewMatrix * vec4(normalize((vW - centre) / radii), 0.0)).xyz), 0.7);
+      gl_FragColor = vec4(normalize(n) * 0.5 + 0.5, 1.0);
+      return;
+    }
+    // Leaves deep in the crown and low down are in each other's shade.
+    vec3 d = (vW - centre) / radii;
+    float out_ = clamp(length(d), 0.0, 1.0);
+    float up = clamp(d.y * 0.5 + 0.5, 0.0, 1.0);
+    float ao = leaf ? mix(0.42, 1.0, smoothstep(0.15, 0.95, out_)) * mix(0.72, 1.05, up) : trunkShade;
+    gl_FragColor = vec4(c.rgb * tint * ao, 1.0);
+    #include <colorspace_fragment>
+  }`;
+
+function shaderFor(m, mode, info) {
+  const map = m.map || null;
+  if (map) map.updateMatrix();
+  const leaf = m.alphaMode === 'BLEND' || /leaves|twig|leaf|needle/i.test(m.name);
+  return new THREE.ShaderMaterial({
+    vertexShader: vert, fragmentShader: frag, side: THREE.DoubleSide,
+    uniforms: {
+      map: { value: map }, hasMap: { value: !!map }, uvMat: { value: map ? map.matrix.clone() : new THREE.Matrix3() },
+      tint: { value: m.color ? m.color.clone() : new THREE.Color(1, 1, 1) }, mode: { value: mode },
+      centre: { value: info.crownCentre }, radii: { value: info.crownRadii }, trunkShade: { value: 0.75 }, leaf: { value: leaf },
+    },
+  });
+}
+
+/** Scales every separate leaf card about its own middle, so a sparse crown fills out. */
+function thicken(geom, k) {
+  if (k === 1) return;
+  const pos = geom.attributes.position, idx = geom.index;
+  const n = pos.count, parent = new Int32Array(n);
+  for (let i = 0; i < n; i++) parent[i] = i;
+  const find = a => { while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; } return a; };
+  for (let t = 0; t < idx.count; t += 3) {
+    const a = find(idx.getX(t)), b = find(idx.getX(t + 1)), c = find(idx.getX(t + 2));
+    parent[b] = a; parent[find(c)] = a;
+  }
+  const sum = new Map();
+  for (let i = 0; i < n; i++) {
+    const r = find(i); let s = sum.get(r);
+    if (!s) sum.set(r, s = [0, 0, 0, 0]);
+    s[0] += pos.getX(i); s[1] += pos.getY(i); s[2] += pos.getZ(i); s[3]++;
+  }
+  for (let i = 0; i < n; i++) {
+    const s = sum.get(find(i)), cx = s[0] / s[3], cy = s[1] / s[3], cz = s[2] / s[3];
+    pos.setXYZ(i, cx + (pos.getX(i) - cx) * k, cy + (pos.getY(i) - cy) * k, cz + (pos.getZ(i) - cz) * k);
+  }
+  pos.needsUpdate = true;
+}
+
+const cache = {};
+async function load(url) {
+  if (!cache[url]) cache[url] = await new GLTFLoader().loadAsync(url);
+  return cache[url];
+}
+
+/**
+ * spec: { url, node (index into the scene's children, or -1 for all), leavesOnly, thicken, frames, size }
+ * Returns { colour, normal (PNG data URLs), meta }.
+ */
+window.bake = async (spec) => {
+  const g = await load(spec.url);
+  const src = spec.node >= 0 ? g.scene.children[spec.node] : g.scene;
+  const tree = src.clone(true);
+  tree.position.set(0, 0, 0);
+  tree.updateMatrixWorld(true);
+  const meshes = [];
+  tree.traverse(o => { if (o.isMesh) meshes.push(o); });
+  const keep = [];
+  for (const o of meshes) {
+    const leaf = o.material.alphaMode === 'BLEND' || /leaves|twig/i.test(o.material.name);
+    if (spec.leavesOnly && !leaf) { o.visible = false; continue; }
+    if (leaf && spec.thicken) { o.geometry = o.geometry.clone(); thicken(o.geometry, spec.thicken); }
+    keep.push(o);
+  }
+  tree.updateMatrixWorld(true);
+  // Bounds from the visible meshes only.
+  const box = new THREE.Box3(), crown = new THREE.Box3(), v = new THREE.Vector3();
+  for (const o of keep) {
+    const p = o.geometry.attributes.position, leaf = o.material.alphaMode === 'BLEND' || /leaves|twig/i.test(o.material.name);
+    for (let i = 0; i < p.count; i += 3) {
+      v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld);
+      box.expandByPoint(v);
+      if (leaf) crown.expandByPoint(v);
+    }
+  }
+  if (crown.isEmpty()) crown.copy(box);
+  // Pivot: under the middle of the crown, on the lowest point.
+  const base = new THREE.Vector3((crown.min.x + crown.max.x) / 2, box.min.y, (crown.min.z + crown.max.z) / 2);
+  const height = box.max.y - box.min.y;
+  const centre = new THREE.Vector3(base.x, base.y + height / 2, base.z);
+  let radius = 0;
+  for (const o of keep) {
+    const p = o.geometry.attributes.position;
+    for (let i = 0; i < p.count; i += 2) radius = Math.max(radius, v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld).distanceTo(centre));
+  }
+  radius *= 1.01;
+  const info = { crownCentre: crown.getCenter(new THREE.Vector3()), crownRadii: crown.getSize(new THREE.Vector3()).multiplyScalar(0.5) };
+
+  const N = spec.frames, S = spec.size;
+  const r = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true, alpha: true, premultipliedAlpha: false });
+  r.setPixelRatio(1);
+  r.setSize(N * S, N * S);
+  r.outputColorSpace = THREE.SRGBColorSpace;
+  r.setClearColor(0x000000, 0);
+  const scene = new THREE.Scene();
+  scene.add(tree);
+  const cam = new THREE.OrthographicCamera(-radius, radius, radius, -radius, 0.01, radius * 4);
+  const out = {};
+  for (const mode of [0, 1]) {
+    for (const o of keep) {
+      o.userData.orig = o.userData.orig || o.material;
+      o.material = shaderFor(o.userData.orig, mode, info);
+    }
+    r.setScissorTest(true);
+    r.setViewport(0, 0, N * S, N * S); r.setScissor(0, 0, N * S, N * S); r.clear();
+    for (let fy = 0; fy < N; fy++)
+      for (let fx = 0; fx < N; fx++) {
+        const d = frameDir(fx, fy, N);
+        cam.position.copy(centre).addScaledVector(d, radius * 2);
+        // Frame up: world up pushed square to the view, or north when looking straight down.
+        const up = Math.abs(d.y) > 0.999 ? new THREE.Vector3(0, 0, -1) : new THREE.Vector3(0, 1, 0);
+        cam.up.copy(up);
+        cam.lookAt(centre);
+        // The atlas is read with v going up, row 0 at the bottom of the image.
+        r.setViewport(fx * S, fy * S, S, S); r.setScissor(fx * S, fy * S, S, S);
+        r.render(scene, cam);
+      }
+    out[mode === 0 ? 'colour' : 'normal'] = r.domElement.toDataURL('image/png');
+  }
+  r.dispose();
+  out.meta = { radius, height, centreAbove: height / 2, frames: N,
+    crownWidth: Math.max(crown.max.x - crown.min.x, crown.max.z - crown.min.z) };
+  return out;
+};
+
+/** Direction from the tree to the viewer for frame (fx, fy): hemi-octahedral, frame centres on grid points. */
+function frameDir(fx, fy, N) {
+  const ax = fx / (N - 1) * 2 - 1, ay = fy / (N - 1) * 2 - 1;
+  const px = (ax + ay) / 2, pz = (ax - ay) / 2;
+  const y = 1 - Math.abs(px) - Math.abs(pz);
+  return new THREE.Vector3(px, Math.max(y, 0), pz).normalize();
+}
+window.ready = true;
+</script></body></html>

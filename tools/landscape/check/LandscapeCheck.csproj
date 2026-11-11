@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Lays out the landscape with the game's own code outside Unity, checks it and writes it out for the preview. Run through run.sh. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)../../../out/landscape-check/obj/</BaseIntermediateOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Check.cs;Stubs.cs" />
+    <Compile Include="../../../unity/Assets/Raceday/Scripts/Circuit.cs" />
+    <Compile Include="../../../unity/Assets/Raceday/Scripts/CircuitData.cs" />
+    <Compile Include="../../../unity/Assets/Raceday/Scripts/CircuitBuilder.cs" />
+    <Compile Include="../../../unity/Assets/Raceday/Scripts/CircuitPart.cs" />
+    <Compile Include="../../../unity/Assets/Raceday/Scripts/MeshKit.cs" />
+    <Compile Include="../../../unity/Assets/Raceday/Scripts/SkyClock.cs" />
+    <Compile Include="../../../unity/Assets/Raceday/Scripts/LandscapePlan.cs" />
+    <Compile Include="../../../unity/Assets/Raceday/Scripts/LandscapeLooks.cs" />
+    <Compile Include="../../../unity/Assets/Raceday/Scripts/Horizon.cs" />
+    <Compile Include="../../../unity/Assets/Raceday/Scripts/Grandstands.cs" />
+  </ItemGroup>
+</Project>

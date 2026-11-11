@@ -37,13 +37,13 @@ namespace TarmacGauntlet.Raceday
         private RaceFlags.Lights lights = (RaceFlags.Lights)(-1);
         private RaceFlags.Car[] states = new RaceFlags.Car[0];
 
-        /// <summary>Builds the furniture for a circuit laid by <paramref name="track"/>.</summary>
-        public static Trackside Build(Circuit circuit, CircuitBuilder track)
+        /// <summary>Builds the furniture for a circuit laid by <paramref name="track"/>, clear of the grandstands.</summary>
+        public static Trackside Build(Circuit circuit, CircuitBuilder track, IReadOnlyList<StandFootprint> stands)
         {
             Trackside t = new GameObject("Trackside").AddComponent<Trackside>();
             t.circuit = circuit;
             t.materials = new FurnitureMaterials();
-            var placed = new TrackFurniture(circuit, track);
+            var placed = new TrackFurniture(circuit, track, stands);
             var built = new FurnitureBuilder(circuit, placed, t.materials);
             Transform root = t.transform;
 

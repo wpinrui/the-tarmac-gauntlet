@@ -7,7 +7,7 @@
 //   posts round the lap      no stretch flagged by one post is longer than 460 m
 //   every corner guarded     each corner has a post within 120 m before its turn-in
 //   posts beside the track   each post stands behind its runoff, clear of any other road, runoff, pit lane or
-//                            grandstand strip, with its floor within 2.5 m of the road's height
+//                            grandstand, with its floor within 2.5 m of the road's height
 //   panels by the track      each post's flag panel stands past the verge, in front of the barrier, clear of
 //                            the distance boards
 //   boards before braking    each hard braking corner has its 300, 200 and 100 boards on one side, that far
@@ -31,6 +31,8 @@ static class Check
     static bool failed;
     static Circuit c;
     static CircuitBuilder b;
+    static List<StandFootprint> footprints;
+    static List<CircuitPart> standParts;
 
     static int Main(string[] args)
     {
@@ -40,7 +42,11 @@ static class Check
         List<CircuitPart> track = b.Build();
         int at = Array.IndexOf(args, "--export");
         if (at >= 0) Export.Write(args[at + 1], c, b, track);
-        var f = new TrackFurniture(c, b);
+        var stands = new Grandstands(c, b, null, StandLook.Main, StandLook.Corners);
+        standParts = stands.Build();
+        footprints = stands.Footprints;
+        if (args.Contains("--list")) foreach (var s in footprints) Console.WriteLine($"stand {s.Side} {s.From:F0}-{s.To:F0} far {s.Far:F0}");
+        var f = new TrackFurniture(c, b, footprints);
         var built = new FurnitureBuilder(c, f, null);
         if (args.Contains("--list"))
         {
@@ -95,8 +101,8 @@ static class Check
             float out_ = Math.Abs(Lateral(p.Base, k)) - c.HalfWidth(k);
             if (out_ < b.RunoffReach(p.Side, k) + 1f) bad.Add($"post at {p.Distance:F0} m stands on its runoff");
             if (Math.Abs(p.Base.y - c.Centre[k].y) > TrackFurniture.MaxDrop) bad.Add($"post at {p.Distance:F0} m is {p.Base.y - c.Centre[k].y:F1} m off the road's height");
-            foreach (var (side, from, to) in TrackFurniture.Stands)
-                if (side == p.Side && c.Ahead(from, p.Distance) <= c.Ahead(from, to)) bad.Add($"post at {p.Distance:F0} m is in a grandstand strip");
+            foreach (StandFootprint stand in footprints)
+                if (stand.Covers(c.Lap, p.Distance, Lateral(p.Base, k))) bad.Add($"post at {p.Distance:F0} m stands on a grandstand");
             for (int j = 0; j < c.Count; j++)
             {
                 if (Math.Abs(c.Wrap(j - k + c.Count / 2) - c.Count / 2) * c.Step <= 60f) continue;
@@ -156,6 +162,15 @@ static class Check
         float road = c.Centre[k].y;
         float lowest = built.RedLenses.Vertices.Concat(built.GreenLenses.Vertices).Min(v => v.y) - road;
         if (lowest < 5f) bad.Add($"lights {lowest:F1} m over the road");
+        foreach (CircuitPart part in standParts)
+            foreach (Vector3 v in part.Kit.Vertices)
+            {
+                if (Mathf.Abs(Vector3.Dot(v - c.Centre[k], c.Forward[k])) > LegHalf + 0.1f) continue;
+                if (v.y > c.Centre[k].y + TrackFurniture.GantryClearance) continue;
+                float lat = Lateral(v, k);
+                foreach (float foot in new[] { l, r })
+                    if (Mathf.Abs(lat - foot) < LegHalf) { bad.Add($"a leg meets the {part.Name} at {lat:F1} m"); break; }
+            }
         foreach (CircuitPart part in track.Where(p => p.Name.StartsWith("Pit wall")))
             foreach (Vector3 v in part.Kit.Vertices)
                 if (Mathf.Abs(Vector3.Dot(v - c.Centre[k], c.Forward[k])) < 3f) wall.Add(Lateral(v, k));

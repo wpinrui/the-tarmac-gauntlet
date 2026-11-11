@@ -1,0 +1,283 @@
+<title>Grandstand Looks</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Full-bleed 3D view of each stand on the real circuit; one slim control rail floats over the bottom. */
+  :root {
+    --sky: #a9c6e2;
+    --rail: rgba(18, 24, 22, 0.78);
+    --ink: #eef2ee;
+    --dim: #9aa8a0;
+    --pick: #e8e2c8;
+    --line: rgba(238, 242, 238, 0.16);
+    --font: "Barlow", "Helvetica Neue", Arial, sans-serif;
+    color-scheme: dark;
+  }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body { background: var(--sky); color: var(--ink); font-family: var(--font); overflow: hidden; }
+  #view { position: fixed; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; }
+  #rail {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    padding-block: 10px calc(10px + env(safe-area-inset-bottom, 0px));
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    background: var(--rail); backdrop-filter: blur(8px);
+    display: flex; flex-wrap: wrap; gap: 10px 28px; align-items: center; justify-content: center;
+  }
+  .group { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+  .group + .group { padding-left: 28px; border-left: 1px solid var(--line); }
+  button {
+    font: 600 14px/1 var(--font); letter-spacing: 0.02em; color: var(--dim);
+    background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 8px 10px; cursor: pointer;
+  }
+  button:hover { color: var(--ink); }
+  button[aria-pressed="true"] { color: var(--ink); border-color: var(--pick); }
+  button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
+  .swatch { width: 30px; height: 30px; padding: 0; display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; }
+  .swatch span { display: block; }
+  #load { position: fixed; inset: 0; display: grid; place-items: center; font: 600 15px var(--font); color: #24302a; }
+  @media (max-width: 720px) {
+    .group + .group { padding-left: 0; border-left: 0; }
+    #rail { gap: 6px 14px; }
+    button { padding: 7px 8px; font-size: 13px; }
+  }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@600&display=swap">
+
+<canvas id="view"></canvas>
+<div id="load">Loading the circuit…</div>
+<nav id="rail" hidden>
+  <div class="group" id="sites"></div>
+  <div class="group" id="mains"></div>
+  <div class="group" id="corners"></div>
+  <div class="group" id="colours"></div>
+</nav>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="data.js"></script>
+<script>
+(async () => {
+  // Same colours as the game's StandMaterials and CircuitMaterials.
+  const LOOKS = {
+    Green: { steel: [0.2, 0.32, 0.24], seats: [0.17, 0.36, 0.25], cladding: [0.62, 0.64, 0.6] },
+    Blue: { steel: [0.3, 0.38, 0.46], seats: [0.2, 0.31, 0.5], cladding: [0.7, 0.71, 0.7] },
+    Cream: { steel: [0.8, 0.77, 0.68], seats: [0.56, 0.2, 0.17], cladding: [0.8, 0.77, 0.68] },
+  };
+  const MAIN_NAMES = { Cantilever: "Flat roof", Barrel: "Curved roof", Open: "Open" };
+  const CORNER_NAMES = { Bleachers: "Steel bleachers", Terrace: "Terrace bank", Covered: "Covered" };
+  const SITE_NAMES = ["Main straight", "Turn 1", "Turn 7", "Turn 10", "Turn 12"];
+  const TRACK = {
+    "Road": [0.17, 0.17, 0.18], "Road edges": [0.17, 0.17, 0.18], "Edge lines": [0.92, 0.92, 0.9], "Kerbs": [0.78, 0.1, 0.1],
+    "Verges": [0.24, 0.36, 0.16], "Grass runoff": [0.23, 0.41, 0.15], "Gravel traps": [0.63, 0.58, 0.48], "Armco": [0.72, 0.74, 0.76],
+    "Tyre walls": [0.06, 0.06, 0.07], "Pit wall": [0.74, 0.73, 0.7], "Pit lane": [0.21, 0.21, 0.22], "Pit lane shoulders": [0.23, 0.41, 0.15],
+    "Pit lane lines": [0.92, 0.92, 0.9], "Garages": [0.32, 0.33, 0.35], "Garage roofs": [0.74, 0.73, 0.7], "Pit box lines": [0.92, 0.92, 0.9],
+    "Start line and safety car lines": [0.92, 0.92, 0.9], "Grid slots": [0.92, 0.92, 0.9], "Grid yellow lines": [0.95, 0.78, 0.1],
+    "Ground": [0.2, 0.35, 0.13], "Pit entry hatching": [0.8, 0.1, 0.1], "Pit exit line": [0.92, 0.92, 0.9], "Pit entry bollard": [0.95, 0.78, 0.1],
+  };
+
+  const bytes = Uint8Array.from(atob(window.STANDS_DATA), c => c.charCodeAt(0));
+  const json = await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"))).text();
+  const data = JSON.parse(json);
+  const b64 = s => { const b = atob(s), a = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return a.buffer; };
+
+  const canvas = document.getElementById("view");
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xa9c6e2);
+  scene.fog = new THREE.Fog(0xb8cde0, 600, 2200);
+  const camera = new THREE.PerspectiveCamera(40, 1, 0.5, 5000);
+  const controls = new THREE.OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.maxPolarAngle = Math.PI * 0.49;
+  controls.minDistance = 4;
+  controls.maxDistance = 700;
+
+  scene.add(new THREE.HemisphereLight(0xcfe0f2, 0x4a5a32, 0.75));
+  const sun = new THREE.DirectionalLight(0xfff1dc, 1.6);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(4096, 4096);
+  const sc = sun.shadow.camera;
+  sc.left = -260; sc.right = 260; sc.top = 260; sc.bottom = -260; sc.near = 10; sc.far = 1400;
+  sun.shadow.bias = -0.0004;
+  scene.add(sun, sun.target);
+
+  const lin = c => new THREE.Color().setRGB(...c).convertSRGBToLinear();
+  const geometries = new Map();
+  // The game's frame is left-handed (z north); three.js is right-handed, so z flips and every triangle turns over.
+  function geometry(id) {
+    if (geometries.has(id)) return geometries.get(id);
+    const blob = data.blobs[id];
+    const q = new Int16Array(b64(blob.pos));
+    const pos = new Float32Array(q.length);
+    for (let i = 0; i < q.length; i += 3) { pos[i] = q[i] * 0.02; pos[i + 1] = q[i + 1] * 0.02; pos[i + 2] = -q[i + 2] * 0.02; }
+    const idx = new Uint32Array(b64(blob.idx));
+    for (let i = 0; i < idx.length; i += 3) { const t = idx[i + 1]; idx[i + 1] = idx[i + 2]; idx[i + 2] = t; }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
+    g.computeVertexNormals();
+    if (blob.col) {
+      const k = new Uint8Array(b64(blob.col)), col = new Float32Array(k.length * 3);
+      for (let i = 0; i < k.length; i++) {
+        const c = lin(data.palette[Math.floor(k[i] / data.paletteWidth)][k[i] % data.paletteWidth]);
+        col[3 * i] = c.r; col[3 * i + 1] = c.g; col[3 * i + 2] = c.b;
+      }
+      g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    }
+    if (blob.name === "Catch fence") {
+      const n = g.attributes.normal, uv = new Float32Array(n.count * 2);
+      for (let i = 0; i < n.count; i++) {
+        uv[2 * i] = (Math.abs(n.getX(i)) > Math.abs(n.getZ(i)) ? pos[3 * i + 2] : pos[3 * i]) * 4;
+        uv[2 * i + 1] = pos[3 * i + 1] * 4;
+      }
+      g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+    }
+    geometries.set(id, g);
+    return g;
+  }
+
+  function chainLink() {
+    const s = 64, cell = 16, cv = document.createElement("canvas");
+    cv.width = cv.height = s;
+    const x = cv.getContext("2d"), img = x.createImageData(s, s);
+    for (let j = 0; j < s; j++) for (let i = 0; i < s; i++) {
+      const a = ((i + j) % cell + cell) % cell, b = ((i - j) % cell + cell) % cell;
+      const wire = Math.min(a, cell - a) < 1.3 || Math.min(b, cell - b) < 1.3;
+      const o = 4 * (j * s + i);
+      img.data[o] = img.data[o + 1] = img.data[o + 2] = 255; img.data[o + 3] = wire ? 255 : 0;
+    }
+    x.putImageData(img, 0, 0);
+    const t = new THREE.CanvasTexture(cv);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = 4;
+    return t;
+  }
+  const fenceTexture = chainLink();
+
+  const mat = (c, extra = {}) => new THREE.MeshStandardMaterial({ color: lin(c), roughness: 0.85, metalness: 0, ...extra });
+  const trackMats = {};
+  for (const [k, c] of Object.entries(TRACK)) trackMats[k] = mat(c, k === "Armco" ? { metalness: 0.6, roughness: 0.4 } : {});
+  const standMats = {
+    "Stand concrete": mat([0.68, 0.67, 0.64]),
+    "Stand roofs": mat([0.36, 0.37, 0.38], { roughness: 0.7, side: THREE.DoubleSide }),
+    "Stand banks": mat([0.23, 0.41, 0.15]),
+    "Crowd": new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }),
+    "Catch fence": new THREE.MeshStandardMaterial({ color: lin([0.62, 0.64, 0.64]), map: fenceTexture, alphaTest: 0.5, metalness: 0.5, roughness: 0.6, side: THREE.DoubleSide }),
+    "Catch fence posts": mat([0.6, 0.62, 0.63], { metalness: 0.6, roughness: 0.5 }),
+    "Stand steel": mat([0, 0, 0], { roughness: 0.65 }),
+    "Stand seats": mat([0, 0, 0], { roughness: 0.7 }),
+    "Stand cladding": mat([0, 0, 0]),
+  };
+
+  const state = { site: 0, main: "Cantilever", corner: "Bleachers", look: "Green" };
+  try { Object.assign(state, JSON.parse(localStorage.getItem("stand-looks") || "{}")); } catch (e) {}
+  let group = null;
+
+  function build() {
+    if (group) scene.remove(group);
+    group = new THREE.Group();
+    const site = data.sites[state.site];
+    const add = (id, m, shadows) => {
+      const mesh = new THREE.Mesh(geometry(id), m);
+      mesh.castShadow = shadows; mesh.receiveShadow = true;
+      group.add(mesh);
+    };
+    for (const id of site.circuit) {
+      const name = data.blobs[id].name;
+      add(id, trackMats[name] || mat([0.5, 0.5, 0.5]), name === "Armco" || name === "Garages" || name === "Pit wall" || name === "Tyre walls");
+    }
+    const shape = site.main ? state.main : state.corner;
+    for (const id of site.shapes[shape]) {
+      const name = data.blobs[id].name;
+      add(id, standMats[name], name !== "Catch fence");
+    }
+    scene.add(group);
+  }
+
+  function paint() {
+    const l = LOOKS[state.look];
+    standMats["Stand steel"].color = lin(l.steel);
+    standMats["Stand seats"].color = lin(l.seats);
+    standMats["Stand cladding"].color = lin(l.cladding);
+  }
+
+  // Look at the stand from across the track, a little upstream, at grandstand height.
+  function frame() {
+    const s = data.sites[state.site];
+    const t = new THREE.Vector3(s.track[0], s.track[1], -s.track[2]);
+    const out = new THREE.Vector3(s.outward[0], 0, -s.outward[2]).normalize();
+    const along = new THREE.Vector3(s.along[0], 0, -s.along[2]).normalize();
+    const len = s.main ? 150 : 95;
+    const focus = new THREE.Vector3(0, 5, 0).addScaledVector(along, -len * 0.1);
+    camera.position.copy(t).addScaledVector(out, s.main ? -12 : -25).addScaledVector(along, -len * 0.6).add(new THREE.Vector3(0, 9, 0));
+    controls.target.copy(focus);
+    const sunDir = new THREE.Vector3(-0.55, 0.62, 0.55).normalize();
+    sun.position.copy(focus).addScaledVector(sunDir, 700);
+    sun.target.position.copy(focus);
+    controls.update();
+  }
+
+  function save() { try { localStorage.setItem("stand-looks", JSON.stringify(state)); } catch (e) {} }
+
+  function buttons(el, entries, key, after) {
+    el.innerHTML = "";
+    for (const [value, label] of entries) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.id = `${key}-${value}`;
+      if (typeof label === "string") b.textContent = label; else b.append(label);
+      b.setAttribute("aria-pressed", String(state[key] === value));
+      b.addEventListener("click", () => {
+        state[key] = value;
+        for (const o of el.children) o.setAttribute("aria-pressed", String(o === b));
+        save();
+        after();
+      });
+      el.append(b);
+    }
+  }
+  function swatch(name) {
+    const w = document.createElement("span");
+    w.className = "swatch";
+    w.setAttribute("aria-label", name);
+    w.title = name;
+    for (const c of [LOOKS[name].steel, LOOKS[name].seats]) {
+      const s = document.createElement("span");
+      s.style.background = `rgb(${c.map(v => Math.round(v * 255)).join(",")})`;
+      w.append(s);
+    }
+    return w;
+  }
+  const show = () => { build(); frame(); };
+  const mains = document.getElementById("mains"), corners = document.getElementById("corners");
+  const shapeRow = () => {
+    const main = data.sites[state.site].main;
+    mains.hidden = !main;
+    corners.hidden = main;
+  };
+  buttons(document.getElementById("sites"), SITE_NAMES.map((n, i) => [i, n]), "site", () => { shapeRow(); show(); });
+  buttons(mains, Object.entries(MAIN_NAMES), "main", build);
+  buttons(corners, Object.entries(CORNER_NAMES), "corner", build);
+  buttons(document.getElementById("colours"), Object.keys(LOOKS).map(n => [n, swatch(n)]), "look", paint);
+
+  function resize() {
+    const w = innerWidth, h = innerHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  addEventListener("resize", resize);
+  resize();
+  shapeRow();
+  paint();
+  show();
+  document.getElementById("load").hidden = true;
+  document.getElementById("rail").hidden = false;
+  (function loop() { controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); })();
+})();
+</script>

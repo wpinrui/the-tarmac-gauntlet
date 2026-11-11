@@ -5,7 +5,7 @@ using UnityEngine;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// Builds the circuit, the trackside furniture (<see cref="Trackside"/>), the sky and its sun (<see cref="TimeOfDay"/>), the career's field and the cameras when the scene starts. The
+    /// Builds the circuit, the country round it (<see cref="Landscape"/>), the trackside furniture (<see cref="Trackside"/>), the sky and its sun (<see cref="TimeOfDay"/>), the career's field and the cameras when the scene starts. The
     /// field is every team with a car, from <see cref="RaceWeekend.Setup"/>, gridded by prestige: each
     /// car on a full tank and new tyres, its starting driver at the wheel. Run on its own, the scene
     /// makes a new career in which the player owns the Cheonma. The <see cref="RaceDirector"/> keeps
@@ -70,8 +70,12 @@ namespace TarmacGauntlet.Raceday
             Time.fixedDeltaTime = 0.01f;
             var circuit = new Circuit(CircuitData.Load());
             var track = new GameObject("Circuit");
-            var builder = new CircuitBuilder(circuit, new CircuitMaterials());
-            foreach (CircuitPart part in builder.Build())
+            var materials = new CircuitMaterials();
+            var builder = new CircuitBuilder(circuit, materials);
+            List<CircuitPart> parts = builder.Build();
+            var stands = new Grandstands(circuit, builder, new StandMaterials(StandLook.Colours), StandLook.Main, StandLook.Corners);
+            parts.AddRange(stands.Build());
+            foreach (CircuitPart part in parts)
             {
                 var go = new GameObject(part.Name) { isStatic = true };
                 go.transform.SetParent(track.transform, false);
@@ -86,8 +90,9 @@ namespace TarmacGauntlet.Raceday
                     go.AddComponent<TrackSurface>().Kind = TrackSurface.ForPart(part.Name);
                 }
             }
+            Landscape.Build(circuit, builder, materials, LandscapeLooks.Current);
             TimeOfDay sky = new GameObject("Sky").AddComponent<TimeOfDay>();
-            Trackside trackside = Trackside.Build(circuit, builder);
+            Trackside trackside = Trackside.Build(circuit, builder, stands.Footprints);
 
             keys = new GameObject("Keyboard").AddComponent<KeyboardState>();
             var line = new RacingLine(circuit);

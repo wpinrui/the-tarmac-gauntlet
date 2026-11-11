@@ -12,7 +12,9 @@ static class Export
 {
     public static void Write(string path, Circuit c, CircuitBuilder b, List<CircuitPart> track)
     {
-        var f = new TrackFurniture(c, b);
+        var stands = new Grandstands(c, b, null, StandLook.Main, StandLook.Corners);
+        stands.Build();
+        var f = new TrackFurniture(c, b, stands.Footprints);
         var built = new FurnitureBuilder(c, f, null);
         // Each view: its centre, how far round it to send, and a camera to start from.
         var views = new List<(string name, Vector3 centre, float radius, Vector3 eye, Vector3 look)>();
