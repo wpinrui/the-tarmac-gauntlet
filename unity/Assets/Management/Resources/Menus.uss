@@ -267,9 +267,7 @@
 .rs-row.of-two-line, .of-row.of-two-line { height: 54px; align-items: flex-start; padding-top: 7px; }
 .of-two-line > Label { height: 20px; }
 .of-team-lines { flex-grow: 1; flex-shrink: 1; min-width: 0; }
-.of-car-line { flex-direction: row; align-items: center; margin-top: 2px; }
-.of-brand { width: 18px; height: 18px; margin-right: 8px; flex-shrink: 0; -unity-background-scale-mode: scale-to-fit; }
-.of-car-name { font-size: 13px; color: rgba(255, 255, 255, 0.62); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.of-car-name { margin-top: 2px; margin-left: 30px; font-size: 13px; color: rgba(255, 255, 255, 0.62); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rs-place { width: 20px; margin-right: 10px; }
 .rs-overall { width: 44px; color: rgba(255, 255, 255, 0.62); -unity-text-align: middle-right; }
 .p1 { color: rgb(232, 193, 90); }

@@ -74,7 +74,7 @@ namespace TarmacGauntlet.Management
             return flag;
         }
 
-        /// <summary>A podium team: its flag and name, and under it the car's brand badge and model.</summary>
+        /// <summary>A podium team: its flag and name, and under it the car model.</summary>
         internal static VisualElement PodiumTeam(ClassifiedCar r, Func<string, string, bool, Label> text)
         {
             GameState game = GameSession.State;
@@ -84,7 +84,7 @@ namespace TarmacGauntlet.Management
         }
 
         /// <summary>
-        /// A team in two lines: flag and name, then the car's brand badge and model. Its row takes the of-two-line
+        /// A team in two lines: flag and name, then the car model, starting where the name does. Its row takes the of-two-line
         /// class, so the row's numbers line up with the name.
         /// </summary>
         internal static VisualElement TeamLines(BaseTeam team, string name, CarModel model, Func<string, string, bool, Label> text)
@@ -95,13 +95,7 @@ namespace TarmacGauntlet.Management
             first.Add(text(name, "rs-team-name", true));
             info.Add(first);
             if (model == null) return info;
-            VisualElement car = Box("of-car-line");
-            VisualElement badge = Box("of-brand");
-            badge.pickingMode = PickingMode.Ignore;
-            badge.style.backgroundImage = Resources.Load<Texture2D>("Brands/" + Garage.Brand(model));
-            car.Add(badge);
-            car.Add(text(model.Name, "of-car-name", false));
-            info.Add(car);
+            info.Add(text(model.Name, "of-car-name", false));
             return info;
         }
 
