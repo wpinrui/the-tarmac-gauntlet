@@ -2,7 +2,7 @@
 one toggle per livery and one for the doors. The projection here is the same one the game's
 livery shader does: each paint face takes the view it faces most, blended where views meet.
 
-Run from a team's folder, e.g. python3 ../common/viewer.py <model.obj> <out.html> <title> <name>=<baked dir> ... [--number 8]
+Run from a team's folder, e.g. python3 ../common/viewer.py <model.obj> <out.html> <title> <name>=<baked dir> ... [--number 88]
 """
 import base64
 import gzip
@@ -77,14 +77,14 @@ function liveryMaterial(lv) {
     sh.uniforms.uAtlas = { value: tex };
     sh.uniforms.uBase = { value: new THREE.Color(lv.base).convertSRGBToLinear() };
     // The race number, drawn as the game's shader draws it.
-    const num = String(lv.number || ''), boxes = (lv.numbers || []).slice(0, 4);
+    const boxes = (lv.numbers || []).slice(0, 4);
     const dg = DIGITS ? new THREE.TextureLoader().load(DIGITS.png) : null;
     sh.uniforms.uDigits = { value: dg };
     sh.uniforms.uNumBox = { value: [0, 1, 2, 3].map(i => boxes[i] ? new THREE.Vector4(boxes[i].x / lv.size, boxes[i].y / lv.size, boxes[i].h / lv.size, boxes[i].rotate * Math.PI / 180) : new THREE.Vector4()) };
     sh.uniforms.uNumInk = { value: [0, 1, 2, 3].map(i => new THREE.Color(boxes[i] ? boxes[i].ink : '#fff').convertSRGBToLinear()) };
     sh.uniforms.uNumBoxes = { value: boxes.length };
     sh.uniforms.uNumWidth = { value: new THREE.Vector4(...[0, 1, 2, 3].map(i => boxes[i] ? boxes[i].w / lv.size : 0)) };
-    sh.uniforms.uNumDigits = { value: new THREE.Vector4(+num[0] || 0, +num[1] || 0, +num[2] || 0, dg ? num.length : 0) };
+    sh.uniforms.uNumDigits = NUM;
     const D = DIGITS || { cell: 0, padX: 0, pad: 0, height: 1, advance: [1], w: 1, h: 1 };
     sh.uniforms.uDigitCell = { value: new THREE.Vector4(D.cell, D.padX, D.advance[0] * D.height * D.h / D.w, D.pad) };
     sh.uniforms.uDigitHeight = { value: D.height }; sh.uniforms.uDigitAdvance = { value: D.advance[0] };
@@ -126,6 +126,13 @@ vec3 livery(vec3 p, vec3 n) {
   };
   return m;
 }
+// The race number every livery shows, shared so the number toggles reach them all.
+const NUM = { value: new THREE.Vector4() };
+function showNumber(n) {
+  const s = String(n);
+  NUM.value.set(+s[0] || 0, +s[1] || 0, +s[2] || 0, DIGITS ? s.length : 0);
+  numPick.forEach(b => b.setAttribute('aria-pressed', b.textContent === s));
+}
 const liveries = LIVERIES.map(liveryMaterial);
 const bodies = [];
 
@@ -158,6 +165,13 @@ bar.appendChild(Object.assign(document.createElement('span'), { className: 'gap'
 let goal = 0, t = 0;
 const doorBtn = button('Doors', () => { goal = 1 - goal; doorBtn.setAttribute('aria-pressed', goal === 1); });
 doorBtn.setAttribute('aria-pressed', 'false');
+// One, two and three digits, to check every number fits its box.
+const numPick = [];
+if (DIGITS) {
+  bar.appendChild(Object.assign(document.createElement('span'), { className: 'gap' }));
+  for (const n of [8, 88, 100]) numPick.push(button(String(n), () => showNumber(n)));
+  showNumber(LIVERIES[0].number || 8);
+}
 // doors.json is in Unity axes (X mirrored), so mirror the hinge back and turn the other way.
 function doors(dt) {
   t += Math.sign(goal - t) * Math.min(Math.abs(goal - t), dt / 0.9);
@@ -215,8 +229,8 @@ DIGITS = Path(__file__).resolve().parents[3] / "unity" / "Assets" / "Raceday" / 
 
 
 def write(obj_path, html_path, title, liveries, number=None):
-    """liveries: [(name, baked dir holding atlas.png and livery.json)]. number: a race number
-    drawn the game's way, for checking the game's atlas."""
+    """liveries: [(name, baked dir holding atlas.png and livery.json)]. Race numbers are drawn
+    the game's way, with toggles for 8, 88 and 100; number is the one shown first."""
     obj_path = Path(obj_path)
     obj = base64.b64encode(gzip.compress(_short(obj_path.read_text()).encode(), 9)).decode()
     doors_path = obj_path.with_suffix(".doors.json")
@@ -228,12 +242,10 @@ def write(obj_path, html_path, title, liveries, number=None):
         atlas = "data:image/png;base64," + base64.b64encode((d / "atlas.png").read_bytes()).decode()
         lvs.append({"name": name, "atlas": atlas, "base": meta["base"], "panels": meta["panels"],
                     "size": meta["size"], "numbers": meta["numbers"], "number": number})
-    digits = None
-    if number:
-        from PIL import Image
-        digits = json.loads((DIGITS / "Digits.json").read_text())
-        w, h = Image.open(DIGITS / "Digits.png").size
-        digits.update(w=w, h=h, png="data:image/png;base64," + base64.b64encode((DIGITS / "Digits.png").read_bytes()).decode())
+    from PIL import Image
+    digits = json.loads((DIGITS / "Digits.json").read_text())
+    w, h = Image.open(DIGITS / "Digits.png").size
+    digits.update(w=w, h=h, png="data:image/png;base64," + base64.b64encode((DIGITS / "Digits.png").read_bytes()).decode())
     html = (PAGE.replace("__TITLE__", title).replace("__OBJ__", obj).replace("__MATS__", json.dumps(_mtl(obj_path.with_suffix(".mtl"))))
             .replace("__DOORS__", json.dumps(doors)).replace("__LIVERIES__", json.dumps(lvs)).replace("__DIGITS__", json.dumps(digits)))
     Path(html_path).write_text(html)

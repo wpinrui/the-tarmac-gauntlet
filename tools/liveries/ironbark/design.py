@@ -124,11 +124,10 @@ def southern_cross(slant):
             x, z = (fx - 0.75) * 3.33, -0.575 + (fy - 0.5) * 1.667
             lv.poly("top", [(x + dx, 0, z - dz) for dx, dz in star(0, 0, r, n)], GOLD)  # points to the tail
         lv.mark("top", MARKS / "logo-light.svg", (0, 0, 1.5), 0.34, rotate=-90)
-        lv.mark("rear", MARKS / "logo-dark.svg", (0.04, 0.63, 0), 0.19)
         lv.mark("rear", MARKS / "url-green.svg", (0.0, 0.36, 0), 0.075)  # in the plate recess
         # Gold number on the green at the front of the door, the flag at the door's foot and the
         # logo big from the door's back half over the rear quarter.
-        lv.side_number(0.6, 0.8, 0.4, 0.24, GOLD)
+        lv.side_number(0.53, 0.82, 0.46, 0.2, GOLD)  # 100 still fits the door's green
         flags(lv, 0.45, 0.3, 0.11)
         z, y, h = {12: (-0.36, 0.46, 0.36), -18: (-0.28, 0.56, 0.41)}[slant]
         for view, sign in (("left", 1), ("right", -1)):
@@ -137,7 +136,7 @@ def southern_cross(slant):
     return make
 
 
-OPTIONS = {"down-to-tail": southern_cross(12), "down-to-nose": southern_cross(-18)}
+OPTIONS = {"southern-cross": southern_cross(-18)}
 
 if __name__ == "__main__":
     views = HERE / "out" / "views" / "views.json"
