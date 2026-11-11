@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Threading;
+using TarmacGauntlet.Simulation;
 using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
@@ -12,7 +13,8 @@ namespace TarmacGauntlet.Raceday
     /// Driver stats, 0 to 100:
     /// Pace sets how much of the car's grip and braking the target speeds use.
     /// Consistency sets how much the corner speeds wander from lap to lap.
-    /// Safety sets how often a corner is overcooked: braking too late and running wide.
+    /// Safety sets how often a corner is overcooked: braking too late and running wide. A wet track
+    /// (<see cref="RaceWeather"/>) makes it happen more often.
     ///
     /// Besides the racing line it has lanes either side of it, each with its own target speeds.
     /// <see cref="Offset"/> picks a point between them, so the car can run beside the line to
@@ -87,6 +89,22 @@ namespace TarmacGauntlet.Raceday
         /// its square root, so the driver brakes earlier and corners slower on old tyres.
         /// </summary>
         public float Grip = 1f;
+        /// <summary>
+        /// How tired the driver is, 0 fresh to 100 spent: target speeds come down so the lap takes as
+        /// much longer as the race maths says (<see cref="LapTime.FatigueLapFactor"/>, through
+        /// <see cref="Endurance.FatigueSpeedPower"/>), and the corner speeds wander more, as Consistency falls.
+        /// </summary>
+        public float Fatigue
+        {
+            get => fatigue;
+            set
+            {
+                fatigue = Mathf.Clamp(value, 0f, 100f);
+                fresh = Mathf.Pow((float)LapTime.FatigueLapFactor(Pace, fatigue), -Endurance.FatigueSpeedPower);
+                steadiness = (float)LapTime.EffectiveConsistency(Consistency, fatigue);
+            }
+        }
+        private float fatigue, fresh = 1f, steadiness;
         /// <summary>How much slower than it wants the car ahead made it go last step, m/s.</summary>
         public float HeldBy { get; private set; }
         /// <summary>Where the car's centre really is relative to the racing line, metres, positive left.</summary>
@@ -126,6 +144,7 @@ namespace TarmacGauntlet.Raceday
             Pace = Mathf.Clamp(pace, 0f, 100f);
             Consistency = Mathf.Clamp(consistency, 0f, 100f);
             Safety = Mathf.Clamp(safety, 0f, 100f);
+            steadiness = Consistency;
             float limit = LimitFor(Pace);
             placeLimit = limit;
             placeMax = maxSpeed;
@@ -393,7 +412,7 @@ namespace TarmacGauntlet.Raceday
                 if (real < laneSpeed) { laneSpeed = real; laneAccel = realAccel; }
             }
             float worn = Mathf.Sqrt(Mathf.Clamp(Grip, 0.3f, 1f));
-            float target = laneSpeed * scale * SpeedScale * worn;
+            float target = laneSpeed * scale * SpeedScale * worn * fresh;
             // Held back by the car ahead: match the cap and drop the profile's own acceleration.
             if (Towed && laneAccel > 0f && scale >= 1f) target = Mathf.Max(target, speed);
             FreeSpeed = target;
@@ -412,7 +431,7 @@ namespace TarmacGauntlet.Raceday
             // Held back only once the cap is down to this car's speed: until then it stays flat, rather
             // than trimming the throttle to creep up on the car ahead.
             bool capped = held && SpeedCap < speed + 0.5f;
-            float want = (capped ? 0f : laneAccel * scale * scale * SpeedScale * SpeedScale * worn * worn) + correction;
+            float want = (capped ? 0f : laneAccel * scale * scale * SpeedScale * SpeedScale * worn * worn * fresh * fresh) + correction;
             if (held && !capped) want = Mathf.Max(want, Profile.EngineAccel(speed));
             float needed = want + Profile.Resist(Index, speed);
             var controls = new Controls { Steer = steer };
@@ -531,7 +550,7 @@ namespace TarmacGauntlet.Raceday
             int ke = c.Wrap(Mathf.FloorToInt(end));
             float laneSpeed = Mathf.Lerp(LaneProfiles[a].SpeedAt(end), LaneProfiles[b].SpeedAt(end), blend);
             float worn = Mathf.Sqrt(Mathf.Clamp(Grip, 0.3f, 1f));
-            float target = laneSpeed * GlideScaleAt(ke) * SpeedScale * worn * GlidePace;
+            float target = laneSpeed * GlideScaleAt(ke) * SpeedScale * worn * fresh * GlidePace;
             bool held = SpeedCap < target;
             HeldBy = held ? target - SpeedCap : 0f;
             if (held) target = SpeedCap;
@@ -644,9 +663,11 @@ namespace TarmacGauntlet.Raceday
                 if (near && !inside && !rolled[i])
                 {
                     rolled[i] = true;
-                    float spread = 0.035f * (1f - Consistency / 100f);
+                    float spread = 0.035f * (1f - steadiness / 100f);
                     float scale = 1f + spread * Mathf.Clamp(Gaussian(), -2f, 1f);
-                    float risk = 0.12f * (1f - Safety / 100f) * (1f - Safety / 100f);
+                    float careless = 1f - Safety / 100f;
+                    // A wet track catches out every driver now and then, the careless ones most.
+                    float risk = 0.12f * careless * careless + 0.025f * RaceWeather.Now.Wet * (0.4f + 0.6f * careless);
                     overcooked[i] = random.NextDouble() < risk;
                     if (overcooked[i])
                     {

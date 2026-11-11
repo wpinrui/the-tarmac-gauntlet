@@ -63,6 +63,19 @@ namespace TarmacGauntlet.Simulation
         public double? BestLap { get; private set; }
         /// <summary>Litres in the tank: kept up to date by the race, so the fuel bill can be worked out at the flag.</summary>
         public double FuelLeft { get; set; }
+        /// <summary>
+        /// How tired the driver at the wheel is, 0 fresh to 100 spent (GDD §2). It builds with time in
+        /// the car, more slowly with the car's Comfort and the driver's Stamina, and goes back to 0
+        /// when a stop puts in another driver.
+        /// </summary>
+        public double Fatigue { get; private set; }
+
+        /// <summary>
+        /// Driven seconds that build one lap's worth of the race maths' fatigue: the GDD's 48 laps over
+        /// the 24 hours, which the driven race runs in 8,640 s. Fatigue follows time, so a fast car's
+        /// driver tires no quicker per hour than a slow one's.
+        /// </summary>
+        public const double FatigueLapSeconds = 180;
 
         public RaceDriver Driver => Car.Lineup[DriverIndex];
         public IReadOnlyList<ActiveIssue> ActiveIssues => active;
@@ -129,6 +142,8 @@ namespace TarmacGauntlet.Simulation
                 Random = random,
             });
             Condition = Degradation.UpdateCarCondition(Condition, Car.Car.Age, Car.EngineerSkill, mode);
+            double fatiguePerLap = Degradation.UpdateDriverFatigue(0, stats.Comfort, Driver.Stats.Stamina, mode);
+            Fatigue = Math.Min(100, Fatigue + fatiguePerLap * Math.Max(lapSeconds, 0) / FatigueLapSeconds);
             if (risk.Failure.HasValue)
             {
                 Retire(raceTime, risk.Failure.Value);
@@ -206,6 +221,7 @@ namespace TarmacGauntlet.Simulation
             if (nextId != null)
             {
                 DriverIndex = next;
+                Fatigue = 0;
                 stints.Add(new Stint { DriverId = nextId, StartLap = Laps + 1, EndLap = Laps });
             }
             NextDriverIndex = (DriverIndex + 1) % Car.Lineup.Count;

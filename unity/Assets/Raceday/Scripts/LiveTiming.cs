@@ -7,8 +7,8 @@ namespace TarmacGauntlet.Raceday
     /// <summary>
     /// The full screen live timing page, on T while the AI drives your car. The race runs at 16x behind
     /// it. Left: every car in race order, filtered by class, your row in white. Right: your car's
-    /// onboard and the track map, then your car's driver, fuel, tyres and condition with the laps
-    /// they last on the engine map in use (the one that runs out first in amber), the engine map, and
+    /// onboard and the track map, then your car's driver, fuel, tyres, condition and the driver's fatigue,
+    /// fuel and tyres with the laps they last on the engine map in use (the one that runs out first in amber), the engine map, and
     /// the next stop: litres, tyres, next driver and Pit now (<see cref="PitOrders"/>). Left alone the
     /// car still pits and chooses for itself. The red button top right, or T, returns to the race, and
     /// the button beside it skips to your next stint, while a teammate drives.
@@ -307,7 +307,7 @@ namespace TarmacGauntlet.Raceday
             GUI.DrawTexture(new Rect(at.x - s / 2f, at.y - s / 2f, s, s), disc, ScaleMode.StretchToFill, true, 0f, colour, 0f, 0f);
         }
 
-        /// <summary>The driver at the wheel, fuel, tyres and condition, and the engine map.</summary>
+        /// <summary>The driver at the wheel, fuel, tyres, condition and fatigue, and the engine map.</summary>
         private void Status(Rect panel, bool paint)
         {
             if (paint) Fill(panel, Panel, 9f);
@@ -323,6 +323,7 @@ namespace TarmacGauntlet.Raceday
                 Bar(x, ref y, w, "FUEL", s.Fuel / Mathf.Max(s.Capacity, 1f), Laps(fuelLaps), fuelLaps <= tyreLaps);
                 Bar(x, ref y, w, "TYRES", 1f - s.Wear, Laps(tyreLaps), tyreLaps < fuelLaps);
                 Bar(x, ref y, w, "CONDITION", (float)Log.Condition / 100f, Mathf.RoundToInt((float)Log.Condition) + "%", false);
+                Bar(x, ref y, w, "FATIGUE", (float)Log.Fatigue / 100f, Mathf.RoundToInt((float)Log.Fatigue) + "%", false);
             }
 
             float bw = (w - 16f * k) / 3f;

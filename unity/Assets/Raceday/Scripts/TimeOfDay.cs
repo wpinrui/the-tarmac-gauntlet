@@ -8,8 +8,10 @@ namespace TarmacGauntlet.Raceday
     /// The sky, the sun and the light they give, following the race clock from the start time through
     /// the 24 hours (<see cref="SkyClock"/>). One directional light is the sun by day and the moon at
     /// night. The ambient light and the fog take the sky's colours. The clouds drift with the wind,
-    /// faster when the race runs faster. A sky-only reflection probe is redrawn as the sky changes,
-    /// so shiny paint reflects the sky it is under.
+    /// faster when the race runs faster and the wind blows. The weather (<see cref="WeatherSky"/>)
+    /// spreads cloud over the sky, greys it and takes the sun's light and shadows. A sky-only
+    /// reflection probe is redrawn as the sky changes, so shiny paint and a wet track reflect the sky
+    /// they are under.
     /// </summary>
     public sealed class TimeOfDay : MonoBehaviour
     {
@@ -17,18 +19,27 @@ namespace TarmacGauntlet.Raceday
         public const float StartHour = 15f;
         /// <summary>Race clock seconds since the start; zero until it is set.</summary>
         [NonSerialized] public Func<float> RaceSeconds;
+        /// <summary>The weather now; the clear sky of the dry race until it is set.</summary>
+        [NonSerialized] public Func<WeatherState> Weather;
 
         /// <summary>Cloud drift, texture tiles a second, for the big and the small cloud layers.</summary>
         private static readonly Vector4 Wind = new Vector4(0.0035f, 0.0012f, 0.0052f, 0.0021f);
         private const float CloudScale = 0.45f;
         /// <summary>Redraw the reflections once the clock has moved this far, hours.</summary>
         private const float ReflectionStep = 0.05f;
+        /// <summary>Redraw the reflections once the cloud has changed this much.</summary>
+        private const float ReflectionCloud = 0.04f;
+        /// <summary>
+        /// How bright the sky's reflection is at night. The floodlights' pools multiply everything under
+        /// them, the reflection too, so a wet track reflecting the glowing night sky would shine white.
+        /// </summary>
+        private const float NightShine = 0.2f;
 
         private Light lamp;
         private Material sky;
         private ReflectionProbe probe;
         private Vector4 clouds;
-        private float reflected = float.NaN;
+        private float reflected = float.NaN, reflectedCloud;
 
         private static readonly int ZenithId = Shader.PropertyToID("_Zenith"), HorizonId = Shader.PropertyToID("_Horizon"),
             GlowId = Shader.PropertyToID("_Glow"), GroundId = Shader.PropertyToID("_Ground"), SunColorId = Shader.PropertyToID("_SunColor"),
@@ -72,7 +83,7 @@ namespace TarmacGauntlet.Raceday
 
         private void Update()
         {
-            clouds += Wind * Time.deltaTime;
+            clouds += Wind * (Time.deltaTime * (Weather != null ? Weather().Wind : 1f));
             for (int k = 0; k < 4; k++) clouds[k] = Mathf.Repeat(clouds[k], 1f);
             Apply();
         }
@@ -81,6 +92,18 @@ namespace TarmacGauntlet.Raceday
         {
             float hour = Hour;
             SkyState s = SkyClock.At(hour, SkyClock.Look);
+            float cover = SkyClock.Look.Cover, haze = SkyClock.Look.Haze, shadows = 1f, cloud = 0f;
+            if (Weather != null)
+            {
+                WeatherState w = Weather();
+                WeatherSky.Apply(ref s, w);
+                cover = WeatherSky.Cover(w.Cloud);
+                haze = WeatherSky.Haze(haze, w);
+                // Under a grey sky the light comes from everywhere and the shadows fade.
+                shadows = Mathf.Lerp(0.15f, 1f, WeatherSky.Direct(w));
+                cloud = w.Cloud + WeatherSky.Heavy(w.Rain);
+            }
+            lamp.shadowStrength = shadows;
             lamp.transform.rotation = Quaternion.LookRotation(-s.LightDir);
             lamp.color = s.LightColour;
             lamp.intensity = s.LightIntensity;
@@ -90,8 +113,8 @@ namespace TarmacGauntlet.Raceday
             RenderSettings.ambientEquatorColor = s.AmbientEquator;
             RenderSettings.ambientGroundColor = s.AmbientGround;
             RenderSettings.fogColor = s.Fog;
-            RenderSettings.fogStartDistance = SkyClock.Look.Haze * 0.2f;
-            RenderSettings.fogEndDistance = SkyClock.Look.Haze;
+            RenderSettings.fogStartDistance = haze * 0.2f;
+            RenderSettings.fogEndDistance = haze;
 
             sky.SetColor(ZenithId, s.Zenith);
             sky.SetColor(HorizonId, s.Horizon);
@@ -103,12 +126,14 @@ namespace TarmacGauntlet.Raceday
             sky.SetVector(SunDirId, s.SunDir);
             sky.SetVector(MoonDirId, s.MoonDir);
             sky.SetVector(CloudOffsetId, clouds);
-            sky.SetFloat(CoverId, SkyClock.Look.Cover);
+            sky.SetFloat(CoverId, cover);
             sky.SetFloat(NightId, s.Night);
 
-            if (float.IsNaN(reflected) || Mathf.Abs(hour - reflected) >= ReflectionStep)
+            probe.intensity = Mathf.Lerp(1f, NightShine, s.Night);
+            if (float.IsNaN(reflected) || Mathf.Abs(hour - reflected) >= ReflectionStep || Mathf.Abs(cloud - reflectedCloud) >= ReflectionCloud)
             {
                 reflected = hour;
+                reflectedCloud = cloud;
                 probe.RenderProbe();
             }
         }

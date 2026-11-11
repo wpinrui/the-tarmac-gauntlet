@@ -156,13 +156,15 @@ namespace TarmacGauntlet.Raceday
         public readonly Vector3 Box, Forward, ToGarage;
         /// <summary>How far the garage door is from the middle of the box, m.</summary>
         public readonly float Door;
+        /// <summary>+1 when the car's driver's door is on the garage side, -1 when on the far side (<see cref="DriverSwap.DoorSide"/>).</summary>
+        public int DoorSide = 1;
 
         private readonly PitStopSpots spots;
         private readonly float floor;
         private float length = -1f, width = -1f;
         /// <summary>The car this step, in the box's frame, and where it stopped: the stop's places follow a car that stops off the mark.</summary>
         private Vector2 car, stopped;
-        private bool near;
+        private bool near, doorway;
         private readonly Dictionary<PitStopSpots.StopJob, (Vector2 at, Vector2 face)> placed = new Dictionary<PitStopSpots.StopJob, (Vector2, Vector2)>();
 
         /// <summary>True once everyone stands at home, idle: nothing to do until the next stop.</summary>
@@ -304,8 +306,8 @@ namespace TarmacGauntlet.Raceday
                 // The marshal stands a step behind the refueller and out from him, the hose holder just behind him.
                 case CrewTask.Kind.Marshal: return (fuel.at + new Vector2(-1.0f, 0.7f), new Vector2(0.4f, -1f).normalized);
                 case CrewTask.Kind.Hose: return (fuel.at + new Vector2(0.3f, 1.0f), new Vector2(-0.3f, -1f).normalized);
-                // The driver's door is on the garage side, by the cockpit; the windscreen is cleaned from the far side.
-                case CrewTask.Kind.Door: return (new Vector2(0.25f, side + 0.65f), new Vector2(0f, -1f));
+                // The door helper stands just ahead of the driver's door as it opens; the windscreen is cleaned from the far side.
+                case CrewTask.Kind.Door: return DriverSwap.Helper(side, DoorSide);
                 case CrewTask.Kind.Screen: return (new Vector2(0.55f, -side - 0.5f), new Vector2(0f, 1f));
                 default: return fuel;
             }
@@ -496,7 +498,18 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>Is a point in the car's way, with a little room round it?</summary>
-        private bool InCar(Vector2 p) => near && Mathf.Abs(p.x - car.x) < HalfLength + 0.5f && Mathf.Abs(p.y - car.y) < width * 0.5f + 0.35f;
+        private bool InCar(Vector2 p) => near && (Mathf.Abs(p.x - car.x) < HalfLength + 0.5f && Mathf.Abs(p.y - car.y) < width * 0.5f + 0.35f || InDoorway(p));
+
+        /// <summary>
+        /// Is a point where the drivers change, while they do: in front of the driver's door, from the car's side out to
+        /// past the open door. The crew walk round it as they walk round the car.
+        /// </summary>
+        private bool InDoorway(Vector2 p)
+        {
+            if (!doorway) return false;
+            float out_ = (p.y - car.y) * DoorSide - width * 0.5f;
+            return p.x - car.x > DriverSwap.DoorwayBack && p.x - car.x < DriverSwap.DoorwayAhead && out_ > -0.1f && out_ < DriverSwap.DoorwayOut;
+        }
 
         /// <summary>True when the straight walk between two points keeps out of the car's way.</summary>
         private bool Clear(Vector2 from, Vector2 to)
@@ -518,15 +531,21 @@ namespace TarmacGauntlet.Raceday
             bool ahead = from.x - car.x > HalfLength;
             Vector2 best = to;
             float shortest = float.MaxValue;
-            for (int k = 0; k < 4; k++)
+            for (int k = 0; k < (doorway ? 6 : 4); k++)
             {
                 float x = k < 2 ? end : -end, y = k % 2 == 0 ? across : -across;
-                if (x > 0f && leaving && !ahead) continue;
+                if (k < 4 && x > 0f && leaving && !ahead) continue;
+                // While the drivers change, the two outer corners of the doorway too.
+                if (k >= 4)
+                {
+                    x = k == 4 ? DriverSwap.DoorwayAhead + 0.35f : DriverSwap.DoorwayBack - 0.35f;
+                    y = DoorSide * (width * 0.5f + DriverSwap.DoorwayOut + 0.35f);
+                }
                 Vector2 corner = car + new Vector2(x, y);
                 if ((corner - from).sqrMagnitude < 0.01f || !Clear(from, corner)) continue;
-                // On from the corner: straight there, or across the car's end to the other corner first.
-                Vector2 other = car + new Vector2(x, -y);
-                float way = (corner - from).magnitude + (Clear(corner, to) ? (to - corner).magnitude : 2f * across + (to - other).magnitude);
+                // On from the corner: straight there, or across the car's end (or the doorway) to the other corner first.
+                Vector2 other = k >= 4 ? car + new Vector2(k == 4 ? DriverSwap.DoorwayBack - 0.35f : DriverSwap.DoorwayAhead + 0.35f, y) : car + new Vector2(x, -y);
+                float way = (corner - from).magnitude + (Clear(corner, to) ? (to - corner).magnitude : (other - corner).magnitude + (to - other).magnitude);
                 if (way < shortest)
                 {
                     shortest = way;
@@ -543,6 +562,7 @@ namespace TarmacGauntlet.Raceday
             if (clock.CarLength > 0f) Measure(clock.CarLength, clock.CarWidth);
             else if (length < 0f) Measure(4.6f, 1.9f);
             near = clock.CarNear;
+            doorway = clock.Stage == CrewStage.Stop && clock.NewDriver && clock.Elapsed < DriverSwap.End(clock);
             car = clock.Car;
             bool standing = near && clock.CarSpeed < 1f && Mathf.Abs(car.x) < 3f && Mathf.Abs(car.y) < 1.5f;
             if (clock.Stage == CrewStage.Stop && standing) stopped = car;

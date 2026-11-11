@@ -66,6 +66,23 @@ namespace TarmacGauntlet.Simulation
             _ => throw new ArgumentOutOfRangeException(nameof(mode)),
         };
 
+        /// <summary>A driver's pace once fatigue (0 to 100) has worn it down.</summary>
+        public static double EffectivePace(double pace, double fatigue) => pace * (1 - (fatigue / 100) * FatiguePaceLoss);
+
+        /// <summary>A driver's consistency once fatigue (0 to 100) has worn it down.</summary>
+        public static double EffectiveConsistency(double consistency, double fatigue) =>
+            consistency * (1 - (fatigue / 100) * FatigueConsistencyLoss);
+
+        /// <summary>Lap time multiplier for a driver of this pace: 1 at the reference pace, below 1 above it.</summary>
+        public static double PaceModifier(double pace) => 1.0 - (pace - ReferencePace) * PaceEffectPerPoint;
+
+        /// <summary>
+        /// How much longer a lap takes for a driver of this pace at this fatigue (0 to 100) than fresh:
+        /// 1 when fresh, about 1.05 for a Pace 80 driver fully tired.
+        /// </summary>
+        public static double FatigueLapFactor(double pace, double fatigue) =>
+            PaceModifier(EffectivePace(pace, fatigue)) / PaceModifier(pace);
+
         /// <summary>
         /// Calculates a single lap time for a car (GDD §2).
         ///
@@ -109,8 +126,7 @@ namespace TarmacGauntlet.Simulation
             double baseTime = FastestLapTime + (1 - speedFraction) * LapTimeSpread;
 
             // 2. Driver pace modifier: fatigue reduces the effective pace before applying.
-            double effectivePace = driverStats.Pace * (1 - (driverFatigue / 100) * FatiguePaceLoss);
-            double paceMod = 1.0 - (effectivePace - ReferencePace) * PaceEffectPerPoint;
+            double paceMod = PaceModifier(EffectivePace(driverStats.Pace, driverFatigue));
 
             // 3. Instruction mode multiplier.
             double modeMod = ModeLapTimeModifier(instructionMode);
@@ -122,8 +138,7 @@ namespace TarmacGauntlet.Simulation
             double fuelMod = 1.0 + fuelLoad * FuelPenaltyPerLitre;
 
             // 6. Random variance: fatigue reduces effective consistency, widening variance.
-            double effectiveConsistency =
-                driverStats.Consistency * (1 - (driverFatigue / 100) * FatigueConsistencyLoss);
+            double effectiveConsistency = EffectiveConsistency(driverStats.Consistency, driverFatigue);
             double varianceRange =
                 MaxVarianceSeconds *
                 (1 - effectiveConsistency / 100) *

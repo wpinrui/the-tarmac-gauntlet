@@ -19,6 +19,12 @@
 //   clear of passing cars   a car driving to or from any other box, or along the fast lane, keeps at least 0.5 m
 //                           from every place a crew works a job round a car standing in its box (0.25 m round them)
 //
+// And the two drivers of every box (DriverSwap), on the stops that change driver:
+//   driver changed in time  by the end of the stop the new driver is in the seat, the other out and the door shut
+//   drivers clear of the car neither driver comes within reach of the car, but for getting in and out by the door
+//   drivers clear of the crew a standing driver keeps 0.35 m from every crew member's middle
+//   drivers home after      25 s after the release the one who got out waits at the back of the garage
+//
 // TRACE="<a stop as a failure names it>" WHO=<person, from 1> prints that person through that stop.
 using System;
 using System.Collections.Generic;
@@ -41,6 +47,12 @@ static class Check
     static readonly List<(float bad, string where)> late = new List<(float, string)>();
     static readonly List<(float bad, string where)> notHome = new List<(float, string)>();
     static readonly List<(float bad, string where)> inFastLane = new List<(float, string)>();
+    static readonly List<(float bad, string where)> notChanged = new List<(float, string)>();
+    static readonly List<(float bad, string where)> driverInCar = new List<(float, string)>();
+    static readonly List<(float bad, string where)> driverOnCrew = new List<(float, string)>();
+    static readonly List<(float bad, string where)> driverNotHome = new List<(float, string)>();
+    const float Apart = 0.35f;
+    static int changes;
     static int stops, people, jobs;
     const float PassGap = 0.5f;
     const float PassLength = 5.2f, PassWidth = 2.0f;   // the biggest car the stops are run with
@@ -105,6 +117,10 @@ static class Check
         Report("home after", notHome, $"{people} people home", "");
         Report("out of the fast lane", inFastLane, $"its edge {-fast:0.00} m out from the box's middle", "m into it");
         Report("clear of passing cars", passing, $"closest {closestPass:0.00} m", "m short");
+        Report("driver changed in time", notChanged, $"{changes} changes", "");
+        Report("drivers clear of the car", driverInCar, $"{stops} stops", "m into the car");
+        Report("drivers clear of the crew", driverOnCrew, $"{Apart:0.00} m apart", "m too close");
+        Report("drivers home after", driverNotHome, $"{stops} stops", "");
         return failed ? 1 : 0;
     }
 
@@ -141,6 +157,11 @@ static class Check
     {
         stops++;
         var crew = new GarageCrew(complex, spots, g, n, 1000 + g);
+        var swap = new DriverSwap(complex, spots, g, true, 2000 + g);
+        crew.DoorSide = swap.DoorSide;
+        if (s.Driver) changes++;
+        float worstCar = 0f, worstCrew = 0f;
+        string carWho = "", crewWho = "";
         people += crew.People.Length;
         string tag = $"garage {g + 1}, {n} crew, {s.Name}";
         float box = lane.BoxLane[g];
@@ -160,6 +181,33 @@ static class Check
         var firstAt = new Dictionary<(int, int), float>();
         var worked = new Dictionary<(int, int), float>();
         float worstDepth = 0f, worstLane = 0f;
+        void Drivers(in StopClock c)
+        {
+            swap.Step(c, Dt);
+            Vector2 f = heading.normalized;
+            var side = new Vector2(-f.y, f.x);
+            for (int d = 0; d < 2; d++)
+            {
+                DriverFigure fig = swap.Figures[d];
+                if (fig.InCar || fig.Lift > 0f) continue;
+                Vector2 at = fig.Body.At;
+                if (c.CarNear)
+                {
+                    Vector2 r = at - c.Car;
+                    float a = Mathf.Abs(Vector2.Dot(r, f)) - c.CarLength * 0.5f, b = Mathf.Abs(Vector2.Dot(r, side)) - c.CarWidth * 0.5f;
+                    float outside = a > 0f && b > 0f ? Mathf.Sqrt(a * a + b * b) : Mathf.Max(a, b);
+                    if (Reach - outside > worstCar) { worstCar = Reach - outside; carWho = $"driver {d + 1} at {c.Stage} {c.Elapsed:0.0} s, at ({at.x:0.0}, {at.y:0.0})"; }
+                }
+                for (int p = 0; p < crew.People.Length; p++)
+                {
+                    float gap = (crew.People[p].At - at).magnitude;
+                    CrewTask? cur = crew.Current(crew.People[p]);
+                    if (Apart - gap > worstCrew) { worstCrew = Apart - gap; crewWho = $"driver {d + 1} and person {p + 1} {cur?.Job} at {c.Stage} {c.Elapsed:0.0} s, at ({at.x:0.0}, {at.y:0.0})"; }
+                }
+                float into = fastY - (at.y - Reach);
+                if (into > worstLane) { worstLane = into; laneWho = $"driver {d + 1} at {c.Stage} ({at.x:0.0}, {at.y:0.0})"; }
+            }
+        }
         worstWho = "";
         float stopAt = 0f + s.StopOff;   // where the car stops, m along the box from its middle
 
@@ -167,6 +215,7 @@ static class Check
         float dist = 140f;
         float t = 0f;
         clock.Stage = CrewStage.Ready;
+        clock.NewDriver = s.Driver;
         while (true)
         {
             float v = Mathf.Min(limit, Mathf.Sqrt(2f * 3.5f * Mathf.Max(dist, 0f)));
@@ -177,6 +226,7 @@ static class Check
             Car(crew, lane, across, g, i, there ? 0f : v, ref clock);
             crew.Step(clock, Dt);
             Watch(crew, clock, ref worstDepth, ref worstLane, fastY);
+            Drivers(clock);
             t += Dt;
             if (there) break;
         }
@@ -188,6 +238,7 @@ static class Check
         {
             clock.Elapsed = e;
             crew.Step(clock, Dt);
+            Drivers(clock);
             if (Environment.GetEnvironmentVariable("TRACE") == tag && (int)(e / Dt) % 10 == 0) Trace(crew, clock, e);
             Watch(crew, clock, ref worstDepth, ref worstLane, fastY);
             for (int p = 0; p < crew.People.Length; p++)
@@ -210,6 +261,12 @@ static class Check
                 Vector3 w = crew.World(crew.PlaceOf(task).at);
                 at.Add((Mathf.RoundToInt(w.x * 20f), Mathf.RoundToInt(w.z * 20f)));
             }
+        if (s.Driver)
+        {
+            DriverFigure now = swap.Figures[swap.Driving], other = swap.Figures[1 - swap.Driving];
+            if (!now.InCar || now.Lift < 1f || other.InCar || other.Lift > 0f || swap.Door > 0.001f)
+                notChanged.Add((1f, $"{tag}: in car {now.InCar}, out {!other.InCar}, door {swap.Door:0.00}, pace {swap.Pace:0.00}"));
+        }
 
         // Each job: there on time and working most of it; each of several wheels worked inside the tyre time.
         for (int p = 0; p < crew.People.Length; p++)
@@ -251,11 +308,17 @@ static class Check
             Car(crew, lane, across, g, i, speed, ref clock);
             crew.Step(clock, Dt);
             Watch(crew, clock, ref worstDepth, ref worstLane, fastY);
+            Drivers(clock);
         }
         // Back to racing: the crew must already be home.
         clock.Stage = CrewStage.Home;
         clock.CarNear = false;
         crew.Step(clock, Dt);
+        swap.Step(clock, Dt);
+        DriverFigure waiting = swap.Figures[1 - swap.Driving];
+        if (!swap.AtRest || waiting.Body.At != swap.Rest) driverNotHome.Add(((waiting.Body.At - swap.Rest).magnitude, $"{tag}: waiting driver at ({waiting.Body.At.x:0.0}, {waiting.Body.At.y:0.0}), {waiting.Body.Clip}"));
+        if (worstCar > 0f) driverInCar.Add((worstCar, tag + ": " + carWho));
+        if (worstCrew > 0f) driverOnCrew.Add((worstCrew, tag + ": " + crewWho));
         int away = crew.People.Count(m => (m.At - m.Home).magnitude > 0.01f || m.Clip != "Idle");
         if (away > 0 || !crew.AtRest) notHome.Add((away, $"{tag}: {away} not home and idle"));
 
