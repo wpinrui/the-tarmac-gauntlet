@@ -748,6 +748,11 @@ namespace TarmacGauntlet.Raceday
                     // H1: a car ahead already within the following gap is left by moving across, away from its lane:
                     // that path is no worse for being inside the gap, so long as it never closes to the car's tail.
                     // T20: in the tow on a straight it closes right up, as close as the car ahead's hardest braking allows (Ivan: slipstream, then pull out).
+                    // T20a, T20c: braking for the corner behind a car already inside the following gap, a path on the
+                    // brakes in its own lane that gets no closer is always open: never every path broken, and no swerve or
+                    // flicker off the brakes (Ivan).
+                    if (!tuck && BrakeLegal && tuckZone && cand.Pedal == Pedal.Brake && !cand.Fixed && Mathf.Abs(cand.Shift - holdOffset) < 0.5f && from > 0.7f * CarL && g > CarL + 0.5f * margin && g >= from - 0.1f
+                        && (HardAhead <= 0f || v <= SafeSpeed(ov[j, s], others[j].Braking, g - CarL - 0.5f * margin))) tuck = true;
                     if (!tuck && Tow > 0f && towZone && from > 0.7f * CarL && g > CarL + margin + Tow * v
                         && v <= SafeSpeed(ov[j, s], others[j].Braking, g - CarL - margin)) tuck = true;
                     bool escape = Escape > 0f && escapeZone && from > 0.7f * CarL && apart > start + 0.05f && g > CarL + margin + Escape * headway * v;
@@ -1048,6 +1053,7 @@ namespace TarmacGauntlet.Raceday
         }
         private static readonly bool Free = Knob("FREE", 1f) > 0f;
         private static readonly float FreeOff = Knob("FREEOFF", 0f);
+        private static readonly bool BrakeLegal = Knob("BRAKELEGAL", 1f) > 0f;
         private static readonly bool EndWait = Knob("ENDWAIT", 1f) > 0f;
         /// <summary>Cost a metre still off the line at the next braking zone, and how early it must be back, s.</summary>
         private static readonly float InPlace = Knob("INPLACE", 0.1f), InPlaceLead = Knob("INLEAD", 0.3f);
