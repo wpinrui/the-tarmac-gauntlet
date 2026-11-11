@@ -77,6 +77,17 @@ static partial class Check
             {
                 Contact c = r.Contacts[seen];
                 lap1.Add(byName[c.A].Laps == 0 || byName[c.B].Laps == 0);
+                if (Environment.GetEnvironmentVariable("PACK_CONTACTS") != null)
+                {
+                    string Path(Racer x)
+                    {
+                        var ch = x.Craft.Chooser; var k = ch?.Chosen;
+                        if (k == null) return $"{r.Name(x)} no plan{(x.Ghost ? " ghost" : "")}{(x.Rejoin.Busy ? " rejoin" : "")}";
+                        return $"{r.Name(x)} {k.Pedal}{(k.Follow ? "F" : "")}{(k.Fixed ? "f" : "")}{(k.Delay > 0 ? "d" : "")} {k.Shift:0.0} {(k.Rejected ?? "ok")} {(x.Pilot.Index >= 0 && TarmacGauntlet.Raceday.PathChooser.FreeStretchAt(x.Pilot) ? "free" : "corner")} v{x.Car.Speed * 3.6f:0} lat{x.Car.Lateral:0.0}";
+                    }
+                    Racer xa = byName[c.A], xb = byName[c.B];
+                    Console.WriteLine($"  CONTACT {Race.Clock(c.Time)} {c.Speed:0.0} m/s gap {Gap(xb.Distance - xa.Distance):0.0} | {Path(xa)} | {Path(xb)}");
+                }
             }
             return false;
         }, minutes * 60f);
