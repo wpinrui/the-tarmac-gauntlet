@@ -37,8 +37,21 @@ def section(p):
 def curves(stations):
     st = sorted(stations, key=lambda r: r["x"])
     xs = np.array([r["x"] for r in st])
-    cv = {"zc": monotone(list(zip(xs, [r["zc"] for r in st])))}
-    R = np.array([r["r"] for r in st])
+    zc = np.array([r["zc"] for r in st], float)
+    # the nose only falls towards its tip: where a measured section's top rises above the one
+    # behind it, lower the section
+    for i in range(1, len(st)):
+        if xs[i] > xs.max() - 0.35:
+            excess = (zc[i] + st[i]["r"][-1]) - (zc[i - 1] + st[i - 1]["r"][-1])
+            if excess > 0:
+                zc[i] -= excess
+    cv = {"zc": monotone(list(zip(xs, zc)))}
+    R = np.array([r["r"] for r in st], float)
+    # round the nose: the grille's filled top edge leaves a ragged lip across the angles there
+    nose = xs > xs.max() - 0.35
+    from scipy.ndimage import gaussian_filter
+    k = int(np.argmax(nose)) - 4                       # a few stations behind, so the blend is smooth
+    R[k:] = gaussian_filter(R[k:], (2.0, 1.5), mode="nearest")
     cv["r"] = [monotone(list(zip(xs, R[:, j]))) for j in range(R.shape[1])]
     return xs, cv
 
@@ -51,10 +64,11 @@ XS, CV = curves(ROWS["stations"])
 NOSE, TAIL = float(XS[-1]), float(XS[0])
 
 
-def loft(sec_at, x0, x1, step, centre=None):
-    """Rings along x, closed by a fan at each end, round centre(x) as (y, z) when given."""
+def loft(sec_at, x0, x1, step, centre=None, even=False):
+    """Rings along x, closed by a fan at each end, round centre(x) as (y, z) when given.
+    The rings close up towards the ends unless even."""
     n = int(np.ceil((x1 - x0) / step)) + 1
-    t = (1 - np.cos(np.linspace(0, np.pi, n))) / 2       # closer rings at the ends
+    t = np.linspace(0, 1, n) if even else (1 - np.cos(np.linspace(0, np.pi, n))) / 2
     rings = []
     for x in x0 + (x1 - x0) * t:
         sec = sec_at(x)
@@ -63,9 +77,30 @@ def loft(sec_at, x0, x1, step, centre=None):
     return close_rings(rings, centres=ends)
 
 
+END_ROLL = 0.025      # the blunt ends roll over within this distance instead of a sharp edge
+
+
 def skin(step=0.016):
-    """The outer skin as one closed solid."""
-    return loft(lambda x: section(at(CV, x)), TAIL, NOSE, step)
+    """The outer skin as one closed solid. Within END_ROLL of each end the section is inset on
+    a quarter circle, so the bumper faces meet the sides on a rounded edge."""
+    from shapely.geometry import Polygon
+    from shapely.geometry.polygon import orient
+    n = len(section(at(CV, NOSE)))
+
+    def sec_at(x):
+        sec = section(at(CV, x))
+        over = max(x - (NOSE - END_ROLL), (TAIL + END_ROLL) - x, 0.0)
+        if over <= 0:
+            return sec
+        d = END_ROLL * (1 - np.sqrt(max(1 - (over / END_ROLL) ** 2, 0.0)))
+        g = Polygon(sec).buffer(0).buffer(-min(d, 0.9 * END_ROLL), join_style=1)
+        if g.is_empty:
+            return sec
+        if g.geom_type != "Polygon":
+            g = max(g.geoms, key=lambda q: q.area)
+        ring = even(np.array(orient(g, 1).exterior.coords)[:-1], n)   # anticlockwise, as section()
+        return ring
+    return loft(sec_at, TAIL, NOSE, step)
 
 
 def inside(x, inset):
@@ -133,6 +168,8 @@ def roof_curves():
     for j in range(R.shape[1]):                 # fill misses along the car
         col = R[:, j]; ok = ~np.isnan(col)
         R[:, j] = np.interp(xs, xs[ok], col[ok])
+    from scipy.ndimage import gaussian_filter, median_filter
+    R = gaussian_filter(median_filter(R, size=(3, 3), mode="nearest"), (1.0, 0.7), mode="nearest")
     return xs, [monotone(list(zip(xs, R[:, j]))) for j in range(R.shape[1])]
 
 

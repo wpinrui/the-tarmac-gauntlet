@@ -23,28 +23,49 @@ def copy(ob, name):
     return c
 
 
+def open_edges(ob):
+    import bmesh
+    bm = bmesh.new(); bm.from_mesh(ob.data)
+    n = sum(1 for e in bm.edges if not e.is_manifold)
+    bm.free()
+    return n
+
+
 def cut(target, cutters):
-    """Cut each cutter away. Exact booleans can fail on a near grazing cutter: then try the
-    hole tolerant mode, then nudge the cutter a fraction of a millimetre."""
+    """Cut each cutter away. Exact booleans can fail on a near grazing cutter or leave open
+    edges: then try the hole tolerant mode, then nudge the cutter a fraction of a millimetre,
+    and keep the try that leaves the fewest open edges. The target is triangulated first:
+    the exact solver mishandles some of the large faces earlier cuts leave."""
+    import bmesh
+    bm = bmesh.new(); bm.from_mesh(target.data)
+    bmesh.ops.triangulate(bm, faces=bm.faces)
+    bm.to_mesh(target.data); bm.free()
     for c in cutters:
-        name, n0 = c.name, len(target.data.polygons)
-        for k in range(4):
-            keep, extra = copy(target, "keep"), copy(c, name + "_try")
-            blend.boolean(target, extra, "DIFFERENCE", tolerant=k % 2 == 1)
+        name, n0, e0 = c.name, len(target.data.polygons), open_edges(target)
+        start, tries = target.data, []
+        for k in range(6):
+            target.data = start.copy()
+            blend.boolean(target, copy(c, name + "_try"), "DIFFERENCE", tolerant=k % 2 == 1)
             if len(target.data.polygons) >= 0.6 * n0:
-                bpy.data.objects.remove(keep)
-                break
-            target.data = keep.data
-            bpy.data.objects.remove(keep)
+                tries.append((open_edges(target), k, target.data))
+                if tries[-1][0] <= e0:
+                    break
             c.location.z += 0.0003
-        else:
+        if not tries:
             raise RuntimeError(f"cutting {name} wrecked {target.name}")
+        target.data = min(tries)[2]
+        if min(tries)[0] > e0:
+            print(f"cut {name}: open edges {e0} -> {min(tries)[0]}")
         bpy.data.objects.remove(c)
 
 
 def join(shell, part):
     """Union a part onto the body. Exact booleans can fail on near touching faces: then nudge
     the part a fraction of a millimetre and try again."""
+    import bmesh
+    bm = bmesh.new(); bm.from_mesh(shell.data)
+    bmesh.ops.triangulate(bm, faces=bm.faces)
+    bm.to_mesh(shell.data); bm.free()
     n0 = len(shell.data.polygons)
     for k in range(4):
         keep, extra = copy(shell, "keep"), copy(part, part.name + "_try")
@@ -90,6 +111,9 @@ def build(game=False):
     blend.paint(shell, "grille", lambda x, y, z: x > 1.6 and any(s.buffer(0.004).contains(Point(y, z)) for s in shapes)
                 and not plain_front(ref, x, y, z))
     join(shell, blend.union_all(parts.mirrors(), "mirrors"))
+    frame, sglass = parts.screen_parts(body.roof_curves()[1])
+    join(shell, frame)
+    out.append(sglass)
     mcut, mglass = parts.mirror_recess()
     cut(shell, mcut)
     out += mglass
@@ -103,14 +127,23 @@ def build(game=False):
 
     env, xs, rcv = parts.envelope()
     eref = blend.tree(env)
-    out += parts.screen_parts(eref, ref)
     out.append(parts.rear_view_mirror(eref))
     roofs = parts.roof_options(eref, xs, rcv, plain)
     bpy.data.objects.remove(env)
     print("roof options built")
 
-    out += parts.interior()
-    out += parts.wheels()
+    wheels = parts.wheels()
+    cabin, seats = parts.interior()
+    # the cabin panels follow the inside of the skin: trim them to stand just off it and the tyres
+    # the panels follow the room's walls; keep them and the hoops clear of the wheel tubs
+    arch, tubs = parts.arches()
+    for ob in arch:
+        bpy.data.objects.remove(ob)
+    for ob in [cabin] + [o for o in seats if o.name.startswith("hoop")]:
+        parts.stand_off(ob, *tubs)
+    for ob in tubs:
+        bpy.data.objects.remove(ob)
+    out += [cabin] + seats + wheels
     opts = parts.options(ref)
     for n, objs in roofs.items():
         for i, ob in enumerate(objs):
@@ -127,6 +160,7 @@ def build(game=False):
     bpy.data.objects.remove(plain)
     obs = [o for o in bpy.context.scene.objects if o.type == "MESH"]
     for ob in obs:
+        blend.tidy(ob)              # weld the near-coincident points booleans leave before writing
         blend.smooth(ob, 50 if ob.name.startswith("wheel_tyre") else 35)
     return obs
 

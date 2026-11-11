@@ -98,6 +98,19 @@ def to_plane(p3, dst):
 
 
 # ---------------------------------------------------------------- lamps
+GAP = 0.0015      # in-plane clearance between neighbouring pieces
+
+
+def apart(pieces):
+    """Each shape less the ones before it, kept GAP clear, so laid pieces never touch."""
+    out, taken = [], None
+    for g in pieces:
+        g = g if taken is None else g.difference(taken.buffer(GAP))
+        out.append(g)
+        taken = g if taken is None else taken.union(g)
+    return out
+
+
 def headlamps(ref, cutters, out):
     h = R["head"]
     shp = smooth2d(poly(h["outline"]), 0.004)
@@ -106,14 +119,15 @@ def headlamps(ref, cutters, out):
     # one projector, set in the widest part of the lamp ahead of the amber corner
     c = rest.buffer(-0.02).centroid if not rest.buffer(-0.02).is_empty else rest.centroid
     rad = min(0.034, max(0.018, 0.9 * rest.buffer(0).exterior.distance(c)))
+    ring = c.buffer(rad + 0.012, 48).difference(c.buffer(rad + 0.002, 48)).intersection(rest)
+    amber, lamp, ring = apart([amber, c.buffer(rad, 48).intersection(rest), ring])
     for sgn, side in ((1, "l"), (-1, "r")):
         fr = plane_fr(h, sgn)
         cutters += blend.lay(ref, f"cut_head_{side}", shp, fr, -0.016, 0.006, "housing", 0.008, along_ray=True)
-        out += blend.lay(ref, f"head_back_{side}", shp.buffer(-0.001), fr, -0.0152, -0.013, "housing", 0.008, along_ray=True)
-        out += blend.lay(ref, f"head_amber_{side}", amber, fr, -0.0128, -0.010, "amber", 0.006, along_ray=True)
-        ring = c.buffer(rad + 0.012, 48).difference(c.buffer(rad + 0.002, 48)).intersection(rest)
-        out += blend.lay(ref, f"head_reflector_{side}", ring, fr, -0.0128, -0.0108, "reflector", 0.004, along_ray=True)
-        out += blend.lay(ref, f"lamp_head_{side}", c.buffer(rad, 48).intersection(rest), fr, -0.0128, -0.0095, "lamp_head", 0.004, along_ray=True)
+        out += blend.lay(ref, f"head_back_{side}", shp.buffer(-0.001), fr, -0.0150, -0.0140, "housing", 0.008, along_ray=True)
+        out += blend.lay(ref, f"head_amber_{side}", amber, fr, -0.0130, -0.010, "amber", 0.006, along_ray=True)
+        out += blend.lay(ref, f"head_reflector_{side}", ring, fr, -0.0130, -0.0110, "reflector", 0.004, along_ray=True)
+        out += blend.lay(ref, f"lamp_head_{side}", lamp, fr, -0.0130, -0.0095, "lamp_head", 0.004, along_ray=True)
         out += blend.lay(ref, f"head_glass_{side}", shp.buffer(-0.002), fr, -0.0045, -0.0018, "head_glass", 0.008, along_ray=True)
 
 
@@ -128,16 +142,17 @@ def taillamps(ref, cutters, out):
     ac = Point(*to_plane(a3 + np.array([0, -0.14, 0]), t))
     ar = np.sqrt(amber.area / np.pi)
     brake = ac.buffer(ar, 48).intersection(inner)
+    rings = [d.buffer(0.009, join_style=1).difference(d.buffer(0.0015, join_style=1)).intersection(inner) for d in (amber, brake)]
+    amber, brake, ring_a, ring_b, red = apart([amber, brake, *rings, red])
     for sgn, side in ((1, "l"), (-1, "r")):
         fr = plane_fr(t, sgn)
         cutters += blend.lay(ref, f"cut_tail_{side}", shp, fr, -0.016, 0.006, "housing", 0.008, along_ray=True)
-        out += blend.lay(ref, f"tail_back_{side}", shp.buffer(-0.001), fr, -0.0152, -0.013, "housing", 0.008, along_ray=True)
-        out += blend.lay(ref, f"lamp_tail_{side}", red, fr, -0.0128, -0.0098, "lamp_tail", 0.005, along_ray=True)
-        out += blend.lay(ref, f"tail_amber_{side}", amber, fr, -0.0128, -0.0098, "amber", 0.004, along_ray=True)
-        for nm, disc in (("ring_a", amber), ("ring_b", brake)):
-            ring = disc.buffer(0.009, join_style=1).difference(disc.buffer(0.0015, join_style=1)).intersection(inner)
-            out += blend.lay(ref, f"tail_{nm}_{side}", ring, fr, -0.0128, -0.0108, "reflector", 0.004, along_ray=True)
-        out += blend.lay(ref, f"lamp_brake_{side}", brake, fr, -0.0128, -0.0098, "lamp_brake", 0.004, along_ray=True)
+        out += blend.lay(ref, f"tail_back_{side}", shp.buffer(-0.001), fr, -0.0150, -0.0140, "housing", 0.008, along_ray=True)
+        out += blend.lay(ref, f"lamp_tail_{side}", red, fr, -0.0130, -0.0098, "lamp_tail", 0.005, along_ray=True)
+        out += blend.lay(ref, f"tail_amber_{side}", amber, fr, -0.0130, -0.0098, "amber", 0.004, along_ray=True)
+        for nm, ring in (("ring_a", ring_a), ("ring_b", ring_b)):
+            out += blend.lay(ref, f"tail_{nm}_{side}", ring, fr, -0.0130, -0.0110, "reflector", 0.004, along_ray=True)
+        out += blend.lay(ref, f"lamp_brake_{side}", brake, fr, -0.0130, -0.0098, "lamp_brake", 0.004, along_ray=True)
         out += blend.lay(ref, f"tail_glass_{side}", shp.buffer(-0.002), fr, -0.0045, -0.0018, "tail_glass", 0.008, along_ray=True)
 
 
@@ -187,50 +202,262 @@ def envelope():
     return blend.make("envelope", v, f, "trim"), xs, rcv
 
 
-def screen_shapes():
-    """In plan: the frame round the sides and top, the black band, the glass. The base tucks
-    under the cowl, clear of the roof surface's front end."""
+SCREEN_FRAME = 0.035     # frame width round the glass, along the surface
+SCREEN_BAND = 0.012      # how far the frame laps over the glass
+SCREEN_FOOT = 0.56       # the screen runs on to here, under the cowl, and is trimmed by the body
+
+
+def _arc(rcv, x, n=400):
+    """The roof surface's left half section at x, top centre first: (y, z) points and the
+    distance along the surface from the top centre."""
+    th = np.linspace(0.02, np.pi / 2 - 0.01, len(rcv))
+    r = np.array([max(float(f(x)), 0.01) for f in rcv])
+    t = np.linspace(np.pi / 2, 0.02, n)
+    rr = np.interp(t, th, r)
+    pts = np.column_stack([rr * np.cos(t), BELT + rr * np.sin(t)])
+    pts[0, 0] = 0.0
+    s = np.concatenate([[0], np.cumsum(np.linalg.norm(np.diff(pts, axis=0), axis=1))])
+    return pts, s
+
+
+def _glass_s(rcv):
+    """Distance along the surface from the top centre to the glass's side edge, by x."""
     sc = poly(R["screen"]["outline"]).convex_hull
-    base = R["roof"]["x1"] - 0.04
-    sc = sc.intersection(box(R["screen"]["x_top"] - 0.005, -2, base, 2))
-    frame = sc.buffer(0.03, join_style=1).intersection(box(-5, -2, base, 2))
-    glass = sc.buffer(-0.012, join_style=1).union(sc.intersection(box(base - 0.03, -2, base, 2)).buffer(-0.012).buffer(0.012))
-    glass = glass.intersection(sc.buffer(-0.012).union(box(base - 0.04, -0.4, base, 0.4)).buffer(0))
-    return frame, sc, glass
-
-
-def screen_parts(env_bvh, ref):
-    """Windscreen: a body-colour frame, a black band round the glass, the glass. Its foot is
-    drawn down onto the body, fading out towards the top."""
-    fr = top_fr()
-    frame, sc, glass = screen_shapes()
-    out = blend.lay(env_bvh, "screen_frame", frame.difference(sc), fr, -0.004, 0.006, "body", 0.01)
-    out += blend.lay(env_bvh, "screen_band", sc.difference(glass), fr, -0.004, 0.003, "trim", 0.008)
-    out += blend.lay(env_bvh, "screen_glass", glass, fr, -0.004, 0.0, "glass", 0.02)
     x_top = R["screen"]["x_top"]
-    for ob in out:
-        _seat(ob, ref, x_top)
-    return out
+    x_hi = sc.bounds[2] - 0.005
+
+    def S(x):
+        xc = min(max(x, x_top), x_hi)
+        cut = sc.intersection(LineString([(xc, -2), (xc, 2)]))
+        w = cut.bounds[3] if not cut.is_empty else 0.3
+        pts, s = _arc(rcv, x)
+        w = min(w, pts[:, 0].max() - SCREEN_FRAME - 0.02)
+        k = int(np.argmax(pts[:, 0] >= w)) if (pts[:, 0] >= w).any() else len(s) - 1
+        return float(s[k])
+    return S
 
 
-def _seat(ob, ref, x_top):
-    """Lower each point by the gap to the body under the screen's foot, less towards the top."""
-    from mathutils import Vector
-    me = ob.data
-    x_foot = R["roof"]["x1"] - 0.04
-    gaps = []
-    for y in np.linspace(-0.6, 0.6, 25):
-        loc = blend.cast(ref, top_fr(), x_foot - 0.06, y)[0]
-        if loc is not None:
-            gaps.append(loc[2])
-    body_z = float(np.median(gaps)) if gaps else BELT
-    zs = np.array([v.co.z for v in me.vertices])
-    xs = np.array([v.co.x for v in me.vertices])
-    foot = zs[xs > x_foot - 0.12].min() if (xs > x_foot - 0.12).any() else body_z
-    drop = max(0.0, foot - body_z - 0.004)
-    for v in me.vertices:
-        w = np.clip((v.co.x - x_top - 0.1) / (x_foot - x_top - 0.1), 0, 1)
-        v.co.z -= drop * w
+class _Surface:
+    """The roof surface over the screen, mapped by (t, s): t the distance along the centre line
+    from the screen's top (forward positive), s the signed distance along the section from the
+    centre. Both are lengths on the surface, so offsets in (t, s) come out even all round."""
+
+    def __init__(self, rcv, x0, x1):
+        from scipy.interpolate import RegularGridInterpolator as RGI
+        self.xg = np.arange(x0, x1, 0.002)
+        sg = np.linspace(0.0, 0.9, 451)
+        Y = np.zeros((len(self.xg), len(sg))); Z = np.zeros_like(Y)
+        for i, x in enumerate(self.xg):
+            pts, s = _arc(rcv, x)
+            Y[i] = np.interp(sg, s, pts[:, 0]); Z[i] = np.interp(sg, s, pts[:, 1])
+        self.fy, self.fz = RGI((self.xg, sg), Y), RGI((self.xg, sg), Z)
+        c = np.column_stack([self.xg, Z[:, 0]])
+        tg = np.concatenate([[0], np.cumsum(np.linalg.norm(np.diff(c, axis=0), axis=1))])
+        self.tg = tg - np.interp(R["screen"]["x_top"], self.xg, tg)
+
+    def x(self, t):
+        return np.interp(t, self.tg, self.xg)
+
+    def t(self, x):
+        return np.interp(x, self.xg, self.tg)
+
+    def point(self, t, s):
+        x = self.x(t)
+        q = np.column_stack([x, np.minimum(np.abs(s), 0.9)])
+        return np.column_stack([x, np.sign(s) * self.fy(q), self.fz(q)])
+
+    def at(self, t, s, d):
+        """Points d off the surface along its normal, outward."""
+        h = 0.002
+        p = self.point(t, s)
+        n = np.cross(self.point(t + h, s) - self.point(t - h, s), self.point(t, s + h) - self.point(t, s - h))
+        n /= np.linalg.norm(n, axis=1, keepdims=True)
+        n *= np.sign(n[:, 2])[:, None]
+        return p + np.asarray(d)[:, None] * n
+
+
+def _glass_outline(rcv, srf):
+    """The glass in (t, s): the screen's outline, kept where the roof surface stands clear of
+    the body, with smooth rounded corners."""
+    from scipy.ndimage import gaussian_filter1d
+    G = _glass_s(rcv)
+    edge = np.array(_cover_edge(0.0, 0.0, 0.006))
+    x_top = R["screen"]["x_top"]
+    xs = np.arange(x_top, float(edge[-1, 0]), 0.005)
+    h = []
+    for x in xs:
+        pts, s = _arc(rcv, x)
+        h.append(min(G(x), float(np.interp(np.interp(x, edge[:, 0], edge[:, 1]), pts[:, 0], s))) - 0.004)
+    h = np.array(h)
+    k = int(np.argmax(h)); stop = k + int(np.argmax(h[k:] < 0.15)) if (h[k:] < 0.15).any() else len(h)
+    xs, h = xs[:stop], gaussian_filter1d(h[:stop], 2.0, mode="nearest")
+    t = srf.t(xs)
+    g = Polygon([(a, -b) for a, b in zip(t, h)] + [(a, b) for a, b in zip(t[::-1], h[::-1])]).buffer(0)
+    return smooth2d(g, 0.01).buffer(-0.05, join_style=1).buffer(0.05, join_style=1)
+
+
+def _loop(g, n):
+    """n even points round g's outline, counter clockwise, with outward normals, in (t, s)."""
+    from shapely.geometry.polygon import orient
+    from scipy.ndimage import gaussian_filter1d
+    p = body.even(np.array(orient(g, 1).exterior.coords)[:-1], n)
+    tan = gaussian_filter1d(np.roll(p, -1, 0) - np.roll(p, 1, 0), 2.0, axis=0, mode="wrap")
+    nrm = np.column_stack([tan[:, 1], -tan[:, 0]])
+    return p, nrm / np.linalg.norm(nrm, axis=1, keepdims=True)
+
+
+def _top_z(x, y):
+    """Height of the plain skin's top at (x, y), or None off its edge."""
+    h = body.half(body.at(body.CV, x))
+    top = h[h[:, 1] > BELT - 0.1]
+    top = top[np.argsort(top[:, 0])]
+    y = abs(y)
+    if not len(top) or y > top[-1, 0] - 0.01:
+        return None
+    return float(np.interp(y, top[:, 0], top[:, 1]))
+
+
+def screen_parts(rcv):
+    """Windscreen: the surround (A-pillars, header and the rail along the glass foot) as one
+    smooth body-colour solid, swept round the glass and lapping over its edge, to join into
+    the body; and the glass, seated under the lap."""
+    x_top = R["screen"]["x_top"]
+    srf = _Surface(rcv, x_top - 0.15, SCREEN_FOOT + 0.1)
+    g = _glass_outline(rcv, srf)
+    p, nrm = _loop(g, 480)
+    F, L = SCREEN_FRAME, SCREEN_BAND
+    # the surround's section: (offset out from the glass edge, height off the surface), a
+    # rounded top lapping the glass, the underside reaching down into the body
+    top = [(o, 0.0015 + 0.0115 * np.sqrt(max(0.0, 1 - ((o - (F - L) / 2) / ((F + L) / 2)) ** 2)) ** 0.8)
+           for o in np.linspace(-L, F, 15)]
+    top[0] = (-L, 0.0015 + 0.002); top[-1] = (F, -0.004)
+    prof = [(-L, 0.0015)] + top + [(F, -0.03), (GAP, -0.03), (GAP, 0.0015)]
+    rings = []
+    for o, d in prof:
+        q = p + o * nrm
+        rings.append(srf.at(q[:, 0], q[:, 1], np.full(len(q), d)))
+    # near the body the underside drops onto it, so the surround stands on the body as one
+    # piece, and its outer side flares out in plan as it drops, meeting the body in a fillet;
+    # well above the body (header, upper pillars) it keeps its own depth
+    from scipy.ndimage import gaussian_filter1d
+    jo, ji = len(prof) - 3, len(prof) - 2
+    q2 = p + (F + 0.01) * nrm
+    dirn = np.nan_to_num(srf.at(q2[:, 0], q2[:, 1], np.full(len(q2), -0.03))[:, :2] - rings[jo][:, :2])
+    dirn /= np.maximum(np.linalg.norm(dirn, axis=1, keepdims=True), 1e-9)
+    w = np.zeros(len(p))
+    for i, (x, y, z) in enumerate(rings[jo]):
+        zb = _top_z(x, y)
+        if zb is not None:
+            w[i] = np.clip((0.10 - (z - zb)) / 0.05, 0.0, 1.0)
+    w = gaussian_filter1d(w, 3.0, mode="wrap")
+    for j, flare in ((jo, 0.045), (ji, 0.0)):
+        pts = rings[j].copy()
+        for i in range(len(p)):
+            if w[i] < 1e-3:
+                continue
+            x, y, z = pts[i]
+            x2, y2 = np.array([x, y]) + flare * w[i] * dirn[i]
+            zb = _top_z(x2, y2)
+            if zb is None:
+                x2, y2 = x, y; zb = _top_z(x, y)
+            if zb is not None:
+                pts[i] = (x2, y2, (1 - w[i]) * z + w[i] * min(z, zb - 0.015))
+        rings[j] = pts
+    # the fillet: points from the outer edge down to the flared foot, dropping first, then out
+    a, b = rings[jo - 1], rings[jo]
+    fil = []
+    for k in (0.2, 0.4, 0.6, 0.8):
+        e_xy, e_z = k ** 2, 1 - (1 - k) ** 2
+        fil.append(np.column_stack([a[:, :2] + (b[:, :2] - a[:, :2]) * e_xy, a[:, 2] + (b[:, 2] - a[:, 2]) * e_z]))
+    rings = rings[:jo] + fil + rings[jo:]
+    m = len(rings)
+    verts = rings
+    verts = np.stack(verts, axis=1).reshape(-1, 3)          # loop point i, section point j -> i * m + j
+    n = len(p)
+    f = [(i * m + j, ((i + 1) % n) * m + j, ((i + 1) % n) * m + (j + 1) % m, i * m + (j + 1) % m)
+         for i in range(n) for j in range(m)]
+    frame = blend.make("screen_frame", verts, f, "body")
+
+    # the glass: rings shrinking to the middle, top and bottom sheets and the edge
+    c = np.array(g.centroid.coords[0])
+    K = 12
+    top, bot = [], []
+    for k in range(K):
+        q = c + (p - c) * (1 - k / K)
+        top.append(srf.at(q[:, 0], q[:, 1], np.zeros(n)))
+        bot.append(srf.at(q[:, 0], q[:, 1], np.full(n, -0.004)))
+    ct = srf.at(np.array([c[0]]), np.array([c[1]]), np.zeros(1))
+    cb = srf.at(np.array([c[0]]), np.array([c[1]]), np.full(1, -0.004))
+    v = np.vstack(top + bot + [ct, cb])
+    T, B, CT, CB = 0, K * n, 2 * K * n, 2 * K * n + 1
+    f = []
+    for base, flip, ctr in ((T, False, CT), (B, True, CB)):
+        for k in range(K - 1):
+            for i in range(n):
+                q = (base + k * n + i, base + k * n + (i + 1) % n, base + (k + 1) * n + (i + 1) % n, base + (k + 1) * n + i)
+                f.append(q[::-1] if flip else q)
+        for i in range(n):
+            q = (base + (K - 1) * n + i, base + (K - 1) * n + (i + 1) % n, ctr)
+            f.append(q[::-1] if flip else q)
+    for i in range(n):
+        f.append((T + i, B + i, B + (i + 1) % n, T + (i + 1) % n))
+    glass = blend.make("screen_glass", v, f, "glass")
+    return frame, glass
+
+
+def bpy_new_mesh(name):
+    import bpy
+    return bpy.data.meshes.new(name)
+
+
+def stand_off(ob, *bodies, d=0.003):
+    """Cut ob back to stand d clear of each body."""
+    for b in bodies:
+        blend.boolean(ob, blend.inflate(b, d), "DIFFERENCE")
+
+
+def grown_skin(x0, x1, d=0.003, step=0.01):
+    """The plain skin between x0 and x1 grown by d, lofted from its sections: a clean solid
+    to cut a part back with, so it stands just off the body."""
+    from shapely.geometry import Polygon as P
+    rings = []
+    for x in np.arange(x0, x1 + step / 2, step):
+        g = P(body.section(body.at(body.CV, x))).buffer(0).buffer(d, join_style=1)
+        ring = body.even(np.array(g.exterior.coords)[:-1], 160)
+        rings.append(np.column_stack([np.full(160, x), ring]))
+    v, f = geom.close_rings(rings)
+    return blend.make("grown_skin", v, f, "trim")
+
+
+def off_skin(ob, d=0.003):
+    """Cut ob back to stand d clear of the plain skin."""
+    xs = [v.co.x for v in ob.data.vertices]
+    # stations off the round numbers parts end on, so no ring lands on a part's end face
+    x0 = max(np.floor((min(xs) - 0.05) / 0.01) * 0.01 + 0.0047, TAIL + 0.002)
+    x1 = min(max(xs) + 0.05, NOSE - 0.002)
+    blend.boolean(ob, grown_skin(x0, x1, d), "DIFFERENCE")
+
+
+def _prism(shape, z0, z1):
+    """shape (in plan, x and y) stood up from z0 to z1 as a closed solid. The ends are proper
+    triangulations, so a shape that is far from convex still makes a sound solid."""
+    import bmesh
+    from shapely.geometry.polygon import orient
+    shape = shape.intersection(box(-3, -2, 3, 2))
+    me = bpy_new_mesh("prism")
+    bm = bmesh.new()
+    for g in getattr(shape, "geoms", [shape]):
+        loop = geom.resample(np.array(orient(g, 1).exterior.coords), 0.01)[:-1]
+        vs = [bm.verts.new((float(x), float(y), z0)) for x, y in loop]
+        face = bm.faces.new(vs)
+        ext = bmesh.ops.extrude_face_region(bm, geom=[face])
+        for v in ext["geom"]:
+            if isinstance(v, bmesh.types.BMVert):
+                v.co.z = z1
+    bmesh.ops.triangulate(bm, faces=bm.faces)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(me); bm.free()
+    return blend.adopt("prism", me, "trim")
 
 
 def side_glass_shape():
@@ -244,18 +471,15 @@ def rear_glass_shape():
 
 def roof_shell(xs, rcv, plain, mat):
     """The top as a shell 18 mm thick, behind the windscreen, standing on the body."""
-    x_front = R["screen"]["x_top"] + 0.02
+    x_front = R["screen"]["x_top"] - SCREEN_FRAME - 0.004     # just behind the frame
     x0 = float(xs[0])
     v, f = body.loft(lambda x: body.roof_section(rcv, x, BELT, drop=0.12), x0, x_front, 0.02,
-                  centre=lambda x: (0.0, BELT))
+                  centre=lambda x: (0.0, BELT), even=True)
     outer = blend.make("roof_outer", v, f, mat)
     v, f = body.loft(lambda x: body.roof_section(rcv, x, BELT, drop=0.2, grow=-0.018), x0 - 0.05, x_front + 0.05, 0.02,
-                  centre=lambda x: (0.0, BELT))
+                  centre=lambda x: (0.0, BELT), even=True)
     blend.boolean(outer, blend.make("roof_inner", v, f, mat), "DIFFERENCE")
-    keep = plain.copy(); keep.data = plain.data.copy()
-    import bpy
-    bpy.context.scene.collection.objects.link(keep)
-    blend.boolean(outer, keep, "DIFFERENCE")                # stands on the body, no overlap
+    off_skin(outer)
     return outer
 
 
@@ -273,13 +497,15 @@ def roof_options(env_bvh, xs, rcv, plain):
             blend.boolean(top, c, "DIFFERENCE")
         objs = [top]
         for sgn, side in ((1, "l"), (-1, "r")):
-            objs += blend.lay(env_bvh, f"roof_side_glass_{side}", sg.buffer(0.006), side_fr(sgn), -0.012, -0.008, "glass", 0.02, along_ray=True)
+            objs += blend.lay(env_bvh, f"roof_side_glass_{side}", sg.buffer(-0.002), side_fr(sgn), -0.012, -0.008, "glass", 0.02, along_ray=True)
             if n == 3:
-                band = sg.buffer(0.012).difference(sg.buffer(-0.002))
-                objs += blend.lay(env_bvh, f"roof_side_band_{side}", band, side_fr(sgn), 0.0005, 0.0025, "trim", 0.008)
-        objs += blend.lay(env_bvh, "roof_rear_glass", rg.buffer(0.006), rear_fr(), -0.012, -0.008, "glass", 0.02, along_ray=True)
+                band = sg.buffer(0.012).difference(sg.buffer(-0.002)).intersection(box(-5, BELT + 0.02, 5, 5))
+                objs += blend.lay(env_bvh, f"roof_side_band_{side}", band, side_fr(sgn), 0.0015, 0.0035, "trim", 0.008)
+        objs += blend.lay(env_bvh, "roof_rear_glass", rg.buffer(-0.002), rear_fr(), -0.012, -0.008, "glass", 0.02, along_ray=True)
         opts[n] = objs
-    opts[2] = [boot_cover()]
+    cover = boot_cover()
+    off_skin(cover)
+    opts[2] = [cover]
     return opts
 
 
@@ -320,6 +546,40 @@ def cockpit_half(x):
     return max(y, 0.2)
 
 
+def screen_cover(extra=0.0, inset=0.01, thresh=0.006):
+    """In plan: behind the screen's top, and ahead of it where the roof surface stands clear
+    of the body. The cockpit opening keeps inside it, so its front edge hides under the glass."""
+    side = _cover_edge(extra, inset, thresh)
+    x_top = R["screen"]["x_top"]
+    return Polygon([(-5, -5), (x_top, -5)] + [(x, -y) for x, y in side] + [(x, y) for x, y in side[::-1]]
+                   + [(x_top, 5), (-5, 5)]).buffer(0)
+
+
+def _cover_edge(extra=0.0, inset=0.01, thresh=0.006):
+    """(x, half width) ahead of the screen's top where the roof surface stands thresh clear of
+    the body, out to extra beyond the glass edge, less inset."""
+    xs, rcv = body.roof_curves()
+    G = _glass_s(rcv)
+    x_top = R["screen"]["x_top"]
+    edge = []
+    for x in np.arange(x_top, SCREEN_FOOT, 0.005):
+        pts, s = _arc(rcv, x)
+        yg = float(np.interp(G(x) + extra, s, pts[:, 0])) - inset
+        h = body.half(body.at(body.CV, x))
+        top = h[h[:, 1] > BELT - 0.1]                       # the body's top surface, centre outwards
+        ok = 0.0
+        for y in np.arange(0.0, yg, 0.005):
+            z_env = np.interp(y, pts[::-1, 0] if pts[-1, 0] < pts[0, 0] else pts[:, 0], pts[::-1, 1] if pts[-1, 0] < pts[0, 0] else pts[:, 1])
+            z_body = np.interp(y, top[::-1, 0], top[::-1, 1])
+            if z_env < z_body + thresh:
+                break
+            ok = y
+        if ok < 0.05:
+            break
+        edge.append((x, ok - inset))
+    return edge
+
+
 def cockpit_cutters():
     """The cockpit as two cutters: the room inside the body below the door tops, and the
     opening through the door tops and deck seen from above."""
@@ -335,7 +595,7 @@ def cockpit_cutters():
     room = blend.make("cockpit_room", v, f, "interior")
     xs = np.linspace(COCKPIT_X[0], COCKPIT_X[1], 80)
     plan = Polygon([(x, cockpit_half(x)) for x in xs] + [(x, -cockpit_half(x)) for x in xs[::-1]])
-    plan = orient(plan.buffer(0), 1)
+    plan = orient(plan.intersection(screen_cover()).buffer(0), 1)
     loop = geom.resample(np.array(plan.exterior.coords), 0.01)[:-1]
     rings = [np.column_stack([loop, np.full(len(loop), z)]) for z in (BELT - 0.09, 2.0)]
     v, f = geom.close_rings(rings)
@@ -373,21 +633,68 @@ def grooves(ref):
         ring = np.roll(ring, -a, axis=0)
         b = (b - a) % len(ring)
         obs.append(blend.groove(ref, f"g_{name}_a", ring[: b + 3], top_fr()))
-        obs.append(blend.groove(ref, f"g_{name}_b", np.vstack([ring[b - 2:], ring[:3]]), top_fr()))
+        # the second half a hair narrower and shallower, so where they overlap its walls lie
+        # inside the first half's groove instead of on top of its walls
+        obs.append(blend.groove(ref, f"g_{name}_b", np.vstack([ring[b - 2:], ring[:3]]), top_fr(),
+                                width=0.0056, depth=0.0055))
     return obs
 
 
 # ---------------------------------------------------------------- mirrors and exhaust
+def _mirror_rows():
+    """The measured slices, smoothed along the arm so neighbouring slices do not jump."""
+    rows = np.array(R["mirror"], float)
+    sm = rows.copy()
+    for j in range(1, 5):
+        col = np.pad(rows[:, j], 1, mode="edge")
+        sm[:, j] = (col[:-2] + 2 * col[1:-1] + col[2:]) / 4
+    sm[:, 1] = np.polyval(np.polyfit(rows[:, 0], rows[:, 1], 1), rows[:, 0])   # the back face is flat
+    for j in (3, 4):                                    # top and bottom run smoothly to the tip
+        sm[:, j] = np.polyval(np.polyfit(rows[:, 0], rows[:, j], 2), rows[:, 0])
+    return sm
+
+
+def _mirror_shape(x0, x1, z0, z1):
+    """A slice of the housing: flat at the back where the glass sits, rounded to the front."""
+    d, h, zc = x1 - x0, (z1 - z0) / 2, (z0 + z1) / 2
+    t = np.linspace(-np.pi / 2, np.pi / 2, 49)
+    k = 2 / 2.6                                       # a superellipse, fuller than an ellipse
+    front = np.column_stack([x0 + d * np.sign(np.cos(t)) * np.abs(np.cos(t)) ** k,
+                             zc + h * np.sign(np.sin(t)) * np.abs(np.sin(t)) ** k])
+    sh = Polygon(np.vstack([[x0, zc - h], front, [x0, zc + h]])).buffer(0)
+    r = min(0.012, h / 2.5, d / 3)
+    return sh.buffer(-r, join_style=1).buffer(r, join_style=1)
+
+
+def _rrect(x0, x1, z0, z1, r, n):
+    """n points round a rounded rectangle by arc length, from its bottom middle, anticlockwise."""
+    pts = [((x0 + x1) / 2, z0)]
+    for cx, cz, a0 in ((x1 - r, z0 + r, -np.pi / 2), (x1 - r, z1 - r, 0), (x0 + r, z1 - r, np.pi / 2), (x0 + r, z0 + r, np.pi)):
+        for a in np.linspace(a0, a0 + np.pi / 2, 9):
+            pts.append((cx + r * np.cos(a), cz + r * np.sin(a)))
+    pts.append(pts[0])
+    pts = np.array(pts)
+    s = np.concatenate([[0], np.cumsum(np.linalg.norm(np.diff(pts, axis=0), axis=1))])
+    t = np.linspace(0, s[-1], n, endpoint=False)
+    return np.column_stack([np.interp(t, s, pts[:, 0]), np.interp(t, s, pts[:, 1])])
+
+
 def _mirror_rings(sgn, inset=0.0, x_lo=None, x_hi=None, y_from=None):
-    rows = [r for r in R["mirror"] if y_from is None or r[0] >= y_from]
+    rows = [r for r in _mirror_rows() if y_from is None or r[0] >= y_from]
     rings = []
     for y, x0, x1, z0, z1 in rows:
-        a = x0 + inset if x_lo is None else x0 + x_lo
-        b = x1 - inset if x_hi is None else x0 + x_hi
-        sh = box(a, z0 + inset, b, z1 - inset)
-        rr = min(0.022, (b - a) / 2.2, (z1 - z0 - 2 * inset) / 2.2)
-        sh = sh.buffer(-rr, join_style=1).buffer(rr, join_style=1)
-        ring = body.even(np.array(sh.exterior.coords)[:-1], 64)
+        sh = _mirror_shape(x0, x1, z0, z1)
+        if inset:
+            sh = sh.buffer(-inset, join_style=1)
+        if x_lo is not None:            # a slab from x_lo behind the back face to x_hi into it
+            zb = sh.bounds
+            ring = _rrect(x0 + x_lo, x0 + x_hi, zb[1], zb[3], min(0.004, (x_hi - x_lo) / 3), 64)
+            rings.append(np.column_stack([ring[:, 0], np.full(64, y * sgn), ring[:, 1]]))
+            continue
+        if sh.geom_type != "Polygon":
+            sh = max(sh.geoms, key=lambda g: g.area)
+        c = np.array(sh.centroid.coords[0])           # start every ring at its own bottom middle
+        ring = body.even(np.array(sh.exterior.coords)[:-1] - c, 64) + c
         rings.append(np.column_stack([ring[:, 0], np.full(64, y * sgn), ring[:, 1]]))
     return rings
 
@@ -395,22 +702,33 @@ def _mirror_rings(sgn, inset=0.0, x_lo=None, x_hi=None, y_from=None):
 MIRROR_FOOT = 0.84
 
 
+MIRROR_Y0 = 0.778       # the housing starts here; inboard of it only the arm
+
+
 def mirrors():
-    """Each housing lofted through the measured slices, its root sunk into the door top."""
+    """Each housing lofted through the measured slices, rounded at both ends, on a short arm
+    down to the door's front top corner."""
     obs = []
     for sgn, side in ((1, "l"), (-1, "r")):
-        rings = _mirror_rings(sgn)
-        root = rings[0].copy(); root[:, 1] = (R["mirror"][0][0] - 0.03) * sgn
-        z0, z1 = root[:, 2].min(), root[:, 2].max()
-        root[:, 2] = MIRROR_FOOT + (root[:, 2] - z0) * (z1 - MIRROR_FOOT) / (z1 - z0)     # down onto the door
-        tip = rings[-1].copy()
-        c = tip.mean(0)
-        tip = c + (tip - c) * 0.6; tip[:, 1] = (R["mirror"][-1][0] + 0.006) * sgn
-        rings = [root] + rings + [tip]
+        rings = _mirror_rings(sgn, y_from=MIRROR_Y0)
+        ends = []
+        for ring, dy in ((rings[0], -0.008), (rings[-1], 0.006)):
+            c = ring.mean(0)
+            e = c + (ring - c) * 0.6
+            e[:, 1] = ring[0, 1] + dy * sgn
+            ends.append(e)
+        rings = [ends[0]] + rings + [ends[1]]
         if sgn < 0:
             rings = rings[::-1]
         v, f = geom.close_rings(rings)
-        obs.append(blend.make(f"mirror_{side}", v, f, "body"))
+        housing = blend.make(f"mirror_{side}", v, f, "body")
+        y0, x0, x1, z0, z1 = _mirror_rows()[1]
+        xa = x0 + 0.35 * (x1 - x0)
+        za, ya = BELT - 0.012, 0.705               # inside the door's top edge
+        path = geom.catmull_open([(xa, ya * sgn, za), (xa, (ya + 0.035) * sgn, za + 0.022),
+                                  (xa + 0.005, (y0 + 0.02) * sgn, z0 + 0.03)], 6)
+        blend.boolean(housing, _tube("arm", path, 0.012, "body"), "UNION")
+        obs.append(housing)
     return obs
 
 
@@ -420,8 +738,11 @@ def mirror_recess():
     cut, glass = [], []
     for sgn, side in ((1, "l"), (-1, "r")):
         for name, x_lo, x_hi, inset, out, mat in (("cut_mirror", -0.03, 0.008, 0.008, cut, "trim"),
-                                                   ("mirror_glass", 0.002, 0.005, 0.0095, glass, "mirror_glass")):
+                                                   ("mirror_glass", 0.002, 0.005, 0.012, glass, "mirror_glass")):
             rings = _mirror_rings(sgn, inset, x_lo, x_hi, y_from)[:-1]
+            if mat == "mirror_glass":
+                rings[0][:, 1] += 0.004 * sgn
+                rings[-1][:, 1] -= 0.004 * sgn
             if sgn < 0:
                 rings = rings[::-1]
             v, f = geom.close_rings(rings)
@@ -448,7 +769,7 @@ def exhaust():
         v, f = geom.lathe(prof, 48, axis="z")
         v = np.column_stack([e["x"] + v[:, 2], y + v[:, 0], e["z"] + v[:, 1]])
         pipes.append(blend.make(f"exhaust_{side}", v, f, "chrome"))
-        v, f = geom.disc((e["x"] + 0.13, y, e["z"]), (1, 0, 0), e["r"] + 0.005, 0.3)
+        v, f = geom.disc((e["x"] + 0.13, y, e["z"]), (1, 0, 0), e["r"] + 0.003, 0.3)
         cut.append(blend.make("cut_exhaust", v, f, "trim"))
     return cut, pipes
 
@@ -471,7 +792,7 @@ def _wall(name, x0, x1, clip, n=12, mat="interior"):
     """A panel following the inside of the body between x0 and x1, cut to clip(x)."""
     rings = []
     for x in np.linspace(x0, x1, n):
-        g = body.inside(x, 0.035 + 0.003).intersection(clip(x))
+        g = body.inside(x, 0.035 + 0.006).intersection(clip(x))
         if g.geom_type != "Polygon":
             g = max(getattr(g, "geoms", [g]), key=lambda q: q.area)
         ring = body.even(np.array(g.exterior.coords)[:-1], 64)
@@ -486,7 +807,7 @@ def _tube(name, path, r, mat):
     for i, p in enumerate(pts):
         t = pts[min(i + 1, len(pts) - 1)] - pts[max(i - 1, 0)]
         t /= np.linalg.norm(t)
-        a = np.cross(t, [1.0, 0, 0]); a /= np.linalg.norm(a)
+        a = np.cross(t, [1.0, 0, 0] if abs(t[0]) < 0.7 else [0, 0, 1.0]); a /= np.linalg.norm(a)
         b = np.cross(t, a)
         ang = np.linspace(0, 2 * np.pi, 20, endpoint=False)
         rings.append(np.array([p + r * (np.cos(q) * a + np.sin(q) * b) for q in ang]))
@@ -497,30 +818,39 @@ def _tube(name, path, r, mat):
 def interior():
     x_front, x_back = COCKPIT_X[1] - 0.004, COCKPIT_X[0] + 0.004
     fl = COCKPIT_FLOOR + 0.002
-    obs = [_wall("firewall", x_front - 0.008, x_front, lambda x: box(-1, fl, 1, BELT - 0.04), n=2),
-           _wall("bulkhead", x_back, x_back + 0.008, lambda x: box(-1, fl, 1, BELT - 0.04), n=2),
-           _wall("dash", 0.12, x_front - 0.0085, lambda x: box(-1, 0.62 + 0.12 * (x - 0.12) / 0.33, 1, BELT - 0.04), n=10)]
+    top = BELT - 0.055                                  # the room's top is BELT - 0.05
+    obs = [_wall("firewall", x_front - 0.008, x_front, lambda x: box(-1, fl, 1, top), n=2),
+           _wall("bulkhead", x_back, x_back + 0.008, lambda x: box(-1, fl, 1, top), n=2),
+           _wall("dash", 0.12, x_front - 0.0085, lambda x: box(-1, 0.62 + 0.12 * (x - 0.12) / 0.33, 1, top), n=10)]
     for sgn, side in ((1, "l"), (-1, "r")):
-        clip = lambda x, s=sgn: (box(0.3, 0.42, 1.2, BELT - 0.05) if s > 0 else box(-1.2, 0.42, -0.3, BELT - 0.05)).intersection(
-            body.inside(x, 0.035 + 0.003)).difference(body.inside(x, 0.035 + 0.03))
+        clip = lambda x, s=sgn: (box(0.3, 0.42, 1.2, top - 0.015) if s > 0 else box(-1.2, 0.42, -0.3, top - 0.015)).intersection(
+            body.inside(x, 0.035 + 0.009)).difference(body.inside(x, 0.035 + 0.036))
         obs.append(_wall(f"door_card_{side}", -0.72, 0.28, clip, n=12))
-        yc = 0.33 * sgn
-        obs.append(_rbox(f"seat_base_{side}", -0.62, -0.12, yc - 0.23, yc + 0.23, fl, 0.45))
-        obs.append(_rbox(f"seat_back_{side}", -0.76, -0.64, yc - 0.23, yc + 0.23, 0.451, 1.0, lean=0.2))
-        obs.append(_rbox(f"seat_wing_l_{side}", -0.78, -0.62, yc + 0.17, yc + 0.25, 0.5, 0.95, r=0.03, lean=0.2))
-        obs.append(_rbox(f"seat_wing_r_{side}", -0.78, -0.62, yc - 0.25, yc - 0.17, 0.5, 0.95, r=0.03, lean=0.2))
-        # roll hoop behind the seat, standing on the bulkhead's face
-        hx = x_back + 0.03
-        path = [(hx, yc - 0.17, BELT - 0.03), (hx, yc - 0.155, 1.06), (hx, yc - 0.11, 1.12),
-                (hx, yc, 1.135), (hx, yc + 0.11, 1.12), (hx, yc + 0.155, 1.06), (hx, yc + 0.17, BELT - 0.03)]
-        obs.append(_tube(f"hoop_{side}", geom.catmull_open(path, 6), 0.021, "trim"))
-    # steering wheel ahead of the right seat, and the rear view mirror under the screen's top
-    sw = []
+    # steering wheel behind the dash ahead of the right seat, on a column into the dash
     yc = -0.33
     ang = np.linspace(0, 2 * np.pi, 41)
-    ring = [(0.2 + 0.05 * np.sin(a), yc + 0.18 * np.cos(a), 0.74 + 0.17 * np.sin(a)) for a in ang]
-    obs.append(_tube("steering_wheel", np.array(ring), 0.016, "trim"))
-    return obs
+    ring = [(0.02 + 0.05 * np.sin(a), yc + 0.17 * np.cos(a), 0.74 + 0.16 * np.sin(a)) for a in ang]
+    wheel = _tube("steering_wheel", np.array(ring), 0.016, "trim")
+    col = _tube("column", np.array([(0.0, yc, 0.735), (0.2, yc, 0.70)]), 0.025, "trim")
+    hub = _tube("hub", np.array([(-0.005, yc, 0.74), (0.02, yc, 0.735)]), 0.06, "trim")
+    for ob in (wheel, hub):
+        blend.boolean(col, ob, "UNION")
+    obs.append(col)
+    cabin = blend.union_all(obs, "cabin")
+    seats = []
+    for sgn, side in ((1, "l"), (-1, "r")):
+        yc = 0.33 * sgn
+        seat = [_rbox(f"seat_base_{side}", -0.62, -0.12, yc - 0.23, yc + 0.23, fl, 0.45),
+                _rbox(f"seat_back_{side}", -0.76, -0.64, yc - 0.23, yc + 0.23, 0.44, 1.0, lean=0.2),
+                _rbox("wing", -0.78, -0.62, yc + 0.17, yc + 0.25, 0.5, 0.95, r=0.03, lean=0.2),
+                _rbox("wing", -0.78, -0.62, yc - 0.25, yc - 0.17, 0.5, 0.95, r=0.03, lean=0.2)]
+        seats.append(blend.union_all(seat, f"seat_{side}"))
+        # roll hoop just behind the seat, its legs down to the floor
+        hx = -0.93
+        path = [(hx, yc - 0.17, fl + 0.001), (hx, yc - 0.17, 0.80), (hx, yc - 0.155, 1.06), (hx, yc - 0.11, 1.12),
+                (hx, yc, 1.135), (hx, yc + 0.11, 1.12), (hx, yc + 0.155, 1.06), (hx, yc + 0.17, 0.80), (hx, yc + 0.17, fl + 0.001)]
+        seats.append(_tube(f"hoop_{side}", geom.catmull_open(path, 6), 0.021, "trim"))   # trimmed to the floor in export
+    return cabin, seats
 
 
 def rear_view_mirror(env_bvh):
@@ -632,7 +962,7 @@ def badge(ref, size, fr, a, b, up, name):
         g = g.buffer(-0.3 * 0.001 / size)
         if g.is_empty:
             continue
-        objs += _flat(ref, g, size, fr, a, b, up, f"{name}_{i}", 0.0030, 0.0040, m, 0.002)
+        objs += _flat(ref, g, size, fr, a, b, up, f"{name}_{i}", 0.0036, 0.0046, m, 0.002)
     return objs
 
 
