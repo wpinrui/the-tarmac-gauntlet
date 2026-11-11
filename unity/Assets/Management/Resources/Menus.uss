@@ -70,7 +70,9 @@
 
 /* Main menu: a tall glass column on the left edge */
 .main-column { position: absolute; left: 0; top: 0; bottom: 0; width: 470px; border-left-width: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; border-top-right-radius: 28px; border-bottom-right-radius: 28px; padding: 110px 56px; }
-.wordmark { height: 200px; margin-bottom: 80px; -unity-background-scale-mode: scale-to-fit; }
+.wordmark { width: 358px; height: 209.32px; margin-bottom: 80px; overflow: hidden; flex-shrink: 0; }
+.wordmark-layer { position: absolute; -unity-background-scale-mode: stretch-to-fill; }
+.wordmark-car { position: absolute; }
 .main-item { height: auto; padding: 12px 18px; margin-left: -18px; border-radius: 14px; font-size: 24px; letter-spacing: 0; }
 .main-item:hover { background-color: rgba(255, 255, 255, 0.2); }
 .main-item .label { font-size: 24px; }
