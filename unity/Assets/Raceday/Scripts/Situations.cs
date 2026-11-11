@@ -213,11 +213,12 @@ namespace TarmacGauntlet.Raceday
             },
             new Situation
             {
-                Id = "T3", Title = "fastest behind slowest in the twisty part", At = 980f, Seconds = 40f,
+                Id = "T3", Title = "fastest behind slowest in the twisty part", At = 700f, Seconds = 40f,
                 Cars = new[]
                 {
+                    // The slow car starts on the straight, so it brakes for Turn 2 itself.
                     new SituationCar { Model = "a-29" },
-                    new SituationCar { Model = "f-01", Ahead = 40f, Seed = 2 },
+                    new SituationCar { Model = "f-01", Ahead = 160f, Seed = 2 },
                 },
             },
             new Situation
@@ -259,12 +260,13 @@ namespace TarmacGauntlet.Raceday
             },
             new Situation
             {
-                Id = "T6c", Title = "two slow cars abreast into the corner", At = T7 - 300f, Seconds = 8f,
+                Id = "T6c", Title = "two slow cars abreast into the corner", At = T7 - 482f, Seconds = 10f,
                 Cars = new[]
                 {
+                    // 2 s further back than the cars meet, so the approach can be seen (Ivan).
                     new SituationCar { Model = "a-29" },
-                    new SituationCar { Model = "f-01", Ahead = 120f, Seed = 2 },
-                    new SituationCar { Model = "f-02", Ahead = 120f, Off = -4.5f, Seed = 3 },
+                    new SituationCar { Model = "f-01", Ahead = 213f, Seed = 2 },
+                    new SituationCar { Model = "f-02", Ahead = 213f, Off = -4.5f, Seed = 3 },
                 },
             },
             new Situation

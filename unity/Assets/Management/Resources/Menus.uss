@@ -11,7 +11,8 @@
 /* Glass */
 .glass { overflow: hidden; border-width: 1px; border-color: rgba(255, 255, 255, 0.2); border-top-color: rgba(255, 255, 255, 0.3); border-radius: 20px; }
 .glass-blur, .glass-sheen { position: absolute; -unity-background-scale-mode: stretch-to-fill; }
-.glass-sheen { left: 0; top: 0; right: 0; bottom: 0; }
+/* Dark glass, because all menu text is white: #0c0e0e at 66% under the sheen. */
+.glass-sheen { left: 0; top: 0; right: 0; bottom: 0; background-color: rgba(12, 14, 14, 0.66); }
 .glass-shadow { position: absolute; -unity-background-scale-mode: stretch-to-fill; -unity-slice-left: 32; -unity-slice-right: 32; -unity-slice-top: 32; -unity-slice-bottom: 32; }
 
 /* Top bar */
@@ -371,3 +372,114 @@
 /* Menu items with nothing behind them yet */
 .item.dim, .icon.dim { opacity: 0.35; }
 .item.dim:hover, .icon.dim:hover { background-color: rgba(0, 0, 0, 0); }
+
+/* Garage: the car workshop and both dealers (WorkshopPanel.cs, DealerPanel.cs, GarageUi.cs) */
+.g-root { flex-grow: 1; min-height: 0; }
+.g-scroll { flex-grow: 1; flex-shrink: 1; min-height: 0; }
+.g-block { flex-shrink: 0; margin-bottom: 12px; }
+.g-foot { flex-direction: row; flex-shrink: 0; margin-top: 4px; }
+.g-lbl { font-size: 13px; letter-spacing: 1px; color: rgba(255, 255, 255, 0.74); }
+.g-sec { flex-shrink: 0; margin-bottom: 6px; font-size: 13px; letter-spacing: 1.3px; color: rgba(255, 255, 255, 0.74); }
+.g-btn { flex-direction: row; align-items: center; justify-content: center; height: 36px; padding-left: 14px; padding-right: 14px; border-radius: 12px; background-color: rgba(255, 255, 255, 0.1); border-width: 1px; border-color: rgba(255, 255, 255, 0.14); }
+.g-btn:hover { background-color: rgba(255, 255, 255, 0.18); }
+.g-btn.disabled { opacity: 0.35; }
+.g-btn.disabled:hover { background-color: rgba(255, 255, 255, 0.1); }
+.g-btn-label { font-size: 14px; letter-spacing: 0.8px; -unity-text-align: middle-center; }
+.g-btn-money { margin-left: 6px; font-size: 14px; color: rgb(61, 220, 132); }
+.chevron.no { opacity: 0.3; }
+.chevron.no:hover { background-color: rgba(0, 0, 0, 0); }
+.g-qty { flex-direction: row; align-items: center; }
+.g-qty .chevron { width: 30px; height: 32px; }
+.g-qty-value { width: 26px; font-size: 16px; -unity-text-align: middle-center; }
+
+/* Stat rows: bar, potential ghost, value and the change against the race car */
+.g-stat { flex-direction: row; align-items: center; height: 22px; margin-bottom: 2px; }
+.g-stat-name { width: 150px; margin-right: 12px; font-size: 13px; letter-spacing: 1px; color: rgba(255, 255, 255, 0.74); }
+.g-stat-bar { flex-grow: 1; height: 6px; border-radius: 9px; background-color: rgba(255, 255, 255, 0.12); overflow: hidden; }
+.g-stat-bar.plain { visibility: hidden; }
+.g-stat-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 9px; }
+.g-ghost { position: absolute; top: 0; bottom: 0; border-top-right-radius: 9px; border-bottom-right-radius: 9px; background-color: rgba(255, 255, 255, 0.22); }
+.g-ghost.lit { background-color: rgba(255, 255, 255, 0.55); }
+.g-stat-value { width: 40px; margin-left: 12px; font-size: 15px; -unity-text-align: middle-right; }
+.g-stat-delta { width: 40px; margin-left: 12px; font-size: 13px; -unity-text-align: middle-right; }
+
+/* Tiles: upgrades, spare parts and tyre sets */
+.g-tiles { flex-direction: row; flex-shrink: 0; margin-bottom: 12px; }
+.g-tile { flex-grow: 1; flex-basis: 0; min-height: 46px; margin-right: 10px; padding: 10px 12px; border-radius: 12px; background-color: rgba(255, 255, 255, 0.06); border-width: 1px; border-color: rgba(255, 255, 255, 0); flex-direction: row; align-items: center; justify-content: space-between; }
+.g-tile.last { margin-right: 0; }
+.g-tile.got { background-color: rgba(255, 255, 255, 0.14); }
+.g-tile.pv { border-color: rgba(255, 255, 255, 0.35); }
+.g-tile.stack { flex-direction: column; align-items: stretch; justify-content: flex-start; }
+.g-tile-head { flex-direction: row; align-items: center; justify-content: space-between; height: 22px; }
+.g-tile-name { font-size: 13px; letter-spacing: 1px; white-space: nowrap; }
+.g-tile-price { font-size: 15px; color: rgba(255, 255, 255, 0.74); }
+.g-tick { width: 22px; height: 22px; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgb(61, 220, 132); }
+.g-tile .g-btn { margin-top: 8px; }
+.g-count { font-size: 20px; }
+.g-buy-row { flex-direction: row; align-items: center; margin-top: 8px; }
+.g-buy-row .g-btn { flex-grow: 1; margin-top: 0; margin-left: 10px; }
+
+/* Workshop */
+.g-head { flex-direction: row; align-items: center; flex-shrink: 0; margin-bottom: 12px; }
+.g-head-mid { flex-grow: 1; align-items: center; }
+.g-name { font-size: 22px; letter-spacing: 1.1px; -unity-text-align: middle-center; }
+.g-sub { flex-direction: row; align-items: center; margin-top: 6px; }
+.g-meta { margin-left: 12px; font-size: 14px; letter-spacing: 0.8px; color: rgba(255, 255, 255, 0.74); }
+.g-dots { flex-direction: row; align-items: center; margin-left: 12px; }
+.g-dot { width: 8px; height: 8px; margin-right: 6px; border-radius: 6px; background-color: rgba(255, 255, 255, 0.28); }
+.g-dot.on { background-color: rgb(255, 255, 255); }
+.g-dot.rc { width: 12px; height: 12px; margin-left: -2px; margin-right: 4px; border-width: 2px; border-color: rgb(225, 6, 0); }
+.g-cond { flex-direction: row; align-items: center; flex-shrink: 0; min-height: 36px; margin-bottom: 12px; }
+.g-cond-bar { flex-grow: 1; height: 8px; margin-left: 14px; border-radius: 9px; background-color: rgba(255, 255, 255, 0.12); overflow: hidden; }
+.g-cond-ghost { position: absolute; top: 0; bottom: 0; background-color: rgba(255, 255, 255, 0.4); }
+.g-cond-pc { width: 56px; font-size: 20px; -unity-text-align: middle-right; }
+.g-repair { flex-direction: row; align-items: center; margin-left: 14px; }
+.g-repair .g-lbl { margin-right: 4px; }
+.g-repair .g-btn { margin-left: 4px; }
+.g-race { flex-grow: 1; height: 52px; }
+.g-race .red-label { font-size: 18px; }
+.g-selected { flex-grow: 1; flex-direction: row; align-items: center; justify-content: center; height: 52px; border-radius: 20px; background-color: rgba(225, 6, 0, 0.22); border-width: 1px; border-color: rgba(255, 80, 70, 0.8); }
+.g-selected-icon { width: 24px; height: 24px; margin-right: 10px; -unity-background-scale-mode: scale-to-fit; }
+.g-selected-label { font-size: 18px; letter-spacing: 2.9px; }
+.g-sell { width: 240px; height: 52px; margin-left: 12px; border-radius: 20px; overflow: hidden; align-items: center; justify-content: center; background-color: rgba(255, 255, 255, 0.1); border-width: 1px; border-color: rgba(255, 255, 255, 0.14); }
+.g-sell:hover { background-color: rgba(255, 255, 255, 0.18); }
+.g-sell-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; -unity-background-scale-mode: stretch-to-fill; }
+.g-sell-label { font-size: 16px; letter-spacing: 1px; }
+
+/* Dealers */
+.g-seg { flex-direction: row; flex-shrink: 0; margin-bottom: 12px; padding: 4px; border-radius: 14px; background-color: rgba(255, 255, 255, 0.06); }
+.g-tab { flex-grow: 1; flex-basis: 0; height: 38px; margin-right: 4px; border-radius: 10px; align-items: center; justify-content: center; }
+.g-tab.last { margin-right: 0; }
+.g-tab:hover { background-color: rgba(255, 255, 255, 0.1); }
+.g-tab.on { background-color: rgba(255, 255, 255, 0.2); }
+.g-tab .cls { opacity: 0.5; }
+.g-tab:hover .cls, .g-tab.on .cls { opacity: 1; }
+.g-rows { flex-shrink: 0; margin-bottom: 12px; }
+.g-row { flex-direction: row; align-items: center; height: 32px; padding-left: 14px; padding-right: 14px; border-radius: 12px; }
+.g-row:hover { background-color: rgba(255, 255, 255, 0.1); }
+.g-row.on { background-color: rgba(255, 255, 255, 0.2); }
+.g-row.g-hd { height: 20px; }
+.g-row.g-hd:hover { background-color: rgba(0, 0, 0, 0); }
+.g-hd-cell { font-size: 12px; letter-spacing: 1.7px; color: rgba(255, 255, 255, 0.74); -unity-text-align: middle-right; }
+.g-hd-cell.g-c-name { -unity-text-align: middle-left; }
+.g-c-name { flex-grow: 1; flex-shrink: 1; min-width: 0; flex-direction: row; align-items: center; }
+.g-c-age { width: 64px; margin-left: 14px; }
+.g-c-cond { width: 92px; margin-left: 14px; }
+.g-c-price { width: 96px; margin-left: 14px; }
+.g-badge { width: 22px; height: 22px; margin-right: 10px; flex-shrink: 0; -unity-background-scale-mode: scale-to-fit; }
+.g-row-name { flex-shrink: 1; font-size: 15px; letter-spacing: 0.6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-row-price { font-size: 15px; color: rgb(61, 220, 132); -unity-text-align: middle-right; }
+.g-row-price.no { color: rgba(255, 255, 255, 0.42); }
+.g-row-meta { font-size: 14px; color: rgba(255, 255, 255, 0.74); -unity-text-align: middle-right; }
+.g-none { flex-shrink: 0; margin-bottom: 12px; padding: 6px 14px; font-size: 14px; color: rgba(255, 255, 255, 0.74); }
+.g-car { flex-direction: row; justify-content: space-between; align-items: flex-end; flex-shrink: 0; margin-bottom: 12px; padding-top: 4px; }
+.g-car-name { font-size: 26px; letter-spacing: 1px; }
+.g-car-sub { flex-direction: row; align-items: center; margin-top: 8px; }
+.g-car-price { font-size: 30px; color: rgb(61, 220, 132); -unity-text-align: middle-right; }
+.g-car-price.no { color: rgb(255, 90, 79); }
+.g-car-list { margin-top: 6px; font-size: 13px; letter-spacing: 0.8px; color: rgba(255, 255, 255, 0.74); -unity-text-align: middle-right; }
+.g-buy { flex-grow: 1; height: 52px; }
+.g-buy .red-label { font-size: 18px; }
+.g-full { flex-grow: 1; padding: 12px 18px; border-radius: 20px; border-width: 1px; border-color: rgba(255, 90, 79, 0.6); background-color: rgba(255, 90, 79, 0.14); }
+.g-full-title { font-size: 16px; letter-spacing: 1.9px; }
+.g-full-text { margin-top: 2px; font-size: 14px; color: rgba(255, 255, 255, 0.74); }
