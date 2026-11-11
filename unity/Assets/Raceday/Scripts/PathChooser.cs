@@ -61,6 +61,13 @@ namespace TarmacGauntlet.Raceday
         /// <summary>A moving ghost this close to the track, m, is planned round like any car (T17).</summary>
         private static readonly float GhostNear = Knob("GHOSTNEAR", 3f);
         private static readonly bool Commit = Knob("COMMIT", 1f) > 0f;
+        /// <summary>T9: H6 and defending judged on real pace (lap time), not only the closing speed of the moment.</summary>
+        private static readonly bool RealPace = Knob("REALPACE", 1f) > 0f;
+        /// <summary>T9: how much faster in real pace, m/s, a car behind must be for the car ahead to defend against it.</summary>
+        private static readonly float DefendThreat = Knob("DEFENDTHREAT", 0.5f);
+        /// <summary>T9: a car whose path takes it out from behind the car ahead moves out at the full rate, not the braking one.</summary>
+        public static readonly bool PullOutFree = Knob("PULLOUTFREE", 0f) > 0f;
+        private static readonly bool PreBreak = Knob("PREBREAK", 1f) > 0f;
         private static readonly bool AvoidGhosts = Knob("AVOIDGHOSTS", 1f) > 0f;
         /// <summary>H12: a recovering ghost keeps off the racing line, on its own side of it, until it is back up to speed (Ivan).</summary>
         private static readonly float AltLine = Knob("ALTLINE", 5f), AltClear = Knob("ALTCLEAR", CarW + RoomMargin + 1f);
@@ -206,9 +213,14 @@ namespace TarmacGauntlet.Raceday
                 float g = Road(o.Distance - me.Distance, lap);
                 bool lapping = o.Distance - me.Distance > lap * 0.5f;
                 if (g < -CarL && -g < 2f * Mathf.Max(mySpeed, 10f) && lapping) { lapped = true; lappingLateral = o.Lateral; }
-                if (g < -CarL && !lapping && -g < mySpeed * 1f && o.Speed > mySpeed - 5f && (!defending || g > attackerGap)) { defending = true; attackerGap = g; attackerLateral = o.Lateral; }
                 float closing = o.Speed - mySpeed;
-                if (g < -CarL && !lapping && closing > Endurance.NoDefendClosing && -g < closing * 2f) fastBehind = true;
+                // T9: how much faster the car behind really is, from its pace over a lap, not only how fast it
+                // closes this moment: one braking behind a train is no slower for it (Ivan).
+                float threat = RealPace && o.LapPace > 0f ? Mathf.Max(closing, mySpeed * (pilot.Profile.LapTime / o.LapPace - 1f)) : closing;
+                // Only a car with a real attacker behind defends: a train of equal cars doesn't all chop (T9).
+                bool attacker = !RealPace || threat > DefendThreat;
+                if (g < -CarL && !lapping && -g < mySpeed * 1f && o.Speed > mySpeed - 5f && attacker && (!defending || g > attackerGap)) { defending = true; attackerGap = g; attackerLateral = o.Lateral; }
+                if (g < -CarL && !lapping && threat > Endurance.NoDefendClosing && -g < threat * 2f) fastBehind = true;
                 if (g > CarL && g < mySpeed * 1f && o.Speed < freeSpeed) passing = true;
                 if (g > 0f && g < aheadGap && Mathf.Abs(o.Lateral - me.Lateral) < CarW + RoomMargin && !(stopped[j] && mySpeed < GhostCrawl + 1f)) { aheadGap = g; ahead = j; aheadInLane = o.Speed; }
                 if (g > CarL && g < wideGap && Mathf.Abs(o.Lateral - me.Lateral) < WideAhead * CarW) { wideGap = g; aheadWide = j; }
@@ -425,7 +437,8 @@ namespace TarmacGauntlet.Raceday
             float turnIn = NextCornerStart(c, Mathf.Repeat(d, lap));
             bool turnedIn = false;
             cand.Path[0] = new Vector2(d, lat);
-            cand.BrokeAt = Steps + 1;
+            // A path ruled out before it is driven breaks its limit at once: last in line when every path breaks one (T9).
+            cand.BrokeAt = PreBreak && cand.Rejected != null ? 0 : Steps + 1;
             for (int s = 1; s <= Steps; s++)
             {
                 int k = c.IndexOf(Mathf.Repeat(d, lap));

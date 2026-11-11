@@ -346,15 +346,20 @@ namespace TarmacGauntlet.Raceday
                 // towards it. TORCS's full braking and side steering stay underneath, below.
                 chooser ??= new PathChooser();
                 chooser.Plan(pilot, me, field, dt);
+                // The full brakes are the last resort: not for a car the chosen path, clear of every
+                // limit, moves out from behind, now or at its last safe moment.
+                if (Braking && chooser.Chosen != null && chooser.Chosen.Rejected == null
+                    && Mathf.Abs(brakeLateral - (line.Lateral[pilot.Index] + chooser.Chosen.Shift)) >= PathChooser.Clear(margin))
+                {
+                    Braking = false;
+                    // T9: not braking after all, so it moves out at the full rate, not the rate the brakes would leave (Ivan).
+                    if (PathChooser.PullOutFree) step = Endurance.OvertakeOffsetRate * dt;
+                }
                 pilot.Offset = Mathf.Clamp(Mathf.MoveTowards(pilot.Offset, chooser.Target, step), AiPilot.LaneShifts[0], AiPilot.LaneShifts[AiPilot.LaneShifts.Length - 1]);
                 Target = chooser.Target;
                 pilot.SpeedCap = chooser.Cap;
                 State = Mathf.Abs(pilot.Offset) > 0.5f ? Mode.Overtaking : Mode.Racing;
                 if (hasFront) { FrontGap = frontDistance; FrontId = front.Id; }
-                // The full brakes are the last resort: not for a car the chosen path, clear of every
-                // limit, moves out from behind, now or at its last safe moment.
-                if (Braking && chooser.Chosen != null && chooser.Chosen.Rejected == null
-                    && Mathf.Abs(brakeLateral - (line.Lateral[pilot.Index] + chooser.Chosen.Shift)) >= PathChooser.Clear(margin)) Braking = false;
             }
             else V0Offset(pilot, me, line, c, lap, here, step, margin, hasFront, front, frontDistance, minCatch, inPath, inPathDistance, inPathCatch,
                 wantSpeed, mass, cm, ca, mu, cw, currentSpeedSqr, spec, behind, closeAhead, fastBehind);
