@@ -6,9 +6,8 @@ namespace TarmacGauntlet.Raceday
 {
     /// <summary>
     /// The running order for the timing tower, with no Unity objects so it can be tested outside Unity.
-    /// Gaps are counted in fake laps: a tenth of the real lap, because the race runs at 10:1. The
-    /// leader shows the fake laps it has completed, from 0, and every other car how many fewer it
-    /// has completed. The tower shows every class leader, the cars round the player and, in the rows
+    /// Laps are counted in fake laps: a tenth of the real lap, because the race runs at 10:1. Every
+    /// car shows the fake laps it has completed, from 0. The tower shows every class leader, the cars round the player and, in the rows
     /// left, the fastest class in race order.
     /// </summary>
     public static class Standings
@@ -57,9 +56,6 @@ namespace TarmacGauntlet.Raceday
                 c.FakeLaps = FakeLaps(c.Distance, lap);
             }
         }
-
-        /// <summary>Fake laps a car is behind the leader. Ranked cars only.</summary>
-        public static int Gap(List<Car> ranked, Car c) => ranked[0].FakeLaps - c.FakeLaps;
 
         /// <summary>
         /// The quickest class in the field. The F1 car is the player's trophy and never fills the tower,
