@@ -692,7 +692,7 @@ def _flat(ref, g, size, fr, a, b, up, name, d0, d1, mat, step=0.004):
     return blend.lay(ref, name, sscale(g, size, size, origin=(0, 0)), pf, d0, d1, mat, step)
 
 
-BADGE_T = 0.009    # badges stand proud of the panel by this much
+BADGE_T = 0.020    # badges stand proud of the panel by this much
 NAME_T = 0.004     # the name's letters stand proud by this much
 
 
