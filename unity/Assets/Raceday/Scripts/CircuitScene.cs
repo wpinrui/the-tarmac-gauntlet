@@ -5,7 +5,7 @@ using UnityEngine;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// Builds the circuit, the country round it (<see cref="Landscape"/>), the trackside furniture (<see cref="Trackside"/>), the sky and its sun (<see cref="TimeOfDay"/>), the career's field and the cameras when the scene starts. The
+    /// Builds the circuit, the country round it (<see cref="Landscape"/>), the trackside furniture (<see cref="Trackside"/>), the sky and its sun (<see cref="TimeOfDay"/>), the race's weather (<see cref="WeatherPlan"/>), the career's field and the cameras when the scene starts. The
     /// field is every team with a car, from <see cref="RaceWeekend.Setup"/>, gridded by prestige: each
     /// car on a full tank and new tyres, its starting driver at the wheel. Run on its own, the scene
     /// makes a new career in which the player owns the Cheonma. The <see cref="RaceDirector"/> keeps
@@ -30,6 +30,9 @@ namespace TarmacGauntlet.Raceday
         /// from the pit lane one car at a time.
         /// </summary>
         [SerializeField] private StartMode start = StartMode.Rolling;
+
+        /// <summary>Seed for the race's weather; 0 rolls a new one each race.</summary>
+        [SerializeField] private int weatherSeed;
 
         private KeyboardState keys;
         private AiDriver ai;
@@ -67,6 +70,7 @@ namespace TarmacGauntlet.Raceday
         private void Awake()
         {
             Time.fixedDeltaTime = 0.01f;
+            RaceWeather.Now = WeatherState.Dry;
             var circuit = new Circuit(CircuitData.Load());
             var track = new GameObject("Circuit");
             var materials = new CircuitMaterials();
@@ -172,6 +176,16 @@ namespace TarmacGauntlet.Raceday
             view.Fit(Complex, tower.Colours, pits.Garages);
             tv.Classes = tower.Classes;
             sky.RaceSeconds = () => tower.RaceTime;
+            // Every race rolls its own weather (WeatherPlan), played on the race clock.
+            int seed = weatherSeed != 0 ? weatherSeed : new System.Random().Next(1, int.MaxValue);
+            var weather = new WeatherPlan(seed, TimeOfDay.StartHour);
+            Debug.Log($"Weather {seed}: {weather.Kind}");
+            WeatherView rain = sky.gameObject.AddComponent<WeatherView>();
+            rain.Plan = weather;
+            rain.RaceSeconds = () => tower.RaceTime;
+            rain.Materials = materials;
+            rain.Cars = racing;
+            sky.Weather = () => weather.At(tower.RaceTime);
             trackside.Cars = racing;
             trackside.Racing = tower.Racing;
             if (starter is RaceStart formation) trackside.PaceCarOut = () => !formation.Racing;
