@@ -89,9 +89,7 @@ def build(game=False):
     cut(shell, cutters)
     print("openings cut, hollows dropped:", blend.drop_voids(shell))
     join(shell, blend.union_all(parts.mirrors(), "mirrors"))
-    pods, pcut, lamps = parts.tail_pods()
-    for pod in pods:
-        join(shell, pod)
+    pcut, lamps = parts.tail_pods()
     cut(shell, pcut)
     out += lamps
     mcut, mglass = parts.mirror_recess()

@@ -158,45 +158,51 @@ def _cyl(name, y, z, r, x0, x1, mat, n=96):
     return blend.make(name, v, f, mat)
 
 
-POD_LEN = 0.40       # the pod fairs forward into the body over this length
+POD_LEN = 0.40       # each tail lamp is a cone running forward into the body over this length
+POD_GAP = 0.0015     # the body is cut this much clear of the cone
 
 
-def _pod(name, y, z, r, xf, n=96):
-    """A round pod, full size at its back face and tapering forward as it sinks into the body."""
+def _cone(name, y, z, r, x0, mat, n=96):
+    """A round cone, full size at its back face and tapering forward as it sinks into the body."""
     t = np.linspace(0, 2 * np.pi, n, endpoint=False)
     rings = []
     for s in np.linspace(0, 1, 16):
         k = 1 - 0.75 * s ** 1.5
         zc = z - 0.06 * s ** 2
-        rings.append(np.column_stack([np.full(n, xf + POD_LEN * s), y + r * k * np.cos(t), zc + r * k * np.sin(t)]))
+        rings.append(np.column_stack([np.full(n, x0 + POD_LEN * s), y + r * k * np.cos(t), zc + r * k * np.sin(t)]))
     v, f = geom.close_rings(rings)
-    ob = blend.make(name, v, f, "body")
+    return blend.make(name, v, f, mat)
+
+
+def _ring(name, y, z, r0, r1, x0, x1, mat):
+    ob = _cyl(name, y, z, r1, x0, x1, mat)
+    blend.boolean(ob, _cyl("hole", y, z, r0, x0 - 0.004, x1 + 0.004, mat), "DIFFERENCE")
     return ob
 
 
 def tail_x_face():
-    """The flat back of each tail lamp pod: just behind the rearmost skin across the lamp, so the
-    whole lamp stands proud on a face square to the car and reads as a true circle."""
+    """The back of each tail lamp: just behind the rearmost skin across the lamp, so the whole
+    lamp stands proud on a face square to the car and reads as a true circle."""
     _x, y, z, r = R["tail_lamp"]
     rim = [_tail_x(y + r * np.cos(t), z + r * np.sin(t)) for t in np.linspace(0, 2 * np.pi, 24, endpoint=False)]
     return min(rim) - 0.012
 
 
 def tail_pods():
-    """Round pods carrying the tail lamps: (pods to join, recess cutters, lamp parts)."""
+    """Each tail lamp is a red cone standing out of the tail, lit whole as the tail light, with a
+    dark bezel round its round face and a brake light in the middle: (body cutters, lamp parts)."""
     _x, y, z, r = R["tail_lamp"]
     xf = tail_x_face()
-    pods, cut, parts = [], [], []
+    R0 = r + TAIL_POD
+    cut, parts = [], []
     for sgn, side in ((1, "l"), (-1, "r")):
         yc = y * sgn
-        pods.append(_pod(f"tail_pod_{side}", yc, z, r + TAIL_POD, xf))
-        cut.append(_cyl(f"cut_tail_{side}", yc, z, r, xf - 0.01, xf + 0.014, "housing"))
-        ring = _cyl(f"lamp_tail_{side}", yc, z, r - 0.006, xf + 0.009, xf + 0.012, "lamp_tail")
-        blend.boolean(ring, _cyl("hole", yc, z, r * 0.55, xf + 0.005, xf + 0.016, "lamp_tail"), "DIFFERENCE")
-        parts += [ring,
-                  _cyl(f"lamp_brake_{side}", yc, z, r * 0.55 - 0.006, xf + 0.009, xf + 0.012, "lamp_brake"),
-                  _cyl(f"tail_glass_{side}", yc, z, r - 0.002, xf + 0.0015, xf + 0.0045, "tail_glass")]
-    return pods, cut, parts
+        cut.append(_cone(f"cut_tail_{side}", yc, z, R0 + POD_GAP, xf - 0.01, "housing"))
+        parts += [_cone(f"lamp_tail_{side}0", yc, z, R0, xf + 0.006, "lamp_tail"),
+                  _ring(f"tail_bezel_{side}", yc, z, r - 0.006, R0 - 0.001, xf, xf + 0.0055, "housing"),
+                  _ring(f"lamp_tail_{side}1", yc, z, r * 0.55 + 0.0005, r - 0.0065, xf + 0.001, xf + 0.0055, "lamp_tail"),
+                  _cyl(f"lamp_brake_{side}", yc, z, r * 0.55, xf + 0.001, xf + 0.0055, "lamp_brake")]
+    return cut, parts
 
 
 # ---------------------------------------------------------------- front
@@ -228,6 +234,7 @@ def front_parts(ref, cutters, out):
 # ---------------------------------------------------------------- glass and trim
 MIRROR_X0, MIRROR_X1 = R["mirror"]["x_back"], R["mirror"]["x_front"]
 GLASS_BAND = 0.014    # black band round each window
+BONNET_GAP = 0.03     # the bonnet line keeps this far from the head lamps
 
 
 def plain_glass(pts, lo, hi, r=0.05):
@@ -350,17 +357,27 @@ def door_path():
     return [_into_glass(path[0])] + path.tolist() + [_into_glass(path[-1])]
 
 
-def bonnet_loop():
-    """The bonnet in plan: the measured lid, kept ahead of the windscreen and clear of the head
-    lamps, then smoothed to one plain loop."""
-    b = poly(R["bonnet"])
-    b = b.intersection(box(R["screen"]["x_base"] + 0.05, -2, 5, 2))
-    for sgn in (1, -1):
-        h = np.array(R["head"]).reshape(-1, 3) * [1, sgn, 1]
-        lamp = Polygon(h[:, :2]).convex_hull
-        b = b.difference(lamp.buffer(0.03))
-    b = soft(biggest(b), 0.06)
-    return np.array(b.simplify(0.002).exterior.coords)[:-1]
+def bonnet_path():
+    """The bonnet shut line in plan: out of the windscreen trim at its lower corner, straight
+    forward to the head lamp, along the lamp's inner edge, and across the nose. The lid runs
+    under the windscreen, so the line has no rear edge."""
+    o, _g, _t = screen_shapes()
+    c = np.array(o.exterior.coords)
+    corner = c[np.argmax(c[:, 1] - 0.3 * c[:, 0])]            # the screen's lower side corner
+    h = np.array(R["head"]).reshape(-1, 3)
+    lamp = Polygon(h[:, :2]).convex_hull.buffer(BONNET_GAP)
+    xs = np.linspace(h[:, 0].min() + 0.05, h[:, 0].max() - 0.02, 7)
+    inner = []
+    for x in xs:                                              # the lamp's inner edge, kept clear
+        g = lamp.intersection(LineString([(x, 0), (x, 2)]))
+        inner.append((x, g.bounds[1]))
+    inner = np.array(inner)
+    side_y = min(corner[1] - 0.02, inner[0, 1])
+    half = [(corner[0] + 0.01, corner[1] - 0.01), (corner[0] + 0.12, side_y)] + \
+           [(x, min(y, side_y)) for x, y in inner] + [(R["badge_front"][0] + 0.03, 0.30), (R["badge_front"][0] + 0.05, 0.0)]
+    half = np.array(half)
+    pts = np.vstack([half, (half[-2::-1] * [1, -1])])
+    return np.array(geom.catmull_open([tuple(p) for p in pts], 8))
 
 
 def engine_loop():
@@ -375,7 +392,7 @@ def grooves(ref):
     path = door_path()
     for sgn, side in ((1, "l"), (-1, "r")):
         obs.append(blend.groove(ref, f"g_door_{side}", path, side_fr(sgn)))
-    obs.append(blend.groove(ref, "g_bonnet", bonnet_loop(), top_fr(), closed=True))
+    obs.append(blend.groove(ref, "g_bonnet", bonnet_path(), top_fr()))
     obs.append(blend.groove(ref, "g_engine", engine_loop(), top_fr(), closed=True))
     return obs
 
