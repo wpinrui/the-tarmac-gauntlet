@@ -43,7 +43,7 @@ static partial class Check
     {
         "Ground", "Edge lines", "Pit lane lines", "Pit entry hatching", "Pit exit line", "Pit box lines",
         "Start line and safety car lines", "Grid slots", "Grid yellow lines", "Garage roofs",
-        "Pit entry bollard", "Road edges", "Armco", "Tyre walls", "Pit wall",
+        "Pit entry bollard", "Road edges", "Paddock lines", "Armco", "Tyre walls", "Pit wall",
     };
 
     static Circuit circuit;

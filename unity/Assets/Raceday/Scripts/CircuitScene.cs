@@ -70,22 +70,17 @@ namespace TarmacGauntlet.Raceday
             Time.fixedDeltaTime = 0.01f;
             var circuit = new Circuit(CircuitData.Load());
             var track = new GameObject("Circuit");
-            foreach (CircuitPart part in new CircuitBuilder(circuit, new CircuitMaterials()).Build())
-            {
-                var go = new GameObject(part.Name) { isStatic = true };
-                go.transform.SetParent(track.transform, false);
-                Mesh mesh = part.Kit.ToMesh(part.Name);
-                go.AddComponent<MeshFilter>().sharedMesh = mesh;
-                var renderer = go.AddComponent<MeshRenderer>();
-                renderer.sharedMaterial = part.Material;
-                if (!part.CastsShadows) renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                if (part.Solid)
-                {
-                    go.AddComponent<MeshCollider>().sharedMesh = mesh;
-                    go.AddComponent<TrackSurface>().Kind = TrackSurface.ForPart(part.Name);
-                }
-            }
+            var builder = new CircuitBuilder(circuit, new CircuitMaterials());
+            foreach (CircuitPart part in builder.Build()) AddPart(track.transform, part);
+            Complex = new PitComplex(circuit, builder.GarageFloors);
+            var pitMaterials = new PitMaterials();
+            var buildings = new GameObject("Pit complex");
+            foreach (CircuitPart part in new PitComplexBuilder(Complex, pitMaterials, PitLook.GlassBand, TeamWall.Full).Build())
+                AddPart(buildings.transform, part);
             TimeOfDay sky = new GameObject("Sky").AddComponent<TimeOfDay>();
+            PitComplexView view = buildings.AddComponent<PitComplexView>();
+            view.Sky = sky;
+            view.Materials = pitMaterials;
 
             keys = new GameObject("Keyboard").AddComponent<KeyboardState>();
             var line = new RacingLine(circuit);
@@ -168,6 +163,8 @@ namespace TarmacGauntlet.Raceday
             // Run on its own the scene is for AI testing, so it starts on the chase camera.
             if (!career) views.StartInChase();
             RaceTower tower = Tower(circuit, racing, field, teams, watched, starter);
+            if (player >= 0 && TeamColour(setup.Game, grid[player].TeamId) is Color own) tower.Colours[player] = own;
+            view.Fit(Complex, tower.Colours, pits.Garages);
             tv.Classes = tower.Classes;
             sky.RaceSeconds = () => tower.RaceTime;
             director = new GameObject("Race director").AddComponent<RaceDirector>();
@@ -240,6 +237,33 @@ namespace TarmacGauntlet.Raceday
             hidden.Add(paceCar.gameObject);
             lab.Race = hidden.ToArray();
             rolling.Pits = pits;
+        }
+
+        /// <summary>The pit complex's layout: garages, the pit building's stations and where the crews stand.</summary>
+        public PitComplex Complex { get; private set; }
+
+        private static void AddPart(Transform parent, CircuitPart part)
+        {
+            var go = new GameObject(part.Name) { isStatic = true };
+            go.transform.SetParent(parent, false);
+            Mesh mesh = part.Kit.ToMesh(part.Name);
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var renderer = go.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = part.Material;
+            if (!part.CastsShadows) renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            if (part.Solid)
+            {
+                go.AddComponent<MeshCollider>().sharedMesh = mesh;
+                go.AddComponent<TrackSurface>().Kind = TrackSurface.ForPart(part.Name);
+            }
+        }
+
+        /// <summary>The team's own colour, picked at new game, or null for a team without one.</summary>
+        private static Color? TeamColour(GameState game, string teamId)
+        {
+            foreach (BaseTeam t in game.Teams)
+                if (t.Id == teamId && t is PlayerTeam p && ColorUtility.TryParseHtmlString(p.TeamColour, out Color c)) return c;
+            return null;
         }
 
         /// <summary>
