@@ -116,7 +116,7 @@ namespace TarmacGauntlet.Raceday
         /// </summary>
         private static readonly float HeldCost = Knob("HELDCOST", 1f);
         /// <summary>Whether, behind a car on the free stretch, each lane is also tried flat out following only what is ahead in it.</summary>
-        private static readonly bool FollowPaths = Knob("FOLLOW", 1f) > 0f, FollowLapOne = Knob("FOLLOW1", 1f) > 0f;
+        private static readonly bool FollowPaths = Knob("FOLLOW", 0f) > 0f, FollowLapOne = Knob("FOLLOW1", 1f) > 0f;
         /// <summary>Deceleration, m/s², braking plans to open a short gap with.</summary>
         /// <summary>Inside the margin behind a car, how much closer a path may not get, m.</summary>
         private static readonly float TouchClose = Knob("TOUCH", 1f);
