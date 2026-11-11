@@ -20,7 +20,7 @@ RED = "#c63d2a"  # the A's core
 
 # Team stack on the door under the window, number on the front fender.
 STACK_Z, STACK_Y, STACK_H = -0.03, 0.425, 0.25
-NUM_Z, NUM_Y, NUM_W, NUM_H = 0.80, 0.38, 0.44, 0.26
+NUM_Z, NUM_Y, NUM_W, NUM_H = 0.80, 0.34, 0.44, 0.24
 
 
 def marks(lv):
