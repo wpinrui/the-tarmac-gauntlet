@@ -264,13 +264,13 @@
 .rs-podium { flex-direction: row; margin-bottom: 14px; }
 .rs-podium-class { width: 44px; height: 34px; font-size: 30px; -unity-text-align: middle-center; }
 .rs-podium-rows { flex-grow: 1; }
-.rs-podium-row { height: 54px; }
-.rs-podium-team { flex-grow: 1; flex-shrink: 1; min-width: 0; }
-.rs-podium-car { flex-direction: row; align-items: center; margin-top: 2px; }
-.rs-podium-badge { width: 18px; height: 18px; margin-right: 8px; flex-shrink: 0; -unity-background-scale-mode: scale-to-fit; }
-.rs-podium-model { font-size: 13px; color: rgba(255, 255, 255, 0.62); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rs-row.of-two-line, .of-row.of-two-line { height: 54px; align-items: flex-start; padding-top: 7px; }
+.of-two-line > Label { height: 20px; }
+.of-team-lines { flex-grow: 1; flex-shrink: 1; min-width: 0; }
+.of-car-line { flex-direction: row; align-items: center; margin-top: 2px; }
+.of-brand { width: 18px; height: 18px; margin-right: 8px; flex-shrink: 0; -unity-background-scale-mode: scale-to-fit; }
+.of-car-name { font-size: 13px; color: rgba(255, 255, 255, 0.62); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rs-place { width: 20px; margin-right: 10px; }
-.rs-podium-row .rs-team-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rs-overall { width: 44px; color: rgba(255, 255, 255, 0.62); -unity-text-align: middle-right; }
 .p1 { color: rgb(232, 193, 90); }
 .p2 { color: rgb(201, 208, 214); }
@@ -405,9 +405,7 @@
 .st-pin.top { top: 28px; }
 .st-pin.bottom { bottom: 0; }
 
-.sc-row { height: 44px; }
 .sc-team { flex-grow: 1; flex-shrink: 1; min-width: 0; }
-.sc-car { margin-top: -2px; font-size: 12px; color: rgba(255, 255, 255, 0.42); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sc-cell { width: 44px; margin-left: 6px; -unity-text-align: middle-center; }
 .sc-det-name { font-size: 26px; letter-spacing: 1px; white-space: normal; }
 .sc-det-car { flex-direction: row; align-items: center; margin-top: 8px; font-size: 16px; }

@@ -34,7 +34,7 @@ namespace TarmacGauntlet.Management
         {
             public BaseTeam Team;
             public CarClass Class;
-            public string Car;
+            public CarModel Model;
             public int Age;
             public int? Last;
             public int[] Values; // by Column, Last as 0 when unknown
@@ -110,15 +110,11 @@ namespace TarmacGauntlet.Management
             ScrollView list = Scroll("rs-scroll");
             foreach (Scout s in rows)
             {
-                VisualElement row = Box("of-row", "of-click", "sc-row");
+                VisualElement row = Box("of-row", "of-click", "of-two-line");
                 row.EnableInClassList("me", s.Mine);
                 row.EnableInClassList("pick", s == chosen);
                 VisualElement team = Box("sc-team");
-                VisualElement named = Box("of-named");
-                named.Add(Flag(s.Team));
-                named.Add(Menus.Text(s.Team.Name, "rs-team-name", true));
-                team.Add(named);
-                team.Add(Menus.Text(s.Car, "sc-car"));
+                team.Add(TeamLines(s.Team, s.Team.Name, s.Model, Menus.Text));
                 row.Add(team);
                 foreach ((Column key, _, _) in Columns)
                 {
@@ -159,7 +155,7 @@ namespace TarmacGauntlet.Management
             side.Add(title);
             VisualElement car = Box("sc-det-car");
             car.Add(ClassLabels.Make(s.Class, "cls-sm", Menus.Bold));
-            car.Add(Menus.Text(s.Car, "sc-det-car-name", true));
+            car.Add(Menus.Text(s.Model.Name, "sc-det-car-name", true));
             side.Add(car);
             VisualElement meta = Box("sc-det-meta");
             meta.Add(Menus.Text("CAR AGE", "sc-det-meta-label"));
@@ -199,7 +195,7 @@ namespace TarmacGauntlet.Management
             {
                 Team = team,
                 Class = model.CarClass,
-                Car = model.Name,
+                Model = model,
                 Age = car.Age,
                 Last = last,
                 Values = new[]

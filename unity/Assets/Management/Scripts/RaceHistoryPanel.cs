@@ -145,7 +145,7 @@ namespace TarmacGauntlet.Management
             foreach (ClassifiedCar r in race.Classification.Where(x => x.CarClass == c && !x.Retired).Take(3))
             {
                 place++;
-                VisualElement row = Box("rs-row", "rs-podium-row");
+                VisualElement row = Box("rs-row", "rs-podium-row", "of-two-line");
                 row.EnableInClassList("me", r.TeamId == GameActions.PlayerTeamId);
                 row.Add(Menus.Text(Num(place), "rs-place p" + place, true));
                 row.Add(PodiumTeam(r, Menus.Text));

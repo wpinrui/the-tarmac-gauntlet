@@ -74,23 +74,33 @@ namespace TarmacGauntlet.Management
             return flag;
         }
 
-        /// <summary>A podium team: its name, and under it the car's brand badge and model.</summary>
+        /// <summary>A podium team: its flag and name, and under it the car's brand badge and model.</summary>
         internal static VisualElement PodiumTeam(ClassifiedCar r, Func<string, string, bool, Label> text)
         {
-            VisualElement info = Box("rs-podium-team");
-            VisualElement name = Box("of-named");
-            BaseTeam team = GameSession.State?.Teams.FirstOrDefault(t => t.Id == r.TeamId);
-            if (team != null) name.Add(Flag(team));
-            name.Add(text(r.TeamName, "rs-team-name", true));
-            info.Add(name);
-            CarModel model = GameSession.State?.CarModels.FirstOrDefault(m => m.Id == r.ModelId) ?? CarModels.All.FirstOrDefault(m => m.Id == r.ModelId);
+            GameState game = GameSession.State;
+            BaseTeam team = game?.Teams.FirstOrDefault(t => t.Id == r.TeamId);
+            CarModel model = game?.CarModels.FirstOrDefault(m => m.Id == r.ModelId) ?? CarModels.All.FirstOrDefault(m => m.Id == r.ModelId);
+            return TeamLines(team, r.TeamName, model, text);
+        }
+
+        /// <summary>
+        /// A team in two lines: flag and name, then the car's brand badge and model. Its row takes the of-two-line
+        /// class, so the row's numbers line up with the name.
+        /// </summary>
+        internal static VisualElement TeamLines(BaseTeam team, string name, CarModel model, Func<string, string, bool, Label> text)
+        {
+            VisualElement info = Box("of-team-lines");
+            VisualElement first = Box("of-named");
+            if (team != null) first.Add(Flag(team));
+            first.Add(text(name, "rs-team-name", true));
+            info.Add(first);
             if (model == null) return info;
-            VisualElement car = Box("rs-podium-car");
-            VisualElement badge = Box("rs-podium-badge");
+            VisualElement car = Box("of-car-line");
+            VisualElement badge = Box("of-brand");
             badge.pickingMode = PickingMode.Ignore;
             badge.style.backgroundImage = Resources.Load<Texture2D>("Brands/" + Garage.Brand(model));
             car.Add(badge);
-            car.Add(text(model.Name, "rs-podium-model", false));
+            car.Add(text(model.Name, "of-car-name", false));
             info.Add(car);
             return info;
         }
