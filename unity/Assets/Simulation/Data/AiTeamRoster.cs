@@ -60,7 +60,7 @@ namespace TarmacGauntlet.Simulation
             // CLASS D: 20 teams
             new AiTeamEntry { Name = "Seorak Technica", Descriptor = "Seorak's rally-bred factory effort", ModelId = "d-12", CarClass = CarClass.D },
             new AiTeamEntry { Name = "Packet Loss Racing", Descriptor = "tech-money privateer, data-obsessed", ModelId = "d-13", CarClass = CarClass.D },
-            new AiTeamEntry { Name = "Petrol Mush Racing", Descriptor = "fuel sponsor backing a scrappy sports car team", ModelId = "d-14", CarClass = CarClass.D },
+            new AiTeamEntry { Name = "KNS Seorak", Descriptor = "Seorak's Southeast Asian satellite programme", ModelId = "d-14", CarClass = CarClass.D },
             new AiTeamEntry { Name = "Poseidon Racing", Descriptor = "trident-bearing privateer with sharp ambitions", ModelId = "d-15", CarClass = CarClass.D },
             new AiTeamEntry { Name = "Virginia Motorsport", Descriptor = "French-founded privateer on the rise", ModelId = "d-12", CarClass = CarClass.D },
             new AiTeamEntry { Name = "Insight Racing", Descriptor = "tech-backed team chasing efficiency gains", ModelId = "d-13", CarClass = CarClass.D },
@@ -82,8 +82,8 @@ namespace TarmacGauntlet.Simulation
             new AiTeamEntry { Name = "Team Tora Racing", Descriptor = "Tora's official touring/GT squad", ModelId = "c-18", CarClass = CarClass.C },
             new AiTeamEntry { Name = "Tora GT Works", Descriptor = "Tora's factory GT programme", ModelId = "c-20", CarClass = CarClass.C },
             new AiTeamEntry { Name = "Greystone Archer", Descriptor = "Archer-supported independent squad", ModelId = "c-16", CarClass = CarClass.C },
-            new AiTeamEntry { Name = "Vosper Liberty Racing", Descriptor = "Liberty-backed privateer with works engines", ModelId = "c-17", CarClass = CarClass.C },
-            new AiTeamEntry { Name = "KNS Seorak", Descriptor = "Seorak's Southeast Asian satellite programme", ModelId = "c-19", CarClass = CarClass.C },
+            new AiTeamEntry { Name = "Golf Course Endurance", Descriptor = "heritage oil brand's flagship endurance entry", ModelId = "c-17", CarClass = CarClass.C },
+            new AiTeamEntry { Name = "Petrol Mush Racing", Descriptor = "fuel sponsor backing a scrappy sports car team", ModelId = "c-19", CarClass = CarClass.C },
             new AiTeamEntry { Name = "Prodigy Racing", Descriptor = "feeder-series talent factory gone GT", ModelId = "c-16", CarClass = CarClass.C },
             new AiTeamEntry { Name = "Canvas Grand Prix", Descriptor = "elite junior formula team stepping up", ModelId = "c-17", CarClass = CarClass.C },
             new AiTeamEntry { Name = "Agile 1 Motorsport", Descriptor = "technical sponsor turned team owner", ModelId = "c-18", CarClass = CarClass.C },
@@ -104,7 +104,7 @@ namespace TarmacGauntlet.Simulation
             new AiTeamEntry { Name = "Sip Vanessa Racing", Descriptor = "veteran-run multi-series operation", ModelId = "b-22", CarClass = CarClass.B },
             new AiTeamEntry { Name = "Vespro Corse", Descriptor = "Italian GT privateer powerhouse", ModelId = "b-23", CarClass = CarClass.B },
             new AiTeamEntry { Name = "Green Goat Racing", Descriptor = "energy drink empire's factory racing arm", ModelId = "b-24", CarClass = CarClass.B },
-            new AiTeamEntry { Name = "Golf Course Endurance", Descriptor = "heritage oil brand's flagship endurance entry", ModelId = "b-25", CarClass = CarClass.B },
+            new AiTeamEntry { Name = "Vosper Liberty Racing", Descriptor = "Liberty-backed privateer with works engines", ModelId = "b-25", CarClass = CarClass.B },
             new AiTeamEntry { Name = "Tsubame Racing", Descriptor = "Japanese motorcycle giant's four-wheel factory effort", ModelId = "b-21", CarClass = CarClass.B },
             new AiTeamEntry { Name = "Zugzwang Factory Racing", Descriptor = "Austrian works team with two-wheel pedigree", ModelId = "b-22", CarClass = CarClass.B },
             // CLASS A: 12 teams
