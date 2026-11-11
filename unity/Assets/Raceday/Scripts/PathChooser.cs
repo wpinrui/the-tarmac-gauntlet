@@ -643,6 +643,8 @@ namespace TarmacGauntlet.Raceday
             bool onTrack = OnTrack(c, me.Lateral, me.Distance);
             float turnIn = NextCornerStart(c, Mathf.Repeat(d, lap));
             bool turnedIn = false;
+            // Where the checks against each car below stop reaching, behind and ahead (ahead, plus the margin and headway kept).
+            float farBehind = -CarL - Mathf.Max(SwipeGap, 3f) - 0.01f, farAhead = CarL + 15f + 0.01f;
             cand.Path[0] = new Vector2(d, lat);
             // A path ruled out before it is driven breaks its limit at once: last in line when every path breaks one (T9).
             cand.BrokeAt = PreBreak && cand.Rejected != null ? 0 : Steps + 1;
@@ -720,8 +722,17 @@ namespace TarmacGauntlet.Raceday
                     float g = Road(od[j, s] - d, lap);
                     // A stopped ghost with no way round: slowed to a crawl, this car may pass through it (H12's safety net).
                     if (stopped[j] && v < GhostCrawl) continue;
+                    // Too far behind for any limit or risk below to reach it: the same result, sooner.
+                    if (g <= farBehind) continue;
                     float side = ol[j, s] - lat;
                     float apart = Mathf.Abs(side);
+                    // Too far ahead for any limit below: only the risk of closing on it in its lane is left.
+                    if (g >= farAhead + margin + headway * v && !stopped[j])
+                    {
+                        float closingFar = v - ov[j, s];
+                        if (apart < CarW + RoomMargin && closingFar > 0.5f) risk += CloseRisk * Mathf.Exp(-Mathf.Max(g - CarL, 0f) / closingFar) * Tick;
+                        continue;
+                    }
                     // H1: never into a car ahead or alongside, with a margin kept: a passing margin past a
                     // car ahead, a little less beside one. A car already closer than that must not get closer.
                     float need = (g > 0.7f * CarL ? Clear(margin) : CarW + AlongsideGap) + reach[j] - 0.5f * CarW;

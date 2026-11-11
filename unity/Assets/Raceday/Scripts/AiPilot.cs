@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Threading;
 using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
@@ -200,9 +202,35 @@ namespace TarmacGauntlet.Raceday
         /// </summary>
         private SpeedProfile Place(int i)
         {
-            places ??= new SpeedProfile[Mathf.RoundToInt(2f * PlaceReach / PlaceStep) + 1];
+            places ??= new SpeedProfile[PlaceCount];
             i = Mathf.Clamp(i, 0, places.Length - 1);
-            return places[i] ??= new SpeedProfile(new RacingLine(Line.Circuit, i * PlaceStep - PlaceReach), Spec, placeLimit, placeMax);
+            return places[i] ??= new SpeedProfile(PlaceLine(Line.Circuit, i), Spec, placeLimit, placeMax);
+        }
+
+        /// <summary>
+        /// Builds every fixed place's speeds now, off the main thread where the car's line is tuned, rather than
+        /// on the race's first steps, when the whole grid asks for them at once. Only under path choosing.
+        /// </summary>
+        public AiPilot BuildPlaces()
+        {
+            if (Experiments.Is(PathChooser.Experiment) && LaneProfiles[0] != LaneProfiles[MiddleLane])
+                for (int i = 0; i < PlaceCount; i++) Place(i);
+            return this;
+        }
+
+        private static readonly int PlaceCount = Mathf.RoundToInt(2f * PlaceReach / PlaceStep) + 1;
+        private static readonly Dictionary<Circuit, RacingLine[]> placeLines = new Dictionary<Circuit, RacingLine[]>();
+
+        /// <summary>The path at fixed place i across the track: the same for every car on a circuit, so built once.</summary>
+        private static RacingLine PlaceLine(Circuit c, int i)
+        {
+            RacingLine[] lines;
+            lock (placeLines)
+                if (!placeLines.TryGetValue(c, out lines)) placeLines[c] = lines = new RacingLine[PlaceCount];
+            RacingLine l = Volatile.Read(ref lines[i]);
+            if (l != null) return l;
+            l = new RacingLine(c, i * PlaceStep - PlaceReach);
+            return Interlocked.CompareExchange(ref lines[i], l, null) ?? l;
         }
 
         private void PlaceBlend(float lateral, out SpeedProfile a, out SpeedProfile b, out float t)
