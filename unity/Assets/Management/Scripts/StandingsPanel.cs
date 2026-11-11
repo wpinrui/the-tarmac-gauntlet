@@ -13,6 +13,7 @@ namespace TarmacGauntlet.Management
     /// <summary>
     /// The Standings screen: all 100 teams by prestige, each with its race car's class and the change since the last
     /// race. It opens on the player's row, and a copy of that row stays pinned to the edge while it is scrolled away.
+    /// Clicking a team shows its result in every race so far in the side pane.
     /// </summary>
     public sealed class StandingsPanel : OfficePanel
     {
@@ -26,6 +27,8 @@ namespace TarmacGauntlet.Management
         private ScrollView list;
         private VisualElement pin;
         private int playerIndex = -1;
+        private string picked;
+        private readonly List<VisualElement> rows = new List<VisualElement>();
 
         protected override string ScreenSlug => Slug;
 
@@ -34,6 +37,8 @@ namespace TarmacGauntlet.Management
             GameState game = GameSession.State;
             if (game == null) return;
             Body.Clear();
+            rows.Clear();
+            if (picked == null || game.Teams.All(t => t.Id != picked)) picked = GameActions.PlayerTeamId;
 
             var header = Box("of-head-row");
             header.Add(Box("st-rank"));
@@ -60,6 +65,7 @@ namespace TarmacGauntlet.Management
                 pin.style.display = DisplayStyle.None;
                 Body.Add(pin);
             }
+            History(game);
 
             list.verticalScroller.valueChanged += _ => Pin();
             list.RegisterCallback<GeometryChangedEvent>(Centre);
@@ -88,8 +94,17 @@ namespace TarmacGauntlet.Management
 
         private VisualElement Row(GameState game, BaseTeam team, int rank)
         {
-            VisualElement row = Box("of-row", "st-row");
+            VisualElement row = Box("of-row", "of-click", "st-row");
             row.EnableInClassList("me", team is PlayerTeam);
+            row.userData = team.Id;
+            row.EnableInClassList("pick", team.Id == picked);
+            row.RegisterCallback<ClickEvent>(_ =>
+            {
+                picked = team.Id;
+                foreach (VisualElement r in rows) r.EnableInClassList("pick", r.userData as string == picked);
+                History(game);
+            });
+            rows.Add(row);
             Label place = Menus.Text(Num(rank), "st-rank", true);
             if (rank <= 3) place.AddToClassList("p" + rank);
             row.Add(place);
@@ -97,7 +112,10 @@ namespace TarmacGauntlet.Management
             Label label = ClassLabels.Make(cls ?? CarClass.F, "cls-sm", Menus.Bold);
             label.style.visibility = cls.HasValue ? Visibility.Visible : Visibility.Hidden;
             row.Add(label);
-            row.Add(Menus.Text(team.Name, "of-fill", true));
+            VisualElement name = Box("of-named", "of-fill");
+            name.Add(Flag(team));
+            name.Add(Menus.Text(team.Name, "rs-team-name", true));
+            row.Add(name);
             row.Add(Menus.Text(team.Prestige.ToString("0.0", CultureInfo.InvariantCulture), "st-prestige", true));
 
             VisualElement trend = Box("st-trend");
@@ -114,6 +132,62 @@ namespace TarmacGauntlet.Management
             }
             row.Add(trend);
             return row;
+        }
+
+        /// <summary>The picked team's finish in every race on record, newest first.</summary>
+        private void History(GameState game)
+        {
+            VisualElement side = Menus.SideBody;
+            side.Clear();
+            BaseTeam team = game.Teams.FirstOrDefault(t => t.Id == picked);
+            if (team == null) return;
+            VisualElement title = Box("of-named");
+            VisualElement flag = Flag(team);
+            flag.AddToClassList("of-flag-lg");
+            title.Add(flag);
+            title.Add(Menus.Text(team.Name.ToUpperInvariant(), "sc-det-name", true));
+            side.Add(title);
+
+            var races = new List<(int Year, RaceResult Result, int ClassPos)>();
+            foreach (RaceHistoryEntry race in game.RaceHistory)
+            {
+                RaceResult r = race.Results.FirstOrDefault(x => x.TeamId == team.Id);
+                if (r == null) continue;
+                int classPos = race.Results.Count(x => x.CarClass == r.CarClass && x.Position <= r.Position);
+                races.Add((race.Year, r, classPos));
+            }
+            if (races.Count == 0) return;
+
+            VisualElement head = Box("of-head-row", "st-hist-head");
+            Label year = Menus.Text("YEAR", "of-head");
+            year.AddToClassList("st-hist-year");
+            head.Add(year);
+            head.Add(Box("of-fill"));
+            Label pos = Menus.Text("POS", "of-head");
+            pos.AddToClassList("st-hist-pos");
+            head.Add(pos);
+            Label classPosHead = Menus.Text("CLASS POS", "of-head");
+            classPosHead.AddToClassList("st-hist-cpos");
+            head.Add(classPosHead);
+            side.Add(head);
+
+            ScrollView list = Scroll("st-hist");
+            foreach ((int y, RaceResult r, int cp) in Enumerable.Reverse(races))
+            {
+                VisualElement row = Box("of-row", "st-hist-row");
+                row.Add(Menus.Text(Num(y), "st-hist-year", true));
+                VisualElement fill = Box("of-fill");
+                fill.Add(ClassLabels.Make(r.CarClass, "cls-sm", Menus.Bold));
+                row.Add(fill);
+                Label at = Menus.Text(r.Retired ? "DNF" : "P" + Num(r.Position), "st-hist-pos", true);
+                if (r.Retired) at.AddToClassList("of-red");
+                row.Add(at);
+                Label c = Menus.Text(r.Retired ? "" : Num(cp), "st-hist-cpos", true);
+                if (!r.Retired && cp <= 3) c.AddToClassList("p" + cp);
+                row.Add(c);
+                list.Add(row);
+            }
+            side.Add(list);
         }
 
         /// <summary>The class of the car a team has entered, or null with none.</summary>

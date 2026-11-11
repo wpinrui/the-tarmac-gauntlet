@@ -264,9 +264,13 @@
 .rs-podium { flex-direction: row; margin-bottom: 14px; }
 .rs-podium-class { width: 44px; height: 34px; font-size: 30px; -unity-text-align: middle-center; }
 .rs-podium-rows { flex-grow: 1; }
-.rs-podium-row { height: 32px; }
+.rs-podium-row { height: 54px; }
+.rs-podium-team { flex-grow: 1; flex-shrink: 1; min-width: 0; }
+.rs-podium-car { flex-direction: row; align-items: center; margin-top: 2px; }
+.rs-podium-badge { width: 18px; height: 18px; margin-right: 8px; flex-shrink: 0; -unity-background-scale-mode: scale-to-fit; }
+.rs-podium-model { font-size: 13px; color: rgba(255, 255, 255, 0.62); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rs-place { width: 20px; margin-right: 10px; }
-.rs-podium-row .rs-team-name { flex-grow: 1; flex-shrink: 1; min-width: 0; }
+.rs-podium-row .rs-team-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rs-overall { width: 44px; color: rgba(255, 255, 255, 0.62); -unity-text-align: middle-right; }
 .p1 { color: rgb(232, 193, 90); }
 .p2 { color: rgb(201, 208, 214); }
@@ -373,17 +377,22 @@
 .rh-hero .rs-hero-prize, .rh-hero .rs-hero-dnf { font-size: 22px; }
 .rh-chart { height: 190px; flex-shrink: 0; margin-bottom: 14px; }
 .rh-chart .rs-readout { top: -4px; right: 0; }
-.rh-head-pos { width: 90px; font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.42); -unity-text-align: middle-left; }
-.rh-head-laps { width: 52px; font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.42); -unity-text-align: middle-right; }
-.rh-head-prize { width: 100px; font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.42); -unity-text-align: middle-right; }
+.rh-head-pos { width: 90px; font-size: 13px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.42); -unity-text-align: middle-left; }
+.rh-head-laps { width: 52px; font-size: 13px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.42); -unity-text-align: middle-right; }
+.rh-head-prize { width: 100px; font-size: 13px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.42); -unity-text-align: middle-right; }
 .rh-legend { flex-direction: row; flex-wrap: wrap; flex-shrink: 0; margin-top: -8px; margin-bottom: 12px; }
 .rh-legend-item { flex-direction: row; align-items: center; margin-right: 16px; margin-bottom: 4px; }
-.rh-legend-item .rs-swatch { margin-right: 6px; }
-.rh-legend-text { font-size: 12px; color: rgba(255, 255, 255, 0.62); }
-.rh-legend-dot { width: 9px; height: 9px; margin-right: 6px; border-radius: 5px; background-color: rgb(255, 176, 32); }
-.rh-legend-tick { width: 2px; height: 10px; margin-right: 6px; background-color: rgba(255, 255, 255, 0.6); }
+.rh-legend-item .rs-swatch { width: 12px; height: 12px; margin-right: 8px; }
+.rh-legend-text { font-size: 15px; color: rgba(255, 255, 255, 0.62); }
+.rh-legend-dot { width: 11px; height: 11px; margin-right: 8px; border-radius: 6px; background-color: rgb(255, 176, 32); }
+.rh-legend-tick { width: 2px; height: 16px; margin-right: 8px; margin-left: 3px; background-color: rgba(255, 255, 255, 0.85); }
 .rh-log { flex-grow: 1; flex-shrink: 1; min-height: 0; max-height: 300px; }
 .rh-log .rs-row { height: 32px; }
+.rh-log .of-head-row { height: 24px; }
+.rh-log-range { width: 110px; -unity-text-align: middle-right; }
+.rh-log-count { width: 54px; -unity-text-align: middle-right; }
+.rh-log-at { width: 58px; -unity-text-align: middle-left; }
+.rh-log-fill { flex-grow: 1; -unity-text-align: middle-left; }
 .rh-issue-name { flex-grow: 1; flex-shrink: 1; min-width: 0; margin-right: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .st-list { flex-grow: 1; flex-shrink: 1; min-height: 0; }
@@ -621,3 +630,15 @@
 .g-full { flex-grow: 1; padding: 12px 18px; border-radius: 20px; border-width: 1px; border-color: rgba(255, 90, 79, 0.6); background-color: rgba(255, 90, 79, 0.14); }
 .g-full-title { font-size: 16px; letter-spacing: 1.9px; }
 .g-full-text { margin-top: 2px; font-size: 14px; color: rgba(255, 255, 255, 0.74); }
+
+/* Flags and team history */
+.of-named { flex-direction: row; align-items: center; min-width: 0; }
+.of-named .rs-team-name, .of-named .sc-det-name { flex-shrink: 1; min-width: 0; }
+.of-flag { width: 20px; height: 15px; margin-right: 10px; flex-shrink: 0; border-width: 1px; border-color: rgba(255, 255, 255, 0.28); border-radius: 2px; -unity-background-scale-mode: scale-and-crop; }
+.of-flag-lg { width: 32px; height: 24px; margin-right: 14px; border-radius: 3px; }
+.st-hist-head { margin-top: 12px; }
+.st-hist { max-height: 640px; }
+.st-hist-row { height: 36px; }
+.st-hist-year { width: 52px; -unity-text-align: middle-left; }
+.st-hist-pos { width: 56px; -unity-text-align: middle-right; }
+.st-hist-cpos { width: 84px; -unity-text-align: middle-right; }

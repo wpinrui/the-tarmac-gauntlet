@@ -1,4 +1,7 @@
 using System;
+using System.Linq;
+using TarmacGauntlet.Career;
+using TarmacGauntlet.Simulation;
 using System.Globalization;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -60,6 +63,36 @@ namespace TarmacGauntlet.Management
                 DriversPanel.Show(menus, driverId);
             });
             return link;
+        }
+
+        /// <summary>The team's nationality flag, sized by the of-flag class.</summary>
+        internal static VisualElement Flag(BaseTeam team)
+        {
+            var flag = new VisualElement { pickingMode = PickingMode.Ignore };
+            flag.AddToClassList("of-flag");
+            flag.style.backgroundImage = Resources.Load<Texture2D>("Flags/" + TeamNationality.Of(team));
+            return flag;
+        }
+
+        /// <summary>A podium team: its name, and under it the car's brand badge and model.</summary>
+        internal static VisualElement PodiumTeam(ClassifiedCar r, Func<string, string, bool, Label> text)
+        {
+            VisualElement info = Box("rs-podium-team");
+            VisualElement name = Box("of-named");
+            BaseTeam team = GameSession.State?.Teams.FirstOrDefault(t => t.Id == r.TeamId);
+            if (team != null) name.Add(Flag(team));
+            name.Add(text(r.TeamName, "rs-team-name", true));
+            info.Add(name);
+            CarModel model = GameSession.State?.CarModels.FirstOrDefault(m => m.Id == r.ModelId) ?? CarModels.All.FirstOrDefault(m => m.Id == r.ModelId);
+            if (model == null) return info;
+            VisualElement car = Box("rs-podium-car");
+            VisualElement badge = Box("rs-podium-badge");
+            badge.pickingMode = PickingMode.Ignore;
+            badge.style.backgroundImage = Resources.Load<Texture2D>("Brands/" + Garage.Brand(model));
+            car.Add(badge);
+            car.Add(text(model.Name, "rs-podium-model", false));
+            info.Add(car);
+            return info;
         }
 
         /// <summary>A coloured square for a driver, as the race summary marks stints.</summary>

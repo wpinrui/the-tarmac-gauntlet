@@ -114,7 +114,10 @@ namespace TarmacGauntlet.Management
                 row.EnableInClassList("me", s.Mine);
                 row.EnableInClassList("pick", s == chosen);
                 VisualElement team = Box("sc-team");
-                team.Add(Menus.Text(s.Team.Name, "rs-team-name", true));
+                VisualElement named = Box("of-named");
+                named.Add(Flag(s.Team));
+                named.Add(Menus.Text(s.Team.Name, "rs-team-name", true));
+                team.Add(named);
                 team.Add(Menus.Text(s.Car, "sc-car"));
                 row.Add(team);
                 foreach ((Column key, _, _) in Columns)
@@ -148,7 +151,12 @@ namespace TarmacGauntlet.Management
         private void Detail(Scout s)
         {
             VisualElement side = Menus.SideBody;
-            side.Add(Menus.Text(s.Team.Name.ToUpperInvariant(), "sc-det-name", true));
+            VisualElement title = Box("of-named");
+            VisualElement flag = Flag(s.Team);
+            flag.AddToClassList("of-flag-lg");
+            title.Add(flag);
+            title.Add(Menus.Text(s.Team.Name.ToUpperInvariant(), "sc-det-name", true));
+            side.Add(title);
             VisualElement car = Box("sc-det-car");
             car.Add(ClassLabels.Make(s.Class, "cls-sm", Menus.Bold));
             car.Add(Menus.Text(s.Car, "sc-det-car-name", true));

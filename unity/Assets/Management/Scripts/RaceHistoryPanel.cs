@@ -148,7 +148,7 @@ namespace TarmacGauntlet.Management
                 VisualElement row = Box("rs-row", "rs-podium-row");
                 row.EnableInClassList("me", r.TeamId == GameActions.PlayerTeamId);
                 row.Add(Menus.Text(Num(place), "rs-place p" + place, true));
-                row.Add(Menus.Text(r.TeamName, "rs-team-name", true));
+                row.Add(PodiumTeam(r, Menus.Text));
                 row.Add(Menus.Text("P" + Num(r.Position), "rs-overall"));
                 rows.Add(row);
             }
@@ -199,10 +199,12 @@ namespace TarmacGauntlet.Management
             VisualElement log = Box("rh-log");
             VisualElement tabs = Box("rs-tabs");
             log.Add(tabs);
+            VisualElement head = Box("of-head-row");
+            log.Add(head);
             ScrollView list = Scroll("rs-scroll");
             log.Add(list);
             side.Add(log);
-            RenderLog(game, race, tabs, list);
+            RenderLog(game, race, tabs, head, list);
         }
 
         /// <summary>Names each driver's colour, and the issue dots and stop ticks on the chart.</summary>
@@ -238,12 +240,12 @@ namespace TarmacGauntlet.Management
             return pace > 0 && leaderLaps > 0 ? leaderLaps / (float)pace : 1f;
         }
 
-        private void RenderLog(GameState game, RaceSummary race, VisualElement tabs, ScrollView list)
+        private void RenderLog(GameState game, RaceSummary race, VisualElement tabs, VisualElement head, ScrollView list)
         {
             void Show(string view)
             {
                 logView = view;
-                RenderLog(game, race, tabs, list);
+                RenderLog(game, race, tabs, head, list);
                 list.scrollOffset = Vector2.zero;
             }
 
@@ -255,10 +257,20 @@ namespace TarmacGauntlet.Management
                 tabs.Add(tab);
             }
 
+            head.Clear();
+            void Head(string text, string cls)
+            {
+                Label label = Menus.Text(text, "of-head");
+                label.AddToClassList(cls);
+                head.Add(label);
+            }
             list.Clear();
             switch (logView)
             {
                 case "stints":
+                    head.Add(Box("of-fill"));
+                    Head("LAPS", "rh-log-range");
+                    Head("TOTAL", "rh-log-count");
                     foreach (StintRecord s in race.Stints)
                     {
                         VisualElement row = Box("rs-row", "rs-stint");
@@ -270,10 +282,12 @@ namespace TarmacGauntlet.Management
                     }
                     break;
                 case "stops":
+                    Head("LAP", "rh-log-at");
+                    Head("NEW DRIVER", "rh-log-fill");
                     foreach (PitStopRecord s in race.PitStops)
                     {
                         VisualElement row = Box("rs-row");
-                        row.Add(Menus.Text("L" + Num(s.Lap), "rs-at"));
+                        row.Add(Menus.Text(Num(s.Lap), "rs-at"));
                         if (s.DriverIn != s.DriverOut)
                         {
                             row.Add(Swatch(Colour(s.DriverIn)));
@@ -283,10 +297,12 @@ namespace TarmacGauntlet.Management
                     }
                     break;
                 case "issues":
+                    Head("LAP", "rh-log-at");
+                    Head("ISSUE", "rh-log-fill");
                     foreach (IssueRecord i in race.Issues)
                     {
                         VisualElement row = Box("rs-row");
-                        row.Add(Menus.Text("L" + Num(i.Lap), "rs-at"));
+                        row.Add(Menus.Text(Num(i.Lap), "rs-at"));
                         row.Add(Menus.Text(i.TemplateId, "rh-issue-name", true));
                         row.Add(Swatch(Colour(i.DriverId)));
                         if (i.FixedLap == null) row.Add(Menus.Text("DNF", "rs-dnf", true));

@@ -271,7 +271,7 @@ namespace TarmacGauntlet.Management
                 VisualElement row = Row("rs-row", "rs-podium-row");
                 row.EnableInClassList("me", r.CarId == summary.Player?.CarId);
                 row.Add(Text(Num(place), "rs-place p" + place, true));
-                row.Add(Text(r.TeamName, "rs-team-name", true));
+                row.Add(OfficeKit.PodiumTeam(r, Text));
                 row.Add(Text("P" + Num(r.Position), "rs-overall"));
                 rows.Add(row);
             }
