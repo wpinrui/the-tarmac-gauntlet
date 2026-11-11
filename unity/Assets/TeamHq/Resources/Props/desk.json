@@ -1,0 +1,1 @@
+{"min": [-1.0, 0.0, -0.46911], "max": [1.0, 0.7875, 0.4781], "mats": [{"col": "desk_0_c.jpg", "nrm": "desk_0_n.jpg", "ms": "desk_0_s.png", "color": [1, 1, 1, 1], "metal": 1.0, "rough": 1.0, "cutout": false, "blend": false, "twoSided": true}], "parts": [{"mat": 0, "n": 6070, "i": 20694, "pos": 0, "nrm": 36420, "uv": 54632, "idx": 103192, "wide": false}]}

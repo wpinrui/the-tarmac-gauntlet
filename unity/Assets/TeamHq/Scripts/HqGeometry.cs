@@ -207,7 +207,7 @@ namespace TarmacGauntlet.TeamHq
                 foreach (float x in new[] { -7f, 0f, 7f })
                     Lights.Add(new HqLight { Position = V(x, H - 1.4f, z), Range = 14, Intensity = 0.6f, Warm = true });
 
-            // Crew corner: workbench with its tools, tool board, lockers and three crew.
+            // Crew corner: workbench with its tools, tool board and lockers. The crew themselves are HqCrew.
             Box("walnut", 0.8f, 0.08f, 4.5f, V(X0 + 0.5f, 0.9f, 1.5f));
             Box("cabinet", 0.7f, 0.85f, 4.4f, V(X0 + 0.48f, 0.43f, 1.5f));
             Plane("dark", 4.5f, 1.4f, V(X0 + 0.02f, 1.85f, 1.5f), Rot.Y(90), 0);
@@ -227,9 +227,6 @@ namespace TarmacGauntlet.TeamHq
                 Box("trim", 0.5f, 1.9f, 0.5f, V(X0 + 0.3f, 0.95f, z));
                 Box("dark", 0.01f, 0.25f, 0.12f, V(X0 + 0.555f, 1.5f, z + 0.12f));
             }
-            Prop("crew_suit", -11.5f, 0, 0.4f, 90);
-            Prop("crew_overalls", -11.6f, 0, 2.6f, 105);
-            Prop("crew_vest", -10.9f, 0, -1.4f, 126);
 
             // Around the bays: the race car's tool cart, tyres, the compressor and the walls' fittings.
             Prop("tool_cart", BayX[1] + 1.55f, 0, CarZ - 1.2f, -90);
