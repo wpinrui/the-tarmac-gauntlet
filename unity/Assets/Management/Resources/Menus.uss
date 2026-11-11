@@ -382,7 +382,8 @@
 .np-page { position: absolute; overflow: hidden; }
 .np-sheet { position: absolute; padding: 34px 54px 30px 54px; flex-direction: column; }
 .np-mast { align-items: stretch; }
-.np-masthead { font-size: 68px; -unity-text-align: middle-center; margin-bottom: 6px; }
+.np-masthead { height: 128px; margin-bottom: 12px; -unity-background-scale-mode: scale-to-fit; }
+.np-thick { height: 6px; margin-bottom: 3px; background-color: rgb(18, 18, 18); }
 .np-rule { height: 1px; background-color: rgb(18, 18, 18); }
 .np-double { height: 5px; border-top-width: 1px; border-bottom-width: 1px; border-color: rgb(18, 18, 18); }
 .np-dateline { font-size: 15px; letter-spacing: 3.6px; padding: 8px 0 6px 0; -unity-text-align: middle-center; }
