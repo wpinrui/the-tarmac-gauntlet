@@ -46,7 +46,9 @@ namespace TarmacGauntlet.Management
         }
 
         private Menus menus;
-        private VisualElement body, roster, detail, statHeader;
+        private const float StatMenuWidth = 180;
+
+        private VisualElement body, roster, detail, statHeader, statMenu;
         private Label statLabel, ageHeader, salaryHeader;
         private ListView list;
         private TextField search;
@@ -95,7 +97,7 @@ namespace TarmacGauntlet.Management
 
         private void Build()
         {
-
+            body.Add(menus.Text("DRIVING ORDER", "section-label"));
             roster = new VisualElement();
             roster.AddToClassList("roster");
             body.Add(roster);
@@ -128,12 +130,15 @@ namespace TarmacGauntlet.Management
             header.Add(Cell(ageHeader, "c-age"));
             statHeader = new VisualElement();
             statHeader.AddToClassList("stat-head");
-            statHeader.Add(Menus.Chevron("chevron-left", () => StepStat(-1)));
             statLabel = menus.Text("", "head");
             statLabel.AddToClassList("stat-name");
-            statLabel.RegisterCallback<ClickEvent>(_ => SortBy(Sort.Stat));
+            statLabel.pickingMode = PickingMode.Ignore;
             statHeader.Add(statLabel);
-            statHeader.Add(Menus.Chevron("chevron-right", () => StepStat(1)));
+            var caret = new VisualElement { pickingMode = PickingMode.Ignore };
+            caret.AddToClassList("caret");
+            caret.style.backgroundImage = Resources.Load<Texture2D>("MenuIcons/chevron-down");
+            statHeader.Add(caret);
+            statHeader.RegisterCallback<ClickEvent>(_ => ToggleStatMenu());
             header.Add(Cell(statHeader, "c-stat"));
             salaryHeader = menus.Text("SALARY", "head");
             salaryHeader.RegisterCallback<ClickEvent>(_ => SortBy(Sort.Salary));
@@ -156,7 +161,32 @@ namespace TarmacGauntlet.Management
 
             detail = new VisualElement();
             detail.AddToClassList("detail");
-            body.Add(detail);
+            menus.SideBody.Add(detail);
+
+            statMenu = new VisualElement();
+            statMenu.AddToClassList("stat-menu");
+            for (int i = -1; i < StatNames.Length; i++)
+            {
+                int pick = i;
+                Label item = menus.Text(i < 0 ? "OVR" : StatNames[i].ToUpperInvariant(), "stat-menu-item");
+                item.userData = pick;
+                item.RegisterCallback<ClickEvent>(e =>
+                {
+                    e.StopPropagation();
+                    PickStat(pick);
+                });
+                statMenu.Add(item);
+            }
+            statMenu.style.display = DisplayStyle.None;
+            body.Add(statMenu);
+            // A press anywhere else closes the stat menu.
+            body.RegisterCallback<PointerDownEvent>(e =>
+            {
+                if (statMenu.style.display == DisplayStyle.None) return;
+                var target = e.target as VisualElement;
+                if (target != null && (statMenu.Contains(target) || statHeader.Contains(target))) return;
+                CloseStatMenu();
+            }, TrickleDown.TrickleDown);
         }
 
         private static VisualElement Cell(VisualElement content, string cls)
@@ -305,7 +335,14 @@ namespace TarmacGauntlet.Management
                 }
                 slot.userData = e.Id;
                 slot.EnableInClassList("sel", e.Id == selected);
-                slot.Add(menus.Text(e.Id == You ? "YOU" : e.Name.ToUpperInvariant(), "slot-name"));
+                var top = new VisualElement();
+                top.AddToClassList("slot-top");
+                top.Add(menus.Text(e.Id == You ? "YOU" : e.Name.ToUpperInvariant(), "slot-name"));
+                var grip = new VisualElement { pickingMode = PickingMode.Ignore };
+                grip.AddToClassList("grip");
+                grip.style.backgroundImage = Resources.Load<Texture2D>("MenuIcons/grip");
+                top.Add(grip);
+                slot.Add(top);
                 var line = new VisualElement();
                 line.AddToClassList("slot-line");
                 Label ovr = menus.Text(e.Ovr.ToString(CultureInfo.InvariantCulture), "slot-ovr", true);
@@ -471,10 +508,29 @@ namespace TarmacGauntlet.Management
             RebuildList(true);
         }
 
-        private void StepStat(int step)
+        /// <summary>The dropdown under the stat column: OVR or one of the five stats, which the column shows and sorts by.</summary>
+        private void ToggleStatMenu()
         {
-            stat = (stat + 1 + step + 6) % 6 - 1;
+            if (statMenu.style.display == DisplayStyle.Flex)
+            {
+                CloseStatMenu();
+                return;
+            }
+            foreach (VisualElement item in statMenu.Children())
+                item.EnableInClassList("on", item.userData is int i && i == stat);
+            Rect r = statHeader.ChangeCoordinatesTo(body, statHeader.contentRect);
+            statMenu.style.left = Mathf.Round(r.xMax + 20 - StatMenuWidth);
+            statMenu.style.top = Mathf.Round(r.yMax + 4);
+            statMenu.style.display = DisplayStyle.Flex;
+        }
+
+        private void CloseStatMenu() => statMenu.style.display = DisplayStyle.None;
+
+        private void PickStat(int pick)
+        {
+            stat = pick;
             sort = Sort.Stat;
+            CloseStatMenu();
             RebuildList(true);
         }
 
