@@ -12,3 +12,6 @@ One row per run, win or lose. Full-suite runs only, plus dev runs marked as such
 | 2026-11-11 | dev, failed | E1.6 + TOUCH 0.2 | Inside the safety gap behind a car, only a path that gets closer breaks H1 | | | 1.47 | 1.00 | 41.2 |
 | 2026-11-11 | dev, failed | E1.6 + ZSWITCH 0.5 | In the braking zone, stay on the brakes rather than flick back to the throttle | | 14.1 | 1.86 | 0.75 | 41.9 |
 | 2026-11-11 | dev, failed | E1.6 + ZSWITCH 2 | The same, stronger | | 14.8 | 1.75 | 0.25 | 47.7 |
+| 2026-11-11 | dev, failed | E1.6 + SSWITCH 1 | Switching sides of the car ahead mid-move costs 1 (T9 back to 5 of 5 seeds) | 5.8 | 14.3 | 1.39 | 0.75 | 41.6 |
+| 2026-11-11 | dev, failed | E1.6 + SSWITCH 0.5 | The same, weaker | 5.8 | 12.0 | 1.47 | 1.00 | 43.4 |
+| 2026-11-11 | dev | E1.7 | A car slowed to a crawl may pass through a stopped ghost it can't get round (H12's safety net) | 5.8 | 12.3 | 1.24 | 0 | 53.0 |
