@@ -18648,5 +18648,10 @@
   "z0": 0.8149,
   "z1": 0.9402
  },
- "picks": {}
+ "picks": {
+  "frontbadge": 1,
+  "rearbadge": 1,
+  "name": 3,
+  "airbrake": 1
+ }
 }

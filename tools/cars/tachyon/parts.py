@@ -841,14 +841,13 @@ def options(ref):
             ob.name = f"opt_{group}_{n}_{i}"
             out.append(ob)
     _x, _y, fz, _r = R["badge_front"]
-    _x, _y, rz, _r = R["badge_rear"]
     for k, style in ((0, "chrome"), (1, "colour")):
         # front: on the nose tip (the reference), or low on the bumper above the intake slot
         add("frontbadge", 1 + k, badge(ref, style, 0.06, front_fr(), 0, fz, up, "fb", BADGE_T))
         add("frontbadge", 3 + k, badge(ref, style, 0.07, front_fr(), 0, 0.36, up, "fb", BADGE_T))
-        # rear: on the black band (the reference), or on the tail below the exhausts
-        add("rearbadge", 1 + k, badge(ref, style, 0.05, rear_fr(), 0, rz, up, "rb", BADGE_T, lift=0.0035))
-        add("rearbadge", 3 + k, badge(ref, style, 0.07, rear_fr(), 0, 0.55, up, "rb", BADGE_T))
+    # rear: Ivan's pick, chrome on the black band between the exhausts
+    tz = float(np.mean(np.array(R["exhaust"][0])[:, 1]))
+    add("rearbadge", 1, badge(ref, "chrome", 0.06, rear_fr(), 0, tz, up, "rb", BADGE_T, lift=0.0035))
     cap = 0.03
     add("name", 1, _flat(ref, nm, cap, rear_fr(), 0.45, 0.55, up, "nm", 0.0012, NAME_T, "chrome"))
     add("name", 2, _flat(ref, nm, cap, rear_fr(), -0.45, 0.55, up, "nm", 0.0012, NAME_T, "chrome"))

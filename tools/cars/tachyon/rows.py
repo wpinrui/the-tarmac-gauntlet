@@ -510,7 +510,7 @@ def measure(path):
         "rear_band": ring(band), "tail_slats": [ring(g) for g in slats], "exhaust": [ring(g) for g in tips],
         "diffuser": ring(diffuser), "badge_rear": badge_r,
         "airbrake": airbrake, "mirror": mirror,
-        "picks": {},
+        "picks": {"frontbadge": 1, "rearbadge": 1, "name": 3, "airbrake": 1},     # Ivan, 2026-11-11
     }
 
 
