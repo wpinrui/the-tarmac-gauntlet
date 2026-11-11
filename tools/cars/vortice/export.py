@@ -98,7 +98,7 @@ def build(game=False):
     ecut, pipes, pocket = parts.exhaust()
     cut(shell, ecut)
     out += pipes
-    parts.rear_parts(ref, out, pocket)
+    cut(shell, parts.rear_parts(ref, out, pocket))
     cut(shell, parts.grooves(ref))
     print("grooves cut")
 

@@ -413,7 +413,7 @@ def measure(path):
         "door": r4(door),
         "bonnet": r4(bonnet),
         "engine_cover": r4(engine),
-        "picks": {},
+        "picks": {"frontbadge": 4, "rearbadge": 2, "name": 4},
     }
 
 

@@ -14771,5 +14771,9 @@
    -0.1856
   ]
  ],
- "picks": {}
+ "picks": {
+  "frontbadge": 4,
+  "rearbadge": 2,
+  "name": 4
+ }
 }

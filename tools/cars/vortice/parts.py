@@ -197,7 +197,7 @@ def tail_pods():
     cut, parts = [], []
     for sgn, side in ((1, "l"), (-1, "r")):
         yc = y * sgn
-        cut.append(_cone(f"cut_tail_{side}", yc, z, R0 + POD_GAP, xf - 0.01, "housing"))
+        cut.append(_cone(f"cut_tail_{side}", yc, z, R0 + POD_GAP, xf + 0.006, "housing"))
         parts += [_cone(f"lamp_tail_{side}0", yc, z, R0, xf + 0.006, "lamp_tail"),
                   _ring(f"tail_bezel_{side}", yc, z, r - 0.006, R0 - 0.001, xf, xf + 0.0055, "housing"),
                   _ring(f"lamp_tail_{side}1", yc, z, r * 0.55 + 0.0005, r - 0.0065, xf + 0.001, xf + 0.0055, "lamp_tail"),
@@ -219,8 +219,8 @@ def intake_shape():
 def front_parts(ref, cutters, out):
     fr = front_fr()
     g = intake_shape()
-    cutters += blend.lay(ref, "cut_intake", g, fr, -0.04, 0.006, "grille", 0.012, along_ray=True)
-    out += blend.lay(ref, "intake_back", g.buffer(-0.006), fr, -0.039, -0.035, "grille", 0.012, along_ray=True)
+    cutters += blend.lay(ref, "cut_intake", g, fr, -0.045, 0.006, "grille", 0.012, along_ray=True)
+    out += blend.lay(ref, "intake_back", g.buffer(-0.002), fr, -0.039, -0.035, "grille", 0.012, along_ray=True)
     b = g.bounds
     zb = b[1] + BAR_Z * (b[3] - b[1])
     for sgn, side in ((1, "l"), (-1, "r")):
@@ -228,7 +228,7 @@ def front_parts(ref, cutters, out):
         pts = [(0.06, zb), (0.25, zb), (0.42, zb - 0.005), (INTAKE_BARS, zb - 0.035)]
         line = LineString(geom.catmull_open(pts, 8)).buffer(0.0085, cap_style=1)
         bar = sscale(line, sgn, 1, origin=(0, 0)).intersection(g.buffer(-0.012))
-        out += blend.lay(ref, f"intake_bar_{side}", bar, fr, -0.03, -0.012, "dark_metal", 0.006, along_ray=True)
+        out += blend.lay(ref, f"intake_bar_{side}", bar, fr, -0.0345, -0.012, "dark_metal", 0.006, along_ray=True)
 
 
 # ---------------------------------------------------------------- glass and trim
@@ -525,18 +525,24 @@ def exhaust():
     return cut, pipes, pocket
 
 
+DIFFUSER_Z0 = 0.20     # below this the tail turns under the car
+
+
 def rear_parts(ref, out, pocket):
-    """The black panels beside the tail lamps and the diffuser, raised on the tail."""
+    """The black panels beside the tail lamps and the diffuser, raised on the tail, each along its
+    own ray so a curved panel keeps an even lift. Returns no cutters."""
     fr = rear_fr()
     _x, y, z, r = R["tail_lamp"]
     for p in R["rear_panels"]:
         g = soft(poly(p), 0.01)
         for sgn, side in ((1, "l"), (-1, "r")):
             q = g if sgn > 0 else flip(g)
-            q = q.difference(Point(y * sgn, z).buffer(r + 0.008, 64))
+            q = q.difference(Point(y * sgn, z).buffer(r + TAIL_POD + 0.008, 64))
             out += blend.lay(ref, f"rear_panel_{side}", q, fr, 0.0015, 0.0035, "grille", 0.008)
     d = soft(poly(R["diffuser"]), 0.02).difference(pocket.buffer(0.01))
-    out += blend.lay(ref, "diffuser", d, fr, 0.0015, 0.004, "grille", 0.01)
+    d = soft(d.intersection(box(-2, DIFFUSER_Z0, 2, 2)), 0.01)     # only where the tail faces back
+    out += blend.lay(ref, "diffuser", d, fr, 0.002, 0.0045, "grille", 0.005, along_ray=True)
+    return []
 
 
 def arches():
@@ -591,8 +597,8 @@ def interior(floor):
             body.inside(x, 0.035 + 0.003)).difference(body.inside(x, 0.035 + 0.025))
         obs.append(_loft(f"door_card_{side}", CABIN_BACK + 0.25, 0.68, clip, n=14))
         yc = 0.30 * sgn
-        obs.append(_rbox(f"seat_base_{side}", -0.35, 0.15, yc - 0.22, yc + 0.22, floor + 0.004, 0.36))
-        obs.append(_rbox(f"seat_back_{side}", -0.47, -0.35, yc - 0.21, yc + 0.21, 0.361, 0.92, lean=0.28))
+        obs.append(_rbox(f"seat_base_{side}", -0.35, 0.15, yc - 0.22, yc + 0.22, floor + 0.002, 0.36))
+        obs.append(_rbox(f"seat_back_{side}", -0.43, -0.31, yc - 0.21, yc + 0.21, 0.361, 0.92, lean=0.12))
     xm = R["screen"]["x_top"] - 0.03
     roof_in = body.inside(xm, 0.035).bounds[3]
     top = roof_in - 0.06
@@ -621,7 +627,7 @@ def engine():
     for sgn, side in ((1, "l"), (-1, "r")):
         y = 0.19 * sgn
         obs.append(_rbox(f"engine_cam_{side}", x0 + 0.03, x1 - 0.03, y - 0.065, y + 0.065, 0.662, 0.74, r=0.03, mat="engine_red"))
-        lo, hi = sorted((0.085 * sgn, 0.125 * sgn))
+        lo, hi = sorted((0.0856 * sgn, 0.1244 * sgn))     # clear of the plenum and cam cover
         for i, x in enumerate(np.linspace(x0 + 0.10, x1 - 0.10, 4)):
             obs.append(_rbox(f"engine_runner_{side}{i}", x - 0.025, x + 0.025, lo, hi, 0.70, 0.765, r=0.012, mat="engine_metal"))
     obs.append(_rbox("engine_plenum", x0 + 0.06, x1 - 0.06, -0.085, 0.085, 0.662, 0.80, r=0.04, mat="engine_metal"))
@@ -788,7 +794,7 @@ def badge_colour():
     for g, (_q, f) in zip(shapes, pieces):
         mat = COLOURS[f.lower()]
         by[mat] = by.get(mat, Polygon()).union(g)
-    return [(g.simplify(0.003), m) for m, g in by.items()]
+    return [(g.simplify(0.003).buffer(-0.004), m) for m, g in by.items()]     # the colours stand just apart
 
 
 def name_shape():
