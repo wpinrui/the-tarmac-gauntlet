@@ -4,7 +4,7 @@ using System.Linq;
 using TarmacGauntlet.Career;
 using TarmacGauntlet.Simulation;
 using UnityEngine.UIElements;
-using static TarmacGauntlet.Management.OfficeKit;
+using static TarmacGauntlet.Management.MenuKit;
 
 namespace TarmacGauntlet.Management
 {
@@ -12,7 +12,7 @@ namespace TarmacGauntlet.Management
     /// The Scouting report: one class at a time, opening on the player's, with every team's race car stats, its crew and
     /// its last finish. A column header sorts by it. Clicking a team shows its car and drivers in the side pane.
     /// </summary>
-    public sealed class ScoutingPanel : OfficePanel
+    public sealed class ScoutingPanel : MenuPanel
     {
         public const string Slug = "scouting-report";
 
@@ -47,7 +47,7 @@ namespace TarmacGauntlet.Management
         private Column sort = Column.Pace;
         private string picked;
 
-        protected override string ScreenSlug => Slug;
+        protected override bool Shows(string slug) => slug == Slug;
 
         protected override void OnOpened()
         {
@@ -69,31 +69,26 @@ namespace TarmacGauntlet.Management
             Scout mine = all.FirstOrDefault(s => s.Mine);
             CarClass cls = shownClass.HasValue && classes.Contains(shownClass.Value) ? shownClass.Value : mine?.Class ?? classes[0];
 
-            VisualElement tabs = Box("rs-tabs");
+            VisualElement tabs = Box("tabs");
             foreach (CarClass c in classes)
             {
                 CarClass pick = c;
-                Label tab = Tab(Menus, ClassLabels.Name(c), c == cls, () =>
+                tabs.Add(ClassTab(c, c == cls, () =>
                 {
                     shownClass = pick;
                     picked = null;
                     Render();
-                });
-                tab.AddToClassList("rs-tab-class");
-                tab.style.color = ClassLabels.Colour(c);
-                tabs.Add(tab);
+                }));
             }
             Body.Add(tabs);
 
-            VisualElement header = Box("of-head-row");
-            header.Add(Box("sc-team"));
+            VisualElement header = HeadRow(Fill());
             foreach ((Column key, string name, string tip) in Columns)
             {
-                Label head = Menus.Text(name, "of-head");
-                head.AddToClassList("sc-cell");
+                Label head = Head(name, "c-scout");
                 head.AddToClassList("sort");
                 head.EnableInClassList("on", key == sort);
-                Menus.Tooltip(head, tip);
+                Tips.Attach(head, tip);
                 head.RegisterCallback<ClickEvent>(_ =>
                 {
                     sort = key;
@@ -107,30 +102,28 @@ namespace TarmacGauntlet.Management
             rows.Sort(Compare);
             Scout chosen = rows.FirstOrDefault(s => s.Team.Id == picked) ?? rows.FirstOrDefault(s => s.Mine) ?? rows[0];
 
-            ScrollView list = Scroll("rs-scroll");
+            ScrollView list = Scroll();
             foreach (Scout s in rows)
             {
-                VisualElement row = Box("of-row", "of-click", "of-two-line");
-                row.EnableInClassList("me", s.Mine);
-                row.EnableInClassList("pick", s == chosen);
-                VisualElement team = Box("sc-team");
-                team.Add(TeamLines(s.Team, s.Team.Name, s.Model, Menus.Text));
+                string id = s.Team.Id;
+                VisualElement row = Row(() =>
+                {
+                    picked = id;
+                    shownClass = cls;
+                    Render();
+                }, "two-line", s.Mine ? "me" : null);
+                row.EnableInClassList("on", s == chosen);
+                VisualElement team = TeamLines(s.Team, s.Team.Name, s.Model);
+                team.AddToClassList("fill");
                 row.Add(team);
                 foreach ((Column key, _, _) in Columns)
                 {
                     int v = s.Values[(int)key];
                     string text = key == Column.Condition ? Num(v) + "%" : key == Column.Last ? (s.Last.HasValue ? "P" + Num(v) : "") : Num(v);
-                    Label cell = Menus.Text(text, "sc-cell", true);
-                    if (key == Column.Condition) cell.AddToClassList(v >= 60 ? "v-hi" : v >= 50 ? "v-mid" : "v-lo");
+                    Label cell = Cell(text, "c-scout", true);
+                    if (key == Column.Condition) Banded(cell, v);
                     row.Add(cell);
                 }
-                string id = s.Team.Id;
-                row.RegisterCallback<ClickEvent>(_ =>
-                {
-                    picked = id;
-                    shownClass = cls;
-                    Render();
-                });
                 list.Add(row);
             }
             Body.Add(list);
@@ -147,38 +140,20 @@ namespace TarmacGauntlet.Management
         private void Detail(Scout s)
         {
             VisualElement side = Menus.SideBody;
-            VisualElement title = Box("of-named");
-            VisualElement flag = Flag(s.Team);
-            flag.AddToClassList("of-flag-lg");
-            title.Add(flag);
-            title.Add(Menus.Text(s.Team.Name.ToUpperInvariant(), "sc-det-name", true));
-            side.Add(title);
-            VisualElement car = Box("sc-det-car");
-            car.Add(ClassLabels.Make(s.Class, "cls-sm", Menus.Bold));
-            car.Add(Menus.Text(s.Model.Name, "sc-det-car-name", true));
+            side.Add(TeamTitle(s.Team));
+            VisualElement car = Box("detail-meta");
+            car.Add(ClassLabels.Make(s.Class, "cls-sm"));
+            car.Add(Text(s.Model.Name, "detail-car", true));
+            car.Add(Text(Years(s.Age), "meta-item"));
             side.Add(car);
-            VisualElement meta = Box("sc-det-meta");
-            meta.Add(Menus.Text("CAR AGE", "sc-det-meta-label"));
-            meta.Add(Menus.Text(Num(s.Age), "sc-det-meta-value", true));
-            side.Add(meta);
-            if (s.Drivers.Count > 0)
-            {
-                VisualElement head = Box("of-head-row", "sc-driver-head");
-                head.Add(Box("of-fill"));
-                Label ovrHead = Menus.Text("OVR", "of-head");
-                ovrHead.AddToClassList("sc-ovr-head");
-                head.Add(ovrHead);
-                side.Add(head);
-            }
+            if (s.Drivers.Count > 0) side.Add(HeadRow(Fill(), Head("OVR", "c-ovr")));
             foreach ((string name, string id, int ovr) in s.Drivers)
             {
-                VisualElement row = Box("of-row", "sc-driver");
-                VisualElement fill = Box("of-fill");
-                fill.Add(DriverLink(Menus, name, id, "sc-driver-name"));
+                VisualElement row = Row();
+                VisualElement fill = Fill();
+                fill.Add(DriverLink(Menus, name, id, "link-name"));
                 row.Add(fill);
-                Label value = Menus.Text(Num(ovr), "sc-ovr", true);
-                value.AddToClassList(ovr >= 60 ? "v-hi" : ovr >= 50 ? "v-mid" : "v-lo");
-                row.Add(value);
+                row.Add(Banded(Cell(Num(ovr), "c-ovr", true), ovr));
                 side.Add(row);
             }
         }
@@ -186,8 +161,8 @@ namespace TarmacGauntlet.Management
         /// <summary>A team with a race car entered, or null without one.</summary>
         private static Scout Read(GameState game, BaseTeam team)
         {
-            CarInstance car = team.Cars.FirstOrDefault(c => c.Id == team.EnteredCarId);
-            CarModel model = car == null ? null : game.CarModels.FirstOrDefault(m => m.Id == car.ModelId) ?? CarModels.All.FirstOrDefault(m => m.Id == car.ModelId);
+            CarInstance car = RaceCar(team);
+            CarModel model = car == null ? null : Model(car.ModelId);
             if (model == null) return null;
             CarStats stats = EffectiveStats.CalculateEffectiveStats(car, model);
             int? last = game.RaceHistory.LastOrDefault()?.Results.FirstOrDefault(r => r.TeamId == team.Id)?.Position;
@@ -229,8 +204,6 @@ namespace TarmacGauntlet.Management
                 if (game.Drivers.FirstOrDefault(d => d.Id == c.DriverId) is Driver d) drivers.Add((d.Name, d.Id, Ovr(d)));
             return drivers.OrderByDescending(d => d.Ovr).ToList();
         }
-
-        private static int Ovr(Driver d) => Round(DriverLifecycle.TotalDriverStats(DriverLifecycle.CalculateDriverStats(d)) / 5);
 
         private static int Round(double v) => (int)JsMath.Round(v);
     }

@@ -1,5 +1,10 @@
 /* The management menus: frosted glass with broadcast type, laid out on a 1600 x 900 reference screen.
-   Fonts are set from code (Menus.cs). Glass blur, sheen and shadows are drawn by MenuGlass.cs. */
+   Every screen is built from the pieces in MenuKit.cs, styled once here. Fonts are set from code.
+   Glass blur, sheen and shadows are drawn by MenuGlass.cs.
+
+   Type: 12px small caps labels, 13px column heads, 15px rows, 26px names, 46px big numbers.
+   Text: white, muted at 62%, dim at 42%. Money and good values in green, bad in red, middling in amber.
+   Corners: 12px for rows, tiles and small buttons, 20px for buttons and insets, 24px for panels. */
 
 .root { position: absolute; left: 0; top: 0; right: 0; bottom: 0; color: rgb(255, 255, 255); }
 .layer { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
@@ -17,14 +22,14 @@
 
 /* Top bar */
 .top { position: absolute; left: 32px; right: 32px; top: 24px; flex-direction: row; justify-content: space-between; align-items: center; }
-.team { flex-direction: row; align-items: center; }
+.top-team { flex-direction: row; align-items: center; }
 .badge { width: 32px; height: 32px; margin-right: 14px; -unity-background-scale-mode: scale-to-fit; }
-.team-name { font-size: 16px; letter-spacing: 1.1px; }
+.top-name { font-size: 16px; letter-spacing: 1.1px; }
 .meta { flex-direction: row; align-items: center; height: 46px; padding-left: 22px; padding-right: 22px; }
 .year { font-size: 15px; letter-spacing: 0.9px; color: rgba(255, 255, 255, 0.62); margin-right: 18px; }
 .money { font-size: 21px; color: rgb(61, 220, 132); }
 
-/* Menus */
+/* Hub menu and icon strip */
 .menu { position: absolute; left: 32px; top: 112px; padding: 10px; }
 .layer.centre > .menu { position: relative; left: 0; top: 0; }
 .group.spaced { margin-top: 14px; }
@@ -34,45 +39,238 @@
 .hub-item { padding-left: 50px; }
 .item-icon { position: absolute; left: 16px; top: 10px; width: 20px; height: 20px; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.75); }
 .item:hover .item-icon, .item.on .item-icon { -unity-background-image-tint-color: rgb(255, 255, 255); }
-
-/* Icon strip */
 .strip { position: absolute; left: 32px; top: 112px; padding: 8px; }
 .strip .group.spaced { margin-top: 12px; }
 .icon { width: 52px; height: 46px; border-radius: 12px; align-items: center; justify-content: center; }
-.icon:hover, .icon.on { background-color: rgba(255, 255, 255, 0.1); }
+.icon:hover { background-color: rgba(255, 255, 255, 0.1); }
 .icon.on { background-color: rgba(255, 255, 255, 0.2); }
 .icon-image { width: 22px; height: 22px; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.75); }
 .icon:hover .icon-image, .icon.on .icon-image { -unity-background-image-tint-color: rgb(255, 255, 255); }
+.item.dim, .icon.dim { opacity: 0.35; }
+.item.dim:hover, .icon.dim:hover { background-color: rgba(0, 0, 0, 0); }
 
-/* Car tag */
+/* The race car's tag in the garage */
 .tag { position: absolute; min-width: 250px; padding: 12px 16px; }
 .tag-top { flex-direction: row; align-items: center; margin-bottom: 8px; }
 .tag-top .cls { margin-right: 10px; }
 .tag-name { font-size: 16px; letter-spacing: 0.8px; white-space: nowrap; }
-.condition { flex-direction: row; align-items: center; }
-.bar { flex-grow: 1; height: 5px; border-radius: 9px; background-color: rgba(255, 255, 255, 0.15); margin-right: 10px; overflow: hidden; }
-.bar-fill { height: 100%; border-radius: 9px; }
-.percent { font-size: 15px; }
-.hi .bar-fill { background-color: rgb(61, 220, 132); }
-.hi .percent { color: rgb(61, 220, 132); }
-.mid .bar-fill { background-color: rgb(255, 176, 32); }
-.mid .percent { color: rgb(255, 176, 32); }
-.lo .bar-fill { background-color: rgb(255, 90, 79); }
-.lo .percent { color: rgb(255, 90, 79); }
+.tag-condition { flex-direction: row; align-items: center; }
+.tag-condition > .stat-value { width: auto; }
+
+/* Panels */
+.panel { position: absolute; right: 32px; top: 100px; bottom: 32px; width: 620px; border-radius: 24px; padding: 16px; }
+.panel-body { flex-grow: 1; }
+.panel#crew, .panel#new-game { bottom: auto; }
+.panel#finances { bottom: auto; max-height: 768px; }
+.side { position: absolute; right: 668px; top: 100px; width: 460px; border-radius: 24px; padding: 20px; }
+.side-body { flex-grow: 1; flex-shrink: 1; min-height: 0; }
+.lineup { position: absolute; right: 40px; bottom: 40px; width: 400px; padding: 10px; }
+.lineup-rows { margin-bottom: 10px; }
+
+/* Small caps label over a part of a panel */
+.section-label { flex-shrink: 0; margin-bottom: 8px; padding-left: 4px; font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.62); }
+.block { flex-shrink: 0; margin-bottom: 12px; }
+
+/* Lists: a head row over rows, both padded 12px so heads sit over their cells. Numbers align right, words left. */
+.list { flex-grow: 1; flex-shrink: 1; min-height: 0; }
+.head-row { flex-direction: row; align-items: center; flex-shrink: 0; height: 28px; padding-left: 12px; padding-right: 12px; }
+.head { flex-shrink: 0; font-size: 13px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.42); -unity-text-align: middle-right; white-space: nowrap; }
+.head.sort:hover, .stat-head:hover .head { color: rgba(255, 255, 255, 0.75); }
+.head.on, .stat-head .head.on { color: rgb(255, 255, 255); }
+.stat-head { flex-direction: row; align-items: center; justify-content: flex-end; }
+.caret { position: absolute; right: -14px; top: 50%; width: 10px; height: 10px; margin-top: -5px; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.6); }
+.row { flex-direction: row; align-items: center; flex-shrink: 0; height: 36px; padding-left: 12px; padding-right: 12px; border-radius: 12px; border-width: 1px; border-color: rgba(255, 255, 255, 0); font-size: 15px; }
+.row.click:hover { background-color: rgba(255, 255, 255, 0.1); }
+.row.me, .row.me.click:hover, .row.drag { background-color: rgba(255, 255, 255, 0.2); }
+.row.on, .row.on.click:hover { background-color: rgba(255, 255, 255, 0.2); border-color: rgba(255, 255, 255, 0.55); }
+.row.two-line { height: 54px; align-items: flex-start; padding-top: 7px; }
+.row.two-line > .cell { height: 20px; }
+.row > .cls { margin-right: 12px; }
+.cell { flex-shrink: 0; white-space: nowrap; -unity-text-align: middle-right; }
+.fill { flex-grow: 1; flex-shrink: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; -unity-text-align: middle-left; }
+.row-icon { width: 18px; height: 18px; margin-right: 14px; flex-shrink: 0; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.75); }
+.grip { width: 10px; height: 14px; margin-right: 12px; flex-shrink: 0; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.45); }
+.drag-row:hover .grip { -unity-background-image-tint-color: rgba(255, 255, 255, 0.9); }
+.pin { position: absolute; left: 0; right: 0; background-color: rgb(74, 77, 77); }
+.pin.top { top: 28px; }
+.pin.bottom { bottom: 0; }
+
+/* Columns before the name */
+.c-pos { width: 30px; margin-right: 12px; }
+.c-place { width: 20px; margin-right: 12px; }
+.c-class { width: 24px; margin-right: 12px; }
+.c-year { width: 52px; margin-right: 12px; -unity-text-align: middle-left; }
+.c-at { width: 36px; margin-right: 16px; }
+.c-secs { width: 52px; margin-right: 12px; }
+.c-tyre { width: 18px; height: 18px; margin-right: 12px; -unity-background-scale-mode: scale-to-fit; }
+.c-fuel { width: 48px; margin-right: 16px; color: rgba(255, 255, 255, 0.62); }
+.c-swatch { width: 10px; margin-right: 12px; }
+/* Columns after the name */
+.c-team { width: 150px; margin-left: 12px; font-size: 13px; color: rgba(255, 255, 255, 0.62); overflow: hidden; text-overflow: ellipsis; -unity-text-align: middle-left; }
+.c-age { width: 40px; margin-left: 12px; }
+.c-stat { width: 92px; margin-left: 12px; }
+.c-salary { width: 86px; margin-left: 12px; }
+.c-cond { width: 64px; margin-left: 12px; }
+.c-price { width: 96px; margin-left: 12px; }
+.c-laps { width: 52px; margin-left: 12px; }
+.c-prize { width: 100px; margin-left: 12px; }
+.c-overall { width: 44px; margin-left: 12px; color: rgba(255, 255, 255, 0.62); }
+.c-prestige { width: 72px; margin-left: 12px; }
+.c-change { width: 72px; margin-left: 12px; }
+.c-scout { width: 44px; margin-left: 6px; }
+.c-ovr { width: 48px; margin-left: 12px; }
+.c-class-pos { width: 84px; margin-left: 12px; }
+.c-amount { margin-left: 14px; }
+.c-range { width: 100px; margin-left: 12px; color: rgba(255, 255, 255, 0.62); }
+.c-count { width: 54px; margin-left: 12px; }
+.c-lap { width: 90px; margin-left: 12px; color: rgba(255, 255, 255, 0.62); }
+.c-fixed { width: 54px; margin-left: 12px; }
+.trend { flex-direction: row; align-items: center; justify-content: flex-end; }
+.trend-arrow { width: 12px; height: 12px; margin-right: 6px; -unity-background-scale-mode: scale-to-fit; }
+
+/* Teams: flag and name in one line, the car model under it in two */
+.team-name { flex-direction: row; align-items: center; min-width: 0; }
+.team-name-text { flex-shrink: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.team-lines { min-width: 0; }
+.car-name { margin-top: 2px; margin-left: 30px; font-size: 13px; color: rgba(255, 255, 255, 0.62); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.flag { width: 20px; height: 15px; margin-right: 10px; flex-shrink: 0; border-width: 1px; border-color: rgba(255, 255, 255, 0.28); border-radius: 2px; -unity-background-scale-mode: scale-and-crop; }
+.flag-lg { width: 32px; height: 24px; margin-right: 14px; border-radius: 3px; }
+.team-title { flex-direction: row; align-items: center; flex-shrink: 0; margin-bottom: 8px; }
+.team-title > .detail-name { flex-shrink: 1; min-width: 0; white-space: normal; }
+.brand-name { flex-direction: row; align-items: center; }
+.brand { width: 22px; height: 22px; margin-right: 10px; flex-shrink: 0; -unity-background-scale-mode: scale-to-fit; }
+.brand-name-text { flex-shrink: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.link { cursor: link; }
+.link-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.words { flex-direction: row; align-items: center; }
+.word { margin-right: 5px; white-space: nowrap; }
+.swatch { width: 10px; height: 10px; border-radius: 3px; margin-right: 12px; flex-shrink: 0; }
+.who { flex-direction: row; align-items: center; }
+.who-name { flex-shrink: 1; min-width: 0; margin-right: 10px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.who-fixed { flex-shrink: 1; min-width: 0; font-size: 13px; color: rgb(255, 176, 32); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+/* Class labels: the class letter in its colour, boxed in the same colour (ClassLabels.cs) */
+.cls { border-width: 1.5px; border-radius: 6px; -unity-text-align: middle-center; flex-shrink: 0; -unity-background-scale-mode: scale-and-crop; }
+.cls-sm { width: 24px; height: 21px; font-size: 12px; }
+.cls-md { width: 30px; height: 27px; font-size: 15px; }
+
+/* Tabs */
+.tabs { flex-direction: row; flex-shrink: 0; margin-bottom: 8px; }
+.tab { flex-direction: row; align-items: center; justify-content: center; height: 36px; min-width: 40px; margin-right: 2px; padding-left: 12px; padding-right: 12px; border-radius: 12px; font-size: 14px; letter-spacing: 1.1px; color: rgba(255, 255, 255, 0.62); -unity-text-align: middle-center; }
+.tab:hover { background-color: rgba(255, 255, 255, 0.1); color: rgb(255, 255, 255); }
+.tab.on { background-color: rgba(255, 255, 255, 0.2); color: rgb(255, 255, 255); }
+.tab-class { letter-spacing: 0; }
+.tab-end { margin-left: auto; }
+.tab-icon { width: 18px; height: 18px; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.75); }
+.tab-count { margin-left: 8px; font-size: 14px; letter-spacing: 0; color: rgba(255, 255, 255, 0.42); }
+.tab.on .tab-count { color: rgba(255, 255, 255, 0.62); }
+
+/* Steppers: a value between two chevrons. A chevron hides where the value can't go further. */
+.stepper { flex-direction: row; align-items: center; flex-shrink: 0; }
+.stepper-value { min-width: 84px; font-size: 15px; letter-spacing: 1.2px; -unity-text-align: middle-center; }
+.chevron { width: 36px; height: 36px; border-radius: 10px; align-items: center; justify-content: center; }
+.chevron:hover { background-color: rgba(255, 255, 255, 0.1); }
+.chevron-image { width: 18px; height: 18px; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.75); }
+.chevron:hover .chevron-image { -unity-background-image-tint-color: rgb(255, 255, 255); }
+.year-stepper { margin-bottom: 8px; }
+.settings-stepper { width: 250px; }
+.settings-stepper > .stepper-value { flex-grow: 1; letter-spacing: 0.6px; }
+.qty-stepper > .chevron { width: 30px; height: 32px; }
+.qty-stepper > .stepper-value { min-width: 26px; font-size: 16px; letter-spacing: 0; }
 
 /* Red buttons: a gradient child under the label, clipped to the corners */
 .red { overflow: hidden; border-radius: 20px; border-top-width: 1px; border-color: rgba(255, 255, 255, 0.3); border-left-width: 0; border-right-width: 0; border-bottom-width: 0; align-items: center; justify-content: center; }
 .red-fill { position: absolute; left: 0; top: 0; right: 0; bottom: 0; -unity-background-scale-mode: stretch-to-fill; }
 .red:hover .red-fill { -unity-background-image-tint-color: rgb(255, 225, 220); }
-.red-label { letter-spacing: 2.9px; -unity-text-align: middle-center; }
-.race { position: absolute; right: 40px; bottom: 40px; height: 62px; padding-left: 54px; padding-right: 54px; }
-.race .red-label { font-size: 22px; letter-spacing: 3.5px; }
+.red-label { font-size: 18px; letter-spacing: 2.9px; -unity-text-align: middle-center; }
+.red.disabled, .ghost-button.disabled { opacity: 0.35; }
+.red.disabled:hover .red-fill { -unity-background-image-tint-color: rgb(255, 255, 255); }
+.ghost-button { overflow: hidden; border-radius: 20px; border-width: 1px; border-color: rgba(255, 255, 255, 0.35); align-items: center; justify-content: center; }
+.ghost-button:hover { background-color: rgba(255, 255, 255, 0.1); }
+.ghost-label { font-size: 18px; letter-spacing: 2.9px; -unity-text-align: middle-center; }
 .panel-button { height: 52px; flex-shrink: 0; }
-.panel-button .red-label { font-size: 18px; }
+.big-button { height: 62px; flex-shrink: 0; padding-left: 54px; padding-right: 54px; }
+.big-button .red-label { font-size: 22px; letter-spacing: 3.5px; }
+.corner { position: absolute; right: 40px; bottom: 40px; }
+.small-button { flex-direction: row; align-items: center; justify-content: center; height: 36px; padding-left: 14px; padding-right: 14px; border-radius: 12px; background-color: rgba(255, 255, 255, 0.1); border-width: 1px; border-color: rgba(255, 255, 255, 0.14); }
+.small-button:hover { background-color: rgba(255, 255, 255, 0.18); }
+.small-button.disabled { opacity: 0.35; }
+.small-button.disabled:hover { background-color: rgba(255, 255, 255, 0.1); }
+.small-label { font-size: 14px; letter-spacing: 0.8px; -unity-text-align: middle-center; }
+.small-money { margin-left: 6px; font-size: 14px; color: rgb(61, 220, 132); }
 
-/* Docked panel */
-.panel { position: absolute; right: 32px; top: 100px; bottom: 32px; width: 620px; border-radius: 24px; padding: 16px; }
-.panel-body { flex-grow: 1; }
+/* Tiles: a small caps label over a value, a count or a button */
+.tiles { flex-direction: row; flex-shrink: 0; margin-bottom: 12px; }
+.tiles > .tile, .roster > .tile { flex-grow: 1; flex-basis: 0; margin-right: 8px; }
+.tiles > .tile.last, .roster > .tile.last { margin-right: 0; }
+.tile { flex-shrink: 0; padding: 10px 12px; border-radius: 12px; background-color: rgba(255, 255, 255, 0.06); border-width: 1px; border-color: rgba(255, 255, 255, 0); }
+.tile.click:hover { background-color: rgba(255, 255, 255, 0.1); }
+.tile.on, .tile.on.click:hover { background-color: rgba(255, 255, 255, 0.2); border-color: rgba(255, 255, 255, 0.55); }
+.tile.got { background-color: rgba(255, 255, 255, 0.14); }
+.tile.pv { border-color: rgba(255, 255, 255, 0.35); }
+.tile-head { flex-direction: row; align-items: center; justify-content: space-between; min-height: 22px; }
+.tile-label { font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.62); white-space: nowrap; }
+.tile-value { margin-top: 2px; font-size: 22px; }
+.tile-count { font-size: 20px; }
+.tile-price { font-size: 15px; color: rgba(255, 255, 255, 0.74); }
+.tile-line { flex-direction: row; align-items: center; justify-content: space-between; margin-top: 6px; }
+.tile-line > .small-button { flex-grow: 1; margin-left: 10px; }
+.tile > .small-button { margin-top: 8px; }
+.tile.preview .tile-value { opacity: 0.55; }
+.tick { width: 22px; height: 22px; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgb(61, 220, 132); }
+.inset { flex-shrink: 0; margin-bottom: 12px; padding: 16px; border-radius: 20px; background-color: rgba(0, 0, 0, 0.18); }
+.pips { flex-direction: row; align-items: center; }
+.pip { width: 6px; height: 6px; border-radius: 3px; margin-left: 4px; background-color: rgb(255, 255, 255); }
+
+/* Stats: a name that explains itself on hover, a 0 to 100 bar, the value, and sometimes a change */
+.stats { flex-shrink: 0; margin-bottom: 14px; }
+.stat-row { flex-direction: row; align-items: center; height: 22px; margin-bottom: 4px; }
+.stat-label { width: 150px; margin-right: 12px; font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.62); }
+.stat-bar { flex-grow: 1; height: 6px; border-radius: 9px; overflow: hidden; background-color: rgba(255, 255, 255, 0.15); }
+.stat-fill { height: 100%; border-radius: 9px; }
+.stat-ghost { position: absolute; top: 0; bottom: 0; border-top-right-radius: 9px; border-bottom-right-radius: 9px; background-color: rgba(255, 255, 255, 0.22); }
+.stat-ghost.lit { background-color: rgba(255, 255, 255, 0.55); }
+.stat-value { width: 40px; margin-left: 12px; font-size: 15px; -unity-text-align: middle-right; }
+.stat-delta { width: 40px; margin-left: 12px; font-size: 13px; -unity-text-align: middle-right; }
+.condition { margin-bottom: 8px; }
+.repair { flex-direction: row; align-items: center; justify-content: flex-end; }
+.repair > .small-button { margin-left: 4px; }
+.tag .stat-bar { height: 5px; margin-right: 10px; }
+
+/* A side pane's or a car's heading: the name, a line of details under it, and a big figure on the right */
+.detail { flex-shrink: 0; }
+.detail-head { flex-direction: row; justify-content: space-between; align-items: flex-end; flex-shrink: 0; margin-bottom: 14px; }
+.detail-name { font-size: 26px; letter-spacing: 1px; }
+.detail-meta { flex-direction: row; align-items: center; flex-shrink: 0; margin-top: 6px; margin-bottom: 8px; }
+.detail-meta > .cls { margin-right: 10px; }
+.detail-car { margin-right: 16px; font-size: 16px; }
+.meta-item { margin-right: 16px; font-size: 14px; letter-spacing: 0.8px; color: rgba(255, 255, 255, 0.62); }
+.detail-big { font-size: 46px; -unity-text-align: lower-right; }
+.detail-right { align-items: flex-end; }
+.detail-right > .meta-item { margin-right: 0; margin-top: 2px; }
+.detail-price { font-size: 28px; -unity-text-align: middle-right; }
+
+/* Popups: lists that open over everything, on the popup layer */
+.popup { position: absolute; padding: 6px; border-radius: 12px; background-color: rgba(24, 24, 26, 0.94); border-width: 1px; border-color: rgba(255, 255, 255, 0.14); }
+.popup-list { flex-shrink: 1; }
+.popup-item { height: 32px; padding-left: 12px; padding-right: 12px; border-radius: 8px; font-size: 14px; letter-spacing: 0.6px; color: rgba(255, 255, 255, 0.75); -unity-text-align: middle-left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.popup-item:hover, .popup-item.on { color: rgb(255, 255, 255); }
+.popup-item:hover { background-color: rgba(255, 255, 255, 0.1); }
+.popup-item.on { background-color: rgba(255, 255, 255, 0.2); }
+
+/* Tooltips: only on stats and skills */
+.tip { position: absolute; max-width: 260px; padding: 10px 14px; border-radius: 12px; font-size: 14px; white-space: normal; background-color: rgba(20, 20, 22, 0.92); border-width: 1px; border-color: rgba(255, 255, 255, 0.14); }
+
+/* Dialogs: over whatever is showing, Cancel and a red confirm */
+.dialog { width: 420px; border-radius: 24px; padding: 16px; }
+.dialog-body { padding: 8px 6px 16px 6px; }
+.dialog-title { font-size: 20px; letter-spacing: 1px; }
+.dialog-sub { font-size: 14px; letter-spacing: 0.8px; color: rgba(255, 255, 255, 0.62); }
+.dialog-career { flex-direction: row; align-items: center; }
+.dialog-badge { width: 44px; height: 44px; margin-right: 14px; -unity-background-scale-mode: scale-to-fit; }
+.dialog-buttons { flex-direction: row; }
+.dialog-button { flex-grow: 1; flex-basis: 0; height: 52px; margin-right: 8px; }
+.dialog-button.last { margin-right: 0; }
 
 /* Main menu: a tall glass column on the left edge */
 .main-column { position: absolute; left: 0; top: 0; bottom: 0; width: 470px; border-left-width: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; border-top-right-radius: 28px; border-bottom-right-radius: 28px; padding: 110px 56px; }
@@ -87,15 +285,9 @@
 /* Settings */
 .settings { width: 560px; border-radius: 24px; padding: 16px; }
 .settings-group.spaced { margin-top: 22px; }
-.row { flex-direction: row; align-items: center; height: 44px; padding-left: 16px; padding-right: 6px; border-radius: 12px; }
-.row:hover { background-color: rgba(255, 255, 255, 0.1); }
-.row-label { flex-grow: 1; font-size: 14px; letter-spacing: 1.1px; color: rgba(255, 255, 255, 0.62); }
-.stepper { width: 250px; flex-direction: row; align-items: center; }
-.stepper-value { flex-grow: 1; font-size: 15px; letter-spacing: 0.6px; -unity-text-align: middle-center; }
-.chevron { width: 36px; height: 36px; border-radius: 10px; align-items: center; justify-content: center; }
-.chevron:hover { background-color: rgba(255, 255, 255, 0.1); }
-.chevron-image { width: 18px; height: 18px; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.75); }
-.chevron:hover .chevron-image { -unity-background-image-tint-color: rgb(255, 255, 255); }
+.setting { flex-direction: row; align-items: center; height: 44px; padding-left: 16px; padding-right: 6px; border-radius: 12px; }
+.setting:hover { background-color: rgba(255, 255, 255, 0.1); }
+.setting-label { flex-grow: 1; font-size: 14px; letter-spacing: 1.1px; color: rgba(255, 255, 255, 0.62); }
 .slider { width: 250px; flex-direction: row; align-items: center; padding-right: 10px; }
 .track { flex-grow: 1; height: 34px; justify-content: center; margin-right: 12px; }
 .track-line { height: 6px; border-radius: 9px; background-color: rgba(255, 255, 255, 0.15); }
@@ -103,39 +295,62 @@
 .knob { position: absolute; top: 9px; width: 16px; height: 16px; margin-left: -8px; border-radius: 8px; background-color: rgb(255, 255, 255); }
 .slider-value { width: 32px; font-size: 15px; -unity-text-align: middle-right; }
 
-/* Tooltips: only on stats and skills */
-.tip { position: absolute; max-width: 260px; padding: 10px 14px; border-radius: 12px; font-size: 14px; white-space: normal; background-color: rgba(20, 20, 22, 0.92); border-width: 1px; border-color: rgba(255, 255, 255, 0.14); }
+/* Skill points: pips for the points left, then each skill between a minus and a plus */
+.skills { flex-shrink: 0; }
+.skill-pips { flex-direction: row; justify-content: center; margin-bottom: 10px; }
+.skill-pip { width: 10px; height: 10px; margin-left: 3.5px; margin-right: 3.5px; border-radius: 5px; background-color: rgb(255, 255, 255); border-width: 1.5px; border-color: rgb(255, 255, 255); }
+.skill-pip.used { background-color: rgba(255, 255, 255, 0); border-color: rgba(255, 255, 255, 0.3); }
+.skill-line { flex-direction: row; }
+.skill { flex-grow: 1; flex-basis: 0; align-items: center; }
+.skill-name { margin-bottom: 4px; font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.62); }
+.skill-level { flex-direction: row; align-items: center; }
+.skill-value { min-width: 38px; font-size: 28px; -unity-text-align: middle-center; }
+.skill-step { width: 28px; height: 28px; border-radius: 9px; align-items: center; justify-content: center; background-color: rgba(255, 255, 255, 0.14); }
+.skill-step:hover { background-color: rgba(255, 255, 255, 0.26); }
+.skill-step-icon { width: 14px; height: 14px; -unity-background-scale-mode: scale-to-fit; }
 
-/* Good to bad: green at 60 or more, amber from 50, red below. v- colours text, f- colours a fill. */
-.v-hi { color: rgb(61, 220, 132); }
-.v-mid { color: rgb(255, 176, 32); }
-.v-lo { color: rgb(255, 90, 79); }
-.f-hi { background-color: rgb(61, 220, 132); }
-.f-mid { background-color: rgb(255, 176, 32); }
-.f-lo { background-color: rgb(255, 90, 79); }
+/* One race, in the race summary and the race history (RaceView.cs) */
+.podium { flex-direction: row; flex-shrink: 0; margin-bottom: 14px; }
+.podium-class { width: 44px; height: 34px; font-size: 30px; -unity-text-align: middle-center; }
+.podium-rows { flex-grow: 1; }
+.hero { flex-direction: row; align-items: center; flex-shrink: 0; margin-bottom: 14px; }
+.hero-pos { font-size: 52px; margin-right: 24px; }
+.hero-class { flex-direction: row; align-items: center; margin-right: 24px; }
+.hero-class-pos { margin-left: 8px; font-size: 20px; }
+.hero-figure { margin-right: 24px; }
+.hero-value { font-size: 20px; }
+.hero-label { margin-top: -2px; font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.62); }
+.hero-prize { margin-left: auto; font-size: 22px; }
+.chart { flex-shrink: 0; height: 190px; margin-bottom: 10px; }
+.chart-plot { flex-grow: 1; }
+.chart-axis { position: absolute; height: 16px; font-size: 12px; letter-spacing: 0.7px; color: rgba(255, 255, 255, 0.42); }
+.chart-readout { position: absolute; top: -4px; right: 0; font-size: 14px; }
+.legend { flex-direction: row; flex-wrap: wrap; flex-shrink: 0; margin-bottom: 8px; }
+.legend-item { flex-direction: row; align-items: center; margin-right: 16px; margin-bottom: 4px; }
+.legend-item > .swatch { width: 12px; height: 12px; margin-right: 8px; }
+.legend-text { font-size: 14px; color: rgba(255, 255, 255, 0.62); }
+.legend-dot { width: 11px; height: 11px; margin-right: 8px; border-radius: 6px; background-color: rgb(255, 176, 32); }
+.legend-tick { width: 2px; height: 16px; margin-right: 8px; margin-left: 3px; background-color: rgba(255, 255, 255, 0.85); }
+.history-log { flex-grow: 1; flex-shrink: 1; min-height: 0; max-height: 300px; }
 
-/* Panel buttons */
-.red.disabled, .ghost-button.disabled { opacity: 0.35; }
-.red.disabled:hover .red-fill { -unity-background-image-tint-color: rgb(255, 255, 255); }
-.ghost-button { height: 52px; flex-shrink: 0; border-radius: 20px; border-width: 1px; border-color: rgba(255, 255, 255, 0.35); align-items: center; justify-content: center; }
-.ghost-button:hover { background-color: rgba(255, 255, 255, 0.1); }
-.ghost-label { font-size: 18px; letter-spacing: 2.9px; -unity-text-align: middle-center; }
+/* Race summary: results left, the player's race right, the car in its box between */
+.summary-results { position: absolute; left: 32px; top: 100px; bottom: 32px; width: 520px; border-radius: 24px; padding: 12px; }
+.summary-side { position: absolute; left: 908px; right: 32px; top: 100px; bottom: 164px; }
+.summary-box { flex-shrink: 0; margin-bottom: 16px; padding: 14px 20px; }
+.summary-box > .hero, .summary-box > .legend { margin-bottom: 0; }
+.summary-log { flex-grow: 1; min-height: 0; padding: 12px; }
+.summary-skills { position: absolute; left: 908px; bottom: 32px; width: 420px; height: 116px; padding: 10px 16px; justify-content: center; }
 
-/* Drivers: lineup tiles, market tools, market list, selected driver */
+/* Drivers */
 .roster { flex-direction: row; flex-shrink: 0; margin-bottom: 12px; }
-.slot { flex-grow: 1; flex-basis: 0; min-height: 66px; margin-right: 8px; padding: 10px 14px; border-radius: 12px; justify-content: center; background-color: rgba(255, 255, 255, 0.08); border-width: 1px; border-color: rgba(255, 255, 255, 0); }
-.slot.last { margin-right: 0; }
-.slot:hover { background-color: rgba(255, 255, 255, 0.12); }
-.slot.sel { background-color: rgba(255, 255, 255, 0.2); }
-.slot.empty { background-color: rgba(255, 255, 255, 0); border-color: rgba(255, 255, 255, 0.2); }
+.slot { min-height: 66px; justify-content: center; }
+.slot:hover { background-color: rgba(255, 255, 255, 0.1); }
+.slot.empty, .slot.empty:hover { background-color: rgba(255, 255, 255, 0); border-color: rgba(255, 255, 255, 0.2); }
 .slot.drag { opacity: 0.4; }
 .slot.over { border-color: rgba(255, 255, 255, 0.7); }
-.slot-name { font-size: 14px; letter-spacing: 0.6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.slot-line { flex-direction: row; align-items: center; justify-content: space-between; margin-top: 3px; }
-.slot-ovr { font-size: 22px; }
-.pips { flex-direction: row; align-items: center; }
-.pip { width: 6px; height: 6px; border-radius: 3px; margin-left: 4px; background-color: rgb(255, 255, 255); }
-
+.slot-name { flex-shrink: 1; min-width: 0; font-size: 14px; letter-spacing: 0.6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.slot .grip { margin-left: auto; margin-right: 0; }
+.slot:hover .grip { -unity-background-image-tint-color: rgba(255, 255, 255, 0.9); }
 .tools { flex-direction: row; flex-shrink: 0; margin-bottom: 6px; }
 .search { flex-grow: 1; flex-direction: row; align-items: center; height: 40px; padding-left: 14px; padding-right: 8px; border-radius: 12px; background-color: rgba(255, 255, 255, 0.08); }
 .search-icon { width: 16px; height: 16px; margin-right: 10px; flex-shrink: 0; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.6); }
@@ -145,67 +360,11 @@
 .chip:hover { background-color: rgba(255, 255, 255, 0.08); }
 .chip.on { background-color: rgba(255, 255, 255, 0.2); border-color: rgba(255, 255, 255, 0.55); color: rgb(255, 255, 255); }
 
-.list-head { flex-direction: row; align-items: center; flex-shrink: 0; height: 30px; padding-left: 14px; padding-right: 14px; }
-.head { font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.42); -unity-text-align: middle-right; }
-.head:hover { color: rgba(255, 255, 255, 0.75); }
-.head.on { color: rgb(255, 255, 255); }
-.cell { flex-shrink: 0; margin-left: 10px; }
-.c-name { flex-grow: 1; flex-shrink: 1; min-width: 0; margin-left: 0; }
-.c-team { width: 150px; }
-.c-age { width: 40px; }
-.c-stat { width: 104px; }
-.c-salary { width: 86px; }
-.stat-head { flex-direction: row; align-items: center; justify-content: flex-end; }
-.stat-head:hover .head { color: rgba(255, 255, 255, 0.75); }
-.stat-head .head.on { color: rgb(255, 255, 255); }
-.caret { position: absolute; right: -14px; top: 50%; width: 10px; height: 10px; margin-top: -5px; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.6); }
-.stat-menu { position: absolute; width: 180px; padding: 6px; border-radius: 12px; background-color: rgba(24, 24, 26, 0.94); border-width: 1px; border-color: rgba(255, 255, 255, 0.14); }
-.stat-menu-item { height: 32px; padding-left: 12px; padding-right: 12px; border-radius: 8px; font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.75); -unity-text-align: middle-left; }
-.stat-menu-item:hover { background-color: rgba(255, 255, 255, 0.1); color: rgb(255, 255, 255); }
-.stat-menu-item.on { background-color: rgba(255, 255, 255, 0.2); color: rgb(255, 255, 255); }
-.section-label { flex-shrink: 0; margin-bottom: 8px; padding-left: 4px; font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.62); }
-.slot-top { flex-direction: row; align-items: center; }
-.slot-name { flex-shrink: 1; min-width: 0; }
-.grip { width: 10px; height: 14px; margin-left: auto; flex-shrink: 0; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.45); }
-.slot:hover .grip { -unity-background-image-tint-color: rgba(255, 255, 255, 0.9); }
-
-.market { flex-grow: 1; flex-shrink: 1; min-height: 0; }
-.market-row { flex-direction: row; align-items: center; height: 35px; padding-left: 14px; padding-right: 14px; border-radius: 12px; font-size: 15px; }
-.market-row:hover { background-color: rgba(255, 255, 255, 0.08); }
-.market-row.sel { background-color: rgba(255, 255, 255, 0.2); }
-.r-name, .r-team { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -unity-text-align: middle-left; }
-.r-team { font-size: 13px; color: rgba(255, 255, 255, 0.62); }
-.r-age, .r-stat, .r-salary { -unity-text-align: middle-right; }
-.market-row.contracted .r-name, .market-row.contracted .r-age, .market-row.contracted .r-salary { color: rgba(255, 255, 255, 0.5); }
-
-.side { position: absolute; right: 668px; top: 100px; width: 460px; border-radius: 24px; padding: 20px; }
-.detail { flex-shrink: 0; }
-.detail-head { flex-direction: row; justify-content: space-between; align-items: flex-end; margin-bottom: 14px; }
-.detail-name { font-size: 26px; letter-spacing: 1px; }
-.detail-meta { flex-direction: row; align-items: center; margin-top: 6px; }
-.meta-item { margin-right: 16px; font-size: 14px; letter-spacing: 0.8px; color: rgba(255, 255, 255, 0.62); }
-.detail-ovr { font-size: 46px; -unity-text-align: lower-right; }
-.stats { margin-bottom: 14px; }
-.stat-row { flex-direction: row; align-items: center; height: 20px; margin-bottom: 6px; }
-.stat-label { width: 130px; margin-right: 14px; font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.62); }
-.stat-bar { flex-grow: 1; height: 6px; border-radius: 9px; overflow: hidden; background-color: rgba(255, 255, 255, 0.15); }
-.stat-fill { height: 100%; border-radius: 9px; }
-.stat-value { width: 40px; margin-left: 14px; font-size: 15px; -unity-text-align: middle-right; }
-.contract { flex-direction: row; margin-bottom: 14px; }
-.option { flex-grow: 1; flex-basis: 0; margin-right: 8px; padding: 8px 14px; border-radius: 12px; border-width: 1px; border-color: rgba(255, 255, 255, 0.14); }
-.option.last { margin-right: 0; }
-.option:hover { background-color: rgba(255, 255, 255, 0.08); }
-.option.sel { background-color: rgba(255, 255, 255, 0.2); border-color: rgba(255, 255, 255, 0.55); }
-.option-label { font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.62); }
-.option-price { font-size: 17px; }
-
-/* Crew: the panel fits its content, so more of the garage shows */
-.panel#crew { bottom: auto; }
-.crew-head { flex-direction: row; align-items: flex-end; margin-bottom: 12px; padding-left: 4px; padding-right: 4px; }
-.crew-count { font-size: 46px; }
-.crew-cost { font-size: 21px; color: rgb(61, 220, 132); }
-.crew-head.preview > .crew-count, .crew-head.preview > .crew-cost, .pit.preview .pit-time { opacity: 0.55; }
+/* Crew */
+.crew-head { align-items: flex-end; margin-bottom: 12px; padding-left: 4px; padding-right: 4px; }
+.crew-head.preview > .detail-big, .crew-head.preview > .detail-price { opacity: 0.55; }
 .crew-action { flex-grow: 1; margin-left: 16px; margin-bottom: 4px; font-size: 14px; letter-spacing: 1.1px; }
+.crew-grid { margin-bottom: 4px; }
 .crew-row { flex-direction: row; margin-bottom: 8px; }
 .member { width: 66px; height: 66px; margin-right: 8px; border-radius: 12px; align-items: center; justify-content: center; border-width: 1px; border-color: rgba(255, 255, 255, 0.22); }
 .member.last { margin-right: 0; }
@@ -217,221 +376,39 @@
 .member.leaving { background-color: rgba(255, 255, 255, 0.1); }
 .member.leaving .member-image { -unity-background-image-tint-color: rgba(255, 255, 255, 0.55); }
 .member.disabled { opacity: 0.35; }
-.pit { flex-direction: row; justify-content: space-between; align-items: center; margin-top: 4px; padding: 14px 16px; border-radius: 20px; background-color: rgba(0, 0, 0, 0.18); }
-.pit-label { font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.62); }
-.pit-time { font-size: 30px; }
 
-/* Class labels: the class letter in its colour, boxed in the same colour (ClassLabels.cs) */
-.cls { border-width: 1.5px; border-radius: 6px; -unity-text-align: middle-center; flex-shrink: 0; -unity-background-scale-mode: scale-and-crop; }
-.cls-sm { width: 24px; height: 21px; font-size: 12px; }
-.cls-md { width: 30px; height: 27px; font-size: 15px; }
-
-/* Lineup: one small panel where the Race button was */
-.lineup { position: absolute; right: 40px; bottom: 40px; width: 400px; padding: 10px; }
-.lu-head { flex-direction: row; justify-content: space-between; padding: 6px 16px 4px 44px; }
-.lu-label { font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.62); }
-.lu-rows { margin-bottom: 10px; }
-.lu-row { flex-direction: row; align-items: center; height: 52px; margin-bottom: 2px; padding-left: 10px; padding-right: 16px; border-radius: 12px; }
-.lu-row:hover { background-color: rgba(255, 255, 255, 0.1); }
-.lu-row.drag { background-color: rgba(255, 255, 255, 0.2); }
-.lu-grip { width: 22px; height: 22px; margin-right: 12px; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.45); }
-.lu-name { flex-grow: 1; font-size: 17px; letter-spacing: 0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lu-ovr { font-size: 24px; min-width: 34px; -unity-text-align: middle-right; }
-.lu-go { height: 62px; }
-.lu-go .red-label { font-size: 22px; letter-spacing: 3.5px; }
-
-/* Race summary: results left, the player's race right, the car in its box between */
-.rs-results { position: absolute; left: 32px; top: 100px; bottom: 32px; width: 520px; border-radius: 24px; padding: 12px; }
-.rs-side { position: absolute; left: 908px; right: 32px; top: 100px; bottom: 164px; }
-.rs-tabs { flex-direction: row; flex-shrink: 0; margin-bottom: 8px; }
-.rs-tab { flex-direction: row; align-items: center; justify-content: center; height: 36px; min-width: 40px; margin-right: 2px; padding-left: 12px; padding-right: 12px; border-radius: 12px; font-size: 14px; letter-spacing: 1.1px; color: rgba(255, 255, 255, 0.62); -unity-text-align: middle-center; }
-.rs-tab:hover { background-color: rgba(255, 255, 255, 0.1); color: rgb(255, 255, 255); }
-.rs-tab.on { background-color: rgba(255, 255, 255, 0.2); color: rgb(255, 255, 255); }
-.rs-tab-class { letter-spacing: 0; }
-.rs-tab-end { margin-left: auto; }
-.rs-tab-icon { width: 18px; height: 18px; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.75); }
-.rs-tab-count { margin-left: 8px; font-size: 14px; letter-spacing: 0; color: rgba(255, 255, 255, 0.42); }
-.rs-tab.on .rs-tab-count { color: rgba(255, 255, 255, 0.62); }
-.rs-scroll { flex-grow: 1; flex-shrink: 1; min-height: 0; }
-.rs-row { flex-direction: row; align-items: center; height: 34px; padding-left: 12px; padding-right: 12px; border-radius: 10px; font-size: 14px; }
-.rs-row.me { background-color: rgba(255, 255, 255, 0.2); }
-.rs-result { height: 42px; }
-.rs-pos { width: 30px; margin-right: 10px; -unity-text-align: middle-right; }
-.rs-team { flex-grow: 1; flex-shrink: 1; min-width: 0; margin-left: 10px; }
-.rs-team-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rs-car { margin-top: -2px; font-size: 12px; color: rgba(255, 255, 255, 0.42); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rs-laps { width: 52px; -unity-text-align: middle-right; }
-.rs-prize { width: 100px; color: rgb(61, 220, 132); -unity-text-align: middle-right; }
-.rs-dnf { width: 100px; font-size: 12px; letter-spacing: 0.8px; color: rgb(255, 90, 79); -unity-text-align: middle-right; }
-.rs-row.out .rs-pos, .rs-row.out .rs-team-name, .rs-row.out .rs-laps { color: rgba(255, 255, 255, 0.42); }
-.rs-podium { flex-direction: row; margin-bottom: 14px; }
-.rs-podium-class { width: 44px; height: 34px; font-size: 30px; -unity-text-align: middle-center; }
-.rs-podium-rows { flex-grow: 1; }
-.rs-row.of-two-line, .of-row.of-two-line { height: 54px; align-items: flex-start; padding-top: 7px; }
-.of-two-line > Label { height: 20px; }
-.of-team-lines { flex-grow: 1; flex-shrink: 1; min-width: 0; }
-.of-car-name { margin-top: 2px; margin-left: 30px; font-size: 13px; color: rgba(255, 255, 255, 0.62); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rs-place { width: 20px; margin-right: 10px; }
-.rs-overall { width: 44px; color: rgba(255, 255, 255, 0.62); -unity-text-align: middle-right; }
-.p1 { color: rgb(232, 193, 90); }
-.p2 { color: rgb(201, 208, 214); }
-.p3 { color: rgb(200, 138, 86); }
-
-.rs-hero { flex-direction: row; align-items: center; flex-shrink: 0; margin-bottom: 16px; padding: 14px 26px; }
-.rs-big { font-size: 64px; margin-right: 28px; }
-.rs-inclass { flex-direction: row; align-items: center; margin-right: 28px; }
-.rs-inclass-pos { margin-left: 8px; font-size: 22px; }
-.rs-stat { margin-right: 28px; }
-.rs-stat-value { font-size: 22px; }
-.rs-stat-label { margin-top: -2px; font-size: 12px; letter-spacing: 1px; color: rgba(255, 255, 255, 0.42); }
-.rs-best { color: rgb(197, 140, 255); }
-.rs-hero-prize, .rs-hero-dnf { margin-left: auto; font-size: 24px; }
-.rs-hero-prize { color: rgb(61, 220, 132); }
-.rs-hero-dnf { color: rgb(255, 90, 79); }
-
-.rs-chart { flex-shrink: 0; height: 220px; margin-bottom: 16px; padding: 14px 14px 8px 14px; }
-.rs-plot { flex-grow: 1; }
-.rs-axis { position: absolute; height: 16px; font-size: 12px; letter-spacing: 0.7px; color: rgba(255, 255, 255, 0.42); }
-.rs-readout { position: absolute; top: 12px; right: 16px; font-size: 14px; }
-
-.rs-log { flex-grow: 1; min-height: 0; padding: 12px; }
-.rs-swatch { width: 10px; height: 10px; border-radius: 3px; margin-right: 12px; flex-shrink: 0; }
-.rs-driver { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 10px; }
-.rs-stint .rs-driver { flex-grow: 1; flex-shrink: 1; min-width: 0; }
-.rs-range { width: 110px; color: rgba(255, 255, 255, 0.62); -unity-text-align: middle-right; }
-.rs-count { width: 54px; -unity-text-align: middle-right; }
-.rs-lap { width: 96px; color: rgba(255, 255, 255, 0.62); -unity-text-align: middle-right; }
-.rs-lap.rs-best { color: rgb(197, 140, 255); }
-.rs-at { width: 58px; color: rgba(255, 255, 255, 0.62); }
-.rs-secs { width: 64px; }
-.rs-tyre { width: 18px; height: 18px; margin-right: 14px; -unity-background-scale-mode: scale-to-fit; }
-.rs-fuel { width: 64px; color: rgba(255, 255, 255, 0.62); }
-.rs-who { flex-direction: row; align-items: center; flex-grow: 1; flex-shrink: 1; min-width: 0; }
-.rs-who .rs-range { width: auto; -unity-text-align: middle-left; }
-.rs-fixed { font-size: 12px; color: rgb(255, 176, 32); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; }
-.rs-issue-name { width: 200px; margin-right: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rs-ok { width: 70px; color: rgb(61, 220, 132); -unity-text-align: middle-right; }
-.rs-issue .rs-dnf { width: 70px; }
-
-.rs-skills { position: absolute; left: 908px; bottom: 32px; width: 420px; height: 116px; padding: 10px 16px; }
-.rs-skills-label { font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.62); }
-.rs-skills-line { flex-direction: row; align-items: center; flex-grow: 1; }
-.rs-pips { margin-right: 16px; }
-.rs-pip { width: 10px; height: 10px; margin-top: 3px; margin-bottom: 3px; border-radius: 5px; background-color: rgb(255, 255, 255); border-width: 1.5px; border-color: rgb(255, 255, 255); }
-.rs-pip.used { background-color: rgba(255, 255, 255, 0); border-color: rgba(255, 255, 255, 0.3); }
-.rs-skill { flex-grow: 1; flex-basis: 0; align-items: center; }
-.rs-skill-name { margin-bottom: 4px; font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.62); }
-.rs-level { flex-direction: row; align-items: center; }
-.rs-skill-value { min-width: 38px; font-size: 28px; -unity-text-align: middle-center; }
-.rs-skill-value.up { color: rgb(61, 220, 132); }
-.rs-step { width: 28px; height: 28px; border-radius: 9px; align-items: center; justify-content: center; background-color: rgba(255, 255, 255, 0.14); }
-.rs-step:hover { background-color: rgba(255, 255, 255, 0.26); }
-.rs-step-icon { width: 14px; height: 14px; -unity-background-scale-mode: scale-to-fit; }
-.rs-continue { position: absolute; right: 40px; bottom: 40px; height: 62px; padding-left: 44px; padding-right: 44px; }
-.rs-continue .red-label { font-size: 22px; letter-spacing: 3.5px; }
-
-/* Office screens: finances, race history, standings, scouting report */
-.panel#finances { bottom: auto; max-height: 768px; }
-.side-body { flex-grow: 1; flex-shrink: 1; min-height: 0; }
-.of-stepper { flex-direction: row; align-items: center; flex-shrink: 0; margin-bottom: 8px; }
-.of-step-value { min-width: 84px; font-size: 15px; letter-spacing: 1.2px; -unity-text-align: middle-center; }
-.of-row { flex-direction: row; align-items: center; height: 36px; padding-left: 12px; padding-right: 12px; border-radius: 12px; font-size: 15px; }
-.of-row.me { background-color: rgba(255, 255, 255, 0.2); }
-.of-click:hover { background-color: rgba(255, 255, 255, 0.1); }
-.of-click.me:hover { background-color: rgba(255, 255, 255, 0.2); }
-.of-row.pick { border-width: 1px; border-color: rgba(255, 255, 255, 0.55); }
-.of-fill { flex-grow: 1; flex-shrink: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.of-right { -unity-text-align: middle-right; }
-.of-green { color: rgb(61, 220, 132); }
-.of-red { color: rgb(255, 90, 79); }
-.of-dim { color: rgba(255, 255, 255, 0.42); }
-.of-head-row { flex-direction: row; align-items: center; flex-shrink: 0; height: 28px; padding-left: 12px; padding-right: 12px; }
-.of-head { font-size: 13px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.42); -unity-text-align: middle-center; }
-.of-head.sort:hover { color: rgba(255, 255, 255, 0.75); }
-.of-head.on { color: rgb(255, 255, 255); }
-
-.fin-hero { flex-direction: row; flex-shrink: 0; margin-bottom: 8px; margin-right: -12px; }
-.fin-figure { flex-grow: 1; flex-basis: 0; margin-right: 12px; padding: 10px 14px; border-radius: 12px; background-color: rgba(255, 255, 255, 0.06); }
-.fin-label { font-size: 14px; letter-spacing: 1.1px; color: rgba(255, 255, 255, 0.62); }
-.fin-value { font-size: 28px; }
-.fin-desc { flex-direction: row; align-items: center; }
-.fin-desc-text { margin-right: 5px; white-space: nowrap; }
-.of-title { flex-shrink: 0; margin-bottom: 8px; padding-left: 8px; font-size: 16px; letter-spacing: 1.3px; }
-.of-link { cursor: link; }
-.sc-driver-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.fin-icon { width: 18px; height: 18px; margin-right: 14px; flex-shrink: 0; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.75); }
-.fin-amount { margin-left: 14px; }
+/* Finances: the prize money table in the side pane */
 .prizes { flex-direction: row; }
 .prize-col { flex-grow: 1; flex-basis: 0; margin-right: 6px; }
 .prize-col.last { margin-right: 0; }
 .prize-cell { flex-direction: row; align-items: center; height: 26px; padding-left: 8px; padding-right: 8px; border-radius: 8px; font-size: 13px; }
 .prize-cell.me { background-color: rgba(255, 255, 255, 0.2); }
-.prize-pos { width: 22px; margin-right: 6px; color: rgba(255, 255, 255, 0.42); -unity-text-align: middle-right; }
+.prize-pos { width: 22px; margin-right: 6px; color: rgba(255, 255, 255, 0.42); }
 .prize-cell.me .prize-pos { color: rgb(255, 255, 255); }
 .prize-amount { flex-grow: 1; -unity-text-align: middle-right; }
 
-.rh-hero { flex-direction: row; align-items: center; flex-shrink: 0; margin-bottom: 14px; }
-.rh-big { font-size: 46px; margin-right: 22px; }
-.rh-hero .rs-inclass { margin-right: 22px; }
-.rh-hero .rs-inclass-pos { font-size: 20px; }
-.rh-hero .rs-stat-value { font-size: 20px; }
-.rh-hero .rs-hero-prize, .rh-hero .rs-hero-dnf { font-size: 22px; }
-.rh-chart { height: 190px; flex-shrink: 0; margin-bottom: 14px; }
-.rh-chart .rs-readout { top: -4px; right: 0; }
-.rh-head-pos { width: 90px; font-size: 13px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.42); -unity-text-align: middle-left; }
-.rh-head-laps { width: 52px; font-size: 13px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.42); -unity-text-align: middle-right; }
-.rh-head-prize { width: 100px; font-size: 13px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.42); -unity-text-align: middle-right; }
-.rh-legend { flex-direction: row; flex-wrap: wrap; flex-shrink: 0; margin-top: -8px; margin-bottom: 12px; }
-.rh-legend-item { flex-direction: row; align-items: center; margin-right: 16px; margin-bottom: 4px; }
-.rh-legend-item .rs-swatch { width: 12px; height: 12px; margin-right: 8px; }
-.rh-legend-text { font-size: 15px; color: rgba(255, 255, 255, 0.62); }
-.rh-legend-dot { width: 11px; height: 11px; margin-right: 8px; border-radius: 6px; background-color: rgb(255, 176, 32); }
-.rh-legend-tick { width: 2px; height: 16px; margin-right: 8px; margin-left: 3px; background-color: rgba(255, 255, 255, 0.85); }
-.rh-log { flex-grow: 1; flex-shrink: 1; min-height: 0; max-height: 300px; }
-.rh-log .rs-row { height: 32px; }
-.rh-log .of-head-row { height: 24px; }
-.rh-log-range { width: 110px; -unity-text-align: middle-right; }
-.rh-log-count { width: 54px; -unity-text-align: middle-right; }
-.rh-log-at { width: 58px; -unity-text-align: middle-left; }
-.rh-log-fill { flex-grow: 1; -unity-text-align: middle-left; }
-.rh-issue-name { flex-grow: 1; flex-shrink: 1; min-width: 0; margin-right: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-.st-list { flex-grow: 1; flex-shrink: 1; min-height: 0; }
-.st-rank { width: 36px; margin-right: 12px; -unity-text-align: middle-right; }
-.st-row .cls { margin-right: 12px; }
-.st-prestige { width: 64px; margin-left: 12px; -unity-text-align: middle-right; }
-.st-trend { width: 72px; margin-left: 12px; -unity-text-align: middle-right; flex-direction: row; align-items: center; justify-content: flex-end; }
-.st-arrow { width: 12px; height: 12px; margin-right: 6px; -unity-background-scale-mode: scale-to-fit; }
-.st-pin { position: absolute; left: 0; right: 0; background-color: rgb(74, 77, 77); }
-.st-pin.top { top: 28px; }
-.st-pin.bottom { bottom: 0; }
-
-.sc-team { flex-grow: 1; flex-shrink: 1; min-width: 0; }
-.sc-cell { width: 44px; margin-left: 6px; -unity-text-align: middle-center; }
-.sc-det-name { font-size: 26px; letter-spacing: 1px; white-space: normal; }
-.sc-det-car { flex-direction: row; align-items: center; margin-top: 8px; font-size: 16px; }
-.sc-det-car .cls { margin-right: 10px; }
-.sc-det-meta { flex-direction: row; margin-top: 8px; margin-bottom: 10px; font-size: 14px; letter-spacing: 0.8px; color: rgba(255, 255, 255, 0.62); }
-.sc-det-meta-value { margin-left: 6px; color: rgb(255, 255, 255); }
-.sc-driver-head { height: 22px; padding-left: 4px; padding-right: 4px; }
-.sc-ovr-head { width: 48px; -unity-text-align: middle-right; }
-.sc-driver { height: 40px; padding-left: 4px; padding-right: 4px; }
-.sc-ovr { width: 48px; font-size: 22px; -unity-text-align: middle-right; }
-/* Dialogs: over whatever is showing, Cancel and a red confirm */
-.dialog { width: 420px; border-radius: 24px; padding: 16px; }
-.dialog-body { padding: 8px 6px 16px 6px; }
-.dialog-title { font-size: 20px; letter-spacing: 1px; }
-.dialog-sub { font-size: 14px; letter-spacing: 0.8px; color: rgba(255, 255, 255, 0.62); }
-.dialog-career { flex-direction: row; align-items: center; }
-.dialog-badge { width: 44px; height: 44px; margin-right: 14px; -unity-background-scale-mode: scale-to-fit; }
-.dialog-buttons { flex-direction: row; }
-.dialog-button { flex-grow: 1; flex-basis: 0; height: 52px; margin-right: 8px; }
-.dialog-button.last { margin-right: 0; }
-.dialog-button .red-label, .dialog-button .ghost-label { font-size: 18px; }
+/* Garage: the car workshop and both dealers (WorkshopPanel.cs, DealerPanel.cs, GarageUi.cs) */
+.frame { flex-grow: 1; min-height: 0; }
+.frame-foot { flex-direction: row; flex-shrink: 0; margin-top: 4px; }
+.frame-foot > .red, .frame-foot > .selected, .frame-foot > .notice { flex-grow: 1; }
+.car-head { flex-direction: row; align-items: center; flex-shrink: 0; margin-bottom: 12px; }
+.car-head-mid { flex-grow: 1; align-items: center; }
+.car-head-mid > .detail-name { -unity-text-align: middle-center; }
+.car-head-mid > .detail-meta { margin-bottom: 0; }
+.dots { flex-direction: row; align-items: center; }
+.dot { width: 8px; height: 8px; margin-right: 6px; border-radius: 6px; background-color: rgba(255, 255, 255, 0.28); }
+.dot.on { background-color: rgb(255, 255, 255); }
+.dot.rc { width: 12px; height: 12px; margin-left: -2px; margin-right: 4px; border-width: 2px; border-color: rgb(225, 6, 0); }
+.selected { flex-direction: row; align-items: center; justify-content: center; height: 52px; border-radius: 20px; background-color: rgba(225, 6, 0, 0.22); border-width: 1px; border-color: rgba(255, 80, 70, 0.8); }
+.selected-icon { width: 24px; height: 24px; margin-right: 10px; -unity-background-scale-mode: scale-to-fit; }
+.selected-label { font-size: 18px; letter-spacing: 2.9px; }
+.sell { width: 250px; height: 52px; flex-shrink: 0; margin-left: 12px; }
+.sell > .ghost-label { font-size: 15px; letter-spacing: 1.5px; }
+.sell-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; -unity-background-scale-mode: stretch-to-fill; }
+.notice { height: 52px; justify-content: center; align-items: center; border-radius: 20px; border-width: 1px; border-color: rgba(255, 90, 79, 0.6); background-color: rgba(255, 90, 79, 0.14); }
+.notice-label { font-size: 18px; letter-spacing: 2.9px; }
 
 /* New game: one panel that fits its content */
-.panel#new-game { bottom: auto; }
-.ng-box { flex-shrink: 0; margin-bottom: 12px; padding: 16px; border-radius: 20px; background-color: rgba(0, 0, 0, 0.18); }
 .ng-team { flex-direction: row; }
 .ng-big { width: 120px; height: 120px; flex-shrink: 0; margin-right: 16px; border-radius: 16px; align-items: center; justify-content: center; background-color: rgba(255, 255, 255, 0.06); }
 .ng-big-badge { width: 84px; height: 84px; -unity-background-scale-mode: scale-to-fit; }
@@ -455,20 +432,7 @@
 .ng-player { flex-direction: row; padding: 12px; }
 .ng-half { flex-grow: 1; flex-basis: 0; margin-right: 8px; }
 .ng-half.last { margin-right: 0; }
-.ng-skills { align-items: stretch; }
-.ng-pips { flex-direction: row; justify-content: center; margin-bottom: 14px; }
-.ng-pip { margin: 0 3.5px; }
-.ng-skill-row { flex-direction: row; }
-.ng-skill-head { flex-direction: row; align-items: center; margin-bottom: 4px; }
-.ng-skill-head .rs-skill-name { margin-bottom: 0; margin-right: 6px; }
-.ng-info { width: 18px; height: 18px; align-items: center; justify-content: center; }
-.ng-info-image { width: 16px; height: 16px; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.5); }
-.ng-info:hover .ng-info-image { -unity-background-image-tint-color: rgb(255, 255, 255); }
-.ng-countries { position: absolute; max-height: 280px; padding: 6px; border-radius: 12px; background-color: rgba(24, 24, 26, 0.94); border-width: 1px; border-color: rgba(255, 255, 255, 0.14); }
-.ng-country-list { flex-shrink: 1; }
-.ng-country { height: 34px; padding-left: 12px; padding-right: 12px; border-radius: 8px; font-size: 15px; color: rgba(255, 255, 255, 0.8); -unity-text-align: middle-left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ng-country:hover { background-color: rgba(255, 255, 255, 0.1); color: rgb(255, 255, 255); }
-.ng-country.on { background-color: rgba(255, 255, 255, 0.2); color: rgb(255, 255, 255); }
+.ng-countries { max-height: 280px; }
 
 /* Newspaper: a broadsheet on a 1600 x 900 sheet, scaled to fit (NewspaperView.cs). Fonts and ink are set from code. */
 .np-page { position: absolute; overflow: hidden; }
@@ -515,129 +479,17 @@
 .np-close:hover { background-color: rgba(255, 255, 255, 0.1); }
 .np-close-icon { width: 18px; height: 18px; -unity-background-scale-mode: scale-to-fit; }
 
-/* Menu items with nothing behind them yet */
-.item.dim, .icon.dim { opacity: 0.35; }
-.item.dim:hover, .icon.dim:hover { background-color: rgba(0, 0, 0, 0); }
-
-/* Garage: the car workshop and both dealers (WorkshopPanel.cs, DealerPanel.cs, GarageUi.cs) */
-.g-root { flex-grow: 1; min-height: 0; }
-.g-scroll { flex-grow: 1; flex-shrink: 1; min-height: 0; }
-.g-block { flex-shrink: 0; margin-bottom: 12px; }
-.g-foot { flex-direction: row; flex-shrink: 0; margin-top: 4px; }
-.g-lbl { font-size: 13px; letter-spacing: 1px; color: rgba(255, 255, 255, 0.74); }
-.g-sec { flex-shrink: 0; margin-bottom: 6px; font-size: 13px; letter-spacing: 1.3px; color: rgba(255, 255, 255, 0.74); }
-.g-btn { flex-direction: row; align-items: center; justify-content: center; height: 36px; padding-left: 14px; padding-right: 14px; border-radius: 12px; background-color: rgba(255, 255, 255, 0.1); border-width: 1px; border-color: rgba(255, 255, 255, 0.14); }
-.g-btn:hover { background-color: rgba(255, 255, 255, 0.18); }
-.g-btn.disabled { opacity: 0.35; }
-.g-btn.disabled:hover { background-color: rgba(255, 255, 255, 0.1); }
-.g-btn-label { font-size: 14px; letter-spacing: 0.8px; -unity-text-align: middle-center; }
-.g-btn-money { margin-left: 6px; font-size: 14px; color: rgb(61, 220, 132); }
-.chevron.no { opacity: 0.3; }
-.chevron.no:hover { background-color: rgba(0, 0, 0, 0); }
-.g-qty { flex-direction: row; align-items: center; }
-.g-qty .chevron { width: 30px; height: 32px; }
-.g-qty-value { width: 26px; font-size: 16px; -unity-text-align: middle-center; }
-
-/* Stat rows: bar, potential ghost, value and the change against the race car */
-.g-stat { flex-direction: row; align-items: center; height: 22px; margin-bottom: 2px; }
-.g-stat-name { width: 150px; margin-right: 12px; font-size: 13px; letter-spacing: 1px; color: rgba(255, 255, 255, 0.74); }
-.g-stat-bar { flex-grow: 1; height: 6px; border-radius: 9px; background-color: rgba(255, 255, 255, 0.12); overflow: hidden; }
-.g-stat-bar.plain { visibility: hidden; }
-.g-stat-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 9px; }
-.g-ghost { position: absolute; top: 0; bottom: 0; border-top-right-radius: 9px; border-bottom-right-radius: 9px; background-color: rgba(255, 255, 255, 0.22); }
-.g-ghost.lit { background-color: rgba(255, 255, 255, 0.55); }
-.g-stat-value { width: 40px; margin-left: 12px; font-size: 15px; -unity-text-align: middle-right; }
-.g-stat-delta { width: 40px; margin-left: 12px; font-size: 13px; -unity-text-align: middle-right; }
-
-/* Tiles: upgrades, spare parts and tyre sets */
-.g-tiles { flex-direction: row; flex-shrink: 0; margin-bottom: 12px; }
-.g-tile { flex-grow: 1; flex-basis: 0; min-height: 46px; margin-right: 10px; padding: 10px 12px; border-radius: 12px; background-color: rgba(255, 255, 255, 0.06); border-width: 1px; border-color: rgba(255, 255, 255, 0); flex-direction: row; align-items: center; justify-content: space-between; }
-.g-tile.last { margin-right: 0; }
-.g-tile.got { background-color: rgba(255, 255, 255, 0.14); }
-.g-tile.pv { border-color: rgba(255, 255, 255, 0.35); }
-.g-tile.stack { flex-direction: column; align-items: stretch; justify-content: flex-start; }
-.g-tile-head { flex-direction: row; align-items: center; justify-content: space-between; height: 22px; }
-.g-tile-name { font-size: 13px; letter-spacing: 1px; white-space: nowrap; }
-.g-tile-price { font-size: 15px; color: rgba(255, 255, 255, 0.74); }
-.g-tick { width: 22px; height: 22px; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgb(61, 220, 132); }
-.g-tile .g-btn { margin-top: 8px; }
-.g-count { font-size: 20px; }
-.g-buy-row { flex-direction: row; align-items: center; margin-top: 8px; }
-.g-buy-row .g-btn { flex-grow: 1; margin-top: 0; margin-left: 10px; }
-
-/* Workshop */
-.g-head { flex-direction: row; align-items: center; flex-shrink: 0; margin-bottom: 12px; }
-.g-head-mid { flex-grow: 1; align-items: center; }
-.g-name { font-size: 22px; letter-spacing: 1.1px; -unity-text-align: middle-center; }
-.g-sub { flex-direction: row; align-items: center; margin-top: 6px; }
-.g-meta { margin-left: 12px; font-size: 14px; letter-spacing: 0.8px; color: rgba(255, 255, 255, 0.74); }
-.g-dots { flex-direction: row; align-items: center; margin-left: 12px; }
-.g-dot { width: 8px; height: 8px; margin-right: 6px; border-radius: 6px; background-color: rgba(255, 255, 255, 0.28); }
-.g-dot.on { background-color: rgb(255, 255, 255); }
-.g-dot.rc { width: 12px; height: 12px; margin-left: -2px; margin-right: 4px; border-width: 2px; border-color: rgb(225, 6, 0); }
-.g-cond { flex-direction: row; align-items: center; flex-shrink: 0; min-height: 36px; margin-bottom: 12px; }
-.g-cond-bar { flex-grow: 1; height: 8px; margin-left: 14px; border-radius: 9px; background-color: rgba(255, 255, 255, 0.12); overflow: hidden; }
-.g-cond-ghost { position: absolute; top: 0; bottom: 0; background-color: rgba(255, 255, 255, 0.4); }
-.g-cond-pc { width: 56px; font-size: 20px; -unity-text-align: middle-right; }
-.g-repair { flex-direction: row; align-items: center; margin-left: 14px; }
-.g-repair .g-lbl { margin-right: 4px; }
-.g-repair .g-btn { margin-left: 4px; }
-.g-race { flex-grow: 1; height: 52px; }
-.g-race .red-label { font-size: 18px; }
-.g-selected { flex-grow: 1; flex-direction: row; align-items: center; justify-content: center; height: 52px; border-radius: 20px; background-color: rgba(225, 6, 0, 0.22); border-width: 1px; border-color: rgba(255, 80, 70, 0.8); }
-.g-selected-icon { width: 24px; height: 24px; margin-right: 10px; -unity-background-scale-mode: scale-to-fit; }
-.g-selected-label { font-size: 18px; letter-spacing: 2.9px; }
-.g-sell { width: 240px; height: 52px; margin-left: 12px; border-radius: 20px; overflow: hidden; align-items: center; justify-content: center; background-color: rgba(255, 255, 255, 0.1); border-width: 1px; border-color: rgba(255, 255, 255, 0.14); }
-.g-sell:hover { background-color: rgba(255, 255, 255, 0.18); }
-.g-sell-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; -unity-background-scale-mode: stretch-to-fill; }
-.g-sell-label { font-size: 16px; letter-spacing: 1px; }
-
-/* Dealers */
-.g-seg { flex-direction: row; flex-shrink: 0; margin-bottom: 12px; padding: 4px; border-radius: 14px; background-color: rgba(255, 255, 255, 0.06); }
-.g-tab { flex-grow: 1; flex-basis: 0; height: 38px; margin-right: 4px; border-radius: 10px; align-items: center; justify-content: center; }
-.g-tab.last { margin-right: 0; }
-.g-tab:hover { background-color: rgba(255, 255, 255, 0.1); }
-.g-tab.on { background-color: rgba(255, 255, 255, 0.2); }
-.g-tab .cls { opacity: 0.5; }
-.g-tab:hover .cls, .g-tab.on .cls { opacity: 1; }
-.g-rows { flex-shrink: 0; margin-bottom: 12px; }
-.g-row { flex-direction: row; align-items: center; height: 32px; padding-left: 14px; padding-right: 14px; border-radius: 12px; }
-.g-row:hover { background-color: rgba(255, 255, 255, 0.1); }
-.g-row.on { background-color: rgba(255, 255, 255, 0.2); }
-.g-row.g-hd { height: 20px; }
-.g-row.g-hd:hover { background-color: rgba(0, 0, 0, 0); }
-.g-hd-cell { font-size: 12px; letter-spacing: 1.7px; color: rgba(255, 255, 255, 0.74); -unity-text-align: middle-right; }
-.g-hd-cell.g-c-name { -unity-text-align: middle-left; }
-.g-c-name { flex-grow: 1; flex-shrink: 1; min-width: 0; flex-direction: row; align-items: center; }
-.g-c-age { width: 64px; margin-left: 14px; }
-.g-c-cond { width: 92px; margin-left: 14px; }
-.g-c-price { width: 96px; margin-left: 14px; }
-.g-badge { width: 22px; height: 22px; margin-right: 10px; flex-shrink: 0; -unity-background-scale-mode: scale-to-fit; }
-.g-row-name { flex-shrink: 1; font-size: 15px; letter-spacing: 0.6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.g-row-price { font-size: 15px; color: rgb(61, 220, 132); -unity-text-align: middle-right; }
-.g-row-price.no { color: rgba(255, 255, 255, 0.42); }
-.g-row-meta { font-size: 14px; color: rgba(255, 255, 255, 0.74); -unity-text-align: middle-right; }
-.g-none { flex-shrink: 0; margin-bottom: 12px; padding: 6px 14px; font-size: 14px; color: rgba(255, 255, 255, 0.74); }
-.g-car { flex-direction: row; justify-content: space-between; align-items: flex-end; flex-shrink: 0; margin-bottom: 12px; padding-top: 4px; }
-.g-car-name { font-size: 26px; letter-spacing: 1px; }
-.g-car-sub { flex-direction: row; align-items: center; margin-top: 8px; }
-.g-car-price { font-size: 30px; color: rgb(61, 220, 132); -unity-text-align: middle-right; }
-.g-car-price.no { color: rgb(255, 90, 79); }
-.g-car-list { margin-top: 6px; font-size: 13px; letter-spacing: 0.8px; color: rgba(255, 255, 255, 0.74); -unity-text-align: middle-right; }
-.g-buy { flex-grow: 1; height: 52px; }
-.g-buy .red-label { font-size: 18px; }
-.g-full { flex-grow: 1; padding: 12px 18px; border-radius: 20px; border-width: 1px; border-color: rgba(255, 90, 79, 0.6); background-color: rgba(255, 90, 79, 0.14); }
-.g-full-title { font-size: 16px; letter-spacing: 1.9px; }
-.g-full-text { margin-top: 2px; font-size: 14px; color: rgba(255, 255, 255, 0.74); }
-
-/* Flags and team history */
-.of-named { flex-direction: row; align-items: center; min-width: 0; }
-.of-named .rs-team-name, .of-named .sc-det-name { flex-shrink: 1; min-width: 0; }
-.of-flag { width: 20px; height: 15px; margin-right: 10px; flex-shrink: 0; border-width: 1px; border-color: rgba(255, 255, 255, 0.28); border-radius: 2px; -unity-background-scale-mode: scale-and-crop; }
-.of-flag-lg { width: 32px; height: 24px; margin-right: 14px; border-radius: 3px; }
-.st-hist-head { margin-top: 12px; }
-.st-hist { max-height: 640px; }
-.st-hist-row { height: 36px; }
-.st-hist-year { width: 52px; -unity-text-align: middle-left; }
-.st-hist-pos { width: 56px; -unity-text-align: middle-right; }
-.st-hist-cpos { width: 84px; -unity-text-align: middle-right; }
+/* Text colours, last so they win over the columns. Good to bad: green at 60 or more, amber from 50, red below.
+   v- colours text and icons, f- colours a fill. */
+.row.out > .cell, .row.out .team-name-text { color: rgba(255, 255, 255, 0.42); }
+.dim, .row.out > .dim { color: rgba(255, 255, 255, 0.42); }
+.v-hi, .row.out > .v-hi { color: rgb(61, 220, 132); -unity-background-image-tint-color: rgb(61, 220, 132); }
+.v-mid, .row.out > .v-mid { color: rgb(255, 176, 32); -unity-background-image-tint-color: rgb(255, 176, 32); }
+.v-lo, .row.out > .v-lo { color: rgb(255, 90, 79); -unity-background-image-tint-color: rgb(255, 90, 79); }
+.f-hi { background-color: rgb(61, 220, 132); }
+.f-mid { background-color: rgb(255, 176, 32); }
+.f-lo { background-color: rgb(255, 90, 79); }
+.best, .c-lap.best { color: rgb(197, 140, 255); }
+.p1 { color: rgb(232, 193, 90); }
+.p2 { color: rgb(201, 208, 214); }
+.p3 { color: rgb(200, 138, 86); }
