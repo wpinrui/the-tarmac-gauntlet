@@ -68,7 +68,8 @@ static partial class Check
         circuit = new Circuit(data);
         line = new RacingLine(circuit);
         // The experiment to run with, as the debug menu's switch: AI_EXPERIMENT=3 is E3.
-        if (int.TryParse(Environment.GetEnvironmentVariable("AI_EXPERIMENT"), out int experiment)) Experiments.On = experiment;
+        // Unset, the checker runs E0 as it always has, though the game itself starts on E1.
+        Experiments.On = int.TryParse(Environment.GetEnvironmentVariable("AI_EXPERIMENT"), out int experiment) ? experiment : 0;
 
         if (args.Length > 2 && args[1] == "line")
         {
