@@ -12,6 +12,8 @@ namespace TarmacGauntlet.Raceday
     public sealed class DriveHud : MonoBehaviour
     {
         public CarController Car;
+        /// <summary>True while the TV view shows the broadcast.</summary>
+        [System.NonSerialized] public bool Hidden;
 
         private GUIStyle gear, speed;
         private static readonly Color Auto = new Color(0.55f, 0.75f, 1f);
@@ -24,7 +26,7 @@ namespace TarmacGauntlet.Raceday
 
         private void OnGUI()
         {
-            if (Car == null || !Car.InputEnabled || Event.current.type != EventType.Repaint) return;
+            if (Car == null || Hidden || !Car.InputEnabled || Event.current.type != EventType.Repaint) return;
             float scale = Screen.height / 1080f;
             if (gear == null)
             {

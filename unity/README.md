@@ -47,6 +47,12 @@ target speed for every 2 m sample (`SpeedProfile.cs`, from the car's grip, downf
 brakes). After a hard crash, or when stuck or spun, it puts the car back on track itself. The console
 shows its predicted lap time and each lap it drives.
 
+The camera starts on the TV view when the race comes from the career, and on the chase camera when the scene runs on
+its own. `C` cycles TV, chase, bonnet, bumper and free. In the TV view the director (`BroadcastDirector.cs`) picks
+the story once a real second: a car stopped off the track, a fight for a class lead, any fight within a class under
+0.5 s, your car, a class leader's stop or yours, a car rejoining, the leader. It cuts between trackside, pan,
+helicopter, onboard and pit lane shots. While you drive, the TV view is your onboard.
+
 `T` opens live timing while the AI drives your car (`LiveTiming.cs`), with the race at 16x behind it: every
 car in race order by class, your car's onboard and the track map, its driver, fuel, tyres and condition with
 the laps each lasts on the engine map in use, the engine map, and the next stop. Pit Now calls the car in at the

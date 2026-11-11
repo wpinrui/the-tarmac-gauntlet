@@ -90,6 +90,7 @@ namespace TarmacGauntlet.Raceday
             keys = new GameObject("Keyboard").AddComponent<KeyboardState>();
             var line = new RacingLine(circuit);
             var pits = new PitLane(circuit);
+            bool career = RaceWeekend.Setup != null;
             RaceSetup setup = RaceWeekend.Setup ?? RaceWeekend.Begin(TestCareer());
             day = new RaceDay(setup);
             IReadOnlyList<GridCar> grid = setup.Grid;
@@ -158,7 +159,16 @@ namespace TarmacGauntlet.Raceday
             range.Player = ai.Car;
 
             RaceCameras views = Camera(circuit, cars, watched, keys);
+            BroadcastDirector tv = views.gameObject.AddComponent<BroadcastDirector>();
+            tv.Circuit = circuit;
+            tv.Cars = racing;
+            tv.Drivers = drivers;
+            tv.Player = player;
+            views.Director = tv;
+            // Run on its own the scene is for AI testing, so it starts on the chase camera.
+            if (!career) views.StartInChase();
             RaceTower tower = Tower(circuit, racing, field, teams, watched, starter);
+            tv.Classes = tower.Classes;
             director = new GameObject("Race director").AddComponent<RaceDirector>();
             director.Day = day;
             director.Cars = racing;

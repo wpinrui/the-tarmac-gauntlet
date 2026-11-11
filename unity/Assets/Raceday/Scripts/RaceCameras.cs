@@ -3,21 +3,28 @@ using UnityEngine;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// C cycles the chase, bonnet and bumper views of the car, then the free camera. V moves to the
-    /// next car, and P to the next car making a pit stop.
+    /// C cycles the TV view, then the chase, bonnet and bumper views of the car, then the free camera.
+    /// The TV view is the broadcast while the AI drives your car (<see cref="BroadcastDirector"/>), and
+    /// the bonnet view while you drive it. V moves to the next car, and P to the next car making a pit
+    /// stop, both in the chase view if the TV view was on.
     /// </summary>
     [RequireComponent(typeof(Camera))]
     public sealed class RaceCameras : MonoBehaviour
     {
-        private enum View { Chase, Bonnet, Bumper, Free }
+        private enum View { Tv, Chase, Bonnet, Bumper, Free }
 
         public CarController Car;
         /// <summary>The cars V steps through, if more than one.</summary>
         public CarController[] Cars;
         public DriveHud Hud;
         public KeyboardState Keys;
+        /// <summary>Directs the TV view.</summary>
+        public BroadcastDirector Director;
 
-        private View view = View.Chase;
+        private View view = View.Tv;
+
+        /// <summary>Starts in the chase view instead of the TV view, as the scene does run on its own for AI testing.</summary>
+        public void StartInChase() => view = View.Chase;
         private Camera cam;
         private FreeCamera free;
         private Vector3 chasePosition;
@@ -34,7 +41,7 @@ namespace TarmacGauntlet.Raceday
         {
             if (Keys != null && Keys.Pressed(KeyCode.C))
             {
-                view = (View)(((int)view + 1) % 4);
+                view = (View)(((int)view + 1) % 5);
                 Apply();
             }
             if (Keys != null && Keys.Pressed(KeyCode.V) && Cars != null && Cars.Length > 1)
@@ -63,6 +70,7 @@ namespace TarmacGauntlet.Raceday
             // Only the car being watched shows its speed and takes the driving keys.
             if (Car != null) Car.InputEnabled = false;
             Car = next;
+            if (view == View.Tv) view = View.Chase;
             if (Hud != null) Hud.Car = Car;
             Apply();
         }
@@ -73,6 +81,7 @@ namespace TarmacGauntlet.Raceday
             if (free != null) free.enabled = isFree;
             if (Car != null) Car.InputEnabled = !isFree;
             cam.fieldOfView = view == View.Chase ? 60f : 70f;
+            if (Hud != null) Hud.Hidden = false;
             chaseSettled = false;
         }
 
@@ -80,7 +89,16 @@ namespace TarmacGauntlet.Raceday
         {
             if (Car == null || view == View.Free) return;
             Transform t = Car.transform;
-            switch (view)
+            bool tv = view == View.Tv;
+            // The broadcast while the AI drives; the HUD is for driving.
+            if (Hud != null) Hud.Hidden = tv && Car.AiDriving;
+            if (tv && Car.AiDriving && Director != null)
+            {
+                Director.Frame(cam);
+                return;
+            }
+            if (tv) cam.fieldOfView = 70f;
+            switch (tv ? View.Bonnet : view)
             {
                 case View.Chase:
                 {
