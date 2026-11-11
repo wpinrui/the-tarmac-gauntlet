@@ -71,6 +71,7 @@ namespace TarmacGauntlet.Raceday
             race = GetComponent<RaceCar>();
             if (Line == null || car.Spec == null) return;
             AiPilot pilot = Given ?? NewPilot(Line);
+            pilot.Fatigue = fatigue;
             PitPlan pit = Pits != null && Garage >= 0 && car.Supplies != null ? new PitPlan(Pits, Garage, car.Supplies) : null;
             Racer = new AiRacer(pilot, new Racecraft(), car.Supplies, pit, Seed);
             Log(pilot);
@@ -110,6 +111,18 @@ namespace TarmacGauntlet.Raceday
             }
         }
 
+        /// <summary>How tired the driver at the wheel is, 0 to 100: it slows the car and makes its corners wander (<see cref="AiPilot.Fatigue"/>).</summary>
+        public float Fatigue
+        {
+            get => fatigue;
+            set
+            {
+                fatigue = value;
+                if (Pilot != null) Pilot.Fatigue = value;
+            }
+        }
+        private float fatigue;
+
         private void OnValidate()
         {
             if (Racer != null && (Pilot.Pace != Pace || Pilot.Consistency != Consistency || Pilot.Safety != Safety)) Use(NewPilot(Pilot.Line));
@@ -129,6 +142,7 @@ namespace TarmacGauntlet.Raceday
         private void Use(AiPilot pilot)
         {
             pilot.Limp = Pilot.Limp;   // a limping car keeps limping on its new pilot
+            pilot.Fatigue = fatigue;
             Racer.UsePilot(pilot);
             Line = pilot.Line;
             Log(pilot);

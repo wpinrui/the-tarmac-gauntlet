@@ -262,5 +262,22 @@ namespace TarmacGauntlet.Simulation.Tests
             double worn = Lap(tyreWear: 1);
             Assert.That(fresh, Is.LessThan(worn));
         }
+
+        [Test]
+        public void FatigueLapFactorIsOneWhenFresh()
+        {
+            Assert.That(LapTime.FatigueLapFactor(80, 0), Is.EqualTo(1).Within(1e-12));
+        }
+
+        [Test]
+        public void FatigueLapFactorMatchesTheLapTimeFormula()
+        {
+            var stats = new DriverStats { Pace = 80, Consistency = 100, Stamina = 50, Safety = 50, Smoothness = 50 };
+            CarStats car = new CarStats { Power = 50, Handling = 50 };
+            double fresh = LapTime.CalculateLapTime(car, stats, 0, InstructionMode.Normal, 0, 0, () => 0.5);
+            double tired = LapTime.CalculateLapTime(car, stats, 100, InstructionMode.Normal, 0, 0, () => 0.5);
+            Assert.That(tired / fresh, Is.EqualTo(LapTime.FatigueLapFactor(80, 100)).Within(1e-12));
+            Assert.That(LapTime.FatigueLapFactor(80, 100), Is.GreaterThan(1.04));
+        }
     }
 }

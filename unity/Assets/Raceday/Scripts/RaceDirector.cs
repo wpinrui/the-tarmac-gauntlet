@@ -8,7 +8,8 @@ namespace TarmacGauntlet.Raceday
     /// Keeps the race for the career (<see cref="RaceDay"/>). Each time a car crosses the line it
     /// logs the lap, which ages the car and may give it an issue or retire it: issues cut the car's
     /// power, grip, fuel efficiency and tyre life until a stop fixes them, and a retired car limps to
-    /// its box, or stops beside the track after a fatal crash (<see cref="Retire"/>). After a stop's driver change, the new driver drives at their own pace. When the
+    /// its box, or stops beside the track after a fatal crash (<see cref="Retire"/>). After a stop's driver change, the new driver drives at their own pace.
+    /// The driver at the wheel tires lap by lap (<see cref="CarRaceLog.Fatigue"/>), which slows the car until a stop puts in someone fresh. When the
     /// race clock runs out each car takes the flag the next time it crosses the line, and once all
     /// have, or <see cref="FlagWait"/> after the time ran out, the race is settled into the career
     /// (<see cref="RaceWeekend.Finish"/>) and the player's car is parked in its box for the race summary.
@@ -96,6 +97,7 @@ namespace TarmacGauntlet.Raceday
                     DriverStats d = log.Driver.Stats;
                     Drivers[i].SetDriver((float)d.Pace, (float)d.Consistency, (float)d.Safety);
                 }
+                if (Drivers[i].Fatigue != (float)log.Fatigue) Drivers[i].Fatigue = (float)log.Fatigue;
             }
 
             if (Day.AllFlagged || (timeUpAt >= 0f && Time.time - timeUpAt > FlagWait)) Finish();
