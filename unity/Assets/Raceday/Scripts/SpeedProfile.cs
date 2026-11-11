@@ -173,8 +173,10 @@ namespace TarmacGauntlet.Raceday
         {
             if (engineTable == null)
             {
-                engineTable = new float[Mathf.CeilToInt(spec.TopSpeed * 1.3f / TableStep) + 2];
-                for (int i = 0; i < engineTable.Length; i++) engineTable[i] = EngineAccel(i * TableStep);
+                // Filled before it is shared: paths driven on other threads may ask for it at once.
+                var table = new float[Mathf.CeilToInt(spec.TopSpeed * 1.3f / TableStep) + 2];
+                for (int i = 0; i < table.Length; i++) table[i] = EngineAccel(i * TableStep);
+                engineTable = table;
             }
             float f = Mathf.Clamp(v / TableStep, 0f, engineTable.Length - 1.001f);
             int j = (int)f;

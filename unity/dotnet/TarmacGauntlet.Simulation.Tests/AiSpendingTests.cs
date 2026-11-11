@@ -194,10 +194,18 @@ namespace TarmacGauntlet.Simulation.Tests
         [Test]
         public void Upgrades_AppliesAffordablePackToCurrentCar()
         {
-            var team = MakeAiTeam("t1", 50_000, new[] { MakeInstance("car1", "m1") });
+            var team = MakeAiTeam("t1", 20_000, new[] { MakeInstance("car1", "m1") });
             var result = Run(team, new[] { MakeModel("m1", 50_000, 50, 50) });
             var u = result.UpdatedTeam.Cars.First(c => c.Id == "car1").InstalledUpgrades;
             Assert.That(u.Power || u.Handling || u.Comfort, Is.True);
+        }
+
+        [Test]
+        public void Crew_AiSpendingNeverChangesCrewSize()
+        {
+            var team = MakeAiTeam("t1", 500_000, new[] { MakeInstance("car1", "m1") }, crewSize: 6);
+            var result = Run(team, new[] { MakeModel("m1", 50_000) });
+            Assert.That(result.UpdatedTeam.CrewSize, Is.EqualTo(6));
         }
 
         [Test]

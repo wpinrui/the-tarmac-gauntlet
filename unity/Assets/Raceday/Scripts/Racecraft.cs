@@ -368,10 +368,12 @@ namespace TarmacGauntlet.Raceday
                     float fromLat = float.IsNaN(fixedWas) ? line.Lateral[pilot.Index] + pilot.Offset : fixedWas;
                     fixedWas = Mathf.MoveTowards(fromLat, chooser.FixedLat, step);
                     pilot.Offset = Mathf.Clamp(fixedWas - line.Lateral[pilot.Index], AiPilot.LaneShifts[0], AiPilot.LaneShifts[AiPilot.LaneShifts.Length - 1]);
+                    pilot.HoldLateral = fixedWas;
                 }
                 else
                 {
                     fixedWas = float.NaN;
+                    pilot.HoldLateral = float.NaN;
                     pilot.Offset = Mathf.Clamp(Mathf.MoveTowards(pilot.Offset, chooser.Target, step), AiPilot.LaneShifts[0], AiPilot.LaneShifts[AiPilot.LaneShifts.Length - 1]);
                 }
                 pilot.Offset = chooser.HoldOwe(pilot.Offset, line.Lateral[pilot.Index], me.Across);

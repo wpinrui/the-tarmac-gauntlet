@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Runs every garage's pit crew through stops with the game's own crew planner outside Unity and checks them. Run through run.sh. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)../../out/pit-crew/obj/</BaseIntermediateOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Check.cs;../ai-check/MoreStubs.cs;../circuit/geometry-check/UnityStubs.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Circuit.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/CircuitData.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/CircuitBuilder.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/CircuitPart.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/MeshKit.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/PitComplex.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/PitLane.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/RacingLine.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/CarSpec.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/TrackSurface.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/SpeedProfile.cs" />
+    <Compile Include="../../unity/Assets/Simulation/**/*.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/PitStopSpots.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/PitCrewPlan.cs" />
+  </ItemGroup>
+</Project>

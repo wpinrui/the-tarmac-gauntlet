@@ -52,9 +52,20 @@ namespace TarmacGauntlet.Raceday
 
         /// <summary>Each garage's floor height, as laid. Filled by <see cref="Build"/>.</summary>
         public float[] GarageFloors { get; private set; }
+        /// <summary>The pit wall's runs, each the middle of its top from one lane sample to the next.</summary>
+        public readonly List<Vector3[]> PitWallRuns = new List<Vector3[]>();
 
         /// <summary>How far out from the road edge the runoff reaches on a side (0 = left), or 0 where the side is open.</summary>
         public float RunoffReach(int side, int k) => open[side][k] ? 0f : barrier[side][k];
+
+        /// <summary>True where armco or a pit wall stands on a side (0 = left) at <see cref="RunoffReach"/>.</summary>
+        public bool Fenced(int side, int k) => !open[side][k] && (fenced[side][k] || pitWall[side][k]);
+
+        /// <summary>True where the barrier on a side (0 = left) is the pit wall.</summary>
+        public bool PitWallAt(int side, int k) => !open[side][k] && pitWall[side][k];
+
+        /// <summary>A point on the verge or runoff as laid, at a lateral offset past the road edge.</summary>
+        public Vector3 RunoffPoint(int k, float lateral) => Point(k, lateral, 0f, true);
 
         /// <param name="materials">May be null outside Unity (tests and previews).</param>
         public CircuitBuilder(Circuit circuit, CircuitMaterials materials)
@@ -510,6 +521,7 @@ namespace TarmacGauntlet.Raceday
 
             // Pit wall: concrete, following the pit lane on its track side wherever the lane is apart from the track.
             float inner = -laneHalf - LaneWiden;
+            PitWallRuns.Clear();
             foreach (List<int> run in LaneRuns(HasPitWall))
             {
                 var top = new List<Vector3[]>();
@@ -522,6 +534,9 @@ namespace TarmacGauntlet.Raceday
                     near.Add(new[] { a, a + Vector3.down * (1.2f + Skirt) });
                     far.Add(new[] { b, b + Vector3.down * (1.2f + Skirt) });
                 }
+                var middle = new Vector3[top.Count];
+                for (int t = 0; t < top.Count; t++) middle[t] = (top[t][0] + top[t][1]) * 0.5f;
+                PitWallRuns.Add(middle);
                 wall.Strip(top, 1f, 1f);
                 wall.Strip(near, 2f, 2f, true);
                 wall.Strip(far, 2f, 2f, true);

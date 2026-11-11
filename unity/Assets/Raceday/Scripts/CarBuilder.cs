@@ -1,3 +1,4 @@
+using TarmacGauntlet.Simulation;
 using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
@@ -6,20 +7,25 @@ namespace TarmacGauntlet.Raceday
     public static class CarBuilder
     {
         private const int IgnoreRaycastLayer = 2;   // so the car's own suspension rays skip it
+        /// <summary>Only the cars are on this layer, so a light can be told to light the cars alone.</summary>
+        public const int CarLayer = IgnoreRaycastLayer;
+        /// <summary>The stand-in box's shell, in the car's space.</summary>
+        public static readonly Vector3 BoxCentre = new Vector3(0f, 0.65f, 0f), BoxSize = new Vector3(1.85f, 0.8f, 4.5f);
         private static int spawned;
 
         /// <summary>
-        /// A car of the given model. With no model path, or none found, it is a plain box in the given
-        /// paint. With no keys it can only be driven by the AI.
+        /// A car of the given model, drawn with its class's 3D model. If that cannot be loaded it is a
+        /// plain box in the given paint. With no keys it can only be driven by the AI.
         /// </summary>
-        public static CarController Spawn(string modelId, string modelPath, Circuit circuit, KeyboardState keys, Color? paint = null)
+        public static CarController Spawn(string modelId, Circuit circuit, KeyboardState keys, Color? paint = null)
         {
             CarSpec spec = CarSpec.For(modelId);
             var root = new GameObject(spec.Name);
             root.layer = IgnoreRaycastLayer;
 
+            string modelPath = CarArt.ModelPath(modelId);
             GameObject model = string.IsNullOrEmpty(modelPath) ? null : LoadModel(modelPath);
-            Transform[] wheels = model != null ? AttachModel(root, model) : BuildBox(root, spec, paint ?? new Color(0.8f, 0.81f, 0.83f));
+            Transform[] wheels = model != null ? AttachModel(root, model, paint) : BuildBox(root, spec, paint ?? new Color(0.8f, 0.81f, 0.83f));
 
             BoxCollider box = root.AddComponent<BoxCollider>();
             box.center = new Vector3(0f, 0.62f, 0.06f);
@@ -37,6 +43,7 @@ namespace TarmacGauntlet.Raceday
             car.Keys = keys;
             car.Circuit = circuit;
             car.Setup(spec, wheels);
+            CarLamps.Fit(car, model != null ? root.transform.Find("Model")?.gameObject : null);
             root.AddComponent<EngineAudio>().Setup(modelId, ++spawned);
             return car;
         }
@@ -52,12 +59,14 @@ namespace TarmacGauntlet.Raceday
 
         /// <summary>
         /// Puts the model under the car and gives each wheel a pivot at its centre, so it can
-        /// steer, spin and move with the suspension. Returns pivots front left, front right, rear left, rear right.
+        /// steer, spin and move with the suspension. With a paint, the body is resprayed in it.
+        /// Returns pivots front left, front right, rear left, rear right.
         /// </summary>
-        private static Transform[] AttachModel(GameObject root, GameObject prefab)
+        private static Transform[] AttachModel(GameObject root, GameObject prefab, Color? paint)
         {
             GameObject model = Object.Instantiate(prefab, root.transform, false);
             model.name = "Model";
+            if (paint.HasValue) CarPaint.Respray(model, paint.Value);
             foreach (Collider c in model.GetComponentsInChildren<Collider>()) Object.Destroy(c);
             foreach (Transform t in model.GetComponentsInChildren<Transform>()) t.gameObject.layer = IgnoreRaycastLayer;
 
@@ -93,8 +102,8 @@ namespace TarmacGauntlet.Raceday
             var paint = new Material(Shader.Find("Standard")) { color = colour };
             var rubber = new Material(Shader.Find("Standard")) { color = new Color(0.08f, 0.08f, 0.08f) };
             GameObject shell = Primitive(PrimitiveType.Cube, root.transform, paint);
-            shell.transform.localPosition = new Vector3(0f, 0.65f, 0f);
-            shell.transform.localScale = new Vector3(1.85f, 0.8f, 4.5f);
+            shell.transform.localPosition = BoxCentre;
+            shell.transform.localScale = BoxSize;
 
             var pivots = new Transform[4];
             for (int i = 0; i < 4; i++)

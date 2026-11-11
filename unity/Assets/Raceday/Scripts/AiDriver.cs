@@ -82,7 +82,7 @@ namespace TarmacGauntlet.Raceday
             int seed = Seed;
             // The line is queued first, so it is ready by the time the pilot is built on the same thread.
             Task<RacingLine> line = LineTuner.Line(circuit, spec);
-            tuning = LineTuner.Run(() => new AiPilot(line.Result, spec, pace, consistency, safety, seed));
+            tuning = LineTuner.Run(() => new AiPilot(line.Result, spec, pace, consistency, safety, seed).BuildPlaces());
         }
 
         /// <summary>Sets the racer up now rather than on the first physics step, so the car is raced as an AI car even when someone else drives it.</summary>

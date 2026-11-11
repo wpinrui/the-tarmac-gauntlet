@@ -58,6 +58,13 @@ namespace TarmacGauntlet.Raceday
             if (supplies.Log != null) supplies.Effects = supplies.Log.Effects;
         }
 
+        /// <summary>When the fuel starts and stops going in, s into the stop: the crew's cue, never their doing.</summary>
+        public float FuelFrom => Settle * scale;
+        public float FuelTo => (Settle + litres / RefuelRate) * scale;
+        /// <summary>When the tyre change starts and ends, s into the stop: both at the end of the fuel when the tyres stay on.</summary>
+        public float TyresFrom => FuelTo;
+        public float TyresTo => FuelTo + (tyres ? TyreChange * scale : 0f);
+
         public void Step(float dt)
         {
             if (Done) return;

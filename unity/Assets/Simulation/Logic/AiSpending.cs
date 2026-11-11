@@ -39,8 +39,6 @@ namespace TarmacGauntlet.Simulation
 
         /// <summary>AI teams always aim to field exactly this many drivers.</summary>
         private const int AiTargetDriverCount = 3;
-        /// <summary>Target crew size AI will work toward when budget permits.</summary>
-        private const int AiTargetCrewSize = 8;
         /// <summary>Number of spare parts AI buys per spending iteration.</summary>
         private const int AiSparePartsPerBuy = 10;
         /// <summary>Number of tyre sets AI buys per spending iteration.</summary>
@@ -137,7 +135,6 @@ namespace TarmacGauntlet.Simulation
             UpgradePack,
             BuyNewCar,
             BuyUsedCar,
-            HireCrew,
             BuySpares,
             BuyTyres,
             RepairCar,
@@ -154,7 +151,6 @@ namespace TarmacGauntlet.Simulation
             public UpgradePackType PackType { get; init; }
             public string ModelId { get; init; } = "";
             public UsedCarListing? Listing { get; init; }
-            public int NewSize { get; init; }
             public int PartsNeeded { get; init; }
             public double ConditionGain { get; init; }
         }
@@ -247,19 +243,6 @@ namespace TarmacGauntlet.Simulation
                         Listing = listing,
                     });
                 }
-            }
-
-            // --- Crew hiring ---
-            if (team.CrewSize < AiTargetCrewSize)
-            {
-                var needed = AiTargetCrewSize - team.CrewSize;
-                options.Add(new SpendingOption
-                {
-                    Kind = OptionKind.HireCrew,
-                    Value = needed * 5, // 5 value points per crew member
-                    Cost = needed * DealerData.CrewCostPerMember,
-                    NewSize = AiTargetCrewSize,
-                });
             }
 
             // --- Car repair ---
@@ -385,9 +368,6 @@ namespace TarmacGauntlet.Simulation
                         EnteredCarId = team.EnteredCarId ?? newInstance.Id,
                     };
                 }
-
-                case OptionKind.HireCrew:
-                    return team with { Budget = team.Budget - option.Cost, CrewSize = option.NewSize };
 
                 case OptionKind.BuySpares:
                     return team with { Budget = team.Budget - option.Cost, SpareParts = team.SpareParts + AiSparePartsPerBuy };
