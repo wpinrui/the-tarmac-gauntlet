@@ -45,7 +45,7 @@ namespace TarmacGauntlet.Raceday
             GlowId = Shader.PropertyToID("_Glow"), GroundId = Shader.PropertyToID("_Ground"), SunColorId = Shader.PropertyToID("_SunColor"),
             CloudLitId = Shader.PropertyToID("_CloudLit"), CloudShadeId = Shader.PropertyToID("_CloudShade"),
             SunDirId = Shader.PropertyToID("_SunDir"), MoonDirId = Shader.PropertyToID("_MoonDir"),
-            CloudOffsetId = Shader.PropertyToID("_CloudOffset"), CoverId = Shader.PropertyToID("_Cover"),
+            CloudOffsetId = Shader.PropertyToID("_CloudOffset"), CoverId = Shader.PropertyToID("_Cover"), OvercastId = Shader.PropertyToID("_Overcast"),
             NightId = Shader.PropertyToID("_Night"), CloudScaleId = Shader.PropertyToID("_CloudScale");
 
         /// <summary>The hour of the day now, on the race clock.</summary>
@@ -92,12 +92,13 @@ namespace TarmacGauntlet.Raceday
         {
             float hour = Hour;
             SkyState s = SkyClock.At(hour, SkyClock.Look);
-            float cover = SkyClock.Look.Cover, haze = SkyClock.Look.Haze, shadows = 1f, cloud = 0f;
+            float cover = SkyClock.Look.Cover, overcast = 0f, haze = SkyClock.Look.Haze, shadows = 1f, cloud = 0f;
             if (Weather != null)
             {
                 WeatherState w = Weather();
                 WeatherSky.Apply(ref s, w);
                 cover = WeatherSky.Cover(w.Cloud);
+                overcast = WeatherSky.Overcast(w.Cloud);
                 haze = WeatherSky.Haze(haze, w);
                 // Under a grey sky the light comes from everywhere and the shadows fade.
                 shadows = Mathf.Lerp(0.15f, 1f, WeatherSky.Direct(w));
@@ -127,6 +128,7 @@ namespace TarmacGauntlet.Raceday
             sky.SetVector(MoonDirId, s.MoonDir);
             sky.SetVector(CloudOffsetId, clouds);
             sky.SetFloat(CoverId, cover);
+            sky.SetFloat(OvercastId, overcast);
             sky.SetFloat(NightId, s.Night);
 
             probe.intensity = Mathf.Lerp(1f, NightShine, s.Night);

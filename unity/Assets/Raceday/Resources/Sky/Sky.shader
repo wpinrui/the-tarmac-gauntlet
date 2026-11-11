@@ -1,5 +1,6 @@
 // The race's sky: a zenith to horizon gradient, the sunset glow towards the sun, the sun and moon,
 // stars at night and two layers of drifting cloud. Every colour comes from TimeOfDay each frame.
+// Under weather (_Overcast) the clouds grow, soften and close into a grey deck with broad darker patches.
 Shader "Hidden/TarmacGauntlet/Sky"
 {
     Properties
@@ -22,7 +23,7 @@ Shader "Hidden/TarmacGauntlet/Sky"
             float4 _Zenith, _Horizon, _Glow, _Ground, _SunColor, _CloudLit, _CloudShade;
             float4 _SunDir, _MoonDir;
             float4 _CloudOffset;   // xy the big layer, zw the small one
-            float _Cover, _Night, _CloudScale;
+            float _Cover, _Night, _CloudScale, _Overcast;
 
             struct v2f
             {
@@ -45,9 +46,11 @@ Shader "Hidden/TarmacGauntlet/Sky"
                 return frac(p.x * p.y * p.z * (p.x + p.y + p.z));
             }
 
-            float Density(float2 uv)
+            // o is how overcast the sky is: the small layer's detail fades towards the deck.
+            float Density(float2 uv, float o)
             {
-                return tex2D(_CloudTex, uv + _CloudOffset.xy).r * 0.7 + tex2D(_CloudTex, uv * 2.3 + _CloudOffset.zw).g * 0.3;
+                float small = lerp(tex2D(_CloudTex, uv * 2.3 + _CloudOffset.zw).g, 0.5, 0.7 * o);
+                return tex2D(_CloudTex, uv + _CloudOffset.xy).r * 0.7 + small * 0.3;
             }
 
             fixed4 frag(v2f i) : SV_Target
@@ -74,11 +77,15 @@ Shader "Hidden/TarmacGauntlet/Sky"
                 star *= _Night * saturate(up * 4.0);
                 float moon = smoothstep(0.99990, 0.99994, dot(d, _MoonDir.xyz)) * saturate(_MoonDir.y * 20.0);
 
-                float2 uv = d.xz / (max(up, 0.0) * 0.85 + 0.15) * _CloudScale;
-                float n = Density(uv);
-                float c = smoothstep(_Cover, _Cover + 0.18, n) * smoothstep(0.0, 0.12, up);
-                float lit = saturate(0.55 + (n - Density(uv + sh * 0.035)) * 6.0);
-                float3 cloud = lerp(_CloudShade.rgb, _CloudLit.rgb, lit);
+                // Under cloud the forms grow to twice the size and their edges soften, so a cloudy sky
+                // closes into a deck; its thicker parts are darker underneath.
+                float o = _Overcast;
+                float2 uv = d.xz / (max(up, 0.0) * 0.85 + 0.15) * _CloudScale * lerp(1.0, 0.5, o);
+                float n = Density(uv, o);
+                float c = smoothstep(_Cover - 0.2 * o, _Cover + 0.18 + 0.1 * o, n) * smoothstep(0.0, 0.12, up);
+                float lit = saturate(0.55 + (n - Density(uv + sh * 0.035, o)) * 6.0);
+                lit = lerp(lit, 1.0 - smoothstep(0.3, 0.75, n), o);
+                float3 cloud = lerp(_CloudShade.rgb, _CloudLit.rgb, lit) * (1.0 - 0.35 * o * smoothstep(0.3, 0.8, n));
                 cloud += _SunColor.rgb * pow(saturate(cs), 6.0) * (1.0 - c) * 0.6 * above;
                 cloud = lerp(cloud, _Horizon.rgb, band * 0.7);
 

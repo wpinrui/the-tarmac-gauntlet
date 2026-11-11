@@ -78,6 +78,9 @@ namespace TarmacGauntlet.Raceday
             public bool Grounded;
         }
 
+        /// <summary>Wheel i's visual pivot, at its centre: 0 front left, 1 front right, 2 rear left, 3 rear right. Null with none.</summary>
+        public Transform WheelVisual(int i) => wheels[i]?.Visual;
+
         public void Setup(CarSpec spec, Transform[] wheelVisuals)
         {
             Spec = spec;
