@@ -9,10 +9,10 @@ namespace TarmacGauntlet.Raceday
     public static class Experiments
     {
         /// <summary>What each experiment tries, E1 first.</summary>
-        public static readonly string[] All = { "path choosing" };
+        public static readonly string[] All = { "path choosing", "rejoin without waiting" };
 
         /// <summary>Each experiment's revision, raised each time a better one is merged.</summary>
-        public static readonly int[] Revisions = { 9 };
+        public static readonly int[] Revisions = { 10, 1 };
 
         /// <summary>The experiment switched on, or 0 for none.</summary>
         public static int On;
