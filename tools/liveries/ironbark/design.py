@@ -4,6 +4,7 @@ Independent, so no maker's logo. Writes one folder of panels per option under ou
 Run: node ../common/views.js ../../../unity/Assets/Art/Vehicles/LibertyCollier/LibertyCollier.obj out/views
      python3 marks.py
      python3 design.py
+     ./game.sh
 
 Side art is given as (z, y) in the car's metres: z runs nose (+2.08) to tail (-1.98), y up from
 the ground. Landmarks on the Collier: front wheel at z 1.27, rear at -1.27 (radius 0.34, arch
@@ -11,7 +12,6 @@ tops at y 0.71); door from z 0.87 to -0.44, y 0.19 to the window line at 0.95; b
 to 2.0; roof z -1.25 to 0.1.
 """
 import math
-import random
 import sys
 from pathlib import Path
 
@@ -23,17 +23,11 @@ from livery import Livery  # noqa: E402
 
 GREEN = "#0f4d2c"
 GOLD = "#f2b51c"
-WATTLE = "#ffd24a"
-CREAM = "#f3ead2"
-
-DOOR_Z, DOOR_W, DOOR_H = 0.22, 0.5, 0.28
-ROOF_Z = -0.55
 
 
-def tail_z(x, y, _tris=[]):
-    """Where the tailgate's surface is at (x, y): a ray from behind the car, along +z, to the
-    first body triangle it meets."""
-    if not _tris:
+def body_tris(_cache=[]):
+    """The model's paint triangles."""
+    if not _cache:
         verts, mat = [], None
         for ln in MODEL.read_text().splitlines():
             t = ln.split()
@@ -45,52 +39,41 @@ def tail_z(x, y, _tris=[]):
                 mat = t[1]
             elif t[0] == "f" and mat == "body":
                 ids = [verts[int(k.split("/")[0]) - 1] for k in t[1:]]
-                for i in range(1, len(ids) - 1):
-                    tri = (ids[0], ids[i], ids[i + 1])
-                    if max(p[2] for p in tri) < -1.3:
-                        _tris.append(tri)
-    best = None
-    for a, b, c in _tris:
-        d = (b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1])
+                _cache += [(ids[0], ids[i], ids[i + 1]) for i in range(1, len(ids) - 1)]
+    return _cache
+
+
+def surface(axis, a, b, pick):
+    """Where a ray along one axis meets the paint. axis 2 (z) takes (x, y), axis 0 (x) takes
+    (z, y); pick chooses among the hits (min z for the tailgate, max x for the car's left)."""
+    i, j = (0, 1) if axis == 2 else (2, 1)
+    hits = []
+    for p, q, r in body_tris():
+        d = (q[i] - p[i]) * (r[j] - p[j]) - (r[i] - p[i]) * (q[j] - p[j])
         if abs(d) < 1e-12:
             continue
-        u = ((x - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (y - a[1])) / d
-        v = ((b[0] - a[0]) * (y - a[1]) - (x - a[0]) * (b[1] - a[1])) / d
+        u = ((a - p[i]) * (r[j] - p[j]) - (r[i] - p[i]) * (b - p[j])) / d
+        v = ((q[i] - p[i]) * (b - p[j]) - (a - p[i]) * (q[j] - p[j])) / d
         if u >= 0 and v >= 0 and u + v <= 1:
-            z = a[2] + u * (b[2] - a[2]) + v * (c[2] - a[2])
-            best = z if best is None else min(best, z)
-    return best
+            hits.append(p[axis] + u * (q[axis] - p[axis]) + v * (r[axis] - p[axis]))
+    return pick(hits)
 
 
-def bezier(pts, n=40):
-    """Points along a cubic Bezier chain: p0 c0 c1 p1 c2 c3 p2 ..."""
-    out = []
-    for i in range(0, len(pts) - 1, 3):
-        p0, c0, c1, p1 = pts[i:i + 4]
-        for k in range(n + (1 if i + 4 >= len(pts) else 0)):
-            t = k / n
-            out.append(tuple((1 - t) ** 3 * a + 3 * (1 - t) ** 2 * t * b + 3 * (1 - t) * t ** 2 * c + t ** 3 * d
-                             for a, b, c, d in zip(p0, c0, c1, p1)))
-    return out
-
-
-def ribbon(centre, w0, w1):
-    """A band along a centreline, w0 wide at the start tapering to w1 at the end."""
-    top, bot = [], []
-    n = len(centre)
-    for i, (z, y) in enumerate(centre):
-        a, b = centre[max(i - 1, 0)], centre[min(i + 1, n - 1)]
-        dz, dy = b[0] - a[0], b[1] - a[1]
-        ln = math.hypot(dz, dy)
-        nz, ny = -dy / ln, dz / ln
-        h = (w0 + (w1 - w0) * i / (n - 1)) / 2
-        top.append((z + nz * h, y + ny * h))
-        bot.append((z - nz * h, y - ny * h))
-    return top + bot[::-1]
-
-
-def circle(z, y, r, n=14):
-    return [(z + math.cos(a) * r, y + math.sin(a) * r) for a in (i / n * 2 * math.pi for i in range(n))]
+def on_top(lv, pts, fill, side=None):
+    """Art on a curved panel shows in the top view too (and side art near the nose in the front
+    view), blended in by the shader: draw it there as well, where it lands on the surface, or
+    that view's paint bleeds into it. pts are rear
+    view (x, y), or side view (z, y) when side is set. Edges are split so the outline follows
+    the curve."""
+    pts = [(p[0] + (q[0] - p[0]) * k / 8, p[1] + (q[1] - p[1]) * k / 8)
+           for p, q in zip(pts, pts[1:] + pts[:1]) for k in range(8)]
+    if side:
+        for sign in (1, -1):
+            xs = [sign * surface(0, z, y, max) for z, y in pts]
+            lv.poly("top", [(x, 0, z) for x, (z, y) in zip(xs, pts)], fill)
+            lv.poly("front", [(x, y, 0) for x, (z, y) in zip(xs, pts)], fill)
+    else:
+        lv.poly("top", [(x, 0, surface(2, x, y, min)) for x, y in pts], fill)
 
 
 def star(cx, cy, r, n, inner=0.47):
@@ -105,43 +88,6 @@ def flags(lv, z, y, height):
     lv.mark("right", MARKS / "flag-mirror.svg", lv._side("right", z, y), height)
 
 
-def numbers(lv, ink, door_y, roof=True):
-    lv.side_number(DOOR_Z, door_y, DOOR_W, DOOR_H, ink)
-    if roof:
-        lv.number("top", (0, 0, ROOF_Z), 0.5, 0.32, ink, rotate=180)
-
-
-# The gold sweep: low on the front bumper, under the door number, up to the rear pillar.
-SWEEP = bezier([(2.12, 0.40), (1.3, 0.40), (0.6, 0.44), (-0.1, 0.55),
-                (-0.7, 0.66), (-1.05, 0.82), (-1.32, 1.04)])
-
-
-def green_and_gold(views):
-    lv = Livery(views, GREEN)
-    lv.side_poly(ribbon(SWEEP, 0.16, 0.07), GOLD)
-    lv.side_poly(ribbon([(z, y - 0.13) for z, y in SWEEP[:int(len(SWEEP) * 0.8)]], 0.025, 0.012), GOLD)
-    rnd = random.Random(3)
-    for _ in range(26):  # wattle blossom where the sweep ends, on the rear pillar
-        a, d = rnd.random() * 2 * math.pi, rnd.random() * 0.13
-        lv.side_poly(circle(-1.42 + math.cos(a) * d, 1.12 + math.sin(a) * d * 0.8, 0.018 + rnd.random() * 0.02),
-                     WATTLE if rnd.random() < 0.5 else GOLD)
-    for x0, x1 in ((0.26, 0.38), (-0.38, -0.26)):  # twin stripes over the bonnet, roof and tailgate
-        lv.band_x(x0, x1, GOLD)
-    for view in ("left", "right"):
-        lv.mark(view, MARKS / "logo-light.svg", lv._side(view, DOOR_Z, 0.32), 0.17)
-    lv.mark("top", MARKS / "logo-light.svg", (0, 0, 1.55), 0.2, rotate=-90)
-    lv.mark("rear", MARKS / "logo-light.svg", (0.0, 0.66, 0), 0.13)
-    flags(lv, 1.22, 0.83, 0.11)
-    numbers(lv, CREAM, 0.79)
-    return lv
-
-
-# The split: green ahead of a line from behind the front wheel up through the B-pillar, gold
-# behind it.
-def split_y(z):
-    return (1.4 - z) / 1.54
-
-
 # The Southern Cross as the flag places it: (x across the fly, y down it, radius on the roof, points).
 CROSS = ((0.75, 0.167, 0.11, 7), (0.625, 0.45, 0.11, 7), (0.873, 0.4, 0.11, 7), (0.75, 0.833, 0.11, 7), (0.81, 0.56, 0.06, 5))
 
@@ -154,7 +100,11 @@ def southern_cross(slant):
         lv.side_poly([(z0, 0.0), (z1, 2.0), (-2.4, 2.0), (-2.4, -0.1), (z0 + 0.15, -0.1)], GOLD)
         lv.side_poly([(z0 - 0.09, 0.0), (z1 - 0.09, 2.0), (z1 - 0.12, 2.0), (z0 - 0.12, 0.0)], GREEN)
         lv.band_x(-2, 2, GOLD, views=("rear",))
-        lv.side_poly(star(1.17, 0.83, 0.075, 7), GOLD)  # the Commonwealth star on the front wing
+        wing = star(1.2, 0.8, 0.065, 7)  # the Commonwealth star on the front wing
+        lv.side_poly(wing, GOLD)
+        on_top(lv, wing, GOLD, side=True)
+        # The roof rail stays green to the end of the roof, so the roof's edge has no gold blur.
+        lv.side_poly([(2.4, 1.24), (-1.3, 1.24), (-1.3, 2.0), (2.4, 2.0)], GREEN)
         # The Southern Cross over the roof, Alpha toward the windscreen, in the flag's arrangement.
         for fx, fy, r, n in CROSS:
             x, z = (fx - 0.75) * 3.33, -0.575 + (fy - 0.5) * 1.667
@@ -168,9 +118,7 @@ def southern_cross(slant):
             x, y = 0.25 - (fx - 0.75) * 0.9, 0.76 - (fy - 0.5) * 0.45
             pts = [(x - dx, y + dy) for dx, dy in star(0, 0, r * 0.4, n)]
             lv.poly("rear", [(px, py, 0) for px, py in pts], GREEN)
-            # The tailgate leans back, so the top view sees these stars too: draw them there as well,
-            # where they land on the surface, or its gold bleeds into them.
-            lv.poly("top", [(px, 0, tail_z(px, py)) for px, py in pts], GREEN)
+            on_top(lv, pts, GREEN)
         lv.mark("rear", MARKS / "url-green.svg", (0.0, 0.36, 0), 0.075)  # in the plate recess
         # Gold number on the green at the front of the door, the flag at the door's foot and the
         # logo big from the door's back half over the rear quarter.
