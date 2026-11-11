@@ -7,8 +7,8 @@ namespace TarmacGauntlet.Raceday
     /// <summary>
     /// The running order for the timing tower, with no Unity objects so it can be tested outside Unity.
     /// Laps are counted in fake laps: a tenth of the real lap, because the race runs at 10:1. Every
-    /// car shows the fake laps it has completed, from 0. The tower shows every class leader, the cars round the player and, in the rows
-    /// left, the fastest class in race order.
+    /// car shows the fake laps it has completed, from 0. The tower shows every class leader, the cars
+    /// round the player and, in the rows left, the fastest class in race order.
     /// </summary>
     public static class Standings
     {

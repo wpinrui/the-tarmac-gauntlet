@@ -190,7 +190,7 @@ namespace TarmacGauntlet.Raceday
                 Vector4.one * Mathf.Max(1f, BadgeBorder * u), Vector4.one * BadgeRadius * u);
             Text(badge, letter, badgeStyle, colour);
 
-            Text(new Rect(gapX, y, GapWidth * u, h), Laps(c), gapStyle, player ? PlayerTet : Color.white);
+            Text(new Rect(gapX, y, GapWidth * u, h), Laps(c), gapStyle, player ? PlayerText : Color.white);
         }
 
         /// <summary>The fake laps the car has completed.</summary>
