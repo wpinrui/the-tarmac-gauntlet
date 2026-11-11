@@ -39,12 +39,13 @@ namespace TarmacGauntlet.Raceday
         private static readonly Color Charcoal = new Color(0.17f, 0.18f, 0.2f, 1f);
         private static readonly int ClothId = Shader.PropertyToID("_Cloth"), PanelId = Shader.PropertyToID("_Panel");
 
-        private enum Still { Standing, Walking, Low }
+        private enum Figure { Standing, Walking, Low }
 
         private sealed class Live
         {
             public HqCrewRig Rig;
             public SkinnedMeshRenderer Skin;
+            public Transform LeftHand, RightHand;
         }
 
         private RaceCar[] cars;
@@ -56,6 +57,8 @@ namespace TarmacGauntlet.Raceday
         private Material[] materials;
         private int[] kitParts;
         private readonly Mesh[] stills = new Mesh[3];
+        /// <summary>Each still figure's hands, left and right, in its own frame.</summary>
+        private readonly Vector3[,] stillHands = new Vector3[3, 2];
 
         // By car: its garage's crew, still figures and live rigs (null where none).
         private GarageCrew[] crews;
@@ -102,6 +105,26 @@ namespace TarmacGauntlet.Raceday
                 kits[i] = KitBlock(colours[i]);
                 Figures(i);
             }
+        }
+
+        // ---------------------------------------------------------------- for the kit and the drivers
+
+        /// <summary>
+        /// Car i's garage crew, or null with none: each person's jobs (<see cref="CrewMember.Tasks"/>), the task they are
+        /// on (<see cref="GarageCrew.Current"/>), its place and time, and where they stand (<see cref="GarageCrew.World"/>).
+        /// </summary>
+        public GarageCrew Crew(int car) => crews != null && car >= 0 && car < crews.Length ? crews[car] : null;
+
+        /// <summary>The stop's clock car i's crew follows this frame.</summary>
+        public StopClock ClockOf(int car) => Crew(car) == null ? default : Clock(car);
+
+        /// <summary>Where a person of car i's crew has a hand, in the world: off the live rig near the camera, else off their still figure.</summary>
+        public Vector3 Hand(int car, int person, bool right)
+        {
+            Live l = live[car][person];
+            if (l != null) return (right ? l.RightHand : l.LeftHand).position;
+            Transform t = figures[car][person].transform;
+            return t.TransformPoint(stillHands[(int)FigureFor(crews[car].People[person]), right ? 1 : 0]);
         }
 
         // ---------------------------------------------------------------- materials and still figures
@@ -165,6 +188,9 @@ namespace TarmacGauntlet.Raceday
                 skin.BakeMesh(mesh, true);
                 mesh.RecalculateBounds();
                 stills[p] = mesh;
+                Transform root = rig.Root.transform;
+                stillHands[p, 0] = root.InverseTransformPoint(rig.Find("LeftHand").position);
+                stillHands[p, 1] = root.InverseTransformPoint(rig.Find("RightHand").position);
             }
             Destroy(rig.Root);
         }
@@ -205,7 +231,7 @@ namespace TarmacGauntlet.Raceday
             t.SetPositionAndRotation(crew.World(m.At), Quaternion.LookRotation(-face, Vector3.up));
         }
 
-        private static Still StillFor(CrewMember m) => m.Low ? Still.Low : m.Clip == "Walk" ? Still.Walking : Still.Standing;
+        private static Figure FigureFor(CrewMember m) => m.Low ? Figure.Low : m.Clip == "Walk" ? Figure.Walking : Figure.Standing;
 
         // ---------------------------------------------------------------- each frame
 
@@ -232,7 +258,7 @@ namespace TarmacGauntlet.Raceday
                         continue;
                     }
                     Place(figures[i][k].transform, crew, m);
-                    figures[i][k].sharedMesh = stills[(int)StillFor(m)];
+                    figures[i][k].sharedMesh = stills[(int)FigureFor(m)];
                 }
             }
             if (Time.unscaledTime >= nextPick)
@@ -256,7 +282,9 @@ namespace TarmacGauntlet.Raceday
             }
             Vector3 toBox = crew.Box - race.transform.position;
             toBox.y = 0f;
-            c.CarStanding = toBox.sqrMagnitude < 2.5f * 2.5f && car.Speed < 1f;
+            c.Car = crew.Local(race.transform.position);
+            c.CarSpeed = car.Speed;
+            c.CarNear = Mathf.Abs(c.Car.x) < 40f && Mathf.Abs(c.Car.y) < 12f;
             PitService service = null;
             PitPlan plan = car.AiDriving && drivers[i] != null ? drivers[i].Racer?.Pit : null;
             if (plan != null)
@@ -337,18 +365,18 @@ namespace TarmacGauntlet.Raceday
             }
             var keep = new bool[crews.Length];
             int people = 0;
-            foreach ((int car, float _, bool _) in candidates)
+            foreach (var c in candidates)
             {
-                int n = crews[car].People.Length;
+                int n = crews[c.car].People.Length;
                 if (people + n > MaxLive) continue;
                 people += n;
-                keep[car] = true;
+                keep[c.car] = true;
             }
             for (int i = 0; i < crews.Length; i++)
             {
                 if (crews[i] == null) continue;
                 bool isLive = live[i][0] != null;
-                if (isLive && !keep[i]) Still(i);
+                if (isLive && !keep[i]) Freeze(i);
             }
             for (int i = 0; i < crews.Length; i++)
             {
@@ -375,7 +403,7 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>Car i's crew go back to still figures, their rigs back to the pool.</summary>
-        private void Still(int i)
+        private void Freeze(int i)
         {
             GarageCrew crew = crews[i];
             for (int k = 0; k < crew.People.Length; k++)
@@ -386,7 +414,7 @@ namespace TarmacGauntlet.Raceday
                 pool.Push(l);
                 figureRenderers[i][k].enabled = true;
                 Place(figures[i][k].transform, crew, crew.People[k]);
-                figures[i][k].sharedMesh = stills[(int)StillFor(crew.People[k])];
+                figures[i][k].sharedMesh = stills[(int)FigureFor(crew.People[k])];
             }
         }
 
@@ -396,7 +424,7 @@ namespace TarmacGauntlet.Raceday
             rig.Root.name = "Live crew " + ++built;
             var skin = rig.Root.GetComponentInChildren<SkinnedMeshRenderer>();
             skin.sharedMaterials = materials;
-            return new Live { Rig = rig, Skin = skin };
+            return new Live { Rig = rig, Skin = skin, LeftHand = rig.Find("LeftHand"), RightHand = rig.Find("RightHand") };
         }
     }
 }

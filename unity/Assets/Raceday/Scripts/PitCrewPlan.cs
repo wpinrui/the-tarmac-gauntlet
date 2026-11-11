@@ -16,16 +16,17 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Seconds into the stop, and when the fuel and the tyres start and end.</summary>
         public float Elapsed, FuelFrom, FuelTo, TyresFrom, TyresTo, Duration;
         public bool NewTyres, NewDriver;
-        /// <summary>The car stands in the box, so the crew walk round it.</summary>
-        public bool CarStanding;
+        /// <summary>The car's middle in the box's frame (<see cref="GarageCrew.Local"/>), its speed, m/s, and whether it is near the box at all.</summary>
+        public Vector2 Car;
+        public float CarSpeed;
+        public bool CarNear;
         public float CarLength, CarWidth;
     }
 
     /// <summary>
     /// One piece of a stop's work. Wheels are part k of a person's m in the tyre time, the second person on a
-    /// wheel working beside the first. The refueller, the hose holder, the marshal with the extinguisher and the
-    /// windscreen cleaner work in the fuel time, the jacks in the tyre time, the lollipop and the driver's door
-    /// through the whole stop.
+    /// wheel working beside the first. The refueller, the hose holder and the marshal with the extinguisher work in
+    /// the fuel time, the jacks in the tyre time, the lollipop, the driver's door and the windscreen through the stop.
     /// </summary>
     public struct CrewTask
     {
@@ -58,8 +59,18 @@ namespace TarmacGauntlet.Raceday
         public float UnderTime, UnderRate, UnderWeight;
         public bool UnderLoop;
 
+        /// <summary>True while at their place inside its time: the work is going on.</summary>
+        public bool Working { get; internal set; }
+        /// <summary>The stage of the stop as this person last saw it.</summary>
+        public CrewStage Stage { get; internal set; }
+
         internal bool Crouched;
         internal float Busy;
+        /// <summary>The task being worked or walked to, and how long it has been worked.</summary>
+        internal int Next;
+        internal float Worked;
+        /// <summary>How much quicker than usual they move: one with several wheels hurries when the tyre time is short.</summary>
+        internal float Pace = 1f;
         internal readonly float IdleFrom;
 
         public CrewMember(Vector2 home, float idleFrom)
@@ -97,15 +108,17 @@ namespace TarmacGauntlet.Raceday
     }
 
     /// <summary>
-    /// A box's crew, with no Unity objects so it can be checked outside Unity. They wait in the garage
+    /// A box's crew, with no Unity objects so it can be checked outside Unity (tools/pit-crew). They wait in the garage
     /// (<see cref="PitComplex.Standby"/>). When the car is on its way in they walk out to wait beside the box, clear of
-    /// the car's way in. Once it stops they take their places round it (<see cref="PitStopSpots.Stop"/>) as each job's
-    /// time comes, crouched at the wheels and jacks, and step back once their work is done. When the stop is done they
-    /// walk back in. They walk round the nose or tail of a standing car, never through it.
+    /// the car's way in, the lollipop on the lane in front of it. Once it stops they take their places round it
+    /// (<see cref="PitStopSpots.Stop"/>), following the car if it stops off its mark, as each job's time comes, crouched
+    /// at the wheels and jacks, and step back to the garage side once their work is done. Work in the car's way out ends
+    /// a little before the release, so the car leaves clear. When the stop is done they walk back in, the far side round
+    /// the tail. They walk round the nose or tail of the car, never through it, and keep out of the fast lane.
     /// Every person hired has a job, handed out in this order: the refueller, one on each wheel, the marshal, a second
     /// on each wheel, the front and rear jacks, the lollipop, the hose holder, the driver's door, the windscreen. With
-    /// fewer than four on the wheels, each does several in turn inside the tyre time; one person alone refuels and
-    /// then does all four.
+    /// fewer than four on the wheels, each does several in turn inside the tyre time, hurrying when it is short; one
+    /// person alone refuels and then does all four. A job over too soon to walk to is let go.
     /// </summary>
     public sealed class GarageCrew
     {
@@ -114,11 +127,26 @@ namespace TarmacGauntlet.Raceday
         /// <summary>The walk's ground speed at rate 1, m/s (crew_suit, as Team HQ measures it).</summary>
         public const float WalkSpeed = 1.56f;
         public const float Speed = WalkSpeed * WalkRate;
+        /// <summary>The walk played faster still for a run, between the wheels when one person does several.</summary>
+        public const float RunRate = 2.1f;
+        /// <summary>The most one with several wheels hurries: running, getting down and up this much quicker still.</summary>
+        public const float MaxPace = 1.7f;
+        /// <summary>
+        /// Work in the car's way out, in front of its nose or on the far side ahead of its tail, ends this long before
+        /// the release, s, so the crew are clear when it goes: longer for those who crouch, as standing up takes time.
+        /// </summary>
+        public const float ClearStanding = 1.4f, ClearCrouched = 2.4f;
+        /// <summary>No one walks round the car's nose this close to the release, s: it is the way out.</summary>
+        public const float NoseShut = 4f;
         /// <summary>Seconds to blend between clips.</summary>
         public const float Fade = 0.25f;
         /// <summary>Lengths of the clips the crew wait on, s, as packed.</summary>
         public const float CrouchDown = 0.625f, CrouchUp = 2.542f;
-        private const float DownRate = 1.2f, UpRate = 1.7f;
+        private const float DownRate = 1.2f, UpRate = 1.7f, QuickDownRate = 1.8f, QuickUpRate = 3.4f;
+        /// <summary>Least work a person with several wheels gives each, s, and the time they allow for moving between them.</summary>
+        private const float MinWheel = 0.3f, MoveBetween = 2.2f;
+        /// <summary>Least time worth walking to a job for, s: with less left, the job is let go.</summary>
+        private const float MinWork = 0.3f;
         /// <summary>Furthest a person's step is, s: a long frame is walked in steps this long.</summary>
         private const float MaxStep = 0.05f;
 
@@ -132,6 +160,9 @@ namespace TarmacGauntlet.Raceday
         private readonly PitStopSpots spots;
         private readonly float floor;
         private float length = -1f, width = -1f;
+        /// <summary>The car this step, in the box's frame, and where it stopped: the stop's places follow a car that stops off the mark.</summary>
+        private Vector2 car, stopped;
+        private bool near;
         private readonly Dictionary<PitStopSpots.StopJob, (Vector2 at, Vector2 face)> placed = new Dictionary<PitStopSpots.StopJob, (Vector2, Vector2)>();
 
         /// <summary>True once everyone stands at home, idle: nothing to do until the next stop.</summary>
@@ -197,23 +228,37 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Most people a stop has work for.</summary>
         public static int StopCrew => 5 + Later.Length;
 
-        /// <summary>Hands out the stop's jobs, one person each, in order: refueller, the wheels, then the rest.</summary>
+        /// <summary>
+        /// Hands out the stop's jobs, one person each, in order: refueller, the wheels, then the rest. With fewer than four
+        /// on the wheels they share them out by side, so no one crosses the car between two: with three, one does the
+        /// garage side's two; with two, one a side; one alone does the garage side and then round the nose to the far side.
+        /// </summary>
         private void Plan()
         {
             int n = People.Length;
             if (n == 0) return;
             People[0].Tasks.Add(new CrewTask { Job = CrewTask.Kind.Fuel });
+            // The car's own left or right is the garage side, by which side of the lane the garages are.
+            bool leftNear = Local(spots.Stop(Garage, PitStopSpots.StopJob.FrontLeft, 4.6f, 1.9f).Position).y > 0f;
+            PitStopSpots.StopJob nearFront = leftNear ? PitStopSpots.StopJob.FrontLeft : PitStopSpots.StopJob.FrontRight;
+            PitStopSpots.StopJob nearRear = leftNear ? PitStopSpots.StopJob.RearLeft : PitStopSpots.StopJob.RearRight;
+            PitStopSpots.StopJob farFront = leftNear ? PitStopSpots.StopJob.FrontRight : PitStopSpots.StopJob.FrontLeft;
+            PitStopSpots.StopJob farRear = leftNear ? PitStopSpots.StopJob.RearRight : PitStopSpots.StopJob.RearLeft;
             int wheelers = Mathf.Min(n - 1, 4);
-            if (wheelers == 0)
-                for (int k = 0; k < 4; k++) People[0].Tasks.Add(new CrewTask { Job = CrewTask.Kind.Wheel, Spot = Wheels[k], Part = k, Parts = 4 });
-            else
+            PitStopSpots.StopJob[][] shares;
+            switch (wheelers)
             {
-                var mine = new List<PitStopSpots.StopJob>[wheelers];
-                for (int m = 0; m < wheelers; m++) mine[m] = new List<PitStopSpots.StopJob>();
-                for (int k = 0; k < 4; k++) mine[k % wheelers].Add(Wheels[k]);
-                for (int m = 0; m < wheelers; m++)
-                    for (int k = 0; k < mine[m].Count; k++)
-                        People[1 + m].Tasks.Add(new CrewTask { Job = CrewTask.Kind.Wheel, Spot = mine[m][k], Part = k, Parts = mine[m].Count });
+                case 0: shares = new[] { new[] { nearRear, nearFront, farFront, farRear } }; break;
+                case 1: shares = new[] { new[] { nearRear, nearFront, farFront, farRear } }; break;
+                case 2: shares = new[] { new[] { farFront, farRear }, new[] { nearFront, nearRear } }; break;
+                case 3: shares = new[] { new[] { farRear }, new[] { farFront }, new[] { nearFront, nearRear } }; break;
+                default: shares = new[] { new[] { Wheels[0] }, new[] { Wheels[1] }, new[] { Wheels[2] }, new[] { Wheels[3] } }; break;
+            }
+            for (int m = 0; m < shares.Length; m++)
+            {
+                CrewMember who = People[wheelers == 0 ? 0 : 1 + m];
+                for (int k = 0; k < shares[m].Length; k++)
+                    who.Tasks.Add(new CrewTask { Job = CrewTask.Kind.Wheel, Spot = shares[m][k], Part = k, Parts = shares[m].Length });
             }
             for (int p = 1 + wheelers, k = 0; p < n && k < Later.Length; p++, k++) People[p].Tasks.Add(Later[k]);
         }
@@ -237,6 +282,13 @@ namespace TarmacGauntlet.Raceday
 
         /// <summary>A task's place at the stop and the way it faces.</summary>
         private (Vector2 at, Vector2 face) Place(CrewTask t)
+        {
+            (Vector2 at, Vector2 face) p = Spot(t);
+            return (p.at + stopped, p.face);
+        }
+
+        /// <summary>A task's place round a car standing on the box's mark.</summary>
+        private (Vector2 at, Vector2 face) Spot(CrewTask t)
         {
             (Vector2 at, Vector2 face) fuel = placed[PitStopSpots.StopJob.Fuel];
             float side = width * 0.5f;
@@ -270,31 +322,158 @@ namespace TarmacGauntlet.Raceday
             switch (t.Job)
             {
                 case CrewTask.Kind.Jack: return new Vector2(t.Spot == PitStopSpots.StopJob.FrontJack ? l + 1.0f : -l - 1.0f, 3.0f);
-                case CrewTask.Kind.Lollipop: return new Vector2(l + 2.6f, 3.0f);
+                // The lollipop waits on the lane in front of the box, where the car stops short of it.
+                case CrewTask.Kind.Lollipop: return Spot(t).at;
                 case CrewTask.Kind.Screen: return new Vector2(l + 1.8f, 3.8f);
             }
-            Vector2 at = Place(t).at;
+            Vector2 at = Spot(t).at;
             if (at.y < 0f) return new Vector2(Mathf.Sign(at.x) * (l + (t.Second ? 1.9f : 1.1f)), 2.0f);
             return new Vector2(at.x, at.y + 1.3f);
         }
 
+        /// <summary>
+        /// Where a task stands once its work is done, until the car goes: on the garage side, those from the far side
+        /// round the tail, out of the car's way out.
+        /// </summary>
+        private Vector2 After(CrewTask t)
+        {
+            float l = HalfLength;
+            Vector2 at = Spot(t).at;
+            switch (t.Job)
+            {
+                case CrewTask.Kind.Jack: return stopped + new Vector2(t.Spot == PitStopSpots.StopJob.FrontJack ? l + 1.0f : -l - 1.0f, 3.0f);
+                case CrewTask.Kind.Lollipop: return stopped + new Vector2(l + 1.6f, width * 0.5f + 1.5f);
+                case CrewTask.Kind.Screen: return stopped + new Vector2(-l - 1.8f, 3.8f);
+            }
+            if (at.y < 0f) return stopped + new Vector2(-l - (t.Second ? 1.9f : 1.1f), 2.0f);
+            return stopped + new Vector2(at.x, at.y + 1.3f);
+        }
+
+        /// <summary>True when a task's place is in the car's way out: in front of the nose, or on the far side ahead of the tail.</summary>
+        private bool InWayOut(CrewTask t)
+        {
+            Vector2 at = Spot(t).at;
+            return at.x > HalfLength - 0.2f && Mathf.Abs(at.y) < width * 0.5f + 0.5f || at.y < 0f && at.x > 0.8f;
+        }
+
         /// <summary>The time a task is worked in, s into the stop; empty when the stop has no such work.</summary>
-        private static (float from, float to) Window(CrewTask t, in StopClock c)
+        private (float from, float to) Window(CrewTask t, in StopClock c)
+        {
+            (float from, float to) w = Work(t, c);
+            if (InWayOut(t)) w.to = Mathf.Min(w.to, c.Duration - (Crouches(t) ? ClearCrouched : ClearStanding));
+            return w;
+        }
+
+        /// <summary>The time a task's work takes, s into the stop. A person with several wheels may work each any time in the tyre time, in turn.</summary>
+        private static (float from, float to) Work(CrewTask t, in StopClock c)
         {
             switch (t.Job)
             {
                 case CrewTask.Kind.Wheel:
-                    if (!c.NewTyres) return (0f, 0f);
-                    float span = (c.TyresTo - c.TyresFrom) / t.Parts;
-                    return (c.TyresFrom + span * t.Part, c.TyresFrom + span * (t.Part + 1));
                 case CrewTask.Kind.Jack: return c.NewTyres ? (c.TyresFrom, c.TyresTo) : (0f, 0f);
                 case CrewTask.Kind.Lollipop: return (0f, c.Duration);
                 case CrewTask.Kind.Door: return c.NewDriver ? (0f, c.Duration) : (0f, 0f);
+                // The windscreen is cleaned any time in the stop.
+                case CrewTask.Kind.Screen: return (0f, c.Duration);
                 default: return (c.FuelFrom, c.FuelTo);
             }
         }
 
         private static bool Crouches(CrewTask t) => t.Job == CrewTask.Kind.Wheel || t.Job == CrewTask.Kind.Jack;
+
+        /// <summary>A person's task at this point of the stop, or null with none left: their place, its time and whether it is being worked now.</summary>
+        public CrewTask? Current(CrewMember m) => m.Next < m.Tasks.Count && m.Stage == CrewStage.Stop ? m.Tasks[m.Next] : (CrewTask?)null;
+
+        /// <summary>A task's place at this stop and the way it faces there, in the box's frame.</summary>
+        public (Vector2 at, Vector2 face) PlaceOf(CrewTask t) => Place(t);
+
+        /// <summary>The time a task is worked in at this stop, s into it.</summary>
+        public (float from, float to) TimeOf(CrewTask t, in StopClock c) => Window(t, c);
+
+        /// <summary>
+        /// Moves a person on to their next task once the current one is over: its time is up, or, for one of several
+        /// wheels, it has had its share of work.
+        /// </summary>
+        private void Progress(CrewMember m, in StopClock c)
+        {
+            if (c.Stage != CrewStage.Stop)
+            {
+                m.Next = 0;
+                m.Worked = 0f;
+                m.Pace = 1f;
+                return;
+            }
+            m.Pace = NeedPace(m, c);
+            while (m.Next < m.Tasks.Count)
+            {
+                CrewTask t = m.Tasks[m.Next];
+                (float from, float to) w = Window(t, c);
+                // Over once its time is up, or there is not time left to get there and work it, or it has had its share.
+                bool over = w.to <= w.from || c.Elapsed + Eta(m, t, c) > w.to - MinWork || t.Parts > 1 && m.Worked >= WheelShare(m, c);
+                if (!over) return;
+                m.Next++;
+                m.Worked = 0f;
+            }
+        }
+
+        /// <summary>
+        /// The work a person with several wheels gives the one they are at: as much as leaves time to get to each wheel
+        /// still to come and work it before its time is up, shared equally.
+        /// </summary>
+        private float WheelShare(CrewMember m, in StopClock c)
+        {
+            float now = Mathf.Max(c.Elapsed, c.TyresFrom) - m.Worked, moves = 0f, share = float.MaxValue;
+            for (int k = m.Next; k < m.Tasks.Count; k++)
+            {
+                if (k > m.Next) moves += Hop(Place(m.Tasks[k - 1]).at, Place(m.Tasks[k]).at, m.Tasks[k], c) / m.Pace;
+                share = Mathf.Min(share, (Window(m.Tasks[k], c).to - now - moves - MinWork) / (k - m.Next + 1));
+            }
+            return Mathf.Max(MinWheel, share);
+        }
+
+        /// <summary>The way between two points, round the car's nose or tail if it stands between them, m.</summary>
+        private float Way(Vector2 from, Vector2 to, in StopClock c)
+        {
+            if (!near || Clear(from, to)) return (to - from).magnitude;
+            Vector2 w = Waypoint(from, to, c);
+            Vector2 other = new Vector2(w.x, 2f * car.y - w.y);
+            return (w - from).magnitude + (Clear(w, to) ? (to - w).magnitude : (other - w).magnitude + (to - other).magnitude);
+        }
+
+        /// <summary>How long a move between two places takes: up, the walk or run there, and down again if the task there is done crouched.</summary>
+        private float Hop(Vector2 from, Vector2 to, CrewTask t, in StopClock c) =>
+            Way(from, to, c) / (WalkSpeed * (t.Parts > 1 ? RunRate : WalkRate)) + 0.3f + CrouchUp / QuickUpRate + (Crouches(t) ? CrouchDown / QuickDownRate : 0f);
+
+        /// <summary>
+        /// How much quicker than usual one with several wheels must move to get round them all in time, from 1 up to
+        /// <see cref="MaxPace"/>: the moves still to make over the time they have, wheel by wheel.
+        /// </summary>
+        private float NeedPace(CrewMember m, in StopClock c)
+        {
+            if (c.Stage != CrewStage.Stop || m.Next >= m.Tasks.Count || m.Tasks[m.Next].Parts <= 1) return 1f;
+            float now = Mathf.Max(c.Elapsed, c.TyresFrom), moves = 0f, pace = 1f;
+            Vector2 at = m.At;
+            bool there = (Place(m.Tasks[m.Next]).at - m.At).sqrMagnitude < 0.01f;
+            for (int k = m.Next; k < m.Tasks.Count; k++)
+            {
+                Vector2 to = Place(m.Tasks[k]).at;
+                if (k > m.Next || !there) moves += Hop(at, to, m.Tasks[k], c);
+                at = to;
+                float left = Window(m.Tasks[k], c).to - now - (k - m.Next + 1) * MinWheel - MinWork;
+                pace = Mathf.Max(pace, moves / Mathf.Max(left, 0.1f));
+            }
+            return Mathf.Min(pace, MaxPace);
+        }
+
+        /// <summary>Roughly how long until a person can start a task: the walk there, round the car if it is in the way, and getting up and down.</summary>
+        private float Eta(CrewMember m, CrewTask t, in StopClock c)
+        {
+            Vector2 at = Place(t).at;
+            if ((at - m.At).sqrMagnitude < 0.01f) return 0f;
+            float speed = WalkSpeed * (t.Parts > 1 ? RunRate : WalkRate);
+            float eta = Way(m.At, at, c) / speed + 0.2f + (m.Crouched ? CrouchUp / QuickUpRate : 0f) + (Crouches(t) ? CrouchDown / QuickDownRate : 0f);
+            return t.Parts > 1 ? eta / m.Pace : eta;
+        }
 
         /// <summary>Where a person wants to be, which way to face, and whether crouched, at this point of the stop.</summary>
         private (Vector2 at, Vector2 face, bool low) Want(CrewMember m, in StopClock c)
@@ -306,32 +485,55 @@ namespace TarmacGauntlet.Raceday
                 Vector2 r = Ready(m.Tasks[0]);
                 return (r, (-r).normalized, false);
             }
-            // At the stop: the first task with work still to come. With none left, wait clear of the car.
-            foreach (CrewTask t in m.Tasks)
+            if (m.Next < m.Tasks.Count)
             {
-                (float from, float to) w = Window(t, c);
-                if (w.to <= w.from || w.to <= c.Elapsed) continue;
+                CrewTask t = m.Tasks[m.Next];
                 (Vector2 at, Vector2 face) p = Place(t);
-                return (p.at, p.face, Crouches(t) && c.Elapsed >= w.from);
+                return (p.at, p.face, Crouches(t) && c.Elapsed >= Window(t, c).from);
             }
-            Vector2 back = Ready(m.Tasks[m.Tasks.Count - 1]);
-            return (back, (-back).normalized, false);
+            Vector2 back = After(m.Tasks[m.Tasks.Count - 1]);
+            return (back, (stopped - back).normalized, false);
         }
 
-        /// <summary>Is a point in the way of the standing car, with a little room round it?</summary>
-        private bool InCar(Vector2 p) => Mathf.Abs(p.x) < HalfLength + 0.5f && Mathf.Abs(p.y) < width * 0.5f + 0.35f;
+        /// <summary>Is a point in the car's way, with a little room round it?</summary>
+        private bool InCar(Vector2 p) => near && Mathf.Abs(p.x - car.x) < HalfLength + 0.5f && Mathf.Abs(p.y - car.y) < width * 0.5f + 0.35f;
 
-        /// <summary>The next point to walk to: straight there, or out past the car's nose or tail and across.</summary>
-        private Vector2 Waypoint(Vector2 from, Vector2 to, bool standing)
+        /// <summary>True when the straight walk between two points keeps out of the car's way.</summary>
+        private bool Clear(Vector2 from, Vector2 to)
         {
-            if (!standing) return to;
-            bool hits = false;
-            for (int k = 1; k < 12 && !hits; k++) hits = InCar(Vector2.Lerp(from, to, k / 12f));
-            if (!hits) return to;
-            float end = (from.x + to.x >= 0f ? 1f : -1f) * (HalfLength + 0.9f);
-            float across = width * 0.5f + 0.95f;
-            if (Mathf.Abs(from.x) < HalfLength + 0.8f) return new Vector2(end, (from.y >= 0f ? 1f : -1f) * across);
-            return new Vector2(end, (to.y >= 0f ? 1f : -1f) * across);
+            for (int k = 1; k <= 12; k++) if (InCar(Vector2.Lerp(from, to, k / 12f))) return false;
+            return true;
+        }
+
+        /// <summary>
+        /// The next point to walk to: straight there, or to the corner off the car's nose or tail that is clear to walk
+        /// to and makes the shortest way on round the car. Near the end of the stop, and after it, no one walks round the nose, the
+        /// car's way out, unless they are in front of it already and stepping out.
+        /// </summary>
+        private Vector2 Waypoint(Vector2 from, Vector2 to, in StopClock c)
+        {
+            if (!near || Clear(from, to)) return to;
+            bool leaving = c.Stage == CrewStage.Release || c.Stage == CrewStage.Home || c.Stage == CrewStage.Stop && c.Elapsed > c.Duration - NoseShut;
+            float end = HalfLength + 0.9f, across = width * 0.5f + 0.95f;
+            bool ahead = from.x - car.x > HalfLength;
+            Vector2 best = to;
+            float shortest = float.MaxValue;
+            for (int k = 0; k < 4; k++)
+            {
+                float x = k < 2 ? end : -end, y = k % 2 == 0 ? across : -across;
+                if (x > 0f && leaving && !ahead) continue;
+                Vector2 corner = car + new Vector2(x, y);
+                if ((corner - from).sqrMagnitude < 0.01f || !Clear(from, corner)) continue;
+                // On from the corner: straight there, or across the car's end to the other corner first.
+                Vector2 other = car + new Vector2(x, -y);
+                float way = (corner - from).magnitude + (Clear(corner, to) ? (to - corner).magnitude : 2f * across + (to - other).magnitude);
+                if (way < shortest)
+                {
+                    shortest = way;
+                    best = corner;
+                }
+            }
+            return best;
         }
 
         /// <summary>Moves the crew on by dt of race time, following the stop's clock.</summary>
@@ -340,11 +542,17 @@ namespace TarmacGauntlet.Raceday
             if (AtRest && (clock.Stage == CrewStage.Home || People.Length == 0)) return;
             if (clock.CarLength > 0f) Measure(clock.CarLength, clock.CarWidth);
             else if (length < 0f) Measure(4.6f, 1.9f);
+            near = clock.CarNear;
+            car = clock.Car;
+            bool standing = near && clock.CarSpeed < 1f && Mathf.Abs(car.x) < 3f && Mathf.Abs(car.y) < 1.5f;
+            if (clock.Stage == CrewStage.Stop && standing) stopped = car;
+            else if (clock.Stage == CrewStage.Home || clock.Stage == CrewStage.Ready) stopped = Vector2.zero;
             int steps = Mathf.Max(1, Mathf.CeilToInt(dt / MaxStep));
             float h = dt / steps;
             bool rest = true;
             foreach (CrewMember m in People)
             {
+                m.Stage = clock.Stage;
                 for (int s = 0; s < steps; s++) Move(m, clock, h);
                 rest &= clock.Stage == CrewStage.Home && m.At == m.Home && m.Clip == "Idle" && !m.Crouched && m.Busy <= 0f;
             }
@@ -354,9 +562,12 @@ namespace TarmacGauntlet.Raceday
         private void Move(CrewMember m, in StopClock c, float dt)
         {
             m.Advance(dt);
+            Progress(m, c);
             (Vector2 at, Vector2 face, bool low) want = Want(m, c);
             Vector2 to = want.at - m.At;
             bool far = to.sqrMagnitude > 0.06f * 0.06f;
+            m.Working = false;
+            bool several = m.Next < m.Tasks.Count && m.Tasks[m.Next].Parts > 1;
             if (m.Busy > 0f)
             {
                 m.Busy -= dt;
@@ -364,33 +575,50 @@ namespace TarmacGauntlet.Raceday
             }
             if (m.Crouched && (far || !want.low))
             {
-                m.Play("CrouchUpA", 0f, UpRate, false);
+                // Up quicker as the car is released, out of its way, and for one with several wheels, to fit them all in the tyre time.
+                bool hurry = c.Stage != CrewStage.Stop || c.Elapsed > c.Duration - ClearCrouched || several || m.Next > 0 && m.Next <= m.Tasks.Count && m.Tasks[m.Next - 1].Parts > 1;
+                float up = hurry ? QuickUpRate * m.Pace : UpRate;
+                m.Play("CrouchUpA", 0f, up, false);
                 m.Crouched = false;
-                m.Busy = CrouchUp / UpRate - 0.3f;
+                m.Busy = CrouchUp / up - 0.3f * UpRate / up;
                 return;
             }
             if (far)
             {
-                Vector2 wp = Waypoint(m.At, want.at, c.CarStanding) - m.At;
+                Vector2 wp = Waypoint(m.At, want.at, c) - m.At;
                 float dist = wp.magnitude;
                 Vector2 dir = wp / Mathf.Max(dist, 1e-4f);
                 m.Facing = Turn(m.Facing, dir, dt * 9f);
-                float go = Mathf.Min(dist, Speed * dt * Mathf.Max(0f, Vector2.Dot(m.Facing, dir)));
+                // One with several wheels runs between them.
+                float rate = several && c.Stage == CrewStage.Stop ? RunRate * m.Pace : WalkRate;
+                float go = Mathf.Min(dist, WalkSpeed * rate * dt * Mathf.Max(0f, Vector2.Dot(m.Facing, dir)));
                 m.At += dir * go;
-                m.Play("Walk", 0f, WalkRate, true);
+                if (m.Clip == "Walk") m.Rate = rate;
+                m.Play("Walk", 0f, rate, true);
                 return;
             }
             m.At = want.at;
             m.Facing = Turn(m.Facing, want.face, dt * 7f);
             if (want.low && !m.Crouched)
             {
-                m.Play("CrouchDown", 0f, DownRate, false);
+                float down = several ? QuickDownRate * m.Pace : DownRate;
+                m.Play("CrouchDown", 0f, down, false);
                 m.Crouched = true;
-                m.Busy = CrouchDown / DownRate - 0.1f;
+                m.Busy = CrouchDown / down - 0.1f;
                 return;
             }
             if (m.Crouched) m.Play("Crouch", 0f, 1f, true);
             else m.Play("Idle", m.IdleFrom, 1f, true);
+            // At the place, down if the job is done crouched, inside its time: the work is going on.
+            if (c.Stage == CrewStage.Stop && m.Next < m.Tasks.Count)
+            {
+                (float from, float to) w = Window(m.Tasks[m.Next], c);
+                if (c.Elapsed >= w.from && c.Elapsed < w.to)
+                {
+                    m.Working = true;
+                    m.Worked += dt;
+                }
+            }
         }
 
         /// <summary>Turns a facing towards another by a share of the way, kept a unit vector.</summary>
