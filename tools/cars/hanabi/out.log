@@ -1,0 +1,14 @@
+laid 35 parts, 7 cutters
+cockpit cut
+openings cut, hollows dropped: 0
+grooves cut
+roof options built
+door cut free: ['door_l', 'door_l_mirror', 'door_l_card']
+door cut free: ['door_r', 'door_r_mirror', 'door_r_card']
+triangles 539056
+Writing to out/ToraHanabi.obj
+OBJ export of 'ToraHanabi.obj' took 498.87 ms
+Info: File exported successfully
+wrote out/ToraHanabi.obj
+wrote /home/user/the-tarmac-gauntlet/tools/cars/hanabi/viewer.html 10046 KB
+exit 0

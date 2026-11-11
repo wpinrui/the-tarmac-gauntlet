@@ -9,6 +9,18 @@ TOUCH = 0.004     # parts closer than this are attached
 ZFIGHT = 0.0004   # parallel faces closer than this fight
 
 
+def _swing(data, doors):
+    """Turn each door's parts open: doors {name prefix: (p0, p1, deg)} in build space."""
+    import math
+    from mathutils import Matrix, Vector
+    for prefix, (p0, p1, deg) in doors.items():
+        p0 = Vector(p0); ax = (Vector(p1) - p0).normalized()
+        m = Matrix.Translation(p0) @ Matrix.Rotation(math.radians(deg), 4, ax) @ Matrix.Translation(-p0)
+        for k, bm in data.items():
+            if re.sub(r"^opt_[a-z]+_\d+_", "", k).startswith(prefix):
+                bm.transform(m)
+
+
 def _load(obj_path):
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.ops.wm.obj_import(filepath=str(obj_path), forward_axis="NEGATIVE_Z", up_axis="Y")
@@ -32,13 +44,22 @@ def _volume(bm):
 
 def _apart(a, b):
     """True for parts of two different options of one group, which never appear together."""
-    ma, mb = re.match(r"opt_(.+)_(\d+)_\d+", a), re.match(r"opt_(.+)_(\d+)_\d+", b)
+    ma, mb = re.match(r"opt_([a-z]+)_(\d+)_", a), re.match(r"opt_([a-z]+)_(\d+)_", b)
     return bool(ma and mb and ma[1] == mb[1] and ma[2] != mb[2])
 
 
-def run(obj_path, free=("wheel_",)):
-    """free: name prefixes allowed to stand apart (wheels sit in the arches)."""
-    data = _load(obj_path)
+def run(obj_path, free=("wheel_",), doors=None):
+    """free: name prefixes allowed to stand apart (wheels sit in the arches). doors: {name
+    prefix: (p0, p1, deg)}, checked swung open on their hinges as well as shut."""
+    hits = _run(_load(obj_path), free)
+    if doors:
+        data = _load(obj_path)
+        _swing(data, doors)
+        hits += [f"door open, {h}" for h in _run(data, free + tuple(doors))]
+    return hits
+
+
+def _run(data, free):
     trees = {k: BVHTree.FromBMesh(bm) for k, bm in data.items()}
     hits = []
     for k, bm in data.items():

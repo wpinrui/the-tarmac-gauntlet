@@ -1,0 +1,8 @@
+door cut free: ['door_l', 'door_l_glass']
+door cut free: ['door_r', 'door_r_glass']
+triangles 222556
+Writing to out/CheonmaCX24Si.obj
+OBJ export of 'CheonmaCX24Si.obj' took 419.06 ms
+Info: File exported successfully
+wrote /home/user/the-tarmac-gauntlet/tools/cars/cheonma/viewer.html 3289 KB
+exit 0

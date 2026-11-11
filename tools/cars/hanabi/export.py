@@ -139,24 +139,27 @@ def build(game=False):
     arch, tubs = parts.arches()
     for ob in arch:
         bpy.data.objects.remove(ob)
-    for ob in [cabin] + [o for o in seats if o.name.startswith("hoop")]:
+    for ob in [cabin] + [o for o in seats if o.name.startswith(("hoop", "door_card"))]:
         parts.stand_off(ob, *tubs)
     for ob in tubs:
         bpy.data.objects.remove(ob)
     out += [cabin] + seats + wheels
+    for sgn in (1, -1):
+        door = parts.door(ref, shell, sgn)
+        print("door cut free:", [o.name for o in door])
     opts = parts.options(ref)
     for n, objs in roofs.items():
         for i, ob in enumerate(objs):
-            ob.name = f"opt_roof_{n}_{i}"
+            ob.name = f"opt_roof_{n}_" + (ob.name if ob.name.startswith("door_") else str(i))
             opts.append(ob)
     if game:
         picks = R["picks"]
         for ob in opts:
-            _o, g, n, i = ob.name.split("_")
+            _o, g, n, i = ob.name.split("_", 3)
             if int(n) != picks[g]:
                 bpy.data.objects.remove(ob)
             else:
-                ob.name = f"{g}_{i}"
+                ob.name = i if i.startswith("door_") else f"{g}_{i}"
     bpy.data.objects.remove(plain)
     obs = [o for o in bpy.context.scene.objects if o.type == "MESH"]
     for ob in obs:
@@ -177,4 +180,6 @@ if __name__ == "__main__":
     out_dir = Path(args[0]) if args else HERE / "out"
     obs = build(game)
     blend.export(obs, out_dir, R["name"], MATERIALS, game=game)
+    if game:
+        blend.write_doors(out_dir / f"{R['name']}.doors.json", {"door_l": parts.door_hinge(1), "door_r": parts.door_hinge(-1)})
     print("wrote", out_dir / f"{R['name']}.obj")
