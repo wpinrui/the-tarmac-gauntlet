@@ -83,4 +83,5 @@ if __name__ == "__main__":
         body2 = (f'<path d="{han}" fill="{ink}" transform="translate({(width - hw) / 2:.2f} 0)"/>'
                  f'<g transform="translate({(width - lw) / 2:.2f} {75 * scale + 60:.2f}) scale({scale})">{line(GOLD)[0]}</g>')
         write(f"seorak-hangul-{tag}.svg", width + 4, 292 + 75 * scale + 70, -292, body2)
+        write(f"seorak-hangul-only-{tag}.svg", hw + 4, 296, -292, f'<path d="{han}" fill="{ink}"/>')
     print("wrote", HERE / "out" / "marks")

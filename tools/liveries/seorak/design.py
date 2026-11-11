@@ -16,7 +16,7 @@ from livery import Livery  # noqa: E402
 PEARL = "#eef0f2"
 NAVY = "#1c2a3a"
 GOLD = "#d9a443"
-RED = "#c63d2a"  # the badge's core
+RED = "#c63d2a"  # the A's core
 
 # Side art keeps out of the rear haunch (z -1.7 to -0.55): the vent channels behind the cockpit
 # have walls facing inward that take the side views, and anything drawn there shows on them
@@ -26,42 +26,37 @@ STACK_Z, STACK_Y, STACK_H = -0.03, 0.425, 0.25
 NUM_Z, NUM_Y, NUM_W, NUM_H = 0.80, 0.38, 0.44, 0.26
 
 
-def common(lv, rear_ink):
-    """Marks every option shares: fender and nose numbers, the team stack on the door, the
-    team line across the rear deck and 설악 on the engine cover."""
+def marks(lv):
+    """Fender and nose numbers, the team stack on the door and 설악 on the nose."""
     lv.side_number(NUM_Z, NUM_Y, NUM_W, NUM_H, NAVY)
     lv.number("top", (0, 0, 1.45), 0.46, 0.28, NAVY, rotate=-90)  # reads from the nose
     for view in ("left", "right"):
         lv.mark(view, MARKS / "team-seorak-stack-navy.svg", lv._side(view, STACK_Z, STACK_Y), STACK_H)
-    lv.mark("top", MARKS / "team-seorak-navy.svg", (0, 0, -1.95), 0.07, rotate=90)  # rear deck, reads from behind
-    lv.mark("top", MARKS / f"seorak-hangul-{rear_ink}.svg", (0, 0, -0.86), 0.21, rotate=90)  # engine cover
-
-
-def summit(views):
-    """The badge's peak on the rear haunch, its legs landing either side of the rear arch, with
-    the badge's red core between them."""
-    lv = Livery(views, PEARL)
-    apex, base, t = (-1.05, 0.86), 0.06, 0.15
-    front, back = -0.45, -1.65
-    outer = [(front, base), apex, (back, base)]
-    inner = [(back + t * 1.5, base), (apex[0], apex[1] - t * 1.6), (front - t * 1.5, base)]
-    lv.side_poly(outer + inner, NAVY)
-    lv.side_poly([(apex[0], 0.40), (apex[0] + 0.25, base), (apex[0] - 0.25, base)], RED)
-    # A navy spine edged in gold, nose to engine cover, broken for the nose number.
-    for z in ((-0.62, 1.15), (1.75, 9)):
-        lv.band_x(-0.12, 0.12, NAVY, views=("top",), z=z)
-        lv.band_x(-0.145, -0.125, GOLD, views=("top",), z=z)
-        lv.band_x(0.125, 0.145, GOLD, views=("top",), z=z)
-    lv.band_x(-0.12, 0.12, NAVY, views=("front",))
-    lv.band_x(-0.145, -0.125, GOLD, views=("front",))
-    lv.band_x(0.125, 0.145, GOLD, views=("front",))
-    common(lv, "navy")
-    return lv
+    lv.mark("top", MARKS / "seorak-hangul-only-navy.svg", (0, 0, 2.02), 0.17, rotate=-90)  # nose tip, under the number
 
 
 RIDGE = [(2.5, 0.20), (1.95, 0.25), (1.60, 0.20), (1.20, 0.24), (0.85, 0.19), (0.45, 0.23), (0.05, 0.19),
          (-0.30, 0.25), (-0.52, 0.27), (-0.70, 0.50), (-0.82, 0.44), (-1.05, 0.80), (-1.30, 0.58),
          (-1.48, 0.66), (-1.80, 0.44), (-2.05, 0.50), (-2.5, 0.38)]
+
+
+# Seorak's A from the wordmark (units: base 88 wide, 72 tall), laid on the rear deck as the base
+# layer: its base spans the car at A_BASE_Z, its point reaches A_APEX_Z behind the cockpit.
+A_OUTER = [(-44, 0), (0, 72), (44, 0), (22.15, 0), (0, 32.1), (-22.15, 0)]
+A_CORE = [(0, 30.24), (16, 0), (-16, 0)]
+A_BASE_Z, A_APEX_Z, A_HALF = -1.25, 0.05, 0.98
+
+
+def seorak_a(lv):
+    """The A across the whole width of the top, point forward."""
+    def place(pts):
+        return [(x / 44 * A_HALF, 0, A_BASE_Z + y / 72 * (A_APEX_Z - A_BASE_Z)) for x, y in pts]
+    # Carry the base a little past the body's edges so it reaches the sides cleanly.
+    over = 0.10 / (A_APEX_Z - A_BASE_Z) * 72
+    outer = [(-44 - 44 / 72 * over, -over), (0, 72), (44 + 44 / 72 * over, -over),
+             (22.15 + 22.15 / 32.1 * over, -over), (0, 32.1), (-22.15 - 22.15 / 32.1 * over, -over)]
+    lv.poly("top", place(outer), NAVY)
+    lv.poly("top", place(A_CORE), RED)
 
 
 def ridgeline(views):
@@ -73,13 +68,14 @@ def ridgeline(views):
     lv.side_poly(RIDGE + [(-2.5, -0.1), (2.5, -0.1)], NAVY)
     lv.band_x(-1.2, 1.2, NAVY, views=("front",), y=(-0.1, 0.20))
     lv.band_x(-1.2, 1.2, GOLD, views=("front",), y=(0.20, 0.218))
+    seorak_a(lv)
     lv.band_x(-1.2, 1.2, NAVY, views=("rear",), y=(-0.1, 0.38))
     lv.band_x(-1.2, 1.2, GOLD, views=("rear",), y=(0.38, 0.398))
-    common(lv, "navy")
+    marks(lv)
     return lv
 
 
-OPTIONS = {"summit": summit, "ridgeline": ridgeline}
+OPTIONS = {"ridgeline": ridgeline}
 
 if __name__ == "__main__":
     views = HERE / "out" / "views" / "views.json"
