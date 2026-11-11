@@ -58,6 +58,8 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Path choosing's knobs for a held place: its heading and bend in the steering, and its own speeds.</summary>
         public static float HoldBend = 1f, HoldHead = 1f;
         public static bool PlaceSpeeds = true;
+        /// <summary>Path choosing: a car lagging its path goes no faster than the path it is really on allows.</summary>
+        public static bool LagSpeeds;
         /// <summary>Fastest the car may go right now, m/s: 0 when racecraft brakes for the car ahead.</summary>
         public float SpeedCap = float.PositiveInfinity;
         /// <summary>Share of the target speed to drive at.</summary>
@@ -335,6 +337,28 @@ namespace TarmacGauntlet.Raceday
                 PlaceBlend(HoldLateral, out SpeedProfile pa, out SpeedProfile pb, out float pt);
                 laneSpeed = StraightSpeed(Mathf.Lerp(pa.SpeedAt(lookahead), pb.SpeedAt(lookahead), pt), la, HoldLateral - Line.Lateral[la]);
                 laneAccel = Mathf.Lerp(pa.Accel[la], pb.Accel[la], pt);
+            }
+            if (LagSpeeds && Experiments.Is(PathChooser.Experiment))
+            {
+                // A car lagging its path is on the path where it is: never faster than that one allows,
+                // or it slides wider still, out of a corner it is already wide in (T20a, T11).
+                float real, realAccel;
+                if (!float.IsNaN(HoldLateral) && PlaceSpeeds)
+                {
+                    PlaceBlend(Line.Lateral[Index] + Shift, out SpeedProfile ra, out SpeedProfile rb, out float rt);
+                    real = StraightSpeed(Mathf.Lerp(ra.SpeedAt(lookahead), rb.SpeedAt(lookahead), rt), la, Shift);
+                    realAccel = Mathf.Lerp(ra.Accel[la], rb.Accel[la], rt);
+                }
+                else
+                {
+                    float lane = Mathf.Clamp(Shift, LaneShifts[0], LaneShifts[LaneShifts.Length - 1]);
+                    int ra = 0;
+                    while (ra < LaneShifts.Length - 2 && lane > LaneShifts[ra + 1]) ra++;
+                    float rt = (lane - LaneShifts[ra]) / (LaneShifts[ra + 1] - LaneShifts[ra]);
+                    real = StraightSpeed(Mathf.Lerp(LaneProfiles[ra].SpeedAt(lookahead), LaneProfiles[ra + 1].SpeedAt(lookahead), rt), la, Shift);
+                    realAccel = Mathf.Lerp(LaneProfiles[ra].Accel[la], LaneProfiles[ra + 1].Accel[la], rt);
+                }
+                if (real < laneSpeed) { laneSpeed = real; laneAccel = realAccel; }
             }
             float worn = Mathf.Sqrt(Mathf.Clamp(Grip, 0.3f, 1f));
             float target = laneSpeed * scale * SpeedScale * worn;
