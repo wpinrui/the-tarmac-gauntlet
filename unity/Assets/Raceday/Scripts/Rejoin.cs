@@ -519,7 +519,8 @@ namespace TarmacGauntlet.Raceday
                 float left = speed < SpinSpeed ? 1f : Mathf.Sqrt(Mathf.Max(1f - turning * turning, 0f));
                 if (Mathf.Abs(slide) > SlideLimit * Mathf.Deg2Rad) left = 0f;
                 c.Brake = Mathf.Min(c.Brake, left * RunoffBraking * grip / (spec.BrakeDecel * 9.81f));
-                c.Throttle *= Mathf.Max(left, 0.15f) * RunoffThrottle;
+                // Getting straight back on without waiting, it floors it as far as the runoff's grip allows (Ivan).
+                c.Throttle *= Mathf.Max(left, 0.15f) * (Experiments.Is(1) || Experiments.Is(2) ? 1f : RunoffThrottle);
             }
             else
             {
