@@ -47,6 +47,13 @@ target speed for every 2 m sample (`SpeedProfile.cs`, from the car's grip, downf
 brakes). After a hard crash, or when stuck or spun, it puts the car back on track itself. The console
 shows its predicted lap time and each lap it drives.
 
+`T` opens live timing while the AI drives your car (`LiveTiming.cs`), with the race at 16x behind it: every
+car in race order by class, your car's onboard and the track map, its driver, fuel, tyres and condition with
+the laps each lasts on the engine map in use, the engine map, and the next stop. Pit Now calls the car in at the
+next pit entry, and the stop puts in the litres and tyres asked for and the next driver picked (`PitOrders` in
+`Consumables.cs`). Left alone the car pits and chooses for itself, and each stop puts the orders back to a full
+tank and new tyres. The red button top right, or `T`, returns to the race.
+
 `F` cycles normal speed, 4x and 16x while the AI drives, and `I` drops back to normal speed. Only cars
 near the camera, and near your car while you drive it, run full physics (`PhysicsRange.cs`: the
 nearest 24 within 300 m at normal speed, 8 within 120 m at 4x, none at 16x). The rest glide along

@@ -288,7 +288,8 @@ namespace TarmacGauntlet.Simulation
             return best;
         }
 
-        private static string DriverName(string id, GameState game)
+        /// <summary>A driver's name: the player's own for the player character.</summary>
+        public static string DriverName(string id, GameState game)
         {
             if (id == RaceEntry.PlayerCharacterDriverId)
                 return game.Teams.OfType<PlayerTeam>().FirstOrDefault()?.PlayerName ?? "";

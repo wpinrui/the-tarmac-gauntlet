@@ -7,6 +7,27 @@ namespace TarmacGauntlet.Raceday
     public enum EngineMap { Conserve, Normal, Push }
 
     /// <summary>
+    /// What the team asks for at the car's next stop, from live timing. Left alone, the car pits when it
+    /// needs to, fills the tank and changes the tyres. Every stop puts the orders back to that.
+    /// </summary>
+    public sealed class PitOrders
+    {
+        /// <summary>True once the team calls the car in: it pits the next time it reaches the pit entry.</summary>
+        public bool Requested;
+        /// <summary>Litres to put in, or null to fill the tank.</summary>
+        public float? Litres;
+        /// <summary>False to keep the tyres on.</summary>
+        public bool Tyres = true;
+
+        public void Reset()
+        {
+            Requested = false;
+            Litres = null;
+            Tyres = true;
+        }
+    }
+
+    /// <summary>
     /// A car's fuel, tyre wear and engine map, with no Unity objects so it can be tested outside Unity.
     /// How much one lap uses at Normal comes from the race maths (<see cref="Degradation"/>): the car's
     /// Fuel Efficiency and Tyre Durability and the driver's Smoothness. Within a lap, fuel follows the
@@ -34,6 +55,8 @@ namespace TarmacGauntlet.Raceday
         public CarRaceLog Log;
         /// <summary>How the car's active issues scale its stats.</summary>
         public IssueEffects Effects = IssueEffects.None;
+        /// <summary>What the team asks for at the next stop.</summary>
+        public readonly PitOrders Orders = new PitOrders();
         /// <summary>
         /// A career car's power and grip next to a new one of its model: its age and condition wear
         /// them down, and its upgrades lift them. The physics car is the model's, so the tuned lines are shared.
@@ -88,6 +111,12 @@ namespace TarmacGauntlet.Raceday
         public float PowerScale => (Map == EngineMap.Push ? 1.05f : Map == EngineMap.Conserve ? 0.92f : 1f) * (float)Effects.Power * PowerTrim;
         private float FuelScale => (Map == EngineMap.Push ? 1.15f : Map == EngineMap.Conserve ? 0.85f : 1f) / Mathf.Max((float)Effects.FuelEfficiency, 0.1f);
         private float WearScale => (Map == EngineMap.Push ? 1.3f : Map == EngineMap.Conserve ? 0.7f : 1f) / Mathf.Max((float)Effects.TyreDurability, 0.1f);
+
+        /// <summary>Laps the fuel lasts at the limit on the engine map in use.</summary>
+        public float FuelLaps => Fuel / Mathf.Max(FuelPerLap * FuelScale, 0.01f);
+
+        /// <summary>Laps at the limit on the engine map in use before the tyres reach <paramref name="limit"/> worn.</summary>
+        public float TyreLaps(float limit) => Mathf.Max(limit - Wear, 0f) / Mathf.Max(WearPerLap * WearScale, 1e-5f);
 
         /// <summary>The race maths' mode for the engine map.</summary>
         public InstructionMode Mode => Map == EngineMap.Push ? InstructionMode.Push : Map == EngineMap.Conserve ? InstructionMode.Conserve : InstructionMode.Normal;
