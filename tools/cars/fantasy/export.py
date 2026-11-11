@@ -98,6 +98,9 @@ def build(game=False):
     for ob in [shell] + doors:
         blend.tidy(ob)
         blend.thin(ob, 0.55)
+    for ob in bpy.context.scene.objects:
+        if "_trim" in ob.name or ob.name.startswith("window_trim"):
+            blend.tidy(ob)      # the trims were split along the shut lines too
 
     out += parts.wheels()
     opts = parts.options(ref)

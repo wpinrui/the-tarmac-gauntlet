@@ -9,9 +9,11 @@ from pathlib import Path
 import numpy as np
 from shapely.affinity import scale as sscale, translate
 from shapely.geometry import LineString, Point, Polygon, box
+from shapely.geometry.polygon import orient
 from shapely.ops import unary_union
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "common"))
+import bpy  # noqa: E402
 import blend  # noqa: E402
 import geom  # noqa: E402
 import body  # noqa: E402
@@ -438,8 +440,13 @@ def glass_parts(ref0, cutters, out):
     opening, panes, _k = side_shapes()
     for sgn, side in ((1, "l"), (-1, "r")):
         fr, lift = side_frame(sgn)
-        trim = lift(opening.difference(unary_union([p.buffer(-0.004) for p in panes])))
-        out += blend.lay(ref0, f"window_trim_{side}", trim, fr, 0.0015, 0.0035, "trim", 0.01, along_ray=True)
+        # laid already split at the door's shut line: a boolean on this thin sheet leaves strips
+        trim = opening.difference(unary_union([p.buffer(-0.004) for p in panes]))
+        bits = trim.intersection(door_outline().buffer(-DOOR_GAP))
+        on_door = max(getattr(bits, "geoms", [bits]), key=lambda g: g.area)    # slivers stay on the body
+        for tag, piece in (("", trim.difference(on_door.buffer(2 * DOOR_GAP))), ("_door", on_door)):
+            out += blend.lay(ref0, f"window_trim_{side}{tag}", lift(piece), fr, 0.0015, 0.0035, "trim", 0.01,
+                             along_ray=True)
         for i, p in enumerate(panes):
             g = lift(p)
             cutters += blend.lay(ref0, f"cut_side_{side}{i}", g.buffer(-0.002), fr, -0.08, 0.006, "trim", along_ray=True)
@@ -530,20 +537,25 @@ def tailgate_path():
 def grooves(ref):
     """Shut lines as V grooves to cut: doors, bonnet, tailgate."""
     obs = []
-    path = door_path()
-    for sgn, side in ((1, "l"), (-1, "r")):
-        obs.append(blend.groove(ref, f"g_door_{side}", path, side_fr(sgn)))
+    from mathutils import Matrix
+    left = blend.groove(ref, "g_door_l", door_path(), side_fr(1))
+    # the right is the left mirrored: laid on its own, it lines up exactly with the door's cut
+    # and the exact boolean then loses the whole door
+    right = left.copy(); right.data = left.data.copy(); right.name = "g_door_r"
+    bpy.context.scene.collection.objects.link(right)
+    right.data.transform(Matrix.Scale(-1, 4, (0, 1, 0)))
+    right.data.flip_normals()
+    obs += [left, right]
     obs.append(blend.groove(ref, "g_bonnet", bonnet_path(), top_fr()))
     obs.append(blend.groove(ref, "g_tailgate", tailgate_path(), rear_fr()))
     return obs
 
 
 # ---------------------------------------------------------------- doors
-DOOR_DEPTH = 0.05     # below the cabin floor the door takes the sill this deep
-DOOR_WALL = 0.09      # above it, the whole wall: the cabin is hollow behind it
+DOOR_WALL = 0.13      # the door takes the wall this deep: the cabin is hollow behind it
 DOOR_GAP = 0.0015     # half the gap round the door, inside the shut line's groove
 DOOR_OPEN = 65.0      # degrees the door swings out
-FRAME_DEPTH = 0.04    # the window frame takes only the thin roof edge and pillar skin
+FRAME_DEPTH = 0.05    # the window frame takes only the thin roof edge and pillar skin
 BELT_DROP = 0.02      # the frame starts this far under the window's bottom line
 
 
@@ -553,7 +565,8 @@ def door_outline():
     d = door_path()
     opening, _p, _k = side_shapes()
     frame = opening.intersection(box(sum(R["b_pillar"]) / 2, -1, 5, 5))
-    return unary_union([Polygon(d).buffer(0), frame])
+    # closed over the strip of skin between the door's top line and the window's bottom
+    return unary_union([Polygon(d).buffer(0), frame]).buffer(0.02, join_style=2).buffer(-0.02, join_style=2)
 
 
 def mirror_footprint():
@@ -580,22 +593,25 @@ def door(ref, shell, obs, floor, sgn=1):
     o = door_outline()
     k = side_shapes()[2]
     sill = Polygon([(-5, np.polyval(k, -5) - BELT_DROP), (5, np.polyval(k, 5) - BELT_DROP), (5, 5), (-5, 5)])
-    # neighbouring regions overlap a little, so their cutters join with no crack between them
-    lap = 0.006
-    regions = [(o.intersection(box(-5, -1, 5, floor + 0.02 + lap)), DOOR_DEPTH),
-               (o.intersection(box(-5, floor + 0.02 - lap, 5, 5)).difference(sill.buffer(-lap)), DOOR_WALL),
-               (o.intersection(sill), FRAME_DEPTH), (mirror_footprint(), -0.004)]
-    trim = [ob for ob in obs if ob.name == f"window_trim_{side}"]
-    roles = {f"side_glass_{side}0": "glass", f"side_glass_{side}1": "glass", f"mirror_glass_{side}": "mirror",
+    # the wall to the window's bottom line, the thin frame above it, and the mirror's foot
+    # (the frame sits a hair inside the outline, so its sides never lie on the wall's)
+    regions = [(o.difference(sill), DOOR_WALL), (o.buffer(-0.0008, join_style=2).intersection(sill), FRAME_DEPTH),
+               (mirror_footprint(), -0.004)]
+    roles = {f"window_trim_{side}_door": "trim", f"side_glass_{side}0": "glass", f"side_glass_{side}1": "glass", f"mirror_glass_{side}": "mirror",
              f"door_card_{side}": "card"}
-    pieces = blend.free_door(ref, side_fr(sgn), regions, DOOR_GAP, shell, trim, roles, o, name=f"door_{side}")
-    # the door's edges, its shut faces, are painted; only its inner face is trim
+    pieces = blend.free_door(ref, side_fr(sgn), regions, DOOR_GAP, shell, [], roles, o.union(mirror_footprint()),
+                             name=f"door_{side}")
+    # the door's edges round its outline, its shut faces, are painted; its inner face and the
+    # top of its wall under the window stay interior
     blend.paint(pieces[0], "body", lambda *c, p=pieces[0]: False)
     me = pieces[0].data
-    k = [m.name for m in me.materials].index("body")
     names = [m.name for m in me.materials]
+    k = names.index("body")
+    rim = o.boundary
     for f in me.polygons:
-        if names[f.material_index] == "interior" and abs(f.normal[1]) < 0.6:
+        c = f.center
+        if names[f.material_index] == "interior" and abs(f.normal[1]) < 0.6 and \
+                rim.distance(Point(c[0], c[2])) < 2 * DOOR_GAP + 0.006:
             f.material_index = k
     return pieces
 
@@ -714,7 +730,10 @@ def _loft(name, x0, x1, clip, n=12, gap=0.003, mat="interior"):
         g = body.inside(x, 0.035 + gap).intersection(clip(x))
         if g.geom_type != "Polygon":
             g = max(getattr(g, "geoms", [g]), key=lambda q: q.area)
-        ring = body.even(np.array(g.exterior.coords)[:-1], 64)
+        # the same turn and start every station, so the loft does not twist
+        ring = body.even(np.array(orient(g, 1).exterior.coords)[:-1], 64)
+        b = g.bounds
+        ring = np.roll(ring, -int(np.argmin(np.hypot(ring[:, 0] - b[0], ring[:, 1] - b[1]))), axis=0)
         rings.append(np.column_stack([np.full(64, x), ring]))
     v, f = geom.close_rings(rings)
     return blend.make(name, v, f, mat)
@@ -759,7 +778,16 @@ def interior(floor):
     for sgn, side in ((1, "l"), (-1, "r")):
         clip = lambda x, s=sgn: (box(0.3, floor + 0.06, 1.2, belt_z - 0.02) if s > 0 else box(-1.2, floor + 0.06, -0.3, belt_z - 0.02)).intersection(
             body.inside(x, 0.035 + 0.003)).difference(body.inside(x, 0.035 + 0.025))
-        obs.append(_loft(f"door_card_{side}", -0.42, 0.78, clip, n=14))
+        card = _loft(f"door_card_{side}", -0.42, 0.78, clip, n=14)
+        blend.outward(card)     # the left one is lofted inside out
+        # an armrest along the card and a pull handle above it, standing in from the card
+        ya = np.mean([body.y_at(x, 0.64) for x in np.linspace(-0.2, 0.45, 8)]) - 0.035 - 0.022
+        lo, hi = sorted((ya * sgn, (ya - 0.065) * sgn))
+        for ob in (_rbox(f"armrest_{side}", -0.22, 0.42, lo, hi, 0.60, 0.66, r=0.02, mat="trim"),
+                   _rbox(f"pull_{side}", 0.05, 0.30, *sorted((ya * sgn, (ya - 0.03) * sgn)), 0.70, 0.725, r=0.01,
+                         mat="trim")):
+            blend.boolean(card, ob, "UNION")
+        obs.append(card)
         yc = 0.36 * sgn
         obs.append(_rbox(f"seat_base_{side}", -0.42, 0.08, yc - 0.24, yc + 0.24, floor + 0.002, 0.50))
         obs.append(_rbox(f"seat_back_{side}", -0.56, -0.44, yc - 0.23, yc + 0.23, 0.501, 1.10, lean=0.2))
