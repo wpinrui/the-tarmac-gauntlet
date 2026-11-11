@@ -21,7 +21,7 @@ namespace TarmacGauntlet.Simulation
             new AiTeamEntry { Name = "Clutch & Pray", Descriptor = "optimistic underdogs", ModelId = "f-03", CarClass = CarClass.F },
             new AiTeamEntry { Name = "Spare Parts Racing", Descriptor = "the car is mostly replacement bits", ModelId = "f-04", CarClass = CarClass.F },
             new AiTeamEntry { Name = "Gravel Trap Racing", Descriptor = "frequent visitors to the run-off area", ModelId = "f-05", CarClass = CarClass.F },
-            new AiTeamEntry { Name = "Duct Tape Dynamics", Descriptor = "structural integrity is a suggestion", ModelId = "f-06", CarClass = CarClass.F },
+            new AiTeamEntry { Name = "Duct Tape Dynamics", Descriptor = "structural integrity is a suggestion", ModelId = "f-01", CarClass = CarClass.F },
             new AiTeamEntry { Name = "Flatbed Legends", Descriptor = "arrive on a flatbed, leave on a flatbed", ModelId = "f-04", CarClass = CarClass.F },
             new AiTeamEntry { Name = "No Insurance Motorsport", Descriptor = "living dangerously in every sense", ModelId = "f-02", CarClass = CarClass.F },
             new AiTeamEntry { Name = "Oily Rag Racing", Descriptor = "one rag, two spanners, zero budget", ModelId = "f-03", CarClass = CarClass.F },
