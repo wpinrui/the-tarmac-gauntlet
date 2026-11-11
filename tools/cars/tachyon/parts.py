@@ -432,6 +432,62 @@ def grooves(ref):
     return obs
 
 
+# ---------------------------------------------------------------- doors
+DOOR_DEPTH = 0.05     # below the cabin floor the door takes the sill this deep
+DOOR_WALL = 0.09      # above it, the whole wall: the cabin is hollow behind it
+DOOR_GAP = 0.0015     # half the gap round the door, inside the shut line's groove
+DOOR_LEAN = (-0.40, -0.22)   # up and forward: the hinge axis leans back and in this much per metre up
+DOOR_STYLES = {"Up and forward": -80.0, "Out to the side": -65.0}   # open angles
+
+
+def door_outline():
+    """The door seen from the side: inside its shut line, and the black opening round the door
+    glass back to the pillar's middle."""
+    opening, panes, _k = side_shapes()
+    d = poly(door_path())
+    x_pillar = panes[0].bounds[0] - QUARTER_GAP / 2
+    return unary_union([d, opening.intersection(box(x_pillar, 0, 5, 5))]).buffer(0)
+
+
+def mirror_footprint():
+    """The mirror on the door seen from the side, with room: taken only outside the skin."""
+    m = R["mirror"]
+    return box(m["x_back"] - 0.04, m["z0"] - 0.10, m["x_front"] + 0.05, m["z1"] + 0.04)
+
+
+def door_hinge(style, sgn=1):
+    """A style's hinge for the left (sgn 1) or right (sgn -1) door: an axis up the door's
+    front edge, outside the skin, and the open angle (right hand rule about p0 to p1)."""
+    o = door_outline()
+    xf = o.bounds[2] + 0.004
+    z0, z1 = 0.25, 0.85
+    y = max(body.y_at(xf - 0.01, z) for z in np.linspace(z0, z1, 20)) + 0.003
+    p0 = (xf, y * sgn, z0)
+    if style == "Up and forward":
+        h = z1 - z0
+        p1 = (xf + DOOR_LEAN[0] * h, (y + DOOR_LEAN[1] * h) * sgn, z1)
+    else:
+        p1 = (xf, y * sgn, z1)
+    return p0, p1, DOOR_STYLES[style] * sgn
+
+
+DOOR_PICK = "Up and forward"
+
+
+def door(ref, shell, obs, floor, sgn=1):
+    """Cut the left (sgn 1) or right (sgn -1) door free of the body and its window trim; the
+    door glass, card, mirror arm and mirror glass go with it. Returns the door's pieces."""
+    side = "l" if sgn > 0 else "r"
+    o = door_outline()
+    regions = [(o.intersection(box(-5, -1, 5, floor + 0.02)), DOOR_DEPTH),
+               (o.intersection(box(-5, floor + 0.02, 5, 5)), DOOR_WALL), (mirror_footprint(), -0.004)]
+    trim = [t for t in obs if t.name == f"window_trim_{side}"]
+    roles = {f"side_glass_{side}0": "glass", f"mirror_glass_{side}": "mirror", f"mirror_arm_{side}": "arm",
+             f"door_card_{side}": "card"}
+    return blend.free_door(ref, side_fr(sgn), regions, DOOR_GAP, shell, trim, roles, o.union(mirror_footprint()),
+                           name=f"door_{side}")
+
+
 # ---------------------------------------------------------------- mirrors
 MIRROR_H = 0.10      # housing height
 MIRROR_W = 0.16      # housing width, out from the arm
