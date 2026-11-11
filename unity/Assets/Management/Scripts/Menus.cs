@@ -114,6 +114,10 @@ namespace TarmacGauntlet.Management
             gameObject.AddComponent<DriversPanel>();
             gameObject.AddComponent<CrewPanel>();
             gameObject.AddComponent<LineupPanel>();
+            gameObject.AddComponent<FinancesPanel>();
+            gameObject.AddComponent<RaceHistoryPanel>();
+            gameObject.AddComponent<StandingsPanel>();
+            gameObject.AddComponent<ScoutingPanel>();
             gameObject.AddComponent<NewGamePanel>();
             gameObject.AddComponent<GarageBays>();
             gameObject.AddComponent<WorkshopPanel>();
@@ -483,6 +487,11 @@ namespace TarmacGauntlet.Management
             return group;
         }
 
+        /// <summary>The bold menu font, for class labels and other text built outside <see cref="Text"/>.</summary>
+        internal Font Bold => bold;
+
+        internal Font SemiBold => semiBold;
+
         internal Label Text(string text, string cls, bool isBold = false)
         {
             var label = new Label(text);
@@ -676,6 +685,9 @@ namespace TarmacGauntlet.Management
             hqCamera.Show(next == Mode.Main || next == Mode.NewGame ? MainShot : next == Mode.Screen ? slug : next == Mode.Paper ? PaperSlug : HubShot);
             Render();
         }
+
+        /// <summary>Opens a hub screen, even one already open.</summary>
+        internal void Open(string slug) => Go(Mode.Screen, slug);
 
         /// <summary>Closes the open screen and goes back to the hub.</summary>
         internal void CloseScreen()

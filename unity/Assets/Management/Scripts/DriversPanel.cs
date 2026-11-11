@@ -78,12 +78,29 @@ namespace TarmacGauntlet.Management
             GameSession.Changed -= OnChanged;
         }
 
+        /// <summary>Opens the screen on one driver, clearing any filter that would hide them in the market.</summary>
+        internal static void Show(Menus menus, string driverId)
+        {
+            DriversPanel panel = menus.GetComponent<DriversPanel>();
+            panel.selected = driverId;
+            panel.contractLength = 3;
+            panel.freeOnly = panel.affordableOnly = false;
+            panel.focus = true;
+            menus.Open(Slug);
+        }
+
+        private bool focus;
+
         private void Opened(string slug, VisualElement panelBody)
         {
             body = slug == Slug ? panelBody : null;
             if (body == null) return;
             Build();
             Refresh();
+            if (!focus) return;
+            focus = false;
+            int at = market.FindIndex(e => e.Id == selected);
+            if (at >= 0) list.schedule.Execute(() => list.ScrollToItem(at));
         }
 
         private void OnChanged(GameState _)
