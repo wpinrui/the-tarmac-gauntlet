@@ -93,9 +93,9 @@ static partial class Check
         public float Behind(Frame f, int i, int j) => Gap(f, j, i) / Math.Max(f.V[j], 5f);
     }
 
-    static SetupRun RunSetup(Situation s)
+    static SetupRun RunSetup(Situation s, int shift = 0)
     {
-        var run = new SetupRun { S = s, Race = SituationRace(s) };
+        var run = new SetupRun { S = s, Race = SituationRace(s, shift) };
         Race race = run.Race;
         var braking = new PositionBraking();
         while (race.Time < s.Seconds)
@@ -849,6 +849,10 @@ static partial class Check
 
     // ---------------------------------------------------------------- the suite
 
+    /// <summary>Set-ups run over several driver seeds, and how many.</summary>
+    static readonly string[] Repeated = { "T9", "T11" };
+    const int Repeats = 5;
+
     static int Suite(bool full)
     {
         var clock = Stopwatch.StartNew();
@@ -864,6 +868,13 @@ static partial class Check
         foreach (SetupRun run in runs)
         {
             if (run.S.Id.StartsWith("H")) { var j = Verdict(run); limits.Add((run.S.Id, j.Pass, j.Why)); }
+            else if (Repeated.Contains(run.S.Id))
+            {
+                // A set-up whose score turns on one chance contact between the other cars: the mean over
+                // several driver seeds, with how many of them scored, so one draw doesn't swing the total.
+                var marks = Enumerable.Range(0, Repeats).AsParallel().AsOrdered().Select(i => Mark(i == 0 ? run : RunSetup(run.S, i))).ToArray();
+                behaviour.Add((run.S.Id, marks.Average(m => m.Score), $"mean of {Repeats} seeds, {marks.Count(m => m.Score > 0)} scored; first: {marks[0].Why}"));
+            }
             else { var sc = Mark(run); behaviour.Add((run.S.Id, sc.Score, sc.Why)); }
         }
 

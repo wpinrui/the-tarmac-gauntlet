@@ -11,7 +11,7 @@ static partial class Check
     /// <summary>Builds the race for a set-up, with every car where and as fast as the set-up says.</summary>
     static string Parts(PathChooser.Candidate c) => c == null ? "-" : $"{c.Shift:0.#}{(c.Delay > 0 ? "d" + c.Delay : "")} S{c.Score:0.00}=g{c.Gain:0.00}-r{c.Risk:0.00}-s{c.Stuck:0.00}";
 
-    static Race SituationRace(Situation s)
+    static Race SituationRace(Situation s, int shift = 0)
     {
         var entries = new List<Entry>();
         RacingLine first = LineFor(s.Cars[0].Model);
@@ -23,7 +23,7 @@ static partial class Check
             entries.Add(new Entry
             {
                 Model = c.Model, Start = k * circuit.Step, Lateral = lateral, Speed = Math.Max(speed, 0.01f),
-                Pace = c.Pace, Consistency = c.Consistency, Safety = c.Safety, Seed = c.Seed,
+                Pace = c.Pace, Consistency = c.Consistency, Safety = c.Safety, Seed = c.Seed + shift,
             });
         }
         var race = new Race(circuit, entries, LineFor);
