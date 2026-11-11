@@ -2,7 +2,8 @@
 // viewer and shows the baked view of the tree (tools/landscape/bake.html) taken from the nearest
 // of 8 x 8 directions over the upper hemisphere. The colour and normal atlases are texture arrays,
 // one layer a kind of tree, so a whole chunk of mixed trees is one draw call. In the shadow pass
-// the quad faces the sun instead, so the shadow has the tree's outline seen from the sun.
+// the quad faces the sun instead, so the shadow has the tree's outline seen from the sun; only
+// trees within _ShadowReach of the camera cast one.
 //
 // Per vertex: position is the foot of the trunk in world space; uv0 the quad corner (-1 to 1);
 // uv1 the quad's half size, the height of the tree's middle above its foot, its turn about the
@@ -15,6 +16,7 @@ Shader "Hidden/TarmacGauntlet/Impostor"
         _Normals ("Normals", 2DArray) = "" {}
         _Cutoff ("Alpha cutoff", Range(0, 1)) = 0.5
         _Frames ("Frames across", Float) = 8
+        _ShadowReach ("Trees cast shadows this far from the camera, m", Float) = 160
     }
     SubShader
     {
@@ -28,7 +30,7 @@ Shader "Hidden/TarmacGauntlet/Impostor"
 
         UNITY_DECLARE_TEX2DARRAY(_Atlas);
         UNITY_DECLARE_TEX2DARRAY(_Normals);
-        float _Frames;
+        float _Frames, _ShadowReach;
 
         struct Input
         {
@@ -57,9 +59,21 @@ Shader "Hidden/TarmacGauntlet/Impostor"
 
             float3 toEye;
             #if defined(UNITY_PASS_SHADOWCASTER)
-                // An orthographic projection here is the sun's shadow map; a perspective one is the
-                // camera's own depth pass, which must match what the camera sees.
-                toEye = UNITY_MATRIX_P[3][3] > 0.5 ? _WorldSpaceLightPos0.xyz : _WorldSpaceCameraPos - centre;
+                // This pass draws both the sun's shadow map and the camera's own depth. Face whichever
+                // view is drawing, read from its own matrices: an orthographic one is the shadow map,
+                // looking along the sun, and the quad must turn square to it so its shadow is the
+                // tree's outline seen from the sun; a perspective one is the camera, which must
+                // match what the camera sees.
+                if (UNITY_MATRIX_P[3][3] > 0.5)
+                {
+                    toEye = UNITY_MATRIX_V[2].xyz;   // the view's +z: back towards the light
+                    // Only trees near the camera cast a shadow: far out the shadow map is too coarse
+                    // for a leafy outline and it breaks up into blotches and streaks.
+                    float far = distance(_WorldSpaceCameraPos, centre);
+                    if (far > _ShadowReach) radius = 0;
+                    else radius *= saturate((_ShadowReach - far) / 30);
+                }
+                else toEye = UNITY_MATRIX_I_V._m03_m13_m23 - centre;
             #else
                 toEye = _WorldSpaceCameraPos - centre;
             #endif
@@ -92,7 +106,13 @@ Shader "Hidden/TarmacGauntlet/Impostor"
 
         void surf(Input IN, inout SurfaceOutput o)
         {
-            fixed4 c = UNITY_SAMPLE_TEX2DARRAY(_Atlas, IN.atlas);
+            #if defined(UNITY_PASS_SHADOWCASTER)
+                // A smaller mip for the outline: one shadow-map texel covers many leaves, and the
+                // softer outline casts a solid crown shadow rather than speckle.
+                fixed4 c = UNITY_SAMPLE_TEX2DARRAY_LOD(_Atlas, IN.atlas, 3);
+            #else
+                fixed4 c = UNITY_SAMPLE_TEX2DARRAY(_Atlas, IN.atlas);
+            #endif
             o.Albedo = c.rgb * IN.color.rgb;
             o.Alpha = c.a;
             o.Normal = normalize(UNITY_SAMPLE_TEX2DARRAY(_Normals, IN.atlas).xyz * 2 - 1);
