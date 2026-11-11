@@ -65,6 +65,7 @@ Lay each window's glass, black band and cutter along that window's own normal, n
 Rebuild each window outline from plain fits: one even curve for each long edge and a straight line for each side. A measured outline carries the reference's waves into the band.
 Every inner face uses an interior material.
 Paint every car amber, whatever colour the reference car is.
+The paint material is named `body`, so the game can respray it.
 
 ## 6. Badge and name
 The brand badge from `src/renderer/assets/brands/<brand>/` goes on the front and rear.
