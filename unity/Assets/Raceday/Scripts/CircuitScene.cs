@@ -51,18 +51,17 @@ namespace TarmacGauntlet.Raceday
         private string lastDriver;
 
         private const string PlayerCar = "a-29";
-        private const string PlayerModel = "Assets/Art/Vehicles/CheonmaCX24Si/CheonmaCX24Si.obj";
         private const string PaceCarModel = "c-19";
         /// <summary>The player's team name when the scene runs on its own.</summary>
         private const string PlayerTeam = "Your Team";
-        /// <summary>Paint for the stand-in boxes, by class, so the classes can be told apart on track.</summary>
+        /// <summary>Paint by class, so the classes can be told apart on track.</summary>
         private static readonly Color[] ClassPaint =
         {
             new Color(0.85f, 0.15f, 0.12f), new Color(0.95f, 0.55f, 0.1f), new Color(0.95f, 0.85f, 0.2f),
             new Color(0.25f, 0.7f, 0.3f), new Color(0.2f, 0.45f, 0.9f), new Color(0.6f, 0.3f, 0.8f),
         };
 
-        /// <summary>The stand-in boxes' paint for a model, by its class.</summary>
+        /// <summary>A model's paint, by its class.</summary>
         internal static Color PaintFor(string id) => ClassPaint[Mathf.Clamp(id[0] - 'a', 0, ClassPaint.Length - 1)];
 
         private void Awake()
@@ -114,7 +113,7 @@ namespace TarmacGauntlet.Raceday
                 bool mine = i == player;
                 string id = field[i];
                 Color paint = PaintFor(id);
-                CarController car = CarBuilder.Spawn(id, mine && id == PlayerCar ? PlayerModel : null, circuit, mine ? keys : null, paint);
+                CarController car = CarBuilder.Spawn(id, circuit, mine ? keys : null, paint);
                 if (pitLaneStart != null) car.PlaceAt(pitLaneStart.Place(i, out Vector3 forward), forward);
                 else
                 {
@@ -237,7 +236,7 @@ namespace TarmacGauntlet.Raceday
             if (start != StartMode.Rolling) return;
 
             // The pace car waits ahead of pole, in pole's column.
-            CarController paceCar = CarBuilder.Spawn(PaceCarModel, null, circuit, null, new Color(0.95f, 0.95f, 0.95f));
+            CarController paceCar = CarBuilder.Spawn(PaceCarModel, circuit, null, new Color(0.95f, 0.95f, 0.95f));
             paceCar.name = "Pace car";
             paceCar.PlaceAt(circuit.IndexOf(circuit.Data.grid.slots[0].d + 40f), RollingStart.ColumnOf(0));
             var rolling = (RaceStart)starter;
