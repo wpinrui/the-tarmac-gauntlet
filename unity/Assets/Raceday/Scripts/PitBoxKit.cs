@@ -97,6 +97,12 @@ namespace TarmacGauntlet.Raceday
 
         public static float LineRadius(KitItem item) => item == KitItem.Nozzle ? FuelRadius : AirRadius;
 
+        /// <summary>
+        /// How long a hanging piece's line is from the boom, m: long enough to reach the filler, a hub or the jack
+        /// socket with a little to spare, so it hangs in a shallow curve there. At rest the spare is gathered up on the boom.
+        /// </summary>
+        public static float LineLength(KitItem item) => item == KitItem.Nozzle ? 5.2f : item == KitItem.Lance ? 5.4f : 5.1f;
+
         /// <summary>The wheel a gun or tyre is for: 0 front left, 1 front right, 2 rear left, 3 rear right. Left and right are the car's.</summary>
         public static int Wheel(KitItem item) =>
             item >= KitItem.TyreFrontLeft && item <= KitItem.TyreRearRight ? item - KitItem.TyreFrontLeft : item - KitItem.GunFrontLeft;
