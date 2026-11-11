@@ -202,9 +202,13 @@ namespace TarmacGauntlet.Raceday
         /// </summary>
         private SpeedProfile Place(int i)
         {
-            places ??= new SpeedProfile[PlaceCount];
+            if (places == null) Interlocked.CompareExchange(ref places, new SpeedProfile[PlaceCount], null);
             i = Mathf.Clamp(i, 0, places.Length - 1);
-            return places[i] ??= new SpeedProfile(PlaceLine(Line.Circuit, i), Spec, placeLimit, placeMax);
+            SpeedProfile have = Volatile.Read(ref places[i]);
+            if (have != null) return have;
+            // Paths driven on other threads may ask for the same place at once: the first one built is kept.
+            var built = new SpeedProfile(PlaceLine(Line.Circuit, i), Spec, placeLimit, placeMax);
+            return Interlocked.CompareExchange(ref places[i], built, null) ?? built;
         }
 
         /// <summary>

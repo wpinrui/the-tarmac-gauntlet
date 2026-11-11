@@ -104,6 +104,13 @@ static partial class Check
     static void PerfStart()
     {
         float seconds = float.TryParse(Environment.GetEnvironmentVariable("PERF_SECONDS"), out float s) ? s : 20f;
+        // PERF_WARM: a short race first, so the measured one runs on code already compiled, as a player's second race would.
+        if (Environment.GetEnvironmentVariable("PERF_WARM") != null)
+        {
+            var warm = new Race(circuit, GameField(12), LineFor);
+            while (warm.Time < 1f) warm.Step();
+            Race.ThinkStepTicks = 0;
+        }
         var load = System.Diagnostics.Stopwatch.StartNew();
         var race = new Race(circuit, GameField(11), LineFor);
         Console.WriteLine($"field built in {load.ElapsedMilliseconds} ms");
