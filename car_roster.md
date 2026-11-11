@@ -17,7 +17,7 @@
 
 | # | Fictional Name | Real Car | MSRP | Pow | Hnd | FE | TD | Cmf | Rel | PST | FC (L) |
 |---|----------------|----------|------|-----|-----|----|----|-----|-----|-----|--------|
-| 7 | Liberty Fantasy | 2022 Ford Fiesta | $20,000 | 24 | 26 | 82 | 78 | 32 | 86 | 88 | 42 |
+| 7 | Liberty Fantasy | 2009 Ford Fiesta | $20,000 | 24 | 26 | 82 | 78 | 32 | 86 | 88 | 42 |
 | 8 | Seorak Hwaeum | 2013 Toyota Corolla | $22,500 | 22 | 24 | 86 | 82 | 62 | 94 | 88 | 50 |
 | 9 | Liberty Fortress | 2018 Ford Focus | $25,000 | 26 | 26 | 76 | 74 | 50 | 82 | 86 | 53 |
 | 10 | Kaiser Oboe | 2009 VW Golf | $27,500 | 24 | 28 | 78 | 76 | 56 | 84 | 86 | 55 |
