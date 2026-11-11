@@ -64,6 +64,8 @@ namespace TarmacGauntlet.Raceday
         public const float GantryClearance = 6.5f;
         /// <summary>The gantry's feet stand at most this far past the road edge.</summary>
         public const float GantryReach = 9f;
+        /// <summary>A gantry foot by the pit wall stands this far in front of where the runoff meets it, clear of the wall.</summary>
+        public const float PitWallClearance = 1.8f;
 
         /// <summary>
         /// Stretches behind the barrier taken by the grandstands, as (side, from, to) in lap metres: posts there move
@@ -233,20 +235,19 @@ namespace TarmacGauntlet.Raceday
             GantryRight.y = FootHeight(1, k, GantryRight);
         }
 
-        /// <summary>How far out from the centre a gantry foot stands: on the pit wall, behind the armco, or on the runoff.</summary>
+        /// <summary>How far out from the centre a gantry foot stands: on the grass in front of the pit wall, behind the armco, or on the runoff.</summary>
         private float Foot(int side, int k)
         {
             float edge = c.HalfWidth(k);
             float reach = b.RunoffReach(side, k);
-            if (b.PitWallAt(side, k)) return edge + reach + 0.5f;
+            if (b.PitWallAt(side, k)) return edge + reach - PitWallClearance;
             if (b.Fenced(side, k) && reach + 1.2f <= GantryReach) return edge + reach + 1.2f;
             return edge + Mathf.Min(Mathf.Max(reach, 2f), GantryReach - 1f);
         }
 
-        /// <summary>The ground under a foot: the pit wall's top, the ground behind the armco, or the runoff.</summary>
+        /// <summary>The ground under a foot: the ground behind the armco, or the runoff.</summary>
         private float FootHeight(int side, int k, Vector3 p)
         {
-            if (b.PitWallAt(side, k)) return c.Surface(k, 0f).y;
             float sign = side == 0 ? 1f : -1f;
             float beyond = Mathf.Abs(Vector3.Dot(p - c.Centre[k], c.Left[k])) - c.HalfWidth(k);
             if (beyond >= b.RunoffReach(side, k)) return c.TerrainHeight(p.x, p.z);

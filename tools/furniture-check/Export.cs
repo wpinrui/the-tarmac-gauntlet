@@ -13,6 +13,7 @@ static class Export
     public static void Write(string path, Circuit c, CircuitBuilder b, List<CircuitPart> track)
     {
         var f = new TrackFurniture(c, b);
+        var built = new FurnitureBuilder(c, f, null);
         // Each view: its centre, how far round it to send, and a camera to start from.
         var views = new List<(string name, Vector3 centre, float radius, Vector3 eye, Vector3 look)>();
         int g = f.GantrySample;
@@ -42,50 +43,33 @@ static class Export
             }
             sb.Append("],\"ground\":");
             Ground(sb, c, centre, radius);
-            sb.Append(",\"looks\":{");
-            bool firstLook = true;
-            foreach (FurnitureBuilder.GantryStyle gs in Enum.GetValues(typeof(FurnitureBuilder.GantryStyle)))
-                foreach (FurnitureBuilder.PostStyle ps in Enum.GetValues(typeof(FurnitureBuilder.PostStyle)))
-                {
-                    FurnitureBuilder.Gantry = gs;
-                    FurnitureBuilder.Post = ps;
-                    var built = new FurnitureBuilder(c, f, null);
-                    if (!firstLook) sb.Append(',');
-                    firstLook = false;
-                    sb.Append($"\"{gs}-{ps}\":[");
-                    bool fm = true;
-                    foreach (var group in built.Parts.GroupBy(p => p.Name))
-                    {
-                        var kit = new MeshKit();
-                        foreach (CircuitPart p in group) kit.Append(p.Kit);
-                        fm = Mesh(sb, group.Key, kit, centre, radius, true, fm);
-                    }
-                    fm = Mesh(sb, "Red lenses", built.RedLenses, centre, radius, true, fm);
-                    fm = Mesh(sb, "Green lenses", built.GreenLenses, centre, radius, true, fm);
-                    var panels = new MeshKit();
-                    foreach (MeshKit p in built.Panels) panels.Append(p);
-                    fm = Mesh(sb, "Panels", panels, centre, radius, true, fm);
-                    sb.Append(']');
-                    if (gs == FurnitureBuilder.GantryStyle.Truss && ps == FurnitureBuilder.PostStyle.Roofed)
-                    {
-                        sb.Append(",\"marshals\":[");
-                        bool fmar = true;
-                        foreach (var (feet, facing, pose) in built.Marshals)
-                        {
-                            Vector3 d = feet - centre;
-                            if (d.x * d.x + d.z * d.z > radius * radius) continue;
-                            if (!fmar) sb.Append(',');
-                            fmar = false;
-                            sb.Append($"[{d.x:F2},{d.y:F2},{d.z:F2},{facing.x:F3},{facing.z:F3},{pose}]");
-                        }
-                        sb.Append(']');
-                    }
-                }
-            sb.Append("}}");
+            sb.Append(",\"furniture\":[");
+            bool fm = true;
+            foreach (var group in built.Parts.GroupBy(p => p.Name))
+            {
+                var kit = new MeshKit();
+                foreach (CircuitPart p in group) kit.Append(p.Kit);
+                fm = Mesh(sb, group.Key, kit, centre, radius, true, fm);
+            }
+            fm = Mesh(sb, "Red lenses", built.RedLenses, centre, radius, true, fm);
+            fm = Mesh(sb, "Green lenses", built.GreenLenses, centre, radius, true, fm);
+            var panels = new MeshKit();
+            foreach (MeshKit p in built.Panels) panels.Append(p);
+            fm = Mesh(sb, "Panels", panels, centre, radius, true, fm);
+            sb.Append("],\"marshals\":[");
+            bool fmar = true;
+            foreach (var (feet, facing, pose) in built.Marshals)
+            {
+                Vector3 d = feet - centre;
+                if (d.x * d.x + d.z * d.z > radius * radius) continue;
+                if (!fmar) sb.Append(',');
+                fmar = false;
+                sb.Append($"[{d.x:F2},{d.y:F2},{d.z:F2},{facing.x:F3},{facing.z:F3},{pose}]");
+            }
+            sb.Append(']');
+            sb.Append('}');
         }
         sb.Append('}');
-        FurnitureBuilder.Gantry = FurnitureBuilder.GantryStyle.Truss;
-        FurnitureBuilder.Post = FurnitureBuilder.PostStyle.Roofed;
         File.WriteAllText(path, sb.ToString());
     }
 

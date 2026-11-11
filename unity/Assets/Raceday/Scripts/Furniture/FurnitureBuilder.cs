@@ -11,12 +11,8 @@ namespace TarmacGauntlet.Raceday
     /// </summary>
     public sealed class FurnitureBuilder
     {
-        public enum GantryStyle { Truss, Concrete, Box }
-        public enum PostStyle { Roofed, Hut }
-
-        /// <summary>The looks to build. Tools change them to preview the others.</summary>
-        public static GantryStyle Gantry = GantryStyle.Truss;
-        public static PostStyle Post = PostStyle.Roofed;
+        /// <summary>Half the width of a gantry leg tower, from its middle to the centre of a corner tube, metres.</summary>
+        public const float LegHalf = 0.35f;
 
         private const float ChunkSize = 250f;
 
@@ -84,70 +80,59 @@ namespace TarmacGauntlet.Raceday
             float foot = Mathf.Min(a.y, b.y) - 0.5f;   // the legs reach a little into the ground
             Vector3 la = new Vector3(a.x, foot, a.z), lb = new Vector3(b.x, foot, b.z);
 
-            MeshKit frame;
-            float top, beamFront;
-            switch (Gantry)
+            MeshKit frame = Kit("Start gantry", m?.GreenSteel);
+            float top = bottom + BeamDepth;
+            const float beamFront = LegHalf + 0.07f;
+            // Square to the span, so every tower face lines up with the chords that meet it.
+            Vector3 span = Flat(lb - la).normalized;
+            Vector3 across = Vector3.Cross(Vector3.up, span).normalized;
+            if (Vector3.Dot(across, along) < 0) across = -across;
+
+            // Each leg is a square tower of four corner tubes. Ties ring it at each level and a diagonal zigzags up
+            // each face between them, so every brace ends on a tube where another member meets it.
+            foreach ((Vector3 p, float ground) in new[] { (la, a.y), (lb, b.y) })
             {
-                case GantryStyle.Truss:
-                {
-                    frame = Kit("Start gantry", m?.GreenSteel);
-                    top = bottom + BeamDepth;
-                    beamFront = 0.42f;
-                    // Each leg is a square tower of four corner tubes, braced across.
-                    foreach (Vector3 p in new[] { la, lb })
+                var corners = new Vector3[4];
+                for (int i = 0; i < 4; i++)
+                    corners[i] = At(p, 0f) + span * (i == 0 || i == 3 ? -LegHalf : LegHalf) + across * (i < 2 ? -LegHalf : LegHalf);
+                foreach (Vector3 corner in corners) Beam(frame, At(corner, p.y), At(corner, top + 0.07f), 0.1f);
+                var levels = new List<float>();
+                float first = ground + 0.3f;
+                int steps = Mathf.Max(1, Mathf.RoundToInt((bottom - first) / 1.5f));
+                for (int j = 0; j <= steps; j++) levels.Add(Mathf.Lerp(first, bottom, j / (float)steps));
+                levels.Add(top);
+                for (int j = 0; j < levels.Count; j++)
+                    for (int fi = 0; fi < 4; fi++)
                     {
-                        float h = top + 0.3f - p.y;
-                        for (int i = 0; i < 4; i++)
-                        {
-                            Vector3 o = along * ((i & 1) == 0 ? -0.35f : 0.35f) + left * ((i & 2) == 0 ? -0.35f : 0.35f);
-                            Beam(frame, p + o, p + o + Vector3.up * h, 0.1f);
-                        }
-                        for (float y = p.y + 1f; y < top; y += 1.4f)
-                            for (int fi = 0; fi < 4; fi++)
-                            {
-                                Vector3 side = fi < 2 ? along : left, across = fi < 2 ? left : along;
-                                if (fi % 2 == 1) side = -side;
-                                Beam(frame, p + side * 0.35f - across * 0.35f + Vector3.up * (y - p.y),
-                                    p + side * 0.35f + across * 0.35f + Vector3.up * (y - p.y + 1.2f), 0.06f);
-                            }
+                        Vector3 c0 = corners[fi], c1 = corners[(fi + 1) % 4];
+                        Beam(frame, At(c0, levels[j]), At(c1, levels[j]), 0.06f);
+                        if (j + 1 == levels.Count) continue;
+                        bool up = (j + fi) % 2 == 0;
+                        Beam(frame, At(up ? c0 : c1, levels[j]), At(up ? c1 : c0, levels[j + 1]), 0.06f);
                     }
-                    // Four chords from leg to leg, with diagonals zigzagging down each face.
-                    float span = Flat(la, lb);
-                    int bays = Mathf.Max(4, Mathf.RoundToInt(span / 1.6f));
-                    foreach (float s in new[] { -0.35f, 0.35f })
-                    {
-                        Vector3 o = along * s;
-                        Vector3 ta = At(la, top) + o, tb = At(lb, top) + o, ba = At(la, bottom) + o, bb = At(lb, bottom) + o;
-                        Beam(frame, ta, tb, 0.14f);
-                        Beam(frame, ba, bb, 0.14f);
-                        for (int i = 0; i < bays; i++)
-                        {
-                            float u0 = i / (float)bays, u1 = (i + 1) / (float)bays;
-                            Vector3 from = i % 2 == 0 ? Vector3.Lerp(ta, tb, u0) : Vector3.Lerp(ba, bb, u0);
-                            Vector3 to = i % 2 == 0 ? Vector3.Lerp(ba, bb, u1) : Vector3.Lerp(ta, tb, u1);
-                            Beam(frame, from, to, 0.07f);
-                        }
-                    }
-                    break;
-                }
-                case GantryStyle.Concrete:
+            }
+
+            // Four chords run right through both towers, over their corner tubes. Between the towers the two faces
+            // are Warren trusses with a tie across at every node.
+            Vector3 innerA = la + span * LegHalf, innerB = lb - span * LegHalf;
+            int bays = Mathf.Max(4, Mathf.RoundToInt(Flat(innerB - innerA).magnitude / 1.6f));
+            foreach (float s in new[] { -LegHalf, LegHalf })
+            {
+                Vector3 o = across * s;
+                Beam(frame, At(la - span * LegHalf, top) + o, At(lb + span * LegHalf, top) + o, 0.14f);
+                Beam(frame, At(la - span * LegHalf, bottom) + o, At(lb + span * LegHalf, bottom) + o, 0.14f);
+                for (int i = 0; i < bays; i++)
                 {
-                    frame = Kit("Start gantry", m?.Concrete);
-                    top = bottom + 1.4f;
-                    beamFront = 0.5f;
-                    foreach (Vector3 p in new[] { la, lb }) Block(frame, p, top + 0.2f - p.y, along, left, 1.4f, 1.0f);
-                    Beam(frame, At(la, (top + bottom) / 2), At(lb, (top + bottom) / 2), 1.0f, 1.4f);
-                    break;
+                    float u0 = i / (float)bays, u1 = (i + 1) / (float)bays;
+                    Vector3 from = At(Vector3.Lerp(innerA, innerB, u0), i % 2 == 0 ? top : bottom) + o;
+                    Vector3 to = At(Vector3.Lerp(innerA, innerB, u1), i % 2 == 0 ? bottom : top) + o;
+                    Beam(frame, from, to, 0.07f);
                 }
-                default:
-                {
-                    frame = Kit("Start gantry", m?.WhitePaint);
-                    top = bottom + 1.1f;
-                    beamFront = 0.35f;
-                    foreach (Vector3 p in new[] { la, lb }) Block(frame, p, top - p.y, along, left, 0.6f, 0.6f);
-                    Beam(frame, At(la, (top + bottom) / 2), At(lb, (top + bottom) / 2), 0.7f, 1.1f);
-                    break;
-                }
+            }
+            for (int i = 1; i < bays; i++)
+            {
+                Vector3 node = At(Vector3.Lerp(innerA, innerB, i / (float)bays), i % 2 == 0 ? top : bottom);
+                Beam(frame, node - across * LegHalf, node + across * LegHalf, 0.06f);
             }
 
             // The light box hangs from the beam over the middle of the road, its lenses facing the grid.
@@ -203,28 +188,16 @@ namespace TarmacGauntlet.Raceday
 
             Vector3 F(float x, float y, float z) => new Vector3(b.x, floor, b.z) + along * x + Vector3.up * y + toRoad * z;
             float hx = PostLength / 2, hz = PostDepth / 2;
-            if (Post == PostStyle.Roofed)
+            MeshKit steel = Kit("Marshal post steel", m?.GreenSteel);
+            MeshKit roof = Kit("Marshal post roofs", m?.Roof);
+            foreach (float x in new[] { -hx + 0.1f, hx - 0.1f })
             {
-                MeshKit steel = Kit("Marshal post steel", m?.GreenSteel);
-                MeshKit roof = Kit("Marshal post roofs", m?.Roof);
-                foreach (float x in new[] { -hx + 0.1f, hx - 0.1f })
-                {
-                    Beam(steel, F(x, 0, hz - 0.1f), F(x, 2.75f, hz - 0.1f), 0.1f);
-                    Beam(steel, F(x, 0, -hz + 0.1f), F(x, 2.45f, -hz + 0.1f), 0.1f);
-                }
-                // A rail along the front, waist high.
-                Beam(steel, F(-hx + 0.1f, 1.0f, hz - 0.1f), F(hx - 0.1f, 1.0f, hz - 0.1f), 0.06f);
-                Slab(roof, F(-hx - 0.2f, 2.8f, hz + 0.3f), F(hx + 0.2f, 2.8f, hz + 0.3f), F(-hx - 0.2f, 2.45f, -hz - 0.2f), F(hx + 0.2f, 2.45f, -hz - 0.2f), 0.06f);
+                Beam(steel, F(x, 0, hz - 0.1f), F(x, 2.75f, hz - 0.1f), 0.1f);
+                Beam(steel, F(x, 0, -hz + 0.1f), F(x, 2.45f, -hz + 0.1f), 0.1f);
             }
-            else
-            {
-                const float wall = 0.2f, height = 2.4f;
-                Block(concrete, F(0, 0, -hz + wall / 2), height, along, toRoad, PostLength, wall);
-                foreach (float x in new[] { -hx + wall / 2, hx - wall / 2 })
-                    Block(concrete, F(x, 0, 0), height, along, toRoad, wall, PostDepth);
-                Block(concrete, F(0, 0, hz - wall / 2), 1.05f, along, toRoad, PostLength, wall);
-                Block(concrete, F(0, height, 0), 0.15f, along, toRoad, PostLength + 0.3f, PostDepth + 0.3f);
-            }
+            // A rail along the front, waist high.
+            Beam(steel, F(-hx + 0.1f, 1.0f, hz - 0.1f), F(hx - 0.1f, 1.0f, hz - 0.1f), 0.06f);
+            Slab(roof, F(-hx - 0.2f, 2.8f, hz + 0.3f), F(hx + 0.2f, 2.8f, hz + 0.3f), F(-hx - 0.2f, 2.45f, -hz - 0.2f), F(hx + 0.2f, 2.45f, -hz - 0.2f), 0.06f);
 
             // The flag panel on its pole by the track, square to the cars coming.
             MeshKit housing = Kit("Flag panel housings", m?.BlackSteel);
@@ -270,6 +243,7 @@ namespace TarmacGauntlet.Raceday
 
         // ---------------------------------------------------------------- shapes
 
+        private static Vector3 Flat(Vector3 v) => new Vector3(v.x, 0f, v.z);
         private static float Flat(Vector3 a, Vector3 b) => Mathf.Sqrt((a.x - b.x) * (a.x - b.x) + (a.z - b.z) * (a.z - b.z));
 
         private static Vector3 At(Vector3 p, float y) => new Vector3(p.x, y, p.z);

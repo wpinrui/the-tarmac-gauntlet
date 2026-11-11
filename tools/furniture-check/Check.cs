@@ -12,8 +12,8 @@
 //                            the distance boards
 //   boards before braking    each hard braking corner has its 300, 200 and 100 boards on one side, that far
 //                            before the turn-in, off the road and in front of the barrier
-//   gantry over the line     the gantry spans the start line with its feet off the road and verge, and its
-//                            light box clears the road by at least 5 m
+//   gantry over the line     the gantry spans the start line with its feet off the road and verge and its legs
+//                            clear of the pit wall, and its light box clears the road by at least 5 m
 //   cheap to draw            at most 120k triangles in all and 20k in any one mesh
 //   race control             SC behind the pace car, red then green lights at the start, green panels on
 //                            the opening lap, yellow before a stopped car and green after it, clearing once
@@ -49,7 +49,7 @@ static class Check
         }
         Posts(f);
         Boards(f);
-        Gantry(f, built);
+        Gantry(f, built, track);
         Budget(built);
         Flags(f);
         return failed ? 1 : 0;
@@ -64,6 +64,9 @@ static class Check
             Console.WriteLine($"FAIL  {rule}: {string.Join("; ", bad.Take(8))}");
         }
     }
+
+    /// <summary>Half the width of a gantry leg tower, tube to tube outside.</summary>
+    static float LegHalf => FurnitureBuilder.LegHalf + 0.05f;
 
     static float Lateral(Vector3 p, int k) => Vector3.Dot(p - c.Centre[k], c.Left[k]);
 
@@ -142,9 +145,10 @@ static class Check
         Report("boards before braking", bad, $"{f.Boards.Count} boards before {corners} corners");
     }
 
-    static void Gantry(TrackFurniture f, FurnitureBuilder built)
+    static void Gantry(TrackFurniture f, FurnitureBuilder built, List<CircuitPart> track)
     {
         var bad = new List<string>();
+        var wall = new List<float>();
         int k = f.GantrySample;
         float l = Lateral(f.GantryLeft, k), r = Lateral(f.GantryRight, k);
         float edge = c.HalfWidth(k) + 2f;
@@ -152,6 +156,19 @@ static class Check
         float road = c.Centre[k].y;
         float lowest = built.RedLenses.Vertices.Concat(built.GreenLenses.Vertices).Min(v => v.y) - road;
         if (lowest < 5f) bad.Add($"lights {lowest:F1} m over the road");
+        foreach (CircuitPart part in track.Where(p => p.Name.StartsWith("Pit wall")))
+            foreach (Vector3 v in part.Kit.Vertices)
+                if (Mathf.Abs(Vector3.Dot(v - c.Centre[k], c.Forward[k])) < 3f) wall.Add(Lateral(v, k));
+        if (wall.Count > 0)
+        {
+            float wMin = wall.Min(), wMax = wall.Max();
+            foreach (float foot in new[] { l, r })
+            {
+                float near = foot - LegHalf, far = foot + LegHalf;
+                bool inside = near >= wMin - 0.01f && far <= wMax + 0.01f;
+                if (!inside && near < wMax && far > wMin) bad.Add($"a leg from {near:F2} m to {far:F2} m cuts the pit wall from {wMin:F2} m to {wMax:F2} m");
+            }
+        }
         Report("gantry over the line", bad, $"span {l - r:F1} m, lowest light {lowest:F1} m over the road");
     }
 
