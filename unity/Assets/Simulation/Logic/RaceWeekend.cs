@@ -101,7 +101,7 @@ namespace TarmacGauntlet.Simulation
         /// <summary>
         /// Writes a finished race into the career: prize money for every team, the player's fuel
         /// bill, tyres and spares used, each car's condition, the race history entry, and prestige
-        /// recalculated for every team. The game moves to the post-race phase.
+        /// recalculated for every team, and the paper. The game moves to the post-race phase.
         /// </summary>
         public static (GameState Game, RaceSummary Summary) Settle(RaceDay race)
         {
@@ -154,7 +154,9 @@ namespace TarmacGauntlet.Simulation
                 }).ToArray(),
             };
 
-            return (next, Summarise(race, order, history, player, fuelUsed, money.PlayerFuelCost, prestigeBefore, next));
+            RaceSummary summary = Summarise(race, order, history, player, fuelUsed, money.PlayerFuelCost, prestigeBefore, next);
+            next = next with { Newspaper = NewspaperWriter.Write(game, next, history, summary) };
+            return (next, summary);
         }
 
         /// <summary>Litres burnt: a full tank at the start plus what went in at the stops, less what's left.</summary>

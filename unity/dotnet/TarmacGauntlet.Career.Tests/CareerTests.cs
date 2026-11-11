@@ -59,7 +59,18 @@ namespace TarmacGauntlet.Career.Tests
                     ["car-p1"] = new[] { new Stint { DriverId = "driver-300", StartLap = 1, EndLap = 60 } },
                 },
                 ModeCounters = new System.Collections.Generic.Dictionary<string, ModeCounter> { ["car-p1"] = new ModeCounter { Push = 3, Normal = 200, Conserve = 7 } },
-            });
+            }) with
+            {
+                Newspaper = new Newspaper
+                {
+                    Year = 1,
+                    Lead = new Story { Headline = "Backfire Racing win", Standfirst = "Home after 210 laps.", Paragraphs = new[] { "One.", "Two." }, TeamId = "player" },
+                    Podiums = new[] { new ClassPodium { CarClass = CarClass.F, Places = new[] { new PodiumPlace { TeamId = "player", TeamName = "Backfire Racing", ModelName = "Nusa Carrier", Laps = 210 } } } },
+                    FeatureKind = FeatureKind.RookieDebut,
+                    Feature = new Story { Headline = "Rookie shines", Paragraphs = new[] { "Three." }, TeamId = "ai-4" },
+                    Coverage = PlayerCoverage.Lead,
+                },
+            };
         }
 
         [Test]
@@ -78,6 +89,23 @@ namespace TarmacGauntlet.Career.Tests
             Assert.That(back.RaceHistory[0].FastestLap!.Time, Is.EqualTo(101.234567));
             Assert.That(back.RaceHistory[0].Stints!["car-p1"][0].EndLap, Is.EqualTo(60));
             Assert.That(DriverLineup.Of(back), Is.EqualTo(new[] { "driver-300", RaceEntry.PlayerCharacterDriverId }));
+            Assert.That(back.Newspaper!.Lead.Paragraphs, Is.EqualTo(new[] { "One.", "Two." }));
+            Assert.That(back.Newspaper.FeatureKind, Is.EqualTo(FeatureKind.RookieDebut));
+            Assert.That(back.Newspaper.Podiums[0].Places[0].ModelName, Is.EqualTo("Nusa Carrier"));
+        }
+
+        [Test]
+        public void LeavingThePaperAdvancesTheSavedCareerOnce()
+        {
+            GameSession.NewCareer(Options, Seeded(8));
+            GameSession.Apply(g => g with { Phase = GamePhase.PostRace });
+            GameSession.Apply(g => Season.AdvanceYear(g, Seeded(9)));
+            GameSession.Apply(g => Season.AdvanceYear(g, Seeded(10)));
+            GameSession.Flush();
+
+            GameState saved = GameSession.Store.Load(GameSession.CareerId!);
+            Assert.That(saved.CurrentYear, Is.EqualTo(2));
+            Assert.That(saved.Phase, Is.EqualTo(GamePhase.PreRace));
         }
 
         [Test]
