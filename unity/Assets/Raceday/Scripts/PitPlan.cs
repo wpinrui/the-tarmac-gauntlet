@@ -44,7 +44,8 @@ namespace TarmacGauntlet.Raceday
             startFuel = supplies.Fuel;
             PitOrders orders = supplies.Orders;
             litres = Mathf.Clamp(orders.Litres ?? float.PositiveInfinity, 0f, Mathf.Max(supplies.Capacity - supplies.Fuel, 0f));
-            scale = 0.85f + 0.3f * (float)spec.Stats.PitStopTime / 100f;
+            // The car's Pit Stop stat scales the work: 0.7 times at 0, 1.3 times at 100.
+            scale = 0.7f + 0.6f * (float)spec.Stats.PitStopTime / 100f;
             PitWork work = supplies.Log?.Pit(orders.Tyres);
             tyres = work == null ? orders.Tyres : work.ChangeTyres;
             NewTyres = tyres;
@@ -274,7 +275,8 @@ namespace TarmacGauntlet.Raceday
                 float a = d.x * along.x + d.z * along.z;
                 float across = d.x * left.x + d.z * left.z;
                 bool moving = o.Velocity.x * o.Velocity.x + o.Velocity.z * o.Velocity.z > 9f;
-                if (moving && a > -110f && a < 8f && across < -Lane.BoxLateral + Lane.FastLane + 2.5f && across > -12f) return false;
+                // Out past the line cars take by the boxes: a car swinging into a nearby box isn't fast lane traffic.
+                if (moving && a > -110f && a < 8f && across < Lane.PassLateral - Lane.BoxLateral - 0.3f && across > -12f) return false;
             }
             return true;
         }

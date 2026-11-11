@@ -263,6 +263,21 @@ namespace TarmacGauntlet.Raceday
         private static void Draw(Rect r, Texture2D shape, Color colour) =>
             GUI.DrawTexture(r, shape, ScaleMode.StretchToFill, true, 0f, colour, 0f, 0f);
 
+        /// <summary>A tyre seen side on: tread and hub.</summary>
+        internal static Texture2D TyreIcon() => Shape(1f, 1f, (x, y) =>
+        {
+            float d = Mathf.Sqrt((x - 0.5f) * (x - 0.5f) + (y - 0.5f) * (y - 0.5f));
+            return (d > 0.34f && d < 0.48f) || (d > 0.1f && d < 0.18f);
+        });
+
+        /// <summary>A fuel pump with its hose.</summary>
+        internal static Texture2D FuelIcon() => Shape(1f, 1f, (x, y) =>
+        {
+            bool body = x > 0.12f && x < 0.58f && y > 0.05f && y < 0.92f && !(x > 0.22f && x < 0.48f && y > 0.55f && y < 0.82f);
+            bool hose = (x > 0.58f && x < 0.84f && y > 0.62f && y < 0.7f) || (x > 0.76f && x < 0.86f && y > 0.2f && y < 0.7f);
+            return body || hose;
+        });
+
         /// <summary>
         /// A white shape on a clear texture, smoothed at the edges: inside(x, y) in design units, y up
         /// from the bottom. Drawn tinted, at the width and height it was made for.

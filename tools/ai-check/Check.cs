@@ -68,7 +68,8 @@ static partial class Check
         circuit = new Circuit(data);
         line = new RacingLine(circuit);
         // The experiment to run with, as the debug menu's switch: AI_EXPERIMENT=3 is E3.
-        if (int.TryParse(Environment.GetEnvironmentVariable("AI_EXPERIMENT"), out int experiment)) Experiments.On = experiment;
+        // Unset, the checker runs E0 as it always has, though the game itself starts on E1.
+        Experiments.On = int.TryParse(Environment.GetEnvironmentVariable("AI_EXPERIMENT"), out int experiment) ? experiment : 0;
 
         if (args.Length > 2 && args[1] == "line")
         {
@@ -94,6 +95,17 @@ static partial class Check
                 Run r = Drive(args[2], pace, 100f, 100f, 3, 1);
                 Console.WriteLine($"{args[2]} pace {pace}: {string.Join(" ", r.Laps.Select(Time))}");
             }
+            return 0;
+        }
+        if (args.Length > 1 && args[1] == "fatigue")
+        {
+            string model = args.Length > 2 ? args[2] : "a-29";
+            foreach (float pace in new[] { 50f, 80f, 100f })
+                foreach (float tired in new[] { 0f, 50f, 100f })
+                {
+                    Run r = Drive(model, pace, 100f, 100f, 3, 1, fatigue: tired);
+                    Console.WriteLine($"{model} pace {pace} fatigue {tired}: {string.Join(" ", r.Laps.Select(Time))}, race maths x{LapTime.FatigueLapFactor(pace, tired):0.000}");
+                }
             return 0;
         }
         if (args.Length > 1 && args[1] == "racecraft")
@@ -416,11 +428,11 @@ static partial class Check
         Report($"laps at the hairpin (by at {where:0} m, hairpin 1442 to 1489 m)", problems);
     }
 
-    static Run Drive(string modelId, float pace, float consistency, float safety, int laps, int seed, Action<StandInCar, AiPilot, AiPilot.Controls> watch = null, bool supplies = false)
+    static Run Drive(string modelId, float pace, float consistency, float safety, int laps, int seed, Action<StandInCar, AiPilot, AiPilot.Controls> watch = null, bool supplies = false, float fatigue = 0f)
     {
         CarSpec spec = CarSpec.For(modelId);
         RacingLine line = LineFor(modelId);
-        var pilot = new AiPilot(line, spec, pace, consistency, safety, seed);
+        var pilot = new AiPilot(line, spec, pace, consistency, safety, seed) { Fatigue = fatigue };
         var car = new StandInCar(spec, line);
         // With supplies the tyres carry the weather's grip, as they do in the game.
         if (supplies) car.Supplies = Consumables.For(spec, pilot.Profile, 60f);

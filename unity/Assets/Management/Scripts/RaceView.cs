@@ -116,8 +116,8 @@ namespace TarmacGauntlet.Management
                 team.AddToClassList("fill");
                 row.Add(team);
                 row.Add(Cell(Num(r.Laps), "c-laps"));
-                Label prize = Cell(r.Retired ? "DNF" : Money(r.PrizeMoney), "c-prize", true);
-                prize.AddToClassList(r.Retired ? "v-lo" : "v-hi");
+                Label prize = Cell(Money(r.PrizeMoney), "c-prize", true);
+                prize.AddToClassList("v-hi");
                 row.Add(prize);
                 list.Add(row);
             }
@@ -174,8 +174,8 @@ namespace TarmacGauntlet.Management
             into.Add(inClass);
             into.Add(Figure(Num(me.Laps), "LAPS", null));
             if (me.BestLap is double best) into.Add(Figure(LapTime(best), "BEST LAP", "best"));
-            Label end = Text(me.Retired ? "DNF" : Money(me.PrizeMoney), "hero-prize", true);
-            end.AddToClassList(me.Retired ? "v-lo" : "v-hi");
+            Label end = Text(Money(me.PrizeMoney), "hero-prize", true);
+            end.AddToClassList("v-hi");
             into.Add(end);
         }
 

@@ -253,6 +253,52 @@ def grooves(ref):
     return obs
 
 
+# ---------------------------------------------------------------- driver's door
+DOOR_DEPTH = 0.05     # below the cabin floor the door takes the sill this deep
+DOOR_WALL = 0.09      # above it, the whole wall: the cabin is hollow behind it
+DOOR_GAP = 0.0015     # half the gap round the door, inside the shut line's groove
+DOOR_OPEN = 65.0      # degrees the door swings out
+
+
+def door_outline():
+    """The left door seen from the side: inside its shut line, closed straight across between
+    the line's two ends, and the window frame round the door glass back to the B-pillar's
+    middle, where the shut line ends."""
+    d = door_path()
+    dlo, _g, _t = dlo_shapes()
+    frame = dlo.intersection(box(d[-1][0], -1, 5, 5))
+    return unary_union([Polygon(d).buffer(0), frame])
+
+
+def mirror_footprint():
+    """The mirror on the door seen from the side, with room: taken only outside the skin."""
+    m = R["mirror"]
+    return box(m["x_back"] - 0.05, m["z"] - 0.12, m["x_back"] + m["length"] + 0.08, m["z"] + 0.12)
+
+
+def door_hinge(sgn=1):
+    """The hinge axis up the door's front edge, outside the skin, and the open angle. Turning
+    about an axis pointing up, a negative angle swings the left door's back edge out and a
+    positive one the right's. sgn picks the side: 1 left, -1 right."""
+    xf = max(p[0] for p in R["door"]) + 0.004
+    zs = [p[1] for p in R["door"]]
+    y = max(body.y_at(CV, xf - 0.01, z) for z in np.linspace(min(zs), max(zs), 20)) + 0.003
+    return (xf, y * sgn, min(zs)), (xf, y * sgn, max(zs)), -DOOR_OPEN * sgn
+
+
+def door(ref, shell, obs, floor, sgn=1):
+    """Cut the left (sgn 1) or right (sgn -1) door free of the body and its window trim; the door glass, card, strips
+    and mirror glass go with it. Returns the door's pieces."""
+    side = "l" if sgn > 0 else "r"
+    o = door_outline()
+    regions = [(o.intersection(box(-5, -1, 5, floor + 0.02)), DOOR_DEPTH),
+               (o.intersection(box(-5, floor + 0.02, 5, 5)), DOOR_WALL), (mirror_footprint(), -0.004)]
+    trim = [o for o in obs if o.name == f"window_trim_{side}"]
+    roles = {f"side_glass_{side}": "glass", f"side_glass_{side}_1": "glass", f"side_strip_{side}": "strip",
+             f"side_strip_{side}_1": "strip", f"mirror_glass_{side}": "mirror", f"door_card_{side}": "card"}
+    return blend.free_door(ref, side_fr(sgn), regions, DOOR_GAP, shell, trim, roles, door_outline(), name=f"door_{side}")
+
+
 # ---------------------------------------------------------------- body additions
 def spoiler():
     """Roof spoiler: the traced profile carried across, trimmed to the roof's own curve."""
