@@ -110,16 +110,19 @@ namespace TarmacGauntlet.Raceday
 
             var boxes = new Vector4[MaxBoxes];
             var inks = new Vector4[MaxBoxes];
+            var widths = Vector4.zero;
             int count = 0;
             foreach (NumberBox n in file.numbers ?? Array.Empty<NumberBox>())
             {
                 if (count == MaxBoxes) break;
                 boxes[count] = new Vector4(n.x / file.size, n.y / file.size, n.h / file.size, n.rotate * Mathf.Deg2Rad);
+                widths[count] = n.w / file.size;
                 inks[count] = ColorUtility.TryParseHtmlString(n.ink, out Color ink) ? (Vector4)ink : Vector4.one;
                 count++;
             }
             mat.SetVectorArray("_NumBox", boxes);
             mat.SetVectorArray("_NumInk", inks);
+            mat.SetVector("_NumWidth", widths);
             mat.SetFloat("_NumBoxes", count);
 
             if (LoadDigits())

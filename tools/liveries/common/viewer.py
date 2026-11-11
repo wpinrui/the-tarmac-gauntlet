@@ -83,6 +83,7 @@ function liveryMaterial(lv) {
     sh.uniforms.uNumBox = { value: [0, 1, 2, 3].map(i => boxes[i] ? new THREE.Vector4(boxes[i].x / lv.size, boxes[i].y / lv.size, boxes[i].h / lv.size, boxes[i].rotate * Math.PI / 180) : new THREE.Vector4()) };
     sh.uniforms.uNumInk = { value: [0, 1, 2, 3].map(i => new THREE.Color(boxes[i] ? boxes[i].ink : '#fff').convertSRGBToLinear()) };
     sh.uniforms.uNumBoxes = { value: boxes.length };
+    sh.uniforms.uNumWidth = { value: new THREE.Vector4(...[0, 1, 2, 3].map(i => boxes[i] ? boxes[i].w / lv.size : 0)) };
     sh.uniforms.uNumDigits = { value: new THREE.Vector4(+num[0] || 0, +num[1] || 0, +num[2] || 0, dg ? num.length : 0) };
     const D = DIGITS || { cell: 0, padX: 0, pad: 0, height: 1, advance: [1], w: 1, h: 1 };
     sh.uniforms.uDigitCell = { value: new THREE.Vector4(D.cell, D.padX, D.advance[0] * D.height * D.h / D.w, D.pad) };
@@ -93,13 +94,14 @@ function liveryMaterial(lv) {
     sh.vertexShader = 'varying vec3 vLp; varying vec3 vLn;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvLp = position; vLn = normal;');
     sh.fragmentShader = `varying vec3 vLp; varying vec3 vLn; uniform sampler2D uAtlas; uniform vec3 uBase;
 uniform vec4 uA_left, uB_left, uA_right, uB_right, uA_top, uB_top, uA_front, uB_front, uA_rear, uB_rear;
-uniform sampler2D uDigits; uniform vec4 uNumBox[4]; uniform vec3 uNumInk[4]; uniform float uNumBoxes; uniform vec4 uNumDigits;
+uniform sampler2D uDigits; uniform vec4 uNumBox[4]; uniform vec3 uNumInk[4]; uniform float uNumBoxes; uniform vec4 uNumDigits; uniform vec4 uNumWidth;
 uniform vec4 uDigitCell; uniform float uDigitHeight, uDigitAdvance;
 vec3 lvNumber(vec2 q, vec3 art) {
   float count = uNumDigits.w, width = count * uDigitAdvance;
   for (int i = 0; i < 4; i++) {
     vec4 box = uNumBox[i]; vec2 d = q - box.xy; float s = sin(box.w), c = cos(box.w);
-    vec2 l = vec2(c * d.x + s * d.y, -s * d.x + c * d.y) / max(box.z, 1e-5);
+    float h = min(box.z, uNumWidth[i] / max(width, 1e-5));
+    vec2 l = vec2(c * d.x + s * d.y, -s * d.x + c * d.y) / max(h, 1e-5);
     float x = l.x + width / 2.0;
     float k = clamp(floor(x / uDigitAdvance), 0.0, 2.0);
     float digit = k < 0.5 ? uNumDigits.x : (k < 1.5 ? uNumDigits.y : uNumDigits.z);
