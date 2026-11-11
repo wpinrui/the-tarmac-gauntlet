@@ -73,12 +73,16 @@ static partial class Check
         /// Seconds car i ran more than a metre off its line from time <paramref name="from"/> on, with no car
         /// overlapping it: room it gave away for nothing (Ivan: get back on the racing line once clear).
         /// </summary>
-        public float OffLineClear(int i, float from)
+        public float OffLineClear(int i, float from, bool brakingOnly = false)
         {
             float t = 0f;
+            SpeedProfile p = Race.Racers[i].Pilot.Profile;
+            int ahead20 = Math.Max(1, (int)(20f / circuit.Step));
             foreach (Frame f in Frames)
             {
                 if (f.T < from || Math.Abs(f.Off[i]) < 1f || f.Busy[i]) continue;
+                // H14: between corners the line is only the default; off it counts once braking for the next corner.
+                if (brakingOnly && p.Speed[circuit.Wrap(f.K[i] + ahead20)] >= p.Speed[f.K[i]] - 1f) continue;
                 bool overlapped = false;
                 for (int j = 0; j < N; j++) if (j != i && Math.Abs(Gap(f, i, j)) < CarL + 1f) overlapped = true;
                 if (!overlapped) t += Race.Dt;
@@ -506,13 +510,13 @@ static partial class Check
                     int k = f.K[0];
                     if (f.V[0] < 0.98f * p0.LaneSpeed(k, f.L[0] - p0.Line.Lateral[k])) lifted += Race.Dt;
                 }
-                // Once past, back on the line.
+                // Once past, back on the line by the next braking zone: off it on the straight is fine (H14, Ivan).
                 Frame past = fs.FirstOrDefault(f => run.Gap(f, 0, 1) < 0f);
-                float offClear = past == null ? 0f : run.OffLineClear(0, past.T);
+                float offClear = past == null ? 0f : run.OffLineClear(0, past.T, true);
                 // Off full throttle behind it with a lane open beside: it should have pulled out (Ivan).
                 float heldRoom = HeldWithRoom(run, fs, false);
                 if (heldRoom > 0.5f) return (0f, $"held up behind {heldRoom:0.0} s with room beside, on the line {100f * share:0}% of {follow * Race.Dt:0.0} s following, {hits} contacts");
-                return (Clamp100(Math.Min(Math.Min(100f * share, Scale(lifted, 0.3f, 2f)), Scale(offClear, 0.5f, 3f)) - 25f * hits), $"on the line {100f * share:0}% of {follow * Race.Dt:0.0} s following, lifted behind it {lifted:0.0} s, off the line once past and clear {offClear:0.0} s, {hits} contacts");
+                return (Clamp100(Math.Min(Math.Min(100f * share, Scale(lifted, 0.3f, 2f)), Scale(offClear, 0.5f, 3f)) - 25f * hits), $"on the line {100f * share:0}% of {follow * Race.Dt:0.0} s following, lifted behind it {lifted:0.0} s, off the line braking once past and clear {offClear:0.0} s, {hits} contacts");
             }
             case "T2":
             case "T12":
