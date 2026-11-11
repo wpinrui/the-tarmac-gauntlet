@@ -37,20 +37,19 @@ namespace TarmacGauntlet.Raceday
     }
 
     /// <summary>
-    /// The sun and moon over a circuit at 50 degrees north on midsummer's day, and the sky's colours
-    /// as the sun climbs and sets. Times are local summer time, hours from midnight. The sun rises
-    /// at about 05:25 and sets at about 21:45, and never drops more than 17 degrees below the
-    /// horizon, so the night is short and never fully dark.
+    /// The sun and moon over a circuit at 50 degrees north in late October, after the clocks go back, and the sky's colours
+    /// as the sun climbs and sets. Times are local standard time, hours from midnight. The sun sets at
+    /// about 17:25, the sky is fully dark by about 18:35, and the sun rises at about 07:10.
     /// </summary>
     public static class SkyClock
     {
         public const float Latitude = 50f;
-        /// <summary>The sun's declination at midsummer, degrees.</summary>
-        public const float Declination = 23.44f;
-        /// <summary>The moon's declination: near full, it sits opposite the sun, low in the south.</summary>
-        public const float MoonDeclination = -18f;
-        /// <summary>Local time of the sun's highest point, hours: summer time at about 6 degrees east.</summary>
-        public const float SolarNoon = 13.6f;
+        /// <summary>The sun's declination in late October, degrees.</summary>
+        public const float Declination = -12f;
+        /// <summary>The moon's declination: near full, it sits opposite the sun, high in the south.</summary>
+        public const float MoonDeclination = 12f;
+        /// <summary>Local time of the sun's highest point, hours: standard time at about 6 degrees east.</summary>
+        public const float SolarNoon = 12.3f;
 
         /// <summary>The look of the race's sky.</summary>
         public static readonly SkyLook Look = new SkyLook
