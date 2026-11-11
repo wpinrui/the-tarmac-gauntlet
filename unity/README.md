@@ -48,7 +48,7 @@ brakes). After a hard crash, or when stuck or spun, it puts the car back on trac
 shows its predicted lap time and each lap it drives.
 
 The camera starts on the TV view when the race comes from the career, and on the chase camera when the scene runs on
-its own. `C` cycles TV, chase, bonnet, bumper and free. In the TV view the director (`BroadcastDirector.cs`) picks
+its own. `C` cycles TV, chase, bonnet, bumper, free and follow. In the TV view the director (`BroadcastDirector.cs`) picks
 the story once a real second: a car stopped off the track, a fight for a class lead, any fight within a class under
 0.5 s, your car, a class leader's stop or yours, a car rejoining, the leader. It cuts between trackside, pan,
 helicopter, onboard and pit lane shots. While you drive, the TV view is your onboard.
@@ -89,7 +89,7 @@ Driving: left and right arrows steer, up accelerates, down brakes (hold it at a 
 reverse). `M` toggles automatic and manual; `A` and `Z` shift up and down and also switch to manual. The
 bottom right shows speed in km/h and the gear, blue in automatic and white in manual. `H`
 toggles steering help. Anti-lock brakes are always on. `R` puts the car back on track, which you
-need after a hard hit on a barrier. `C` cycles the chase, bonnet and bumper views and the free camera.
+need after a hard hit on a barrier. `C` cycles the chase, bonnet and bumper views, the free camera and the follow camera.
 
 The car's physics come from its game stats (`Raceday/Scripts/CarSpec.cs`): Power sets the engine,
 Handling sets tyre grip and downforce. Grass and gravel have less grip and slow the car.
@@ -115,6 +115,8 @@ cars nearest the listener within 350 m play. To hear a change outside Unity, `ba
 
 Free camera: move the mouse to look, `W` `A` `S` `D` move along the ground, `Q` and `E` go down and up,
 `Shift` is 5x faster and the scroll wheel changes speed. Click to capture the mouse, `Esc` frees it.
+The follow camera is the free camera riding along with the watched car. It starts in the chase spot, and its look
+and moves stay relative to the car as it turns.
 
 The circuit is built at runtime from `Assets/Raceday/Resources/Tracks/circuit.json`, which
 `tools/circuit/generate.py` writes (`python3 tools/circuit/generate.py`, needs numpy). Change the
