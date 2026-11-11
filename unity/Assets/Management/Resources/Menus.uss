@@ -378,6 +378,54 @@
 .ng-country:hover { background-color: rgba(255, 255, 255, 0.1); color: rgb(255, 255, 255); }
 .ng-country.on { background-color: rgba(255, 255, 255, 0.2); color: rgb(255, 255, 255); }
 
+/* Newspaper: a broadsheet on a 1600 x 900 sheet, scaled to fit (NewspaperView.cs). Fonts and ink are set from code. */
+.np-page { position: absolute; overflow: hidden; }
+.np-sheet { position: absolute; padding: 34px 54px 30px 54px; flex-direction: column; }
+.np-mast { align-items: stretch; }
+.np-masthead { font-size: 68px; -unity-text-align: middle-center; margin-bottom: 6px; }
+.np-rule { height: 1px; background-color: rgb(18, 18, 18); }
+.np-double { height: 5px; border-top-width: 1px; border-bottom-width: 1px; border-color: rgb(18, 18, 18); }
+.np-dateline { font-size: 15px; letter-spacing: 3.6px; padding: 8px 0 6px 0; -unity-text-align: middle-center; }
+.np-grid { flex-grow: 1; flex-direction: column; padding-top: 18px; overflow: hidden; }
+.np-row { flex-direction: row; }
+.np-fill { flex-grow: 1; }
+.np-cell { flex-direction: column; overflow: hidden; }
+.np-ruled { border-left-width: 1px; border-color: rgb(18, 18, 18); margin-left: 15px; padding-left: 15px; }
+.np-top { border-bottom-width: 1px; border-color: rgb(18, 18, 18); padding-bottom: 20px; margin-bottom: 20px; }
+.np-h1 { font-size: 66px; white-space: normal; margin-bottom: 10px; }
+.np-h2 { font-size: 40px; white-space: normal; margin-bottom: 8px; }
+.np-h3 { font-size: 32px; white-space: normal; margin-bottom: 8px; }
+.np-stand { font-size: 25px; white-space: normal; margin-bottom: 14px; }
+.np-cols { flex-direction: row; }
+.np-col { flex-grow: 1; flex-basis: 0; }
+.np-col-ruled { border-left-width: 1px; margin-left: 12px; padding-left: 12px; }
+.np-p { font-size: 20px; white-space: normal; margin-bottom: 8px; }
+.np-pods { flex-direction: row; flex-wrap: wrap; margin-right: -24px; }
+.np-pod { padding-right: 24px; margin-bottom: 20px; }
+.np-pod-class { font-size: 15px; letter-spacing: 3.3px; border-bottom-width: 1px; border-color: rgb(18, 18, 18); padding-bottom: 4px; margin-bottom: 4px; }
+.np-pod-row { flex-direction: row; }
+.np-pod-place { width: 26px; font-size: 18px; }
+.np-pod-team { flex-grow: 1; flex-shrink: 1; font-size: 18px; white-space: normal; }
+.np-pod-laps { font-size: 18px; margin-left: 8px; }
+.np-pods-wide .np-pod { margin-bottom: 0; }
+.np-pods-wide .np-pod-place, .np-pods-wide .np-pod-team, .np-pods-wide .np-pod-laps { font-size: 16px; }
+.np-strip { border-top-width: 1px; border-color: rgb(18, 18, 18); padding-top: 14px; margin-top: 14px; }
+.np-front .np-h1 { font-size: 54px; }
+.np-front .np-h2 { font-size: 34px; }
+.np-front .np-h3 { font-size: 28px; }
+.np-front .np-stand { font-size: 21px; margin-bottom: 10px; }
+.np-front .np-p { font-size: 18px; }
+.np-front .np-top { padding-bottom: 14px; margin-bottom: 14px; }
+.np-brief { border-top-width: 1px; border-color: rgb(18, 18, 18); margin-top: 10px; padding-top: 9px; }
+.np-brief-text { font-size: 20px; -unity-text-align: middle-center; white-space: normal; }
+.np-close { position: absolute; right: 24px; top: 24px; width: 48px; height: 48px; border-radius: 24px; align-items: center; justify-content: center; }
+.np-close:hover { background-color: rgba(255, 255, 255, 0.1); }
+.np-close-icon { width: 18px; height: 18px; -unity-background-scale-mode: scale-to-fit; }
+
+/* Menu items with nothing behind them yet */
+.item.dim, .icon.dim { opacity: 0.35; }
+.item.dim:hover, .icon.dim:hover { background-color: rgba(0, 0, 0, 0); }
+
 /* Garage: the car workshop and both dealers (WorkshopPanel.cs, DealerPanel.cs, GarageUi.cs) */
 .g-root { flex-grow: 1; min-height: 0; }
 .g-scroll { flex-grow: 1; flex-shrink: 1; min-height: 0; }

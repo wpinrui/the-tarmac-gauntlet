@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 
 namespace TarmacGauntlet.Simulation
 {
@@ -117,6 +118,15 @@ namespace TarmacGauntlet.Simulation
             var last = LastNames[(int)Math.Floor(random() * LastNames.Length)];
             return $"{first} {last}";
         }
+
+        /// <summary>The rookies who join the driver pool at the end of a year, with ids unique to that year.</summary>
+        public static IReadOnlyList<RookieSpec> RookieSpecs(int year, int count, Func<double> random) =>
+            Enumerable.Range(0, count).Select(i => new RookieSpec
+            {
+                Id = $"rookie-y{year}-{i}",
+                Name = GenerateDriverName(i, random),
+                Nationality = Nationalities[(int)Math.Floor(random() * Nationalities.Length)],
+            }).ToArray();
 
         private static DriverStats GeneratePeakStats(Func<double> random) => new DriverStats
         {
