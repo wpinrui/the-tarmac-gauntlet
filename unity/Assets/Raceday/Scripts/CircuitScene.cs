@@ -5,7 +5,7 @@ using UnityEngine;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// Builds the circuit, the sun, the career's field and the cameras when the scene starts. The
+    /// Builds the circuit, the sky and its sun (<see cref="TimeOfDay"/>), the career's field and the cameras when the scene starts. The
     /// field is every team with a car, from <see cref="RaceWeekend.Setup"/>, gridded by prestige: each
     /// car on a full tank and new tyres, its starting driver at the wheel. Run on its own, the scene
     /// makes a new career in which the player owns the Cheonma. The <see cref="RaceDirector"/> keeps
@@ -85,7 +85,7 @@ namespace TarmacGauntlet.Raceday
                     go.AddComponent<TrackSurface>().Kind = TrackSurface.ForPart(part.Name);
                 }
             }
-            Sun();
+            TimeOfDay sky = new GameObject("Sky").AddComponent<TimeOfDay>();
 
             keys = new GameObject("Keyboard").AddComponent<KeyboardState>();
             var line = new RacingLine(circuit);
@@ -169,6 +169,7 @@ namespace TarmacGauntlet.Raceday
             if (!career) views.StartInChase();
             RaceTower tower = Tower(circuit, racing, field, teams, watched, starter);
             tv.Classes = tower.Classes;
+            sky.RaceSeconds = () => tower.RaceTime;
             director = new GameObject("Race director").AddComponent<RaceDirector>();
             director.Day = day;
             director.Cars = racing;
@@ -360,28 +361,6 @@ namespace TarmacGauntlet.Raceday
             if (starter is RaceStart rolling) tower.Racing = () => rolling.Racing;
             else if (pitLaneStart != null) tower.Racing = () => pitLaneStart.Gone(0);
             return tower;
-        }
-
-        private static void Sun()
-        {
-            var go = new GameObject("Sun");
-            Light sun = go.AddComponent<Light>();
-            sun.type = LightType.Directional;
-            sun.intensity = 1.2f;
-            sun.color = new Color(1f, 0.96f, 0.9f);
-            sun.shadows = LightShadows.Soft;
-            go.transform.rotation = Quaternion.Euler(42f, -35f, 0f);
-            RenderSettings.sun = sun;
-            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.62f, 0.7f, 0.82f);
-            RenderSettings.ambientEquatorColor = new Color(0.5f, 0.55f, 0.5f);
-            RenderSettings.ambientGroundColor = new Color(0.25f, 0.27f, 0.2f);
-            RenderSettings.fog = true;
-            RenderSettings.fogMode = FogMode.Linear;
-            RenderSettings.fogColor = new Color(0.7f, 0.76f, 0.84f);
-            RenderSettings.fogStartDistance = 1500f;
-            RenderSettings.fogEndDistance = 7000f;
-            QualitySettings.shadowDistance = 400f;
         }
 
         private static RaceCameras Camera(Circuit circuit, CarController[] cars, int watched, KeyboardState keys)
