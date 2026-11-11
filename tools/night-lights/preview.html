@@ -1,0 +1,420 @@
+<title>Gauntlet Night Lights</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Full-bleed night view of the start line; one slim rail of looks floats over the bottom. Single dark look: it is night. */
+  :root {
+    --night: #05070d;
+    --rail: rgba(8, 11, 18, 0.82);
+    --ink: #e9ecf2;
+    --dim: #8b93a6;
+    --pick: #f2e6c4;
+    --font: "Barlow", "Helvetica Neue", Arial, sans-serif;
+    color-scheme: dark;
+  }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body { background: var(--night); color: var(--ink); font-family: var(--font); overflow: hidden; }
+  #view { position: fixed; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; }
+  #rail {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    padding-block: 10px calc(10px + env(safe-area-inset-bottom, 0px));
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    background: var(--rail); backdrop-filter: blur(8px);
+    display: flex; flex-wrap: wrap; gap: 10px 36px; align-items: center; justify-content: center;
+  }
+  .group { display: flex; gap: 6px; align-items: center; }
+  .group svg.mark { width: 22px; height: 22px; color: var(--dim); margin-right: 4px; flex: none; }
+  button {
+    font: 600 14px/1 var(--font); letter-spacing: 0.02em; color: var(--dim);
+    background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 8px 10px; cursor: pointer;
+  }
+  button:hover { color: var(--ink); }
+  button[aria-pressed="true"] { color: var(--ink); border-color: var(--pick); }
+  button:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
+  button.swatch { width: 32px; height: 32px; padding: 5px; }
+  button.swatch span { display: block; width: 100%; height: 100%; border-radius: 50%; }
+  #load { position: fixed; inset: 0; display: grid; place-items: center; font: 600 15px var(--font); color: var(--dim); }
+  @media (max-width: 720px) { #rail { gap: 6px 16px; } button { padding: 7px 8px; font-size: 13px; } }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@600&display=swap">
+
+<canvas id="view"></canvas>
+<div id="load">Loading the circuit…</div>
+<nav id="rail" hidden>
+  <div class="group" id="flood"><svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 22V7M7 4h10v4H7z"/><path d="M8 11l-3 5M16 11l3 5M12 11v5"/></svg></div>
+  <div class="group" id="head"><svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 15l2-5h11l4 5v3H3z"/><circle cx="7" cy="18" r="1.6"/><circle cx="16" cy="18" r="1.6"/><path d="M21 12l2-1M21 15h2"/></svg></div>
+  <div class="group" id="time"></div>
+  <div class="group" id="views"></div>
+</nav>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="data.js"></script>
+<script>
+(async () => {
+  const D = window.NIGHT;
+  const raw = Uint8Array.from(atob(window.NIGHT_MESHES), c => c.charCodeAt(0));
+  const bin = await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();
+
+  // Same colours as the game's CircuitMaterials, StandMaterials (blue look), PitMaterials and FloodMaterials.
+  const COLOURS = {
+    "Road": [0.17, 0.17, 0.18], "Road edges": [0.17, 0.17, 0.18], "Edge lines": [0.92, 0.92, 0.9], "Kerbs": [0.78, 0.1, 0.1],
+    "Verges": [0.24, 0.36, 0.16], "Grass runoff": [0.23, 0.41, 0.15], "Gravel traps": [0.63, 0.58, 0.48], "Armco": [0.72, 0.74, 0.76],
+    "Tyre walls": [0.06, 0.06, 0.07], "Pit wall": [0.74, 0.73, 0.7], "Pit lane": [0.21, 0.21, 0.22], "Pit lane shoulders": [0.23, 0.41, 0.15],
+    "Pit lane lines": [0.92, 0.92, 0.9], "Garages": [0.32, 0.33, 0.35], "Garage roofs": [0.74, 0.73, 0.7], "Pit box lines": [0.92, 0.92, 0.9],
+    "Start line and safety car lines": [0.92, 0.92, 0.9], "Grid slots": [0.92, 0.92, 0.9], "Grid yellow lines": [0.95, 0.78, 0.1],
+    "Ground": [0.2, 0.35, 0.13], "Paddock": [0.3, 0.3, 0.31], "Paddock lines": [0.92, 0.92, 0.9], "Pit entry hatching": [0.8, 0.1, 0.1],
+    "Pit exit line": [0.92, 0.92, 0.9], "Pit entry bollard": [0.95, 0.78, 0.1],
+    "Stand concrete": [0.68, 0.67, 0.64], "Stand steel": [0.3, 0.38, 0.46], "Stand cladding": [0.7, 0.71, 0.7], "Stand seats": [0.2, 0.31, 0.5],
+    "Stand roofs": [0.36, 0.37, 0.38], "Stand banks": [0.23, 0.41, 0.15], "Catch fence": [0.62, 0.64, 0.64], "Catch fence posts": [0.6, 0.62, 0.63],
+    "Pit building": [0.66, 0.65, 0.62], "Pit building glass": [0.07, 0.09, 0.11], "Pit building steel": [0.16, 0.3, 0.22],
+    "Garage team colours": [0.55, 0.2, 0.18], "Garage fit-out": [0.19, 0.2, 0.22], "Garage metal": [0.62, 0.63, 0.65], "Garage tyres": [0.05, 0.05, 0.055],
+    "Garage lights": [1, 1, 1], "Floodlight steel": [0.55, 0.57, 0.58], "Floodlight lenses": [0.55, 0.57, 0.56],
+  };
+  const CLASS_PAINT = [[0.85, 0.15, 0.12], [0.95, 0.55, 0.1], [0.95, 0.85, 0.2], [0.25, 0.7, 0.3], [0.2, 0.45, 0.9], [0.6, 0.3, 0.8]];
+  const WINDOW_GLOW = [1, 0.82, 0.58];
+  const L = D.look;
+  const lin = (c, k = 1) => new THREE.Color().setRGB(c[0] * k, c[1] * k, c[2] * k).convertSRGBToLinear();
+  const linMul = (c, k) => new THREE.Color().setRGB(c[0], c[1], c[2]).convertSRGBToLinear().multiplyScalar(k);
+  const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  const on = night => smooth(0, 0.12, night);
+
+  const state = { flood: "Neutral", head: "White", time: 1, view: "wide" };
+  try { Object.assign(state, JSON.parse(localStorage.getItem("night-looks") || "{}")); } catch (e) {}
+  const save = () => { try { localStorage.setItem("night-looks", JSON.stringify(state)); } catch (e) {} };
+
+  const canvas = document.getElementById("view");
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.autoClear = false;
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.3, 4000);
+  const controls = new THREE.OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.maxPolarAngle = Math.PI * 0.495;
+  controls.minDistance = 3;
+  controls.maxDistance = 600;
+
+  // The game's frame is left-handed (z north); three.js is right-handed, so z flips and every triangle turns over.
+  const V = a => new THREE.Vector3(a[0], a[1], -a[2]);
+  function geometry(m) {
+    const n = m.n, q = new Int16Array(bin, m.pos, n * 3), k = new Int8Array(bin, m.nrm, n * 3);
+    const pos = new Float32Array(n * 3), nrm = new Float32Array(n * 3);
+    for (let t = 0; t < n; t += 3) for (let j = 0; j < 3; j++) {
+      const src = (t + j) * 3, dst = (t + [0, 2, 1][j]) * 3;
+      pos[dst] = q[src] * 0.01; pos[dst + 1] = q[src + 1] * 0.01; pos[dst + 2] = -q[src + 2] * 0.01;
+      nrm[dst] = k[src] / 127; nrm[dst + 1] = k[src + 1] / 127; nrm[dst + 2] = -k[src + 2] / 127;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    g.setAttribute("normal", new THREE.BufferAttribute(nrm, 3));
+    if (m.uv >= 0) {
+      const u = new Float32Array(bin, m.uv, n * 2), uv = new Float32Array(n * 2);
+      for (let t = 0; t < n; t += 3) for (let j = 0; j < 3; j++) {
+        const src = (t + j) * 2, dst = (t + [0, 2, 1][j]) * 2;
+        uv[dst] = u[src]; uv[dst + 1] = u[src + 1];
+      }
+      g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+    }
+    return g;
+  }
+
+  // ---------------------------------------------------------------- textures the game makes in code
+  function windows() {
+    const cell = 16, w = D.windowCells * cell, h = D.storeyCells * cell, cv = document.createElement("canvas");
+    cv.width = w; cv.height = h;
+    const x = cv.getContext("2d");
+    x.fillStyle = "#000"; x.fillRect(0, 0, w, h);
+    let seed = 17;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let cx = 0; cx < D.windowCells; cx++) for (let cy = 0; cy < D.storeyCells; cy++) {
+      const r = rnd(), lit = r < 0.3 ? 0 : r < 0.45 ? 0.35 : 0.75 + 0.25 * rnd(), v = Math.round(lit * 255);
+      x.fillStyle = `rgb(${v},${v},${v})`;
+      x.fillRect(cx * cell + 1, h - (cy * cell + cell - 2), cell - 2, cell - 5);
+    }
+    const t = new THREE.CanvasTexture(cv);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(1 / D.windowCells, 1 / D.storeyCells);
+    return t;
+  }
+  function crowd() {
+    const [w, h] = D.crowdSize, px = new Uint8Array(w * h * 4).fill(128);
+    D.crowd.forEach((row, r) => row.forEach((c, i) => { const o = 4 * (r * w + i); px[o] = c[0] * 255; px[o + 1] = c[1] * 255; px[o + 2] = c[2] * 255; px[o + 3] = 255; }));
+    const t = new THREE.DataTexture(px, w, h, THREE.RGBAFormat);
+    t.magFilter = t.minFilter = THREE.NearestFilter;
+    t.encoding = THREE.sRGBEncoding;
+    t.needsUpdate = true;
+    return t;
+  }
+  const windowTex = windows(), crowdTex = crowd();
+
+  // ---------------------------------------------------------------- pools of light, as Night/LightPool.shader draws them
+  const poolVert = `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+  const poolFrag = `uniform vec3 uColor; varying vec2 vUv;
+    void main() { float f = clamp(1.0 - dot(vUv, vUv), 0.0, 1.0); f *= f; gl_FragColor = vec4(uColor * f, 0.0); }`;
+  function poolPair(geo, parent, order) {
+    const multiply = new THREE.ShaderMaterial({
+      uniforms: { uColor: { value: new THREE.Color() } }, vertexShader: poolVert, fragmentShader: poolFrag,
+      transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
+      blending: THREE.CustomBlending, blendSrc: THREE.DstColorFactor, blendDst: THREE.OneFactor,
+    });
+    const lift = multiply.clone();
+    lift.uniforms = { uColor: { value: new THREE.Color() } };
+    lift.blendSrc = THREE.OneFactor;
+    const a = new THREE.Mesh(geo, multiply), b = new THREE.Mesh(geo, lift);
+    a.renderOrder = order; b.renderOrder = order + 1;
+    parent.add(a, b);
+    return { multiply, lift };
+  }
+
+  // ---------------------------------------------------------------- the scenes: the circuit, the cars (lit by the real lights too), the pools
+  const world = new THREE.Scene(), carScene = new THREE.Scene(), poolScene = new THREE.Scene();
+  const hemis = [new THREE.HemisphereLight(), new THREE.HemisphereLight()];
+  const moons = [new THREE.DirectionalLight(), new THREE.DirectionalLight()];
+  world.add(hemis[0], moons[0]); carScene.add(hemis[1], moons[1]);
+
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(3000, 32, 16), new THREE.ShaderMaterial({
+    uniforms: { zenith: { value: new THREE.Color() }, horizon: { value: new THREE.Color() } }, side: THREE.BackSide, depthWrite: false,
+    vertexShader: `varying vec3 vDir; void main() { vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `uniform vec3 zenith, horizon; varying vec3 vDir;
+      void main() { float h = 1.0 - clamp(normalize(vDir).y, 0.0, 1.0); gl_FragColor = vec4(mix(zenith, horizon, h * h * h * h), 1.0); }`,
+  }));
+  sky.renderOrder = -1;
+  world.add(sky);
+
+  const mats = {}, glowing = {};
+  const lambert = (name, extra = {}) => new THREE.MeshLambertMaterial({ color: lin(COLOURS[name] || [0.5, 0.5, 0.5]), ...extra });
+  let floodPools = null;
+  for (const m of D.meshes) {
+    const name = m.part, geo = geometry(m);
+    if (name === "Floodlight pools") { floodPools = poolPair(geo, poolScene, 10); continue; }
+    let mat = mats[name];
+    if (!mat) {
+      if (name === "Pit building glass") mat = lambert(name, { emissive: new THREE.Color(1, 1, 1), emissiveMap: windowTex });
+      else if (name === "Crowd") mat = new THREE.MeshLambertMaterial({ map: crowdTex, emissive: new THREE.Color(1, 1, 1), emissiveMap: crowdTex });
+      else if (name === "Stand seats") mat = lambert(name, { emissive: new THREE.Color() });
+      else if (name === "Floodlight lenses") mat = lambert(name, { emissive: new THREE.Color() });
+      else if (name === "Garage lights") mat = lambert(name, { emissive: lin([1.1, 1.1, 1.05]) });
+      else if (name === "Catch fence") mat = lambert(name, { transparent: true, opacity: 0.35, depthWrite: false });
+      else mat = lambert(name, name === "Stand roofs" ? { side: THREE.DoubleSide } : {});
+      mats[name] = mat;
+    }
+    world.add(new THREE.Mesh(geo, mat));
+  }
+
+  // ---------------------------------------------------------------- the cars
+  const path = D.path.map(p => ({ c: V(p), left: new THREE.Vector3(p[3], 0, -p[4]), fwd: new THREE.Vector3(p[5], p[6], -p[7]).normalize(), half: p[8] }));
+  const step = 2, lastIndex = path.length - 1;
+  const lampMats = {
+    head: new THREE.MeshBasicMaterial({ color: new THREE.Color() }),
+    tail: new THREE.MeshBasicMaterial({ color: new THREE.Color() }),
+    brake: new THREE.MeshBasicMaterial({ color: linMul(D.red, 1).multiplyScalar(1), }),
+  };
+  lampMats.brake.color = lin(D.red, L.BrakeGlow);
+  const lampPair = (z, x, y, w, h) => {
+    const g = new THREE.Group();
+    for (const s of [-1, 1]) { const q = new THREE.Mesh(new THREE.PlaneGeometry(w, h), null); q.position.set(s * x, y, z); if (z < 0) q.rotation.y = Math.PI; g.add(q); }
+    return g;
+  };
+  // The beam on the road, as LampMaterials builds it: 24 m ahead of the nose, widening from 1.8 to 9 m.
+  function beamGeometry() {
+    const along = 8, across = 4, pos = [], uv = [], idx = [];
+    for (let r = 0; r <= along; r++) {
+      const t = r / along, z = 24 * t, half = (1.8 + (9 - 1.8) * t) / 2;
+      for (let c = 0; c <= across; c++) { const x = -half + 2 * half * c / across; pos.push(x, 0.05, -z); uv.push(x / half, Math.pow(t, 0.7) * 2 - 1); }
+    }
+    for (let r = 0; r < along; r++) for (let c = 0; c < across; c++) { const a = r * (across + 1) + c; idx.push(a, a + across + 1, a + 1, a + 1, a + across + 1, a + across + 2); }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+    g.setIndex(idx);
+    return g;
+  }
+  const beamGeo = beamGeometry();
+  let beamMats = [];
+  const cars = [];
+  for (let i = 0; i < 14; i++) {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.8, 4.5), new THREE.MeshLambertMaterial({ color: lin(CLASS_PAINT[i % 6]) }));
+    body.position.y = 0.65;
+    g.add(body);
+    const heads = lampPair(-2.255, 0.62, 0.81, 0.42, 0.16); heads.children.forEach(q => q.material = lampMats.head);
+    const tails = lampPair(2.255, 0.68, 0.85, 0.36, 0.14); tails.children.forEach(q => q.material = lampMats.tail);
+    g.add(heads, tails);
+    carScene.add(g);
+    const beamHolder = new THREE.Group();
+    beamHolder.position.z = -2.25;
+    const pair = poolPair(beamGeo, beamHolder, 20);
+    beamMats.push(pair);
+    const beamRoot = new THREE.Group();
+    beamRoot.add(beamHolder);
+    poolScene.add(beamRoot);
+    cars.push({ g, beamRoot, tails, s: (i * 53) % (lastIndex * step - 40), lateral: [3.5, -3.5, 0][i % 3], cruise: 52 + (i % 4) * 3, v: 50, braking: false });
+  }
+  const braking = (lastIndex * step) - 150;
+  function placeCar(car, dt) {
+    car.braking = car.s > braking;
+    car.v = car.braking ? Math.max(28, car.v - 14 * dt) : Math.min(car.cruise, car.v + 4 * dt);
+    car.s += car.v * dt;
+    if (car.s >= lastIndex * step - 2) { car.s = 0; car.v = car.cruise; }
+    const f = car.s / step, i = Math.min(lastIndex - 1, Math.floor(f)), t = f - i, a = path[i], b = path[i + 1];
+    const p = a.c.clone().lerp(b.c, t).addScaledVector(a.left, car.lateral);
+    const fwd = a.fwd.clone().lerp(b.fwd, t).normalize();
+    car.g.position.copy(p);
+    car.g.lookAt(p.clone().sub(fwd));
+    car.beamRoot.position.copy(p);
+    car.beamRoot.quaternion.copy(car.g.quaternion);
+    car.tails.children.forEach(q => q.material = car.braking ? lampMats.brake : lampMats.tail);
+  }
+
+  // ---------------------------------------------------------------- the real lights, as NightLights places them: they light the cars only
+  const lamps = D.lights.map(l => ({ kind: l.kind, p: V(l.p), aim: V(l.aim), target: V(l.target), reach: l.reach, cone: l.cone }));
+  const floodSpots = [], headSpots = [];
+  for (let i = 0; i < 4; i++) { const s = new THREE.SpotLight(0xffffff, 0, 1, 1, 0.4, 2); carScene.add(s, s.target); floodSpots.push(s); }
+  for (let i = 0; i < 2; i++) { const s = new THREE.SpotLight(0xffffff, 0, 70, (55 / 2) * Math.PI / 180, 0.5, 2); carScene.add(s, s.target); headSpots.push(s); }
+  function realLights(sky) {
+    const level = on(sky.night), floodTint = D.flood[state.flood], headTint = D.headlamps[state.head];
+    const focus = camera.position.clone().add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(30));
+    const near = lamps.map((l, i) => [l.target.distanceToSquared(focus), i]).filter(x => x[0] < 160 * 160).sort((a, b) => a[0] - b[0]).slice(0, 4);
+    floodSpots.forEach((s, k) => {
+      const pick = near[k];
+      s.intensity = pick ? level : 0;
+      if (!pick) return;
+      const l = lamps[pick[1]];
+      s.color = lin(floodTint, 2.5);
+      s.position.copy(l.p);
+      s.target.position.copy(l.target);
+      s.distance = l.reach * 1.6 + 10;
+      s.angle = (l.cone / 2) * Math.PI / 180;
+    });
+    const nearCars = cars.map((c, i) => [c.g.position.distanceToSquared(camera.position), i]).filter(x => x[0] < 120 * 120).sort((a, b) => a[0] - b[0]).slice(0, 2);
+    headSpots.forEach((s, k) => {
+      const pick = nearCars[k];
+      s.intensity = pick ? level : 0;
+      if (!pick) return;
+      const g = cars[pick[1]].g;
+      s.color = lin(headTint, 3);
+      s.position.copy(g.localToWorld(new THREE.Vector3(0, 0.7, -2.3)));
+      s.target.position.copy(g.localToWorld(new THREE.Vector3(0, -1.5, -30)));
+    });
+  }
+
+  // ---------------------------------------------------------------- the look: the sky at the chosen hour and the chosen colours
+  function look() {
+    const s = D.skies[state.time], n = s.night, lit = on(n);
+    const floodTint = D.flood[state.flood], headTint = D.headlamps[state.head];
+    sky.material.uniforms.zenith.value = lin(s.zenith);
+    sky.material.uniforms.horizon.value = lin(s.horizon);
+    for (const h of hemis) { h.color = lin(s.ambientSky); h.groundColor = lin(s.ambientGround); h.intensity = 1; }
+    for (const m of moons) { m.color = lin(s.light, s.intensity); m.intensity = 1; m.position.copy(V(s.lightDir)).multiplyScalar(500); }
+    mats["Floodlight lenses"].emissive = lin(floodTint, L.LensGlow * lit);
+    mats["Pit building glass"].emissive = lin(WINDOW_GLOW, 1.4 * n);
+    mats["Crowd"].emissive = lin(floodTint, L.StandGlow * n);
+    mats["Stand seats"].emissive = new THREE.Color().copy(lin(floodTint, L.StandGlow * n)).multiply(lin(COLOURS["Stand seats"]));
+    floodPools.multiply.uniforms.uColor.value = linMul(floodTint, L.PoolBrightening * n);
+    floodPools.lift.uniforms.uColor.value = linMul(floodTint, L.PoolLift * n);
+    for (const b of beamMats) {
+      b.multiply.uniforms.uColor.value = linMul(headTint, L.BeamBrightening * n);
+      b.lift.uniforms.uColor.value = linMul(headTint, L.BeamLift * n);
+    }
+    lampMats.head.color = lin(headTint, L.HeadlampGlow * lit);
+    lampMats.tail.color = lin(D.red, L.TailGlow * lit);
+  }
+
+  // ---------------------------------------------------------------- views
+  const at = d => path[Math.round((d + 460) / step)];
+  function frame() {
+    controls.enabled = state.view !== "chase";
+    const s = at(0);
+    if (state.view === "wide") {
+      camera.position.copy(s.c).addScaledVector(s.left, -30).addScaledVector(s.fwd, 60).add(new THREE.Vector3(0, 30, 0));
+      controls.target.copy(at(-110).c).addScaledVector(s.left, 12);
+    } else if (state.view === "pits") {
+      const roof = lamps.filter(l => l.kind === "PitRoof").sort((a, b) => a.target.lengthSq() - b.target.lengthSq())[0];
+      camera.position.copy(roof.target).addScaledVector(s.fwd, 40).add(new THREE.Vector3(0, 2.5, 0));
+      controls.target.copy(roof.target).addScaledVector(s.fwd, -60).add(new THREE.Vector3(0, 3, 0));
+    } else if (state.view === "stand") {
+      const stand = lamps.filter(l => l.kind === "Stand").sort((a, b) => a.target.lengthSq() - b.target.lengthSq())[0];
+      camera.position.copy(stand.p).add(new THREE.Vector3(0, 1.5, 0)).addScaledVector(s.fwd, -20);
+      controls.target.copy(s.c).addScaledVector(s.left, 20).addScaledVector(s.fwd, -30);
+    }
+    controls.update();
+  }
+  function chase() {
+    const g = cars[0].g, back = new THREE.Vector3(0, 2.6, 8.5), ahead = new THREE.Vector3(0, 1, -12);
+    camera.position.copy(g.localToWorld(back));
+    camera.lookAt(g.localToWorld(ahead));
+  }
+
+  function buttons(el, entries, key, after) {
+    for (const [value, content] of entries) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.id = `${key}-${value}`;
+      if (typeof content === "string") b.textContent = content; else { b.className = "swatch"; b.setAttribute("aria-label", content.name); b.title = content.name; b.append(content.el); }
+      b.setAttribute("aria-pressed", String(state[key] === value));
+      b.addEventListener("click", () => {
+        state[key] = value;
+        for (const o of el.querySelectorAll("button")) o.setAttribute("aria-pressed", String(o === b));
+        save();
+        after();
+      });
+      el.append(b);
+    }
+  }
+  const dot = (name, c) => { const s = document.createElement("span"); s.style.background = `rgb(${c.map(v => Math.round(v * 255)).join(",")})`; s.style.boxShadow = `0 0 10px rgb(${c.map(v => Math.round(v * 255)).join(",")})`; return { name, el: s }; };
+  buttons(document.getElementById("flood"), Object.entries(D.flood).map(([k, c]) => [k, dot(k, c)]), "flood", look);
+  buttons(document.getElementById("head"), Object.entries(D.headlamps).map(([k, c]) => [k, dot(k, c)]), "head", look);
+  const hhmm = h => { const m = Math.round((h % 24) * 60); return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`; };
+  buttons(document.getElementById("time"), D.skies.map((s, i) => [i, hhmm(s.hour)]), "time", look);
+  buttons(document.getElementById("views"), [["wide", "Start line"], ["chase", "Chase"], ["pits", "Pit lane"], ["stand", "Grandstand"]], "view", frame);
+
+  // ---------------------------------------------------------------- drawing: linear light into a float target, then out to the screen
+  let target;
+  const blit = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
+    uniforms: { src: { value: null } }, depthTest: false, depthWrite: false,
+    vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+    fragmentShader: `uniform sampler2D src; varying vec2 vUv;
+      vec3 srgb(vec3 c) { c = clamp(c, 0.0, 1.0); return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
+      void main() { gl_FragColor = vec4(srgb(texture2D(src, vUv).rgb), 1.0); }`,
+  }));
+  const blitScene = new THREE.Scene(), blitCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  blit.frustumCulled = false;
+  blitScene.add(blit);
+  function resize() {
+    const w = innerWidth, h = innerHeight, r = renderer.getPixelRatio();
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    if (target) target.dispose();
+    target = new THREE.WebGLMultisampleRenderTarget(Math.round(w * r), Math.round(h * r), { type: THREE.HalfFloatType, format: THREE.RGBAFormat });
+    target.samples = 4;
+    blit.material.uniforms.src.value = target.texture;
+  }
+  addEventListener("resize", resize);
+  resize();
+  look();
+  frame();
+  document.getElementById("load").hidden = true;
+  document.getElementById("rail").hidden = false;
+
+  const clock = new THREE.Clock();
+  let since = 1;
+  (function loop() {
+    const dt = Math.min(clock.getDelta(), 0.1);
+    for (const c of cars) placeCar(c, dt);
+    if (state.view === "chase") chase(); else controls.update();
+    sky.position.copy(camera.position);
+    if ((since += dt) > 0.25) { since = 0; realLights(D.skies[state.time]); }
+    renderer.setRenderTarget(target);
+    renderer.setClearColor(0x000000, 1);
+    renderer.clear();
+    renderer.render(world, camera);
+    renderer.render(carScene, camera);
+    renderer.render(poolScene, camera);
+    renderer.setRenderTarget(null);
+    renderer.render(blitScene, blitCam);
+    requestAnimationFrame(loop);
+  })();
+})();
+</script>

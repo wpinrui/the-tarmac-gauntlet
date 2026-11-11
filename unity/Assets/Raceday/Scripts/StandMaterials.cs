@@ -27,6 +27,26 @@ namespace TarmacGauntlet.Raceday
             FenceMesh.renderQueue = (int)UnityEngine.Rendering.RenderQueue.AlphaTest;
         }
 
+        private static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
+
+        /// <summary>
+        /// Lights the seats and the crowd under the roofs at night, as the roofs' floodlights would: each glows in its own
+        /// colours, tinted by the floodlights'. 0 by day, 1 at night.
+        /// </summary>
+        public void Night(float night, Color tint)
+        {
+            foreach (Material m in new[] { Seats, Crowd })
+            {
+                if (!m.IsKeywordEnabled("_EMISSION"))
+                {
+                    m.EnableKeyword("_EMISSION");
+                    m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+                    m.SetTexture("_EmissionMap", m.mainTexture);
+                }
+                m.SetColor(EmissionId, tint * (NightLook.StandGlow * night));
+            }
+        }
+
         /// <summary>Steel, seat and cladding colours for each look.</summary>
         public static (Color steel, Color seats, Color cladding) Paint(StandColours colours) => colours switch
         {
