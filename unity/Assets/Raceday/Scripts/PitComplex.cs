@@ -188,22 +188,6 @@ namespace TarmacGauntlet.Raceday
             return new CrewSpot(f.At(x, 0f, z), f.Out);
         }
 
-        /// <summary>Where the four fresh tyres wait for a stop, on the floor inside the door, by the -x wall.</summary>
-        public CrewSpot FreshTyres(int garage, int wheel)
-        {
-            GarageFrame f = frames[garage];
-            float x = Width * 0.5f - 1.2f;
-            float z = Depth * 0.5f - 1.4f - wheel * 0.9f;
-            return new CrewSpot(f.At(-x, 0f, z), f.Out);
-        }
-
-        /// <summary>The fuel rig's nozzle rest, inside the door by the +x wall, where the refueller picks it up.</summary>
-        public CrewSpot FuelRig(int garage)
-        {
-            GarageFrame f = frames[garage];
-            return new CrewSpot(f.At(RightWall(garage, Depth * 0.5f) - 0.5f, 0f, Depth * 0.5f - 0.6f), f.Out);
-        }
-
         /// <summary>Inner face of a garage's -x wall, its own.</summary>
         public float LeftWall => -Width * 0.5f + WallHalf;
 
