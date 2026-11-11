@@ -197,9 +197,18 @@ def front_parts(ref, cutters, out):
 MIRROR_X0, MIRROR_X1 = R["mirror"]["x_back"], R["mirror"]["x_front"]
 
 
+def dlo_line():
+    """The measured window opening with its top edge refit as one smooth curve, so the roof
+    line shows no dip over the B-pillar."""
+    d = np.array(R["dlo"], float)
+    top = (d[:, 1] > 1.25) & (d[:, 0] > -0.95) & (d[:, 0] < 0.15)
+    d[top, 1] = np.polyval(np.polyfit(d[top, 0], d[top, 1], 3), d[top, 0])
+    return d
+
+
 def dlo_shapes():
     """The side window opening, its glass (split by the pillars) and the black band round it."""
-    dlo = soft(poly(R["dlo"]), 0.015)
+    dlo = soft(poly(dlo_line()), 0.015)
     glass = dlo.buffer(-0.02, join_style=1)
     b0, b1 = R["b_pillar"]
     d0, d1 = R["divider"]
@@ -217,7 +226,7 @@ def screen_shapes():
 
 def rear_shapes():
     rg = soft(poly(R["rear_glass"]), 0.03)
-    glass = rg.buffer(-0.028, join_style=1)
+    glass = rg.buffer(-0.016, join_style=1)
     return rg, glass, rg.difference(glass)
 
 
@@ -275,51 +284,93 @@ def door_paths():
     rd = _open_below(rd_all, rd_all[:, 1].max() - 0.06)
     if rd[0][0] > rd[-1][0]:
         rd = rd[::-1]
-    rear = [_into_glass(rd[0])] + rd.tolist() + [_into_glass(rd[-1])]
+    # the shared edge runs down the middle of the B-pillar black, so each door shows the same width
+    bc = float(np.mean(R["b_pillar"]))
+    edge = rd[:, 0] > bc - 0.04
+    rd[edge, 0] += bc - float(rd[-1][0]) + 0.005
+    rear = [_into_glass(rd[0])] + rd.tolist() + [[bc, belt(bc) + 0.03]]
     bottom = float(rd[:, 1].min())
-    xs = float(rd[-1][0])
+    fe = rd[edge]
+    z_end = bottom + 0.004
+    xs = float(np.interp(z_end, fe[::-1, 1] if fe[0, 1] > fe[-1, 1] else fe[:, 1],
+                         fe[::-1, 0] if fe[0, 1] > fe[-1, 1] else fe[:, 0]))
     x0 = MIRROR_X0 + MIRROR_D + 0.03       # clear of the mirror arm
     front = [_into_glass((x0, belt(x0)))] + geom.catmull_open([
         (x0, belt(x0) - 0.002), (FRONT_DOOR_X - 0.06, belt(FRONT_DOOR_X - 0.06) + 0.004),
         (FRONT_DOOR_X, belt(FRONT_DOOR_X) - 0.05), (FRONT_DOOR_X + 0.01, 0.72), (FRONT_DOOR_X - 0.005, 0.5),
         (FRONT_DOOR_X - 0.06, bottom + 0.004)], 8).tolist()
-    front += [[xs + 0.02, bottom + 0.002]]
+    front += [[xs - 0.002, z_end]]
     return rear, front
 
 
-def lid_paths():
-    """Boot lid: across the deck at the rear glass foot, back along the deck, then down the
-    tail and across under the lamps."""
+def bonnet_loop():
+    """The bonnet in plan: a plain arc at the cowl, straight sides along the wing tops, then
+    back over the headlamps' top edges and straight across above the grille."""
+    half = [(0.97, 0.0), (0.955, 0.3), (0.925, 0.55), (0.905, 0.70), (0.935, 0.775), (1.02, 0.79),
+            (1.25, 0.79), (1.50, 0.79), (1.68, 0.78), (1.77, 0.735), (1.85, 0.655), (1.92, 0.565),
+            (1.975, 0.46), (2.005, 0.33), (2.02, 0.16), (2.025, 0.0)]
+    pts = half + [(x, -y) for x, y in half[-2:0:-1]]
+    return geom.catmull_closed(pts, 8)
+
+
+class LidWrap:
+    """A frame bending over the boot's back corner, for the lid's shut line. 2D (u, y): u runs
+    back along the deck (rays straight down), round the corner, then down the tail (rays
+    straight forward). The corner is centred at (xc, zc) with radius rc."""
+
+    def __init__(self, xc, zc, rc):
+        self.xc, self.zc, self.rc = xc, zc, rc
+        self.u1 = rc * np.pi / 2
+
+    def __call__(self, u, y):
+        far = self.rc + 0.5
+        if u <= 0:
+            o, d = (self.xc - u, self.zc + far), (0.0, -1.0)
+        elif u >= self.u1:
+            o, d = (self.xc - far, self.zc - (u - self.u1)), (1.0, 0.0)
+        else:
+            t = u / self.rc
+            d = (np.sin(t), -np.cos(t))
+            o = (self.xc - d[0] * far, self.zc - d[1] * far)
+        return np.array([o[0], y, o[1]]), np.array([d[0], 0.0, d[1]])
+
+    def deck(self, x):
+        return self.xc - x
+
+    def tail(self, z):
+        return self.u1 + self.zc - z
+
+
+LID_WRAP = dict(xc=TAIL + 0.27, zc=0.95, rc=0.10)
+
+
+def lid_loop():
+    """Boot lid as one loop in the LidWrap frame: across the deck at the rear glass foot, back
+    along both deck sides at one width, over the corner, then down the tail inside the lamps
+    and across under them."""
+    fr = LidWrap(**LID_WRAP)
+    zc = LID_WRAP["zc"]
     lid = poly(R["lid"])
+    low = lid.intersection(box(-5, -5, 5, zc))
+    ys = float(low.bounds[2])
     x_glass = float(np.min(np.array(R["rear_glass_side"])[:, 0]))
-    half = float(lid.bounds[2]) - 0.02
-    deck = [[x_glass - 0.03, -half], [x_glass - 0.03, half]]
-    sides = [[[x_glass - 0.03, s * half], [TAIL + 0.12, s * half]] for s in (1, -1)]
-    zcut = R["spots"]["spoiler_z"] - 0.06
-    low = np.array(soft(lid, 0.02).intersection(box(-5, -5, 5, zcut)).exterior.coords)[:-1]
-    top = low[:, 1] > zcut - 1e-6
-    k = int(np.argmax(top & np.roll(top, -1))) + 1        # open along the cut, between its two ends
-    tail = np.roll(low, -k, axis=0)
-    tail = geom.resample(tail, 0.01)
-    return deck, sides, tail.tolist()
+    u0 = fr.deck(x_glass - 0.03)
+    ring = np.array(low.exterior.coords)[:-1]
+    shape = Polygon([(fr.tail(z), y) for y, z in ring]).union(box(u0, -ys, fr.tail(zc) + 0.001, ys))
+    shape = soft(shape.buffer(0), 0.03)
+    return fr, np.array(shape.exterior.coords)[:-1]
 
 
 def grooves(ref):
-    """Shut lines as V grooves to cut: doors, bonnet, boot lid."""
+    """Shut lines as V grooves to cut: doors, bonnet, boot lid. Each loop is one closed groove."""
     obs = []
     rear, front = door_paths()
     for sgn, side in ((1, "l"), (-1, "r")):
         obs.append(blend.groove(ref, f"g_rdoor_{side}", rear, side_fr(sgn)))
         obs.append(blend.groove(ref, f"g_fdoor_{side}", front, side_fr(sgn)))
-    b = R["bonnet"]
-    h = len(b) // 2
-    obs.append(blend.groove(ref, "g_bonnet_a", b[: h + 2], top_fr()))
-    obs.append(blend.groove(ref, "g_bonnet_b", b[h:] + b[:2], top_fr(), width=0.0056, depth=0.0055))
-    deck, sides, tail = lid_paths()
-    obs.append(blend.groove(ref, "g_lid_deck", deck, top_fr()))
-    for i, s in enumerate(sides):
-        obs.append(blend.groove(ref, f"g_lid_side{i}", s, top_fr(), width=0.0056, depth=0.0055))
-    obs.append(blend.groove(ref, "g_lid_tail", tail, rear_fr()))
+    obs.append(blend.groove(ref, "g_bonnet", bonnet_loop(), top_fr(), closed=True))
+    fr, lid = lid_loop()
+    obs.append(blend.groove(ref, "g_lid", lid, fr, closed=True))
     return obs
 
 

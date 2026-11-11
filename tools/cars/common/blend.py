@@ -269,19 +269,36 @@ def lay(bvh, name, geom, fr, d0, d1, mat, step=0.01, accept=None, along_ray=Fals
     return obs
 
 
-def groove(bvh, name, path2d, fr, width=0.006, depth=0.006, step=0.008):
-    """V groove along a 2D path laid on the body, as a solid to cut away."""
-    pts = resample(path2d, step)
+def groove(bvh, name, path2d, fr, width=0.006, depth=0.006, step=0.008, closed=False):
+    """V groove along a 2D path laid on the body, as a solid to cut away. closed: the path is a
+    loop, and the groove is one ring with no ends, so no two cutters meet."""
+    path = np.asarray(path2d, float)
+    if closed:
+        path = np.vstack([path, path[:1]])
+    pts = resample(path, step)
+    if closed:
+        pts = pts[:-1]
     hits = [cast(bvh, fr, *p) for p in pts]
     hits = [h for h in hits if h[0] is not None]
+    n = len(hits)
     rings = []
-    for i, (p, n) in enumerate(hits):
-        a = hits[max(i - 1, 0)][0]; b = hits[min(i + 1, len(hits) - 1)][0]
+    for i, (p, nr) in enumerate(hits):
+        if closed:
+            a, b = hits[(i - 1) % n][0], hits[(i + 1) % n][0]
+        else:
+            a, b = hits[max(i - 1, 0)][0], hits[min(i + 1, n - 1)][0]
         t = b - a; t /= np.linalg.norm(t)
-        side = np.cross(n, t); side /= np.linalg.norm(side)
-        rings.append(np.array([p + n * 0.004 + side * width / 2, p + n * 0.004 - side * width / 2,
-                               p - n * depth]))
-    v, f = close_rings(rings)
+        side = np.cross(nr, t); side /= np.linalg.norm(side)
+        rings.append(np.array([p + nr * 0.004 + side * width / 2, p + nr * 0.004 - side * width / 2,
+                               p - nr * depth]))
+    if closed:
+        rings.append(rings[0])
+        v, f = close_rings(rings, cap=False)
+        m = len(rings[0]); last = (len(rings) - 1) * m
+        f = [tuple(k - last if k >= last else k for k in face) for face in f]
+        v = v[:last]
+    else:
+        v, f = close_rings(rings)
     return make(name, v, f, "trim")
 
 
