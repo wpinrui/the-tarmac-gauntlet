@@ -12,7 +12,7 @@ namespace TarmacGauntlet.Raceday
     public static class StandLook
     {
         public const MainStandShape Main = MainStandShape.Cantilever;
-        public const CornerStandShape Corners = CornerStandShape.Bleachers;
+        public const CornerStandShape Corners = CornerStandShape.Covered;
         public const StandColours Colours = StandColours.Green;
     }
 
