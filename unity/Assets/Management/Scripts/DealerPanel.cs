@@ -205,7 +205,7 @@ namespace TarmacGauntlet.Management
         /// <summary>A price, dimmed when the team can't pay it.</summary>
         private static Label Price(double price, bool affordable, string cls)
         {
-            Label l = Text(Money(price), cls, true);
+            Label l = Cell(Money(price), cls, true);
             l.AddToClassList(affordable ? "v-hi" : "dim");
             return l;
         }
