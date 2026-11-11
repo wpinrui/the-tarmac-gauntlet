@@ -73,6 +73,8 @@ namespace TarmacGauntlet.Raceday
         private static readonly float FallBehind = Knob("FALLBEHIND", 0f), WideAhead = Knob("WIDE", 3f), ZoneSwitch = Knob("ZSWITCH", 0f), SideSwitch = Knob("SSWITCH", 0.3f), ZoneHyst = Knob("ZHYST", 0f);
         /// <summary>Share of the side risk a car further back than <see cref="BehindFrom"/> car lengths carries: one behind is its own to miss.</summary>
         private static readonly float BehindRisk = Knob("BRISK", 0f), BehindFrom = Knob("BFROM", 0.5f), ToLine = Knob("TOLINE", 1f), OffLine = Knob("OFFLINE", OffLineCost);
+        /// <summary>How far the room left to a car alongside on the inside goes from the passing margin to the room owed (H2: no more than owed, Ivan).</summary>
+        private static readonly float OweTight = Knob("OWETIGHT", 0.7f);
         /// <summary>Score per second a pull-out waits: of two near-equal moves, the later one, so the car stays in the tow until it must move.</summary>
         private static readonly float LateBonus = Knob("LATE", 0.1f);
         /// <summary>Side-to-side gap H1 keeps to a car alongside, m.</summary>
@@ -353,7 +355,7 @@ namespace TarmacGauntlet.Raceday
                     {
                         float gj = Road(od[j, s] - d, lap);
                         if (stopped[j] || Mathf.Abs(gj) > CarL + 2f || ins * (ol[j, s] - lat) <= 0f) continue;
-                        bound = Mathf.Min(bound, ins * ol[j, s] - (Clear(margin) + reach[j] - 0.5f * CarW + 0.1f));
+                        bound = Mathf.Min(bound, ins * ol[j, s] - (Mathf.Lerp(Clear(margin), CarW + RoomMargin, OweTight) + reach[j] - 0.5f * CarW + 0.1f));
                     }
                     if (ins * lat > bound) { lat = ins * bound; off = lat - line.Lateral[k]; }
                 }
