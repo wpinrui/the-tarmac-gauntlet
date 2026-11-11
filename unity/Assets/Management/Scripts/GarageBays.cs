@@ -8,13 +8,17 @@ namespace TarmacGauntlet.Management
     /// <summary>
     /// Keeps the garage bays in step with the team's cars: the race car in the centre bay, the others beside it,
     /// and a car browsed at a dealer in the first empty bay, or the last bay when all four are full. Also points the
-    /// workshop and dealer shots at the bay they show.
+    /// workshop and dealer shots at the bay they show, and sets how many crew work in the building.
     /// </summary>
     public sealed class GarageBays : MonoBehaviour
     {
+        /// <summary>People working in the building on the main menu, before a game is loaded.</summary>
+        private const int DemoCrew = 6;
+
         private Menus menus;
         private HqCars cars;
         private HqCamera hqCamera;
+        private HqCrew crew;
         private GameState shownState;
         private bool hadGame;
         private string browseKey, browseModel, workshopCar;
@@ -62,7 +66,9 @@ namespace TarmacGauntlet.Management
             if (cars == null) return;
             shownState = GameSession.State;
 
-            PlayerTeam p = Garage.Player;
+            PlayerTeam p = MenuKit.Player;
+            if (crew == null) crew = FindAnyObjectByType<HqCrew>();
+            if (crew != null) crew.Count = p?.CrewSize ?? DemoCrew;
             if (p == null)
             {
                 if (hadGame) cars.ShowDemo();

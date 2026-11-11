@@ -346,15 +346,21 @@ namespace TarmacGauntlet.Raceday
                 // towards it. TORCS's full braking and side steering stay underneath, below.
                 chooser ??= new PathChooser();
                 chooser.Plan(pilot, me, field, dt);
+                // The full brakes are the last resort: not for a car the chosen path, clear of every
+                // limit, moves out from behind, now or at its last safe moment.
+                if (Braking && chooser.Chosen != null && chooser.Chosen.Rejected == null
+                    && Mathf.Abs(brakeLateral - (line.Lateral[pilot.Index] + chooser.Chosen.Shift)) >= PathChooser.Clear(margin))
+                {
+                    Braking = false;
+                    // T9: not braking after all, so it moves out at the full rate, not the rate the brakes would leave (Ivan).
+                    if (PathChooser.PullOutFree) step = Endurance.OvertakeOffsetRate * dt;
+                }
                 pilot.Offset = Mathf.Clamp(Mathf.MoveTowards(pilot.Offset, chooser.Target, step), AiPilot.LaneShifts[0], AiPilot.LaneShifts[AiPilot.LaneShifts.Length - 1]);
+                pilot.Offset = chooser.HoldOwe(pilot.Offset, line.Lateral[pilot.Index]);
                 Target = chooser.Target;
                 pilot.SpeedCap = chooser.Cap;
                 State = Mathf.Abs(pilot.Offset) > 0.5f ? Mode.Overtaking : Mode.Racing;
                 if (hasFront) { FrontGap = frontDistance; FrontId = front.Id; }
-                // The full brakes are the last resort: not for a car the chosen path, clear of every
-                // limit, moves out from behind, now or at its last safe moment.
-                if (Braking && chooser.Chosen != null && chooser.Chosen.Rejected == null
-                    && Mathf.Abs(brakeLateral - (line.Lateral[pilot.Index] + chooser.Chosen.Shift)) >= PathChooser.Clear(margin)) Braking = false;
             }
             else V0Offset(pilot, me, line, c, lap, here, step, margin, hasFront, front, frontDistance, minCatch, inPath, inPathDistance, inPathCatch,
                 wantSpeed, mass, cm, ca, mu, cw, currentSpeedSqr, spec, behind, closeAhead, fastBehind);
@@ -491,6 +497,14 @@ namespace TarmacGauntlet.Raceday
                 float diffAngle = Mathf.DeltaAngle(me.Yaw * Mathf.Rad2Deg, side.Yaw * Mathf.Rad2Deg) * Mathf.Deg2Rad;
                 // Under path choosing it is only the last resort, within 2 m: the chosen path keeps the room.
                 float reach = Experiments.Is(PathChooser.Experiment) ? PathChooser.SideFilterGap : Endurance.SideCollisionMargin * margin;
+                // H2, H3: on the outside of a corner it keeps its committed line, and opens its steering for the car
+                // on its inside only when a contact is about to happen (Ivan).
+                int bend = TurnAt(c, here) != 0 || BrakingZone(pilot) ? PathChooser.NextTurnAt(c, here) : 0;
+                bool outsideCar = bend != 0 && Mathf.Sign(side.Lateral - me.Lateral) == -bend && (!PathChooser.SideOweOnly || chooser?.Chosen != null && chooser.Chosen.Owe);
+                // The inside car, level with the outside one, likewise keeps its tight line, owed its room: steering parallel to a car turning in cuts it off the inside of the track (Ivan).
+                bool insideCar = PathChooser.SideInside && bend != 0 && Mathf.Sign(side.Lateral - me.Lateral) == bend && Mathf.Abs(Mathf.Repeat(side.Distance - me.Distance + 0.5f * lap, lap) - 0.5f * lap) < CarLength;
+                if (Experiments.Is(PathChooser.Experiment) && PathChooser.SideImminent > 0f && (outsideCar || insideCar))
+                    reach = PathChooser.SideImminent;
                 if (d < reach && diffAngle * (side.Lateral - me.Lateral) < 0f)
                 {
                     float cc = reach / 2f;

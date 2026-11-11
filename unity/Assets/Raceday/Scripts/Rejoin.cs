@@ -115,6 +115,8 @@ namespace TarmacGauntlet.Raceday
         public const float StoppedSpeed = 0.5f;
         /// <summary>Back to racing once on the tarmac, this close to the racing line and facing along it, metres.</summary>
         public const float OnLine = 1f;
+        /// <summary>How far off the racing line the alternative line runs, m: a car's width and a gap clear of a car on the line (H12).</summary>
+        public const float AltClear = Racecraft.CarWidth + 0.3f + 1f;
         /// <summary>The runoff's grip relative to tarmac: gravel's, the worst of it.</summary>
         public const float RunoffGrip = 0.5f;
         /// <summary>A car leaving the runoff waits while a car coming couldn't brake to its speed in the room, with this many seconds to spare.</summary>
@@ -421,6 +423,14 @@ namespace TarmacGauntlet.Raceday
             Vector3 lt = line.Tangent[k];
             float lineAngle = Mathf.Atan2(Vector3.Dot(lt, circuit.Left[k]), Vector3.Dot(lt, circuit.Forward[k]));
             float fromLine = lateral - line.Lateral[k];
+            if (Experiments.Is(1))
+            {
+                // H12: it heads for the alternative line, clear of the racing line on its own side, and keeps
+                // to it until back up to speed (Ivan). Where the line runs by that edge, it keeps to the edge.
+                float s = Mathf.Abs(fromLine) > 0.5f ? Mathf.Sign(fromLine) : -Mathf.Sign(line.Lateral[k]);
+                float edge = Mathf.Max(half - RacingLine.EdgeMargin, 0f);
+                fromLine = lateral - Mathf.Clamp(line.Lateral[k] + s * AltClear, -edge, edge);
+            }
             // Far out on the runoff it may head back more steeply, easing to the aim by the edge.
             float far = Mathf.Clamp01((PastEdge - NearEdge) / (FarEdge - NearEdge));
             float limit = EntryLimit(pilot, half, speed);
@@ -519,7 +529,8 @@ namespace TarmacGauntlet.Raceday
                 float left = speed < SpinSpeed ? 1f : Mathf.Sqrt(Mathf.Max(1f - turning * turning, 0f));
                 if (Mathf.Abs(slide) > SlideLimit * Mathf.Deg2Rad) left = 0f;
                 c.Brake = Mathf.Min(c.Brake, left * RunoffBraking * grip / (spec.BrakeDecel * 9.81f));
-                c.Throttle *= Mathf.Max(left, 0.15f) * RunoffThrottle;
+                // Getting straight back on without waiting, it floors it as far as the runoff's grip allows (Ivan).
+                c.Throttle *= Mathf.Max(left, 0.15f) * (Experiments.Is(1) || Experiments.Is(2) ? 1f : RunoffThrottle);
             }
             else
             {

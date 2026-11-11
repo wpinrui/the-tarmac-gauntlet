@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using TarmacGauntlet.Career;
 using TarmacGauntlet.Simulation;
 using UnityEngine;
 using UnityEngine.UIElements;
+using static TarmacGauntlet.Management.MenuKit;
 
 namespace TarmacGauntlet.Management
 {
@@ -14,7 +14,7 @@ namespace TarmacGauntlet.Management
     /// lineup, starter first, and dragging one reorders it. Below them the market can be searched, filtered and
     /// sorted, and the box at the bottom shows the selected driver with Hire, Buy out or Release.
     /// </summary>
-    public sealed class DriversPanel : MonoBehaviour
+    public sealed class DriversPanel : MenuPanel
     {
         public const string Slug = "drivers";
         private const int MaxDrivers = 4;
@@ -45,10 +45,9 @@ namespace TarmacGauntlet.Management
             public int Stat(int index) => index < 0 ? Ovr : Stats[index];
         }
 
-        private Menus menus;
         private const float StatMenuWidth = 180;
 
-        private VisualElement body, roster, detail, statHeader, statMenu;
+        private VisualElement roster, detail, statHeader, statMenu;
         private Label statLabel, ageHeader, salaryHeader;
         private ListView list;
         private TextField search;
@@ -65,51 +64,43 @@ namespace TarmacGauntlet.Management
         private string dragging;
         private Vector2 dragFrom;
 
-        private void Awake()
+        /// <summary>Opens the screen on one driver, clearing any filter that would hide them in the market.</summary>
+        internal static void Show(Menus menus, string driverId)
         {
-            menus = GetComponent<Menus>();
-            menus.ScreenOpened += Opened;
-            GameSession.Changed += OnChanged;
+            DriversPanel panel = menus.GetComponent<DriversPanel>();
+            panel.selected = driverId;
+            panel.contractLength = 3;
+            panel.freeOnly = panel.affordableOnly = false;
+            panel.focus = true;
+            menus.Open(Slug);
         }
 
-        private void OnDestroy()
-        {
-            menus.ScreenOpened -= Opened;
-            GameSession.Changed -= OnChanged;
-        }
+        private bool focus;
 
-        private void Opened(string slug, VisualElement panelBody)
+        protected override bool Shows(string slug) => slug == Slug;
+
+        protected override void OnOpened() => Build();
+
+        protected override void Render()
         {
-            body = slug == Slug ? panelBody : null;
-            if (body == null) return;
-            Build();
             Refresh();
+            if (!focus) return;
+            focus = false;
+            int at = market.FindIndex(e => e.Id == selected);
+            if (at >= 0) list.schedule.Execute(() => list.ScrollToItem(at));
         }
-
-        private void OnChanged(GameState _)
-        {
-            if (body != null && body.panel != null) Refresh();
-        }
-
-        private static PlayerTeam Player => GameSession.State?.Teams.OfType<PlayerTeam>().FirstOrDefault();
 
         // ------------------------------------------------------------------ building
 
         private void Build()
         {
-            body.Add(menus.Text("DRIVING ORDER", "section-label"));
-            roster = new VisualElement();
-            roster.AddToClassList("roster");
-            body.Add(roster);
+            Body.Add(Section("Driving order"));
+            roster = Box("roster");
+            Body.Add(roster);
 
-            var tools = new VisualElement();
-            tools.AddToClassList("tools");
-            var searchBox = new VisualElement();
-            searchBox.AddToClassList("search");
-            var glass = new VisualElement { pickingMode = PickingMode.Ignore };
-            glass.AddToClassList("search-icon");
-            glass.style.backgroundImage = Resources.Load<Texture2D>("MenuIcons/search");
-            searchBox.Add(glass);
+            VisualElement tools = Box("tools");
+            VisualElement searchBox = Box("search");
+            searchBox.Add(Icon("search", "search-icon"));
             search = new TextField();
             search.AddToClassList("search-field");
             search.RegisterValueChangedCallback(_ => RebuildList(true));
@@ -119,56 +110,47 @@ namespace TarmacGauntlet.Management
             cheapChip = Chip("Affordable", () => { affordableOnly = !affordableOnly; RebuildList(true); });
             tools.Add(freeChip);
             tools.Add(cheapChip);
-            body.Add(tools);
+            Body.Add(tools);
 
-            var header = new VisualElement();
-            header.AddToClassList("list-head");
-            header.Add(Cell(new VisualElement(), "c-name"));
-            header.Add(Cell(new VisualElement(), "c-team"));
-            ageHeader = menus.Text("AGE", "head");
+            ageHeader = Head("AGE", "c-age");
+            ageHeader.AddToClassList("sort");
             ageHeader.RegisterCallback<ClickEvent>(_ => SortBy(Sort.Age));
-            header.Add(Cell(ageHeader, "c-age"));
-            statHeader = new VisualElement();
-            statHeader.AddToClassList("stat-head");
-            statLabel = menus.Text("", "head");
-            statLabel.AddToClassList("stat-name");
+            statHeader = Box("c-stat", "stat-head");
+            statLabel = Head("", "sort");
             statLabel.pickingMode = PickingMode.Ignore;
             statHeader.Add(statLabel);
-            var caret = new VisualElement { pickingMode = PickingMode.Ignore };
-            caret.AddToClassList("caret");
-            caret.style.backgroundImage = Resources.Load<Texture2D>("MenuIcons/chevron-down");
-            statHeader.Add(caret);
+            statHeader.Add(Icon("chevron-down", "caret"));
             statHeader.RegisterCallback<ClickEvent>(_ => ToggleStatMenu());
-            header.Add(Cell(statHeader, "c-stat"));
-            salaryHeader = menus.Text("SALARY", "head");
+            salaryHeader = Head("SALARY", "c-salary");
+            salaryHeader.AddToClassList("sort");
             salaryHeader.RegisterCallback<ClickEvent>(_ => SortBy(Sort.Salary));
-            header.Add(Cell(salaryHeader, "c-salary"));
-            body.Add(header);
+            Body.Add(HeadRow(Fill(), Box("c-team"), ageHeader, statHeader, salaryHeader));
 
             list = new ListView
             {
-                fixedItemHeight = 35,
+                fixedItemHeight = 36,
                 virtualizationMethod = CollectionVirtualizationMethod.FixedHeight,
                 selectionType = SelectionType.None,
                 itemsSource = market,
                 makeItem = MakeRow,
                 bindItem = BindRow,
             };
-            list.AddToClassList("market");
+            list.AddToClassList("list");
             list.Q<ScrollView>().verticalScrollerVisibility = ScrollerVisibility.Hidden;
             list.Q<ScrollView>().horizontalScrollerVisibility = ScrollerVisibility.Hidden;
-            body.Add(list);
+            list.RegisterCallback<DetachFromPanelEvent>(_ => CloseStatMenu());
+            Body.Add(list);
 
-            detail = new VisualElement();
-            detail.AddToClassList("detail");
-            menus.SideBody.Add(detail);
+            detail = Box("detail");
+            Menus.SideBody.Add(detail);
 
-            statMenu = new VisualElement();
-            statMenu.AddToClassList("stat-menu");
+            statMenu?.RemoveFromHierarchy();
+            statMenu = Box("popup");
+            statMenu.style.width = StatMenuWidth;
             for (int i = -1; i < StatNames.Length; i++)
             {
                 int pick = i;
-                Label item = menus.Text(i < 0 ? "OVR" : StatNames[i].ToUpperInvariant(), "stat-menu-item");
+                Label item = Text(i < 0 ? "OVR" : StatNames[i].ToUpperInvariant(), "popup-item");
                 item.userData = pick;
                 item.RegisterCallback<ClickEvent>(e =>
                 {
@@ -178,9 +160,9 @@ namespace TarmacGauntlet.Management
                 statMenu.Add(item);
             }
             statMenu.style.display = DisplayStyle.None;
-            body.Add(statMenu);
+            Menus.Popups.Add(statMenu);
             // A press anywhere else closes the stat menu.
-            body.RegisterCallback<PointerDownEvent>(e =>
+            Body.RegisterCallback<PointerDownEvent>(e =>
             {
                 if (statMenu.style.display == DisplayStyle.None) return;
                 var target = e.target as VisualElement;
@@ -189,33 +171,25 @@ namespace TarmacGauntlet.Management
             }, TrickleDown.TrickleDown);
         }
 
-        private static VisualElement Cell(VisualElement content, string cls)
-        {
-            content.AddToClassList("cell");
-            content.AddToClassList(cls);
-            return content;
-        }
-
         private VisualElement Chip(string text, Action onClick)
         {
-            Label chip = menus.Text(text.ToUpperInvariant(), "chip");
+            Label chip = Text(text.ToUpperInvariant(), "chip");
             chip.RegisterCallback<ClickEvent>(_ => onClick());
             return chip;
         }
 
         private VisualElement MakeRow()
         {
-            var row = new VisualElement();
-            row.AddToClassList("market-row");
-            row.Add(Cell(menus.Text("", "r-name"), "c-name"));
-            row.Add(Cell(menus.Text("", "r-team"), "c-team"));
-            row.Add(Cell(menus.Text("", "r-age"), "c-age"));
-            row.Add(Cell(menus.Text("", "r-stat", true), "c-stat"));
-            row.Add(Cell(menus.Text("", "r-salary"), "c-salary"));
-            row.RegisterCallback<ClickEvent>(_ =>
+            VisualElement row = null;
+            row = Row(() =>
             {
                 if (row.userData is string id) Select(id);
             });
+            row.Add(Cell("", "fill", true));
+            row.Add(Cell("", "c-team"));
+            row.Add(Cell("", "c-age"));
+            row.Add(Cell("", "c-stat", true));
+            row.Add(Cell("", "c-salary"));
             return row;
         }
 
@@ -223,16 +197,14 @@ namespace TarmacGauntlet.Management
         {
             Entry e = market[index];
             row.userData = e.Id;
-            row.EnableInClassList("sel", e.Id == selected);
-            row.EnableInClassList("contracted", e.Contract != null);
-            row.Q<Label>(className: "r-name").text = e.Name;
-            row.Q<Label>(className: "r-team").text = e.TeamName ?? "";
-            row.Q<Label>(className: "r-age").text = e.Age.ToString(CultureInfo.InvariantCulture);
-            Label value = row.Q<Label>(className: "r-stat");
+            row.EnableInClassList("on", e.Id == selected);
+            row.EnableInClassList("out", e.Contract != null);
+            row.Q<Label>(className: "fill").text = e.Name;
+            row.Q<Label>(className: "c-team").text = e.TeamName ?? "";
+            row.Q<Label>(className: "c-age").text = Num(e.Age);
             int v = e.Stat(stat);
-            value.text = v.ToString(CultureInfo.InvariantCulture);
-            Band(value, v, "v");
-            row.Q<Label>(className: "r-salary").text = Menus.Money(e.Salary);
+            Banded(row.Q<Label>(className: "c-stat"), v).text = Num(v);
+            row.Q<Label>(className: "c-salary").text = Money(e.Salary);
         }
 
         // ------------------------------------------------------------------ game data
@@ -265,7 +237,7 @@ namespace TarmacGauntlet.Management
                 };
             }
 
-            PlayerTeam p = game.Teams.OfType<PlayerTeam>().First();
+            PlayerTeam p = Player;
             int own = p.Skills.Driver * 5;
             entries[You] = new Entry { Id = You, Name = p.PlayerName, Stats = Enumerable.Repeat(own, 5).ToArray(), Ovr = own };
             return entries;
@@ -324,8 +296,7 @@ namespace TarmacGauntlet.Management
             IReadOnlyList<string> lineup = DriverLineup.Of(game);
             for (int i = 0; i < MaxDrivers; i++)
             {
-                var slot = new VisualElement();
-                slot.AddToClassList("slot");
+                VisualElement slot = Box("tile", "slot");
                 if (i == MaxDrivers - 1) slot.AddToClassList("last");
                 if (i >= lineup.Count || !all.TryGetValue(lineup[i], out Entry e))
                 {
@@ -334,20 +305,13 @@ namespace TarmacGauntlet.Management
                     continue;
                 }
                 slot.userData = e.Id;
-                slot.EnableInClassList("sel", e.Id == selected);
-                var top = new VisualElement();
-                top.AddToClassList("slot-top");
-                top.Add(menus.Text(e.Id == You ? "YOU" : e.Name.ToUpperInvariant(), "slot-name"));
-                var grip = new VisualElement { pickingMode = PickingMode.Ignore };
-                grip.AddToClassList("grip");
-                grip.style.backgroundImage = Resources.Load<Texture2D>("MenuIcons/grip");
-                top.Add(grip);
+                slot.EnableInClassList("on", e.Id == selected);
+                VisualElement top = Box("tile-head");
+                top.Add(Text(e.Id == You ? "YOU" : e.Name.ToUpperInvariant(), "slot-name"));
+                top.Add(Icon("grip", "grip"));
                 slot.Add(top);
-                var line = new VisualElement();
-                line.AddToClassList("slot-line");
-                Label ovr = menus.Text(e.Ovr.ToString(CultureInfo.InvariantCulture), "slot-ovr", true);
-                Band(ovr, e.Ovr, "v");
-                line.Add(ovr);
+                VisualElement line = Box("tile-line");
+                line.Add(Banded(Text(Num(e.Ovr), "tile-value", true), e.Ovr));
                 if (e.Contract != null) line.Add(Pips(e.Contract.RemainingYears));
                 slot.Add(line);
                 Draggable(slot);
@@ -362,51 +326,37 @@ namespace TarmacGauntlet.Management
             if (p == null || !all.TryGetValue(selected, out Entry e)) return;
             bool full = DriverLineup.Of(GameSession.State).Count >= MaxDrivers;
 
-            var head = new VisualElement();
-            head.AddToClassList("detail-head");
-            var who = new VisualElement();
-            who.Add(menus.Text(e.Name.ToUpperInvariant(), "detail-name", true));
+            VisualElement head = Box("detail-head");
+            VisualElement who = Box();
+            who.Add(Text(e.Name.ToUpperInvariant(), "detail-name", true));
             if (e.Id != You)
             {
-                var meta = new VisualElement();
-                meta.AddToClassList("detail-meta");
-                meta.Add(menus.Text("AGE " + e.Age.ToString(CultureInfo.InvariantCulture), "meta-item"));
-                if (e.TeamName != null) meta.Add(menus.Text(e.TeamName.ToUpperInvariant(), "meta-item"));
+                VisualElement meta = Box("detail-meta");
+                meta.Add(Text("AGE " + Num(e.Age), "meta-item"));
+                if (e.TeamName != null) meta.Add(Text(e.TeamName.ToUpperInvariant(), "meta-item"));
                 if (e.Contract != null) meta.Add(Pips(e.Contract.RemainingYears));
                 who.Add(meta);
             }
             head.Add(who);
-            Label big = menus.Text(e.Ovr.ToString(CultureInfo.InvariantCulture), "detail-ovr", true);
-            Band(big, e.Ovr, "v");
-            head.Add(big);
+            head.Add(Banded(Text(Num(e.Ovr), "detail-big", true), e.Ovr));
             detail.Add(head);
 
-            var stats = new VisualElement();
-            stats.AddToClassList("stats");
+            VisualElement stats = Box("stats");
             for (int i = 0; i < StatNames.Length; i++)
-            {
-                var row = new VisualElement();
-                row.AddToClassList("stat-row");
-                Label name = menus.Text(StatNames[i].ToUpperInvariant(), "stat-label");
-                menus.Tooltip(name, StatTips[i]);
-                row.Add(name);
-                row.Add(Bar(e.Stats[i]));
-                row.Add(menus.Text(e.Stats[i].ToString(CultureInfo.InvariantCulture), "stat-value", true));
-                stats.Add(row);
-            }
+                stats.Add(StatRow(Tips, StatNames[i], StatTips[i], Bar(e.Stats[i]), Num(e.Stats[i])));
             detail.Add(stats);
 
             if (e.Id == You) return;
             if (e.Mine)
             {
-                detail.Add(GhostButton("Release", () => Act(g => GameActions.ReleaseDriver(g, e.Id))));
+                detail.Add(GhostButton("Release", "panel-button", () => Act(g => GameActions.ReleaseDriver(g, e.Id))));
                 return;
             }
             if (e.Contract != null)
             {
                 double cost = DriverLifecycle.CalculateBuyoutCost(e.Contract);
                 bool can = !full && p.Budget >= cost;
-                VisualElement buy = menus.RedButton("Buy out " + Menus.Money(cost), "panel-button", () =>
+                VisualElement buy = RedButton("Buy out " + Money(cost), "panel-button", () =>
                 {
                     if (can) Act(g => GameActions.BuyoutDriver(g, e.Id, e.Name, cost));
                 });
@@ -415,17 +365,12 @@ namespace TarmacGauntlet.Management
                 return;
             }
 
-            var options = new VisualElement();
-            options.AddToClassList("contract");
+            var options = new List<VisualElement>();
             for (int len = 1; len <= 3; len++)
             {
                 int l = len;
-                var opt = new VisualElement();
-                opt.AddToClassList("option");
-                if (len == 3) opt.AddToClassList("last");
-                opt.EnableInClassList("sel", len == contractLength);
-                opt.Add(menus.Text(len == 1 ? "1 YEAR" : len + " YEARS", "option-label"));
-                opt.Add(menus.Text(Menus.Money(DriverLifecycle.CalculateContractSalary(e.Salary, len, p.Skills.Business)), "option-price", true));
+                VisualElement opt = Tile(len == 1 ? "1 year" : Num(len) + " years", null, "click", len == contractLength ? "on" : null);
+                opt.Add(Text(Money(DriverLifecycle.CalculateContractSalary(e.Salary, len, p.Skills.Business)), "tile-value", true));
                 opt.RegisterCallback<ClickEvent>(_ =>
                 {
                     contractLength = l;
@@ -433,60 +378,16 @@ namespace TarmacGauntlet.Management
                 });
                 options.Add(opt);
             }
-            detail.Add(options);
+            detail.Add(Tiles(options));
             double salary = DriverLifecycle.CalculateContractSalary(e.Salary, contractLength, p.Skills.Business);
             bool canHire = !full && p.Budget >= salary;
             int length = contractLength;
-            VisualElement hire = menus.RedButton("Hire", "panel-button", () =>
+            VisualElement hire = RedButton("Hire", "panel-button", () =>
             {
                 if (canHire) Act(g => GameActions.HireDriver(g, e.Id, e.Name, length, salary));
             });
             hire.EnableInClassList("disabled", !canHire);
             detail.Add(hire);
-        }
-
-        private VisualElement GhostButton(string text, Action onClick)
-        {
-            var button = new VisualElement();
-            button.AddToClassList("ghost-button");
-            Label label = menus.Text(text.ToUpperInvariant(), "ghost-label", true);
-            label.pickingMode = PickingMode.Ignore;
-            button.Add(label);
-            button.RegisterCallback<ClickEvent>(_ => onClick());
-            return button;
-        }
-
-        private static VisualElement Bar(int value)
-        {
-            var bar = new VisualElement();
-            bar.AddToClassList("stat-bar");
-            var fill = new VisualElement { pickingMode = PickingMode.Ignore };
-            fill.AddToClassList("stat-fill");
-            fill.style.width = Length.Percent(Mathf.Clamp(value, 0, 100));
-            Band(fill, value, "f");
-            bar.Add(fill);
-            return bar;
-        }
-
-        private static VisualElement Pips(int count)
-        {
-            var pips = new VisualElement();
-            pips.AddToClassList("pips");
-            for (int i = 0; i < count; i++)
-            {
-                var pip = new VisualElement();
-                pip.AddToClassList("pip");
-                pips.Add(pip);
-            }
-            return pips;
-        }
-
-        /// <summary>Green at 60 or more, amber from 50 to 59, red below 50; "v" colours text, "f" colours a fill.</summary>
-        private static void Band(VisualElement e, int value, string kind)
-        {
-            e.EnableInClassList(kind + "-hi", value >= 60);
-            e.EnableInClassList(kind + "-mid", value >= 50 && value < 60);
-            e.EnableInClassList(kind + "-lo", value < 50);
         }
 
         // ------------------------------------------------------------------ actions
@@ -497,7 +398,7 @@ namespace TarmacGauntlet.Management
             selected = id;
             contractLength = 3;
             foreach (VisualElement slot in roster.Children())
-                slot.EnableInClassList("sel", slot.userData as string == id);
+                slot.EnableInClassList("on", slot.userData as string == id);
             list.RefreshItems();
             RenderDetail();
         }
@@ -518,13 +419,17 @@ namespace TarmacGauntlet.Management
             }
             foreach (VisualElement item in statMenu.Children())
                 item.EnableInClassList("on", item.userData is int i && i == stat);
-            Rect r = statHeader.ChangeCoordinatesTo(body, statHeader.contentRect);
-            statMenu.style.left = Mathf.Round(r.xMax + 20 - StatMenuWidth);
-            statMenu.style.top = Mathf.Round(r.yMax + 4);
+            Rect r = statHeader.worldBound;
+            Vector2 at = Menus.Popups.WorldToLocal(new Vector2(r.xMax, r.yMax));
+            statMenu.style.left = Mathf.Round(at.x + 20 - StatMenuWidth);
+            statMenu.style.top = Mathf.Round(at.y + 4);
             statMenu.style.display = DisplayStyle.Flex;
         }
 
-        private void CloseStatMenu() => statMenu.style.display = DisplayStyle.None;
+        private void CloseStatMenu()
+        {
+            if (statMenu != null) statMenu.style.display = DisplayStyle.None;
+        }
 
         private void PickStat(int pick)
         {

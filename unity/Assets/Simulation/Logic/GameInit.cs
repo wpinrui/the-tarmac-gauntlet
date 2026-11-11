@@ -100,7 +100,7 @@ namespace TarmacGauntlet.Simulation
             "Ortiz", "Park", "Rivera", "Silva", "Tanaka", "Uribe", "Volkov", "Walsh",
         };
 
-        private static readonly string[] Nationalities =
+        public static readonly string[] Nationalities =
         {
             "br", "jp", "mx", "gb", "se", "fr", "gh", "ru", "in", "de",
             "es", "it", "kr", "nl", "au", "ca", "ar", "cl", "no", "fi",

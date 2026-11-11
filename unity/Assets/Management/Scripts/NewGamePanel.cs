@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using TarmacGauntlet.Simulation;
 using UnityEngine;
 using UnityEngine.UIElements;
+using static TarmacGauntlet.Management.MenuKit;
 
 namespace TarmacGauntlet.Management
 {
@@ -12,12 +12,11 @@ namespace TarmacGauntlet.Management
     /// The new game panel over the empty garage: team name and badge, the player's name and nationality, and the
     /// starting skill points. Start builds the career and opens the hub. Unspent points are forfeited, so Start asks first.
     /// </summary>
-    public sealed class NewGamePanel : MonoBehaviour
+    public sealed class NewGamePanel : MenuPanel
     {
         private const int MaxName = 28;
 
-        private Menus menus;
-        private VisualElement body, big, shapes, colours, pips, skills, start, countries;
+        private VisualElement big, shapes, colours, skills, start, countries;
         private TextField team, player, nation;
         private ScrollView countryList;
 
@@ -26,29 +25,24 @@ namespace TarmacGauntlet.Management
         private readonly List<(string Code, string Name)> matches = new List<(string Code, string Name)>();
         private int highlight;
 
-        private void Awake()
-        {
-            menus = GetComponent<Menus>();
-            menus.ScreenOpened += Opened;
-        }
+        protected override bool Shows(string slug) => slug == Menus.NewGameSlug;
 
-        private void OnDestroy()
-        {
-            menus.ScreenOpened -= Opened;
-        }
+        protected override bool FollowsGame => false;
 
-        private void Opened(string slug, VisualElement panelBody)
+        protected override void OnOpened()
         {
-            body = slug == Menus.NewGameSlug ? panelBody : null;
-            if (body == null) return;
             shape = Badges.Shapes[0];
             colour = Badges.Colours[0];
             nationality = null;
-            foreach ((PlayerSkillType type, _, _) in RaceSummaryScreen.Skills) levels[type] = 0;
+            foreach ((PlayerSkillType type, _, _) in Skills) levels[type] = 0;
             Build();
+            team.schedule.Execute(() => team.Focus());
+        }
+
+        protected override void Render()
+        {
             RenderBadge();
             RenderSkills();
-            team.schedule.Execute(() => team.Focus());
         }
 
         private int Left => GameInit.StartingSkillPoints - levels.Values.Sum();
@@ -58,7 +52,7 @@ namespace TarmacGauntlet.Management
         private void Build()
         {
             // Team: the badge preview beside the name, shapes and colours.
-            VisualElement teamBox = Box("ng-team");
+            VisualElement teamBox = Group("ng-team");
             big = new VisualElement();
             big.AddToClassList("ng-big");
             var bigBadge = new VisualElement { pickingMode = PickingMode.Ignore };
@@ -106,10 +100,10 @@ namespace TarmacGauntlet.Management
             }
             column.Add(colours);
             teamBox.Add(column);
-            body.Add(teamBox);
+            Body.Add(teamBox);
 
             // Player: name and nationality.
-            VisualElement playerBox = Box("ng-player");
+            VisualElement playerBox = Group("ng-player");
             player = Field("Your name", "ng-half");
             player.RegisterValueChangedCallback(_ => RenderStart());
             playerBox.Add(player);
@@ -117,30 +111,18 @@ namespace TarmacGauntlet.Management
             nation.AddToClassList("last");
             BuildNationality();
             playerBox.Add(nation);
-            body.Add(playerBox);
+            Body.Add(playerBox);
             team.RegisterValueChangedCallback(_ => RenderStart());
 
             // Skills: the points left as pips, then each skill's level.
-            VisualElement skillBox = Box("ng-skills");
-            pips = new VisualElement();
-            pips.AddToClassList("ng-pips");
-            skillBox.Add(pips);
-            skills = new VisualElement();
-            skills.AddToClassList("ng-skill-row");
-            skillBox.Add(skills);
-            body.Add(skillBox);
+            skills = Group("ng-skills");
+            Body.Add(skills);
 
-            start = menus.RedButton("Start", "panel-button", PressStart);
-            body.Add(start);
+            start = RedButton("Start", "panel-button", PressStart);
+            Body.Add(start);
         }
 
-        private static VisualElement Box(string cls)
-        {
-            var box = new VisualElement();
-            box.AddToClassList("ng-box");
-            box.AddToClassList(cls);
-            return box;
-        }
+        private static VisualElement Group(string cls) => Box("inset", cls);
 
         private TextField Field(string placeholder, string cls)
         {
@@ -156,15 +138,11 @@ namespace TarmacGauntlet.Management
         /// <summary>Typing filters the countries, names that start with the text first. Arrows and Enter pick one.</summary>
         private void BuildNationality()
         {
-            countries = new VisualElement();
-            countries.AddToClassList("ng-countries");
-            countryList = new ScrollView(ScrollViewMode.Vertical);
-            countryList.AddToClassList("ng-country-list");
-            countryList.verticalScrollerVisibility = ScrollerVisibility.Hidden;
-            countryList.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
+            countries = Box("popup", "ng-countries");
+            countryList = Scroll("popup-list");
             countries.Add(countryList);
             countries.style.display = DisplayStyle.None;
-            menus.Popups.Add(countries);
+            Menus.Popups.Add(countries);
 
             nation.RegisterCallback<FocusInEvent>(_ =>
             {
@@ -207,7 +185,7 @@ namespace TarmacGauntlet.Management
             countryList.Clear();
             foreach ((string Code, string Name) c in matches)
             {
-                Label item = menus.Text(c.Name, "ng-country");
+                Label item = Text(c.Name, "popup-item");
                 item.RegisterCallback<PointerDownEvent>(e =>
                 {
                     e.StopPropagation();
@@ -246,7 +224,7 @@ namespace TarmacGauntlet.Management
                 return;
             }
             Rect r = nation.worldBound;
-            Vector2 at = menus.Popups.WorldToLocal(new Vector2(r.xMin, r.yMax));
+            Vector2 at = Menus.Popups.WorldToLocal(new Vector2(r.xMin, r.yMax));
             countries.style.left = Mathf.Round(at.x);
             countries.style.top = Mathf.Round(at.y + 4);
             countries.style.width = Mathf.Round(r.width);
@@ -266,62 +244,15 @@ namespace TarmacGauntlet.Management
 
         private void RenderSkills()
         {
-            menus.HideTooltip();
-            pips.Clear();
-            for (int i = 0; i < GameInit.StartingSkillPoints; i++)
-            {
-                var pip = new VisualElement { pickingMode = PickingMode.Ignore };
-                pip.AddToClassList("rs-pip");
-                pip.AddToClassList("ng-pip");
-                pip.EnableInClassList("used", i >= Left);
-                pips.Add(pip);
-            }
-
+            Tips.Hide();
             skills.Clear();
-            foreach ((PlayerSkillType type, string name, string tip) in RaceSummaryScreen.Skills)
-            {
-                int level = levels[type];
-                var skill = new VisualElement();
-                skill.AddToClassList("rs-skill");
-                var head = new VisualElement();
-                head.AddToClassList("ng-skill-head");
-                head.Add(menus.Text(name.ToUpperInvariant(), "rs-skill-name"));
-                var info = new VisualElement();
-                info.AddToClassList("ng-info");
-                var infoImage = new VisualElement { pickingMode = PickingMode.Ignore };
-                infoImage.AddToClassList("ng-info-image");
-                infoImage.style.backgroundImage = Resources.Load<Texture2D>("MenuIcons/info");
-                info.Add(infoImage);
-                menus.Tooltip(info, tip);
-                head.Add(info);
-                skill.Add(head);
-                var row = new VisualElement();
-                row.AddToClassList("rs-level");
-                row.Add(Step("minus", level > 0, () => Spend(type, -1)));
-                row.Add(menus.Text(level.ToString(CultureInfo.InvariantCulture), "rs-skill-value", true));
-                row.Add(Step("plus", Left > 0 && level < RaceSummaryScreen.MaxSkill, () => Spend(type, 1)));
-                skill.Add(row);
-                skills.Add(skill);
-            }
+            skills.Add(SkillPicker(Tips, GameInit.StartingSkillPoints, Left, t => levels[t], _ => 0, Spend));
             RenderStart();
-        }
-
-        private static VisualElement Step(string icon, bool on, Action onClick)
-        {
-            var button = new VisualElement();
-            button.AddToClassList("rs-step");
-            var image = new VisualElement { pickingMode = PickingMode.Ignore };
-            image.AddToClassList("rs-step-icon");
-            image.style.backgroundImage = Resources.Load<Texture2D>("MenuIcons/" + icon);
-            button.Add(image);
-            button.style.visibility = on ? Visibility.Visible : Visibility.Hidden;
-            button.RegisterCallback<ClickEvent>(_ => onClick());
-            return button;
         }
 
         private void Spend(PlayerSkillType type, int points)
         {
-            levels[type] = Mathf.Clamp(levels[type] + points, 0, RaceSummaryScreen.MaxSkill);
+            levels[type] = Mathf.Clamp(levels[type] + points, 0, MaxSkill);
             RenderSkills();
         }
 
@@ -340,15 +271,15 @@ namespace TarmacGauntlet.Management
                 return;
             }
             int left = Left;
-            menus.Dialog(dialogBody =>
+            Menus.Dialog(dialogBody =>
             {
-                dialogBody.Add(menus.Text(left.ToString(CultureInfo.InvariantCulture) + " UNSPENT SKILL POINTS", "dialog-title", true));
+                dialogBody.Add(Text(Num(left) + " UNSPENT SKILL POINTS", "dialog-title", true));
             }, "Cancel", "Start", Begin);
         }
 
         private void Begin()
         {
-            menus.StartCareer(new NewGameOptions
+            Menus.StartCareer(new NewGameOptions
             {
                 PlayerName = player.value.Trim(),
                 Nationality = nationality,
