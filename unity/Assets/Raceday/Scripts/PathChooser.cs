@@ -33,8 +33,8 @@ namespace TarmacGauntlet.Raceday
         /// <summary>How far past the paths' ends the lane they end in is costed, m.</summary>
         private const float TailLook = 300f;
         private const float G = 9.81f;
-        /// <summary>Seconds a metre off the racing line costs on top of its lane's speeds, so a car alone keeps to the line.</summary>
-        private const float OffLineCost = 0.01f;
+        /// <summary>Seconds a metre off the racing line costs on top of its lane's speeds: a car clear of traffic gets back on the line, rather than leave the door open (Ivan).</summary>
+        private const float OffLineCost = 0.05f;
         /// <summary>Seconds of the car's own speed kept as a gap nose to tail, on top of the margin.</summary>
         private static readonly float Headway = Knob("HEAD", 0.15f);
         /// <summary>The headway kept on lap one and from a few seconds before a corner, when cars ahead brake hard; below 0, <see cref="Headway"/> throughout.</summary>
@@ -71,6 +71,8 @@ namespace TarmacGauntlet.Raceday
         /// <summary>The nearest car ahead not quite in this car's lane, which braking slows for when none is.</summary>
         private int aheadWide = -1;
         private static readonly float FallBehind = Knob("FALLBEHIND", 0f), WideAhead = Knob("WIDE", 3f), ZoneSwitch = Knob("ZSWITCH", 0f), SideSwitch = Knob("SSWITCH", 0.3f), ZoneHyst = Knob("ZHYST", 0f);
+        /// <summary>Share of the side risk a car further back than <see cref="BehindFrom"/> car lengths carries: one behind is its own to miss.</summary>
+        private static readonly float BehindRisk = Knob("BRISK", 0f), BehindFrom = Knob("BFROM", 0.5f), ToLine = Knob("TOLINE", 1f), OffLine = Knob("OFFLINE", OffLineCost);
         /// <summary>Score per second a pull-out waits: of two near-equal moves, the later one, so the car stays in the tow until it must move.</summary>
         private static readonly float LateBonus = Knob("LATE", 0.1f);
         /// <summary>Side-to-side gap H1 keeps to a car alongside, m.</summary>
@@ -218,7 +220,7 @@ namespace TarmacGauntlet.Raceday
                     else if (defending && !exempt && !zone && away && (movePhase == 2 || movePhase == 1 && Mathf.Sign(cand.Shift - myOffset) != moveDir)) cand.Rejected = "H4";
                     Simulate(pilot, me, cand, ahead, nextTurn, margin, brakes, riskWeight, passCost, freeSpeed);
                     // A little against changing its mind, so it doesn't dither between two near-equal paths.
-                    cand.Score -= (zone ? Hysteresis + ZoneHyst : Hysteresis) * Mathf.Abs(cand.Shift - lastShift) + (cand.Pedal != lastPedal ? 0.01f : 0f) + OffLineCost * Mathf.Abs(cand.Shift);
+                    cand.Score -= (zone ? Hysteresis + ZoneHyst : Hysteresis) * LineChange(cand.Shift, lastShift) + (cand.Pedal != lastPedal ? 0.01f : 0f) + OffLine * Mathf.Abs(cand.Shift);
                     // Changing sides of the car ahead mid-move weaves across the cars behind: only for a clearly better path.
                     if (Mathf.Abs(cand.Shift) > 1f && Mathf.Abs(lastShift) > 1f && Mathf.Sign(cand.Shift) != Mathf.Sign(lastShift)) cand.Score -= SideSwitch;
                     // Once braking for a car in the braking zone, it stays on the brakes rather than flick back on the throttle.
@@ -232,7 +234,7 @@ namespace TarmacGauntlet.Raceday
                         if (lapped && !zone && Mathf.Abs(later.Shift) < 1.5f) later.Rejected = "H9";
                         else later.Rejected = cand.Rejected;
                         Simulate(pilot, me, later, ahead, nextTurn, margin, brakes, riskWeight, passCost, freeSpeed);
-                        later.Score -= (zone ? Hysteresis + ZoneHyst : Hysteresis) * Mathf.Abs(later.Shift - lastShift) + OffLineCost * Mathf.Abs(later.Shift);
+                        later.Score -= (zone ? Hysteresis + ZoneHyst : Hysteresis) * LineChange(later.Shift, lastShift) + OffLine * Mathf.Abs(later.Shift);
                         Candidates.Add(later);
                     }
                     // In the tow on a straight, of near-equal moves the later one wins, while a still later one
@@ -423,7 +425,7 @@ namespace TarmacGauntlet.Raceday
                     // A car alongside on its inside into a corner is owed a car's width (H2) and no more:
                     // running close to it there is no risk to weigh, or the car would back off and wave it by.
                     bool owedInside = nextTurn != 0 && !stopped[j] && Mathf.Abs(g) < CarL && Mathf.Sign(side) == -nextTurn;
-                    if (!owedInside && Mathf.Abs(g) < CarL + 3f && apart - CarW < 2f) risk += SideRisk * Mathf.Exp(-(apart - CarW) / 0.5f) * Tick;
+                    if (!owedInside && Mathf.Abs(g) < CarL + 3f && apart - CarW < 2f) risk += (g < -BehindFrom * CarL ? BehindRisk : 1f) * SideRisk * Mathf.Exp(-(apart - CarW) / 0.5f) * Tick;
                     // Closing on a car in its lane: the sooner it would reach it, the riskier. Following at its speed is not.
                     float closing = v - ov[j, s];
                     if (g > 0f && apart < CarW + RoomMargin && closing > 0.5f) risk += CloseRisk * Mathf.Exp(-Mathf.Max(g - CarL, 0f) / closing) * Tick;
@@ -598,6 +600,14 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>How far apart across the track two cars' middles stay when one passes the other, m: a car's width and a margin.</summary>
+        /// <summary>The change of lane the hysteresis costs, m: with <see cref="ToLine"/>, a move back towards the line costs that share less.</summary>
+        private static float LineChange(float shift, float last)
+        {
+            float change = Mathf.Abs(shift - last);
+            bool back = Mathf.Abs(shift) < Mathf.Abs(last) && (Mathf.Abs(shift) < 0.5f || Mathf.Sign(shift) == Mathf.Sign(last));
+            return back ? change * (1f - ToLine) : change;
+        }
+
         public static float Clear(float margin) => CarW + 0.6f * Endurance.WidthMargin * margin;
 
         private static bool OnTrack(Circuit c, float lat, float d) => Mathf.Abs(lat) - 0.5f * CarW <= c.HalfWidth(c.IndexOf(Mathf.Repeat(d, c.Lap)));

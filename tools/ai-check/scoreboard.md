@@ -40,3 +40,5 @@ One row per run, win or lose. Full-suite runs only, plus dev runs marked as such
 | 2026-11-11 | dev | v1 + RJ LANE 3 | Rejoin: a car more than 3 m across from the joining lane doesn't hold a rejoining car (no gain on v1) | 4.2 | 9.4 | 0.47 | 0 | 63.9 |
 | 2026-11-11 | dev, failed | E1.8 + RJ LANE 3 | The same on E1 | 6.0 | 14.2 | 1.63 | 0 | 48.6 |
 | 2026-11-11 | dev, unfinished | RJ BRAKE 9, SECS 0.5 (v1 and E1); RJ LANE 4.5 (E1) | Rejoin assumes the car coming brakes at 9 m/s² with 0.5 s to spare; stopped when Ivan paused the work | | | | | |
+| 2026-11-11 | dev, unfinished | E1.8 + back to the line | Stopped for Ivan's method change: shipped as E1.9 without a race run | | | | | |
+| 2026-11-11 | set-ups | E1.9 | Back on the racing line once clear: a metre off the line costs 0.05 s (was 0.01), a move back to the line costs no hysteresis, a car behind adds no side risk. Ivan tests in Unity; no metric run. T1 100, T8 85, H8 pass, H10 pass | | | | | |

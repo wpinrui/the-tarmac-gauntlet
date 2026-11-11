@@ -669,9 +669,6 @@ namespace TarmacGauntlet.Raceday
         /// cars coming: each could brake to its speed in the room there is, with
         /// <see cref="YieldSeconds"/> to spare, and none is alongside.
         /// </summary>
-        private static float RjKnob(string name, float value) =>
-            float.TryParse(System.Environment.GetEnvironmentVariable("AI_RJ_" + name), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float v) ? v : value;
-        private static readonly float RjLane = RjKnob("LANE", 0f), RjBrake = RjKnob("BRAKE", YieldBraking), RjSecs = RjKnob("SECS", YieldSeconds);
         public static bool RoomToJoin(TrafficCar me, IReadOnlyList<TrafficCar> field, float lap, float speed, float half)
         {
             for (int i = 0; i < field.Count; i++)
@@ -680,13 +677,10 @@ namespace TarmacGauntlet.Raceday
                 if (o.Id == me.Id || o.Ghost || OffTrack(o, half)) continue;
                 float behind = Mathf.Repeat(me.Distance - o.Distance + AlongsideMetres, lap) - AlongsideMetres;
                 if (behind > lap * 0.5f || Gone(me, o, behind)) continue;
-                // A car across the track from the lane this car joins in passes it, as it would one at speed by the edge.
-                float joinLane = Mathf.Sign(me.Lateral) * (half - 0.5f * Racecraft.CarWidth);
-                if (RjLane > 0f && Mathf.Abs(o.Lateral - joinLane) > RjLane && behind >= AlongsideMetres) continue;
                 if (behind < AlongsideMetres) return false;
                 float closing = o.Speed - speed;
                 if (closing <= 0f) continue;
-                float need = (o.Speed * o.Speed - speed * speed) / (2f * RjBrake) + RjSecs * o.Speed;
+                float need = (o.Speed * o.Speed - speed * speed) / (2f * YieldBraking) + YieldSeconds * o.Speed;
                 if (behind < need) return false;
             }
             return true;
