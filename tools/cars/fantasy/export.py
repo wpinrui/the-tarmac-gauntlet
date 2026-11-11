@@ -86,7 +86,7 @@ def build(game=False):
     mcut, mglass = parts.mirror_recess()
     cut(shell, mcut)
     out += mglass
-    ecut, pipes = parts.exhaust()
+    ecut, pipes = parts.exhaust(ref)
     cut(shell, ecut)
     out += pipes
     cut(shell, parts.grooves(ref))

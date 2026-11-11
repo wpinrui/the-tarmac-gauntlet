@@ -247,7 +247,8 @@ def front_parts(ref, cutters, out):
             out += blend.lay(ref, f"grille_slat_{i}", bar, fr, -0.0245, -0.006, "trim", 0.006, along_ray=True)
     # the chin lip
     chin = soft(mirrored(poly(R["chin"])), 0.02)
-    out += blend.lay(ref, "chin", chin.intersection(box(-1, -1, 1, 0.19)), fr, 0.0015, 0.005, "trim", 0.01)
+    near = lambda p: p[0] > NOSE - 0.35
+    out += blend.lay(ref, "chin", chin.intersection(box(-1, -1, 1, 0.19)), fr, 0.0015, 0.005, "trim", 0.01, accept=near)
     # round fog lamps in black bezels
     fy, fz, fr_r = R["fog"]
     for sgn, side in ((1, "l"), (-1, "r")):
@@ -262,7 +263,11 @@ def front_parts(ref, cutters, out):
 def rear_parts(ref, cutters, out):
     fr = rear_fr()
     d = soft(mirrored(poly(R["diffuser"])), 0.02)
-    out += blend.lay(ref, "diffuser", d, fr, 0.0015, 0.006, "trim", 0.01)
+    e = R["exhaust"]
+    for _x, y in exhaust_ends(ref):
+        d = d.difference(Point(y, e["z"]).buffer(e["r"] + 0.006, 48))
+    near = lambda p: p[0] < TAIL + 0.4
+    out += blend.lay(ref, "diffuser", d, fr, 0.0015, 0.006, "trim", 0.01, accept=near)
     refl = soft(poly(R["reflector"]), 0.008)
     for sgn, side in ((1, "l"), (-1, "r")):
         g = refl if sgn > 0 else flip(refl)
@@ -272,16 +277,29 @@ def rear_parts(ref, cutters, out):
     out += blend.lay(ref, "lamp_brake_top", strip, fr, 0.0012, 0.004, "lamp_brake", 0.006)
 
 
-def exhaust():
-    """Two round tips side by side under the right of the bumper."""
+def exhaust_ends(ref):
+    """Where each tip ends: just out of the bumper, behind its own point on the skin."""
+    e = R["exhaust"]
+    out = []
+    for y in e["y"]:
+        loc, _n = blend.cast(ref, rear_fr(), y, e["z"])
+        out.append((float(loc[0]) - 0.012 if loc is not None else e["x"], y))
+    return out
+
+
+def exhaust(ref):
+    """Two round tips side by side under the right of the bumper, each with a dark plug a
+    little way in."""
     e = R["exhaust"]
     cut, pipes = [], []
-    for i, y in enumerate(e["y"]):
+    for i, (x, y) in enumerate(exhaust_ends(ref)):
         prof = [(e["r"] - 0.003, 0.0), (e["r"], 0.0), (e["r"], 0.22), (e["r"] - 0.003, 0.22)]
         v, f = geom.lathe(prof, 48, axis="z")
-        v = np.column_stack([e["x"] + v[:, 2], y + v[:, 0], e["z"] + v[:, 1]])
+        v = np.column_stack([x + v[:, 2], y + v[:, 0], e["z"] + v[:, 1]])
         pipes.append(blend.make(f"exhaust_{i}", v, f, "chrome"))
-        v, f = geom.disc((e["x"] + 0.11, y, e["z"]), (1, 0, 0), e["r"] + 0.004, 0.26)
+        v, f = geom.disc((x + 0.04, y, e["z"]), (1, 0, 0), e["r"] - 0.0025, 0.01)
+        pipes.append(blend.make(f"exhaust_plug_{i}", v, f, "trim"))
+        v, f = geom.disc((x + 0.11, y, e["z"]), (1, 0, 0), e["r"] + 0.004, 0.26)
         cut.append(blend.make("cut_exhaust", v, f, "trim"))
     return cut, pipes
 
@@ -486,16 +504,26 @@ def bonnet_path():
     return np.vstack([q, (q[-2::-1] * [1, -1])])
 
 
+TAILGATE_GAP = 0.016     # the tailgate's sides keep this far inside the tail lamps
+
+
 def tailgate_path():
-    """The tailgate's sides and bottom, seen from behind, made even."""
-    t = np.array(R["tailgate"])
-    half = t[t[:, 0] >= 0]
-    half = half[np.argsort(-half[:, 1])]
-    half = np.vstack([half, [[0.0, half[:, 1].min()]]])
+    """The tailgate's sides and bottom, seen from behind, made even. Its sides run down
+    beside the tail lamps' inner edges, never over them."""
     from scipy.interpolate import splev, splprep
+    lamp = poly(np.array(R["tail"][0])[:, 1:]).buffer(TAILGATE_GAP)
+    t = geom.resample(np.array(R["tailgate"]), 0.01)
+    if t[0, 0] < 0:
+        t = t[::-1]
+    half = t[: int(np.argmax(t[:, 0] < 0))].copy()
+    for p in half:
+        if lamp.contains(Point(p)):
+            c = lamp.intersection(LineString([(0, p[1]), (2, p[1])]))
+            p[0] = c.bounds[0]
+    half = np.vstack([half, [[0.0, half[:, 1].min()]]])
     pts = np.vstack([half, half[-2::-1] * [-1, 1]])
-    tck, _u = splprep([pts[:, 0], pts[:, 1]], s=0.002, k=3)
-    x, y = splev(np.linspace(0, 1, 360), tck)
+    tck, _u = splprep([pts[:, 0], pts[:, 1]], s=0.0006, k=3)
+    x, y = splev(np.linspace(0, 1, 400), tck)
     return np.column_stack([x, y])
 
 
@@ -515,6 +543,8 @@ DOOR_DEPTH = 0.05     # below the cabin floor the door takes the sill this deep
 DOOR_WALL = 0.09      # above it, the whole wall: the cabin is hollow behind it
 DOOR_GAP = 0.0015     # half the gap round the door, inside the shut line's groove
 DOOR_OPEN = 65.0      # degrees the door swings out
+FRAME_DEPTH = 0.04    # the window frame takes only the thin roof edge and pillar skin
+BELT_DROP = 0.02      # the frame starts this far under the window's bottom line
 
 
 def door_outline():
@@ -548,12 +578,26 @@ def door(ref, shell, obs, floor, sgn=1):
     door glass, card and mirror glass go with it. Returns the door's pieces."""
     side = "l" if sgn > 0 else "r"
     o = door_outline()
-    regions = [(o.intersection(box(-5, -1, 5, floor + 0.02)), DOOR_DEPTH),
-               (o.intersection(box(-5, floor + 0.02, 5, 5)), DOOR_WALL), (mirror_footprint(), -0.004)]
+    k = side_shapes()[2]
+    sill = Polygon([(-5, np.polyval(k, -5) - BELT_DROP), (5, np.polyval(k, 5) - BELT_DROP), (5, 5), (-5, 5)])
+    # neighbouring regions overlap a little, so their cutters join with no crack between them
+    lap = 0.006
+    regions = [(o.intersection(box(-5, -1, 5, floor + 0.02 + lap)), DOOR_DEPTH),
+               (o.intersection(box(-5, floor + 0.02 - lap, 5, 5)).difference(sill.buffer(-lap)), DOOR_WALL),
+               (o.intersection(sill), FRAME_DEPTH), (mirror_footprint(), -0.004)]
     trim = [ob for ob in obs if ob.name == f"window_trim_{side}"]
     roles = {f"side_glass_{side}0": "glass", f"side_glass_{side}1": "glass", f"mirror_glass_{side}": "mirror",
              f"door_card_{side}": "card"}
-    return blend.free_door(ref, side_fr(sgn), regions, DOOR_GAP, shell, trim, roles, o, name=f"door_{side}")
+    pieces = blend.free_door(ref, side_fr(sgn), regions, DOOR_GAP, shell, trim, roles, o, name=f"door_{side}")
+    # the door's edges, its shut faces, are painted; only its inner face is trim
+    blend.paint(pieces[0], "body", lambda *c, p=pieces[0]: False)
+    me = pieces[0].data
+    k = [m.name for m in me.materials].index("body")
+    names = [m.name for m in me.materials]
+    for f in me.polygons:
+        if names[f.material_index] == "interior" and abs(f.normal[1]) < 0.6:
+            f.material_index = k
+    return pieces
 
 
 # ---------------------------------------------------------------- spoiler
