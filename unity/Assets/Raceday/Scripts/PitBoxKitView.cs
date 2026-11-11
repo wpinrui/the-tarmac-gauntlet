@@ -21,8 +21,6 @@ namespace TarmacGauntlet.Raceday
         private const float Cull = 0.035f;
         /// <summary>Size of the space the kit stands in, garage front and box, m.</summary>
         private const float Zone = 9f;
-        /// <summary>A taken piece's line is this much longer than its rest drop, so it sags a little as the crew carry the piece, m.</summary>
-        private const float Slack = 0.6f;
         private const int MaxBatch = 1023;
         private static readonly int ColorId = Shader.PropertyToID("_Color");
 
@@ -265,7 +263,7 @@ namespace TarmacGauntlet.Raceday
                     if (piece == null) continue;
                     var item = (KitItem)k;
                     Vector3 a = anchors[i, k], b = piece.position;
-                    float length = a.y - rests[i, k].Position.y + Slack;
+                    float length = PitBoxKit.LineLength(item);
                     var line = new MeshKit();
                     PitBoxKit.Pipe(line, PitBoxKit.Slung(a, b, PitBoxKit.Sag(a, b, length)), PitBoxKit.LineRadius(item), item == KitItem.Nozzle ? 6 : 4);
                     Mesh mesh = liveLines[i, k];

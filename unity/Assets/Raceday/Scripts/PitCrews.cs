@@ -120,6 +120,9 @@ namespace TarmacGauntlet.Raceday
         /// <summary>The stop's clock car i's crew follows this frame.</summary>
         public StopClock ClockOf(int car) => Crew(car) == null ? default : Clock(car);
 
+        /// <summary>True while car i's crew are played as live rigs, near the camera.</summary>
+        public bool IsLive(int car) => live != null && car >= 0 && car < live.Length && live[car] != null && live[car].Length > 0 && live[car][0] != null;
+
         /// <summary>Where a person of car i's crew has a hand, in the world: off the live rig near the camera, else off their still figure.</summary>
         public Vector3 Hand(int car, int person, bool right)
         {
@@ -331,6 +334,8 @@ namespace TarmacGauntlet.Raceday
             {
                 CarRaceLog log = car.Supplies?.Log;
                 c.NewDriver = log != null && log.NextDriverIndex != log.DriverIndex;
+                // As the stop will: the tyres ordered and a set left, so the fresh tyres are fetched as the car comes in.
+                c.NewTyres = car.Supplies != null && car.Supplies.Orders.Tyres && car.Supplies.TyresLeft;
             }
             return c;
         }

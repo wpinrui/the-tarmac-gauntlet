@@ -47,11 +47,13 @@ namespace TarmacGauntlet.Simulation
             if (me == null || entry.PositionHistory == null || entry.CarIndexById == null || !entry.CarIndexById.TryGetValue(me.CarId, out int slot))
                 return bare;
 
-            IReadOnlyList<Stint> stints = entry.Stints != null && entry.Stints.TryGetValue(me.CarId, out IReadOnlyList<Stint>? s)
-                ? s.Where(x => x.EndLap >= x.StartLap).ToArray()
+            IReadOnlyList<Stint> all = entry.Stints != null && entry.Stints.TryGetValue(me.CarId, out IReadOnlyList<Stint>? s)
+                ? s
                 : Array.Empty<Stint>();
-            // A new stint starts on the lap after the stop that put its driver in.
-            string DriverAt(int lap) => stints.LastOrDefault(x => x.StartLap <= lap)?.DriverId ?? stints.FirstOrDefault()?.DriverId ?? "";
+            IReadOnlyList<Stint> stints = all.Where(x => x.EndLap >= x.StartLap).ToArray();
+            // A new stint starts on the lap after the stop that put its driver in. A stop on the last
+            // lap leaves an empty stint, which still says who got in.
+            string DriverAt(int lap) => all.LastOrDefault(x => x.StartLap <= lap)?.DriverId ?? all.FirstOrDefault()?.DriverId ?? "";
             RaceEvent[] events = (entry.Events ?? Array.Empty<RaceEvent>()).Where(e => e.CarId == me.CarId).ToArray();
 
             return bare with

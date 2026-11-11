@@ -7,8 +7,8 @@ namespace TarmacGauntlet.Raceday
 {
     /// <summary>
     /// The TV timing tower in the top left corner. A tab on top counts down the race time left. Under
-    /// it, one row per car: position, a slash in the team's colour, team name, class badge and gap in
-    /// fake laps (<see cref="Standings"/>). Class leaders have their position on a red block, and the
+    /// it, one row per car: position, a slash in the team's colour, team name, class badge and fake laps
+    /// completed (<see cref="Standings"/>). Class leaders have their position on a red block, and the
     /// player's row is white. It shows every class leader and the four cars either side of the player,
     /// then fills the screen height with the fastest class. Sizes are in design units, a hundredth of
     /// the width of a 16:9 screen.
@@ -62,7 +62,7 @@ namespace TarmacGauntlet.Raceday
 
         private readonly List<Standings.Car> order = new List<Standings.Car>();
         private readonly List<Standings.Row> rows = new List<Standings.Row>();
-        private readonly Dictionary<int, string> gaps = new Dictionary<int, string>();
+        private readonly Dictionary<int, string> laps = new Dictionary<int, string>();
         private readonly Dictionary<string, string> fitted = new Dictionary<string, string>();
         private Standings.Car[] entries;
         private float clock;
@@ -190,15 +190,13 @@ namespace TarmacGauntlet.Raceday
                 Vector4.one * Mathf.Max(1f, BadgeBorder * u), Vector4.one * BadgeRadius * u);
             Text(badge, letter, badgeStyle, colour);
 
-            Text(new Rect(gapX, y, GapWidth * u, h), Gap(c), gapStyle, player ? PlayerText : Color.white);
+            Text(new Rect(gapX, y, GapWidth * u, h), Laps(c), gapStyle, player ? PlayerText : Color.white);
         }
 
-        /// <summary>The leader's fake laps, or how many the car is behind it.</summary>
-        private string Gap(Standings.Car c)
+        /// <summary>The fake laps the car has completed.</summary>
+        private string Laps(Standings.Car c)
         {
-            if (c.Position == 1) return positions.Length > c.FakeLaps ? positions[c.FakeLaps] : c.FakeLaps.ToString();
-            int gap = Standings.Gap(order, c);
-            if (!gaps.TryGetValue(gap, out string s)) gaps[gap] = s = "+" + gap;
+            if (!laps.TryGetValue(c.FakeLaps, out string s)) laps[c.FakeLaps] = s = c.FakeLaps.ToString();
             return s;
         }
 
@@ -262,6 +260,21 @@ namespace TarmacGauntlet.Raceday
 
         private static void Draw(Rect r, Texture2D shape, Color colour) =>
             GUI.DrawTexture(r, shape, ScaleMode.StretchToFill, true, 0f, colour, 0f, 0f);
+
+        /// <summary>A tyre seen side on: tread and hub.</summary>
+        internal static Texture2D TyreIcon() => Shape(1f, 1f, (x, y) =>
+        {
+            float d = Mathf.Sqrt((x - 0.5f) * (x - 0.5f) + (y - 0.5f) * (y - 0.5f));
+            return (d > 0.34f && d < 0.48f) || (d > 0.1f && d < 0.18f);
+        });
+
+        /// <summary>A fuel pump with its hose.</summary>
+        internal static Texture2D FuelIcon() => Shape(1f, 1f, (x, y) =>
+        {
+            bool body = x > 0.12f && x < 0.58f && y > 0.05f && y < 0.92f && !(x > 0.22f && x < 0.48f && y > 0.55f && y < 0.82f);
+            bool hose = (x > 0.58f && x < 0.84f && y > 0.62f && y < 0.7f) || (x > 0.76f && x < 0.86f && y > 0.2f && y < 0.7f);
+            return body || hose;
+        });
 
         /// <summary>
         /// A white shape on a clear texture, smoothed at the edges: inside(x, y) in design units, y up

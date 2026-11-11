@@ -273,8 +273,7 @@ namespace TarmacGauntlet.Raceday
             Outline(badge, colour, 6f);
             Label(badge, RaceTower.ClassLetter(c.Class), small, colour, TextAnchor.MiddleCenter);
             Label(Col(r, ClassX + 64f, 44f), c.ClassPosition.ToString(), right, mine ? Ink : Dim, TextAnchor.MiddleRight);
-            string gap = c.Position == 1 ? c.FakeLaps.ToString() : "+" + Standings.Gap(order, c);
-            Label(Col(r, LapX, 64f), gap, right, ink, TextAnchor.MiddleRight);
+            Label(Col(r, LapX, 64f), c.FakeLaps.ToString(), right, ink, TextAnchor.MiddleRight);
             AiDriver d = Drivers[c.Id];
             int stops = d != null && d.Racer?.Pit != null ? d.Racer.Pit.Stops : 0;
             Label(Col(r, PitX, 48f), stops.ToString(), right, mine ? Ink : Dim, TextAnchor.MiddleRight);

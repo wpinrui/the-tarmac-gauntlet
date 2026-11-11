@@ -64,6 +64,18 @@ namespace TarmacGauntlet.Raceday
         /// <summary>The stage of the stop as this person last saw it.</summary>
         public CrewStage Stage { get; internal set; }
 
+        /// <summary>
+        /// Where in the garage, in the box's frame, this person picks up the kit they carry to the stop, or null with
+        /// none: they go there first as the car comes in and take it back there after the stop. With <see cref="FetchTyre"/>
+        /// it is a fresh tyre, fetched only for a stop that changes the tyres.
+        /// </summary>
+        public Vector2? FetchAt;
+        public bool FetchTyre;
+        /// <summary>True from picking the kit up at <see cref="FetchAt"/> until putting it back there.</summary>
+        public bool Carrying { get; internal set; }
+        /// <summary>True once the fetch is let go for this stop: the car would be in before they were back out.</summary>
+        internal bool FetchLetGo;
+
         internal bool Crouched;
         internal float Busy;
         /// <summary>The task being worked or walked to, and how long it has been worked.</summary>
@@ -147,6 +159,10 @@ namespace TarmacGauntlet.Raceday
         private const float MinWheel = 0.3f, MoveBetween = 2.2f;
         /// <summary>Least time worth walking to a job for, s: with less left, the job is let go.</summary>
         private const float MinWork = 0.3f;
+        /// <summary>Seconds to pick up or put down kit fetched from the garage.</summary>
+        public const float FetchTime = 0.4f;
+        /// <summary>Time to spare after fetching kit, s: the fetch is let go unless they would be out at their spot this long before the car stops.</summary>
+        private const float FetchSpare = 1.5f;
         /// <summary>Furthest a person's step is, s: a long frame is walked in steps this long.</summary>
         private const float MaxStep = 0.05f;
 
@@ -329,8 +345,8 @@ namespace TarmacGauntlet.Raceday
                 case CrewTask.Kind.Screen: return new Vector2(l + 1.8f, 3.8f);
             }
             Vector2 at = Spot(t).at;
-            if (at.y < 0f) return new Vector2(Mathf.Sign(at.x) * (l + (t.Second ? 1.9f : 1.1f)), 2.0f);
-            return new Vector2(at.x, at.y + 1.3f);
+            // Out wide of their own place, the far side too, to step in once the car stops.
+            return new Vector2(at.x, at.y + Mathf.Sign(at.y) * 1.3f);
         }
 
         /// <summary>
@@ -393,6 +409,22 @@ namespace TarmacGauntlet.Raceday
         public (float from, float to) TimeOf(CrewTask t, in StopClock c) => Window(t, c);
 
         /// <summary>
+        /// How much of a person's current task's work is done, 0 to 1: the share of its time gone, or for one of
+        /// several wheels, the share of its own work given.
+        /// </summary>
+        public float WorkDone(CrewMember m, in StopClock c)
+        {
+            if (m.Next >= m.Tasks.Count) return 1f;
+            CrewTask t = m.Tasks[m.Next];
+            if (t.Parts > 1) return Mathf.Clamp01(m.Worked / WheelShare(m, c));
+            (float from, float to) w = Window(t, c);
+            return w.to <= w.from ? 0f : Mathf.Clamp01((c.Elapsed - w.from) / (w.to - w.from));
+        }
+
+        /// <summary>Is a person at their current task's place?</summary>
+        public bool AtPlace(CrewMember m) => m.Next < m.Tasks.Count && (Place(m.Tasks[m.Next]).at - m.At).sqrMagnitude < 0.01f;
+
+        /// <summary>
         /// Moves a person on to their next task once the current one is over: its time is up, or, for one of several
         /// wheels, it has had its share of work.
         /// </summary>
@@ -411,7 +443,9 @@ namespace TarmacGauntlet.Raceday
                 CrewTask t = m.Tasks[m.Next];
                 (float from, float to) w = Window(t, c);
                 // Over once its time is up, or there is not time left to get there and work it, or it has had its share.
-                bool over = w.to <= w.from || c.Elapsed + Eta(m, t, c) > w.to - MinWork || t.Parts > 1 && m.Worked >= WheelShare(m, c);
+                // At the place, the work goes on to the end of its time: the fuel nozzle stays on till the fuel is in.
+                float eta = Eta(m, t, c);
+                bool over = w.to <= w.from || c.Elapsed + eta > w.to - (eta > 0f ? MinWork : 0f) || t.Parts > 1 && m.Worked >= WheelShare(m, c);
                 if (!over) return;
                 m.Next++;
                 m.Worked = 0f;
@@ -478,24 +512,69 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>Where a person wants to be, which way to face, and whether crouched, at this point of the stop.</summary>
-        private (Vector2 at, Vector2 face, bool low) Want(CrewMember m, in StopClock c)
+        private (Vector2 at, Vector2 face, bool low, bool fetch) Want(CrewMember m, in StopClock c)
         {
-            var home = (m.Home, new Vector2(0f, -1f), false);
-            if (m.Tasks.Count == 0 || c.Stage == CrewStage.Home || c.Stage == CrewStage.Release) return home;
+            var home = (m.Home, new Vector2(0f, -1f), false, false);
+            if (m.Tasks.Count == 0) return home;
+            // Kit fetched for the stop goes back where it came from on the way home.
+            if (c.Stage == CrewStage.Home) m.FetchLetGo = false;
+            if (m.FetchAt is Vector2 kit && (m.Carrying ? c.Stage == CrewStage.Home || c.Stage == CrewStage.Release : Fetching(m, kit, c)))
+            {
+                Vector2 via = Indoors(m.At, kit);
+                return (via, Toward(m.At, via, m.Facing), false, via == kit);
+            }
+            if (c.Stage == CrewStage.Home || c.Stage == CrewStage.Release) return home;
             if (c.Stage == CrewStage.Ready)
             {
                 Vector2 r = Ready(m.Tasks[0]);
-                return (r, (-r).normalized, false);
+                return (r, (-r).normalized, false, false);
             }
             if (m.Next < m.Tasks.Count)
             {
                 CrewTask t = m.Tasks[m.Next];
                 (Vector2 at, Vector2 face) p = Place(t);
-                return (p.at, p.face, Crouches(t) && c.Elapsed >= Window(t, c).from);
+                return (p.at, p.face, Crouches(t) && c.Elapsed >= Window(t, c).from, false);
             }
             Vector2 back = After(m.Tasks[m.Tasks.Count - 1]);
-            return (back, (stopped - back).normalized, false);
+            return (back, (stopped - back).normalized, false, false);
         }
+
+        /// <summary>
+        /// Should a person go for their kit as the car comes in: only while the car is far enough off for them to get
+        /// it and be back out at their spot beside the box before it stops, else they let it go for this stop.
+        /// </summary>
+        private bool Fetching(CrewMember m, Vector2 kit, in StopClock c)
+        {
+            if (c.Stage != CrewStage.Ready || m.FetchLetGo || m.FetchTyre && !c.NewTyres) return false;
+            // The way there round the front of the garage, and from there out to the spot.
+            float line = Door - 0.5f;
+            Vector2 a = m.At, ready = Ready(m.Tasks[0]);
+            float way = Mathf.Abs(kit.x - a.x) < 0.5f ? (kit - a).magnitude
+                : Mathf.Abs(a.y - line) + Mathf.Abs(kit.x - a.x) + Mathf.Abs(kit.y - line);
+            way += (ready - kit).magnitude;
+            float trip = way / (WalkSpeed * RunRate) + FetchTime + FetchSpare;
+            // The car's time to the box at its speed now: it is braking, so it will take longer still.
+            float carIn = c.Car.x < 0f ? c.Car.magnitude / Mathf.Max(c.CarSpeed, 3f) : 0f;
+            if (carIn > trip) return true;
+            m.FetchLetGo = true;
+            return false;
+        }
+
+        /// <summary>
+        /// The next point on the way to kit inside the garage: across in front of its door, clear of
+        /// the middle of the garage, where the waiting driver walks to the door and waits.
+        /// </summary>
+        private Vector2 Indoors(Vector2 from, Vector2 to)
+        {
+            float line = Door - 0.5f;
+            if (Mathf.Abs(to.x - from.x) < 0.5f) return to;
+            if (from.y > line + 0.1f) return new Vector2(from.x, line);
+            return Mathf.Abs(from.y - line) < 0.05f || from.y < line ? new Vector2(to.x, line) : to;
+        }
+
+        /// <summary>The way from one point to another, or the given way when they are the same.</summary>
+        private static Vector2 Toward(Vector2 from, Vector2 to, Vector2 otherwise) =>
+            (to - from).sqrMagnitude > 1e-4f ? (to - from).normalized : otherwise;
 
         /// <summary>Is a point in the car's way, with a little room round it?</summary>
         private bool InCar(Vector2 p) => near && (Mathf.Abs(p.x - car.x) < HalfLength + 0.5f && Mathf.Abs(p.y - car.y) < width * 0.5f + 0.35f || InDoorway(p));
@@ -583,7 +662,7 @@ namespace TarmacGauntlet.Raceday
         {
             m.Advance(dt);
             Progress(m, c);
-            (Vector2 at, Vector2 face, bool low) want = Want(m, c);
+            (Vector2 at, Vector2 face, bool low, bool fetch) want = Want(m, c);
             Vector2 to = want.at - m.At;
             bool far = to.sqrMagnitude > 0.06f * 0.06f;
             m.Working = false;
@@ -609,8 +688,9 @@ namespace TarmacGauntlet.Raceday
                 float dist = wp.magnitude;
                 Vector2 dir = wp / Mathf.Max(dist, 1e-4f);
                 m.Facing = Turn(m.Facing, dir, dt * 9f);
-                // One with several wheels runs between them.
-                float rate = several && c.Stage == CrewStage.Stop ? RunRate * m.Pace : WalkRate;
+                // One with several wheels runs between them; one fetching kit as the car comes in runs for it.
+                bool fetching = c.Stage == CrewStage.Ready && m.FetchAt != null && !m.Carrying && !m.FetchLetGo;
+                float rate = several && c.Stage == CrewStage.Stop ? RunRate * m.Pace : fetching ? RunRate : WalkRate;
                 float go = Mathf.Min(dist, WalkSpeed * rate * dt * Mathf.Max(0f, Vector2.Dot(m.Facing, dir)));
                 m.At += dir * go;
                 if (m.Clip == "Walk") m.Rate = rate;
@@ -619,6 +699,14 @@ namespace TarmacGauntlet.Raceday
             }
             m.At = want.at;
             m.Facing = Turn(m.Facing, want.face, dt * 7f);
+            if (want.fetch)
+            {
+                // A moment to pick the kit up or put it down.
+                m.Carrying = !m.Carrying;
+                m.Play("Idle", m.IdleFrom, 1f, true);
+                m.Busy = FetchTime;
+                return;
+            }
             if (want.low && !m.Crouched)
             {
                 float down = several ? QuickDownRate * m.Pace : DownRate;
