@@ -53,21 +53,17 @@ namespace TarmacGauntlet.Raceday
         private readonly PitComplex pc;
         private readonly PitMaterials m;
         private readonly PitBoxKit boxKit;
-        private readonly bool teamBoom, withBoom;
         private readonly List<CircuitPart> parts = new List<CircuitPart>();
 
         private readonly MeshKit concrete = new MeshKit(), glass = new MeshKit(), steel = new MeshKit();
         private readonly MeshKit team = new MeshKit(), fit = new MeshKit(), metal = new MeshKit(), rubber = new MeshKit(), lamps = new MeshKit();
 
         /// <param name="materials">May be null outside Unity (tests and previews).</param>
-        /// <param name="boom">How the boom over each box is built: the race's own, or none for a preview that shows its own.</param>
-        public PitComplexBuilder(PitComplex complex, PitMaterials materials, BoomLook? boom = PitBoxKit.Look, bool teamBoom = PitBoxKit.TeamBoom)
+        public PitComplexBuilder(PitComplex complex, PitMaterials materials)
         {
             pc = complex;
             m = materials;
-            boxKit = new PitBoxKit(complex, boom ?? PitBoxKit.Look);
-            withBoom = boom != null;
-            this.teamBoom = teamBoom;
+            boxKit = new PitBoxKit(complex);
         }
 
         public List<CircuitPart> Build()
@@ -166,7 +162,7 @@ namespace TarmacGauntlet.Raceday
             Block(fit, f, rig.x, rig.y, 0.9f, 1.0f, 0f, PitBoxKit.FuelRigHeight);
             Block(team, f, rig.x, rig.y + 0.52f, 0.92f, 0.04f, 1.7f, 2.2f, paint);
             Block(metal, f, rig.x, rig.y + 0.3f, 0.16f, 0.16f, PitBoxKit.FuelRigHeight, PitBoxKit.FuelRigHeight + 0.08f);
-            if (withBoom) boxKit.Boom(g, teamBoom ? team : metal, teamBoom ? flat : (Vector2?)null, rubber);
+            boxKit.Boom(g, metal, null, rubber);
 
             // Strip lights across the ceiling.
             foreach (float lz in new[] { -5.0f, -1.5f, 2.0f, 5.5f })

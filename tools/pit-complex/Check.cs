@@ -64,12 +64,7 @@ static class Check
         Kit.InItsBox(pc, kit, looks.Values.First());
         Kit.RestsClear(pc, kit);
         Kit.Cheap();
-        if (args.Length > 1)
-        {
-            // The preview shows every boom, so its pit complex is built without one and each boom is written apart.
-            looks["Pit complex"] = new PitComplexBuilder(pc, null, null).Build();
-            Preview.Write(args[1], circuit, pc, track, looks, spots);
-        }
+        if (args.Length > 1) Preview.Write(args[1], circuit, pc, track, looks, spots);
         return failed || Environment.ExitCode != 0 ? 1 : 0;
     }
 
@@ -307,28 +302,6 @@ static class Preview
             }
         }
 
-        // Every boom look, steel and in team colours, in the garages round the focus.
-        foreach (BoomLook look in Enum.GetValues(typeof(BoomLook)))
-            foreach (bool team in new[] { false, true })
-            {
-                var bk = new PitBoxKit(pc, look);
-                MeshKit structure = new MeshKit(), hoses = new MeshKit();
-                for (int g = 0; g < pc.Garages; g++)
-                {
-                    GarageFrame gf = pc.Frame(g);
-                    float gx = gf.Floor.x - focus.x, gz = gf.Floor.z - focus.z;
-                    if (gx * gx + gz * gz > Radius * Radius) continue;
-                    bk.Boom(g, structure, team ? PitComplexBuilder.PaletteUv(g) : (Vector2?)null, hoses);
-                }
-                string tag = $"boom {look} {(team ? "team" : "steel")}";
-                var boomParts = new List<CircuitPart>
-                {
-                    new CircuitPart(team ? "Garage team colours" : "Garage metal", structure, null, false, true),
-                    new CircuitPart("Garage tyres", hoses, null, false, true),
-                };
-                foreach (CircuitPart bp in boomParts) Add(tag, bp.Name, boomParts);
-            }
-
         // The moving kit: each shape once, in its own frame, and where each piece rests in the garages round the focus.
         foreach (KitModel model in Enum.GetValues(typeof(KitModel)))
             foreach (var (paint, mk) in PitBoxKit.Model(model))
@@ -336,9 +309,8 @@ static class Preview
                 AddLocal($"model {model}", $"{model} {paint}", mk);
             }
         var kitAt = new List<object>();
-        foreach (BoomLook look in Enum.GetValues(typeof(BoomLook)))
         {
-            var bk = new PitBoxKit(pc, look);
+            var bk = new PitBoxKit(pc);
             for (int g = 0; g < pc.Garages; g++)
             {
                 GarageFrame gf = pc.Frame(g);
@@ -350,10 +322,10 @@ static class Preview
                     KitPose r = bk.Rest(g, item);
                     Vector3 at = r.Position - focus;
                     float yaw = (float)(Math.Atan2(r.Forward.x, r.Forward.z) * 180 / Math.PI);
-                    kitAt.Add(new { look = look.ToString(), g, model = PitBoxKit.ModelOf(item).ToString(), x = at.x, y = at.y, z = at.z, yaw });
+                    kitAt.Add(new { g, model = PitBoxKit.ModelOf(item).ToString(), x = at.x, y = at.y, z = at.z, yaw });
                     if (!PitBoxKit.Hangs(item)) continue;
                     Vector3 an = bk.Anchor(g, item) - focus;
-                    kitAt.Add(new { look = look.ToString(), g, model = PitBoxKit.LineOf(item).ToString(), x = an.x, y = an.y, z = an.z, yaw, drop = an.y - at.y });
+                    kitAt.Add(new { g, model = PitBoxKit.LineOf(item).ToString(), x = an.x, y = an.y, z = an.z, yaw, drop = an.y - at.y });
                 }
             }
         }

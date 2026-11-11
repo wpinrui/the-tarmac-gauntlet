@@ -3,17 +3,6 @@ using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
 {
-    /// <summary>How the overhead boom over each pit box is built.</summary>
-    public enum BoomLook
-    {
-        /// <summary>One arm out from the garage to a crossbar over the middle of the box.</summary>
-        Tee,
-        /// <summary>Two arms out from the garage, one over each axle.</summary>
-        Twin,
-        /// <summary>Two arms carrying a frame over the whole car, a line over every wheel.</summary>
-        Gantry,
-    }
-
     /// <summary>The kit a crew moves at a stop, one of each in every garage with a car.</summary>
     public enum KitItem
     {
@@ -43,7 +32,7 @@ namespace TarmacGauntlet.Raceday
 
     /// <summary>
     /// The pit box equipment, laid out from the circuit with no Unity objects so it can be checked outside Unity.
-    /// Over every box an overhead boom reaches out from the garage's fascia, carrying the fuel hose from the fuel
+    /// Over every box an overhead gantry reaches out from the garage's fascia, carrying the fuel hose from the fuel
     /// rig inside the garage and an air line for each wheel gun and for the air jack lance. Each gun, the lance and
     /// the fuel nozzle hang on their lines below the boom, clear over the car, until the crew pull them down. The
     /// lollipop, the fire extinguisher and the trolley of four fresh tyres stand inside the door, out of the crew's
@@ -53,11 +42,6 @@ namespace TarmacGauntlet.Raceday
     /// </summary>
     public sealed class PitBoxKit
     {
-        /// <summary>The boom the race is built with.</summary>
-        public const BoomLook Look = BoomLook.Gantry;
-        /// <summary>The boom is painted in its team's colour, not plain steel.</summary>
-        public const bool TeamBoom = false;
-
         /// <summary>Where a car stands in its box: this far out from the garage's middle, along the row's Out, m.</summary>
         public const float BoxOut = 13.1f;
         /// <summary>Underside of the boom over the box, m above the garage floor.</summary>
@@ -79,13 +63,14 @@ namespace TarmacGauntlet.Raceday
         public const int ItemCount = 13;
 
         private const int Sides = 8;
-        private readonly PitComplex pc;
-        public readonly BoomLook Style;
+        /// <summary>The gantry's two arms out from the fascia, x across the garage, one over each axle.</summary>
+        public static readonly float[] Arms = { -1.6f, 1.6f };
 
-        public PitBoxKit(PitComplex complex, BoomLook look = Look)
+        private readonly PitComplex pc;
+
+        public PitBoxKit(PitComplex complex)
         {
             pc = complex;
-            Style = look;
         }
 
         // ---------------------------------------------------------------- what each piece is
@@ -119,44 +104,21 @@ namespace TarmacGauntlet.Raceday
         // ---------------------------------------------------------------- where it rests
 
         /// <summary>
-        /// Where a hanging piece's line leaves the boom, (x across, z out) in the garage's frame. The car stands
+        /// Where a hanging piece's line leaves the gantry, (x across, z out) in the garage's frame: a gun over each
+        /// wheel, the nozzle over the filler and the lance behind the car. The car stands
         /// nose towards -x with its left side towards the garage, as <see cref="PitStopSpots"/> has it.
         /// </summary>
         public Vector2 AnchorLocal(KitItem item)
         {
             float near = BoxOut - 1.6f, far = BoxOut + 1.6f;
-            switch (Style)
+            switch (item)
             {
-                case BoomLook.Tee:
-                    switch (item)
-                    {
-                        case KitItem.Nozzle: return new Vector2(1.0f, BoxOut - 1.1f);
-                        case KitItem.GunFrontLeft: return new Vector2(-1.6f, BoxOut - 0.18f);
-                        case KitItem.GunFrontRight: return new Vector2(-1.6f, BoxOut + 0.18f);
-                        case KitItem.GunRearLeft: return new Vector2(1.6f, BoxOut - 0.18f);
-                        case KitItem.GunRearRight: return new Vector2(1.6f, BoxOut + 0.18f);
-                        default: return new Vector2(3.2f, BoxOut);
-                    }
-                case BoomLook.Twin:
-                    switch (item)
-                    {
-                        case KitItem.Nozzle: return new Vector2(1.6f, BoxOut - 0.9f);
-                        case KitItem.GunFrontLeft: return new Vector2(-1.6f, near);
-                        case KitItem.GunFrontRight: return new Vector2(-1.6f, far);
-                        case KitItem.GunRearLeft: return new Vector2(1.6f, near);
-                        case KitItem.GunRearRight: return new Vector2(1.6f, far);
-                        default: return new Vector2(1.6f, BoxOut + 0.3f);
-                    }
-                default:
-                    switch (item)
-                    {
-                        case KitItem.Nozzle: return new Vector2(0.95f, near);
-                        case KitItem.GunFrontLeft: return new Vector2(-1.6f, near);
-                        case KitItem.GunFrontRight: return new Vector2(-1.6f, far);
-                        case KitItem.GunRearLeft: return new Vector2(1.6f, near);
-                        case KitItem.GunRearRight: return new Vector2(1.6f, far);
-                        default: return new Vector2(3.25f, BoxOut);
-                    }
+                case KitItem.Nozzle: return new Vector2(0.95f, near);
+                case KitItem.GunFrontLeft: return new Vector2(-1.6f, near);
+                case KitItem.GunFrontRight: return new Vector2(-1.6f, far);
+                case KitItem.GunRearLeft: return new Vector2(1.6f, near);
+                case KitItem.GunRearRight: return new Vector2(1.6f, far);
+                default: return new Vector2(3.25f, BoxOut);
             }
         }
 
@@ -211,8 +173,8 @@ namespace TarmacGauntlet.Raceday
         // ---------------------------------------------------------------- the boom
 
         /// <summary>
-        /// Builds garage g's boom into the garage meshes: its beams in structure (with every corner on uv, when the
-        /// boom takes the team's colour), the hangers up to the fascia, and the hose runs in hoses. The fuel hose
+        /// Builds garage g's boom, a steel gantry, into the garage meshes: its beams in structure (with every corner
+        /// on uv, if given), the hangers up to the fascia, and the hose runs in hoses. The fuel hose
         /// runs from the top of the fuel rig inside the garage, under the raised door, up to the boom and along it to
         /// the nozzle's anchor; an air line runs from the garage ceiling the same way to every other anchor.
         /// </summary>
@@ -236,33 +198,20 @@ namespace TarmacGauntlet.Raceday
                 structure.Box(f.At(x, armY, Fascia - 0.12f), f.Side, f.Out, new Vector3(0.3f, Beam * 1.4f, 0.3f), uv);
             }
             float near = BoxOut - 1.6f, far = BoxOut + 1.6f;
-            List<float> arms = Arms();
-            switch (Style)
-            {
-                case BoomLook.Tee:
-                    Bar(arms[0], Fascia - 0.2f, arms[0], BoxOut, armY);
-                    Bar(-2.0f, BoxOut, 3.4f, BoxOut, armY);
-                    break;
-                case BoomLook.Twin:
-                    foreach (float x in arms) Bar(x, Fascia - 0.2f, x, far + 0.1f, armY);
-                    Bar(arms[0], far + 0.1f, arms[1], far + 0.1f, armY);
-                    break;
-                default:
-                    foreach (float x in arms) Bar(x, Fascia - 0.2f, x, far + 0.1f, armY);
-                    Bar(-2.4f, near - 0.08f, 3.4f, near - 0.08f, armY);
-                    Bar(-2.4f, far + 0.08f, 3.4f, far + 0.08f, armY);
-                    Bar(-2.4f, near - 0.08f, -2.4f, far + 0.08f, armY);
-                    Bar(3.4f, near - 0.08f, 3.4f, far + 0.08f, armY);
-                    break;
-            }
-            foreach (float x in arms) Hanger(x);
+            // The two arms out from the fascia, and a frame on them over the whole car.
+            foreach (float x in Arms) Bar(x, Fascia - 0.2f, x, far + 0.1f, armY);
+            Bar(-2.4f, near - 0.08f, 3.4f, near - 0.08f, armY);
+            Bar(-2.4f, far + 0.08f, 3.4f, far + 0.08f, armY);
+            Bar(-2.4f, near - 0.08f, -2.4f, far + 0.08f, armY);
+            Bar(3.4f, near - 0.08f, 3.4f, far + 0.08f, armY);
+            foreach (float x in Arms) Hanger(x);
 
             // Hose runs. Each takes its own place beside the arm it follows so no two lie in each other.
             int k = 0;
             for (KitItem item = KitItem.Nozzle; item <= KitItem.Lance; item++, k++)
             {
                 Vector2 a = AnchorLocal(item);
-                float arm = NearestArm(arms, a.x);
+                float arm = a.x < 0f ? Arms[0] : Arms[1];
                 float x = arm + (k - 3) * 0.045f;
                 float under = BoomUnder - 0.03f - LineRadius(item);
                 var run = new List<Vector3>
@@ -286,16 +235,6 @@ namespace TarmacGauntlet.Raceday
                 else run.Add(f.At(x, 6.8f, pc.Depth * 0.5f - 1.4f));
                 Pipe(hoses, run, LineRadius(item), item == KitItem.Nozzle ? 6 : 4);
             }
-        }
-
-        /// <summary>The boom's arms out from the fascia, x across the garage.</summary>
-        public List<float> Arms() => Style == BoomLook.Tee ? new List<float> { 1.0f } : new List<float> { -1.6f, 1.6f };
-
-        private static float NearestArm(List<float> arms, float x)
-        {
-            float best = arms[0];
-            foreach (float a in arms) if (Mathf.Abs(a - x) < Mathf.Abs(best - x)) best = a;
-            return best;
         }
 
         /// <summary>The fuel rig's tank tower, by the +x wall inside the door: middle across and out, and its height.</summary>
