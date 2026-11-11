@@ -79,6 +79,8 @@ namespace TarmacGauntlet.Raceday
         private static readonly float Defend = Knob("DEFEND", 0.3f), DefendCover = Knob("DCOVER", 3f), DefendWithin = Knob("DWITHIN", 0.45f), DefendFrom = Knob("DFROM", 10f);
         /// <summary>Gap kept nose to tail when moving across in front of a car behind, m: never across its nose (T8).</summary>
         private static readonly float SwipeGap = Knob("SWIPE", 1f);
+        /// <summary>How far ahead of where the car is the line leaving a car its width may aim, m (H2).</summary>
+        private static readonly float OweLead = Knob("OWELEAD", 2f);
         /// <summary>Score per second a pull-out waits: of two near-equal moves, the later one, so the car stays in the tow until it must move.</summary>
         private static readonly float LateBonus = Knob("LATE", 0.1f);
         /// <summary>Side-to-side gap H1 keeps to a car alongside, m.</summary>
@@ -281,7 +283,12 @@ namespace TarmacGauntlet.Raceday
             Chosen = best;
             // The pilot's own offset, not where the car is, as the car lags what its pilot steers.
             // A path that moves later holds where it is for now: in the tow until the last safe moment.
-            Target = best.Owe ? pilot.Offset + best.SoonOff : best.Delay > 0f ? pilot.Offset : best.Shift;
+            // Leaving a car its width steps on from the pilot's offset, but no more than OweLead ahead of where
+            // the car is: a car wide at the limit lags its pilot, which would otherwise step on and on until it
+            // aims across the car it owes (H2).
+            float owe = pilot.Offset + best.SoonOff;
+            if (best.Owe && OweLead > 0f) owe = Mathf.Clamp(owe, myOffset + best.SoonOff - OweLead, myOffset + best.SoonOff + OweLead);
+            Target = best.Owe ? owe : best.Delay > 0f ? pilot.Offset : best.Shift;
             Cap = CapAt(best.Pedal, ahead, 0, mySpeed, me.Distance, margin);
             lastShift = best.Shift;
             lastPedal = best.Pedal;
