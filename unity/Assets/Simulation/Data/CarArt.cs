@@ -30,6 +30,7 @@ namespace TarmacGauntlet.Simulation
         private static readonly Dictionary<string, string> LiveryByTeam = new Dictionary<string, string>
         {
             { "Scuderia Feretti", "Assets/Art/Liveries/ScuderiaFeretti" },
+            { "Gravel Trap Racing", "Assets/Art/Liveries/GravelTrapRacing" },
         };
 
         /// <summary>The team's livery folder, or null for a team with no livery yet.</summary>
