@@ -24,7 +24,7 @@ namespace TarmacGauntlet.Simulation
         /// <summary>
         /// Gets the race ready from the career. <paramref name="lineup"/> is the player's driver ids
         /// in stint order, starter first, with <see cref="RaceEntry.PlayerCharacterDriverId"/> for the
-        /// owner-driver; null keeps the default order.
+        /// owner-driver; null uses the order stored in the career (<see cref="DriverLineup.Of"/>).
         /// </summary>
         public static RaceSetup Begin(GameState game, IReadOnlyList<string>? lineup = null)
         {
@@ -54,6 +54,7 @@ namespace TarmacGauntlet.Simulation
         /// </summary>
         public static RaceSetup BuildSetup(GameState game, IReadOnlyList<string>? lineup = null)
         {
+            lineup ??= DriverLineup.Of(game);
             var teams = game.Teams.Select((t, i) => (Team: t, Order: i)).ToDictionary(x => x.Team.Id);
             var grid = new List<(GridCar Car, int Order)>();
             foreach (CarEntry entry in RaceEntry.BuildCarEntries(game))

@@ -94,3 +94,110 @@
 .track-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 9px; background-color: rgb(255, 255, 255); }
 .knob { position: absolute; top: 9px; width: 16px; height: 16px; margin-left: -8px; border-radius: 8px; background-color: rgb(255, 255, 255); }
 .slider-value { width: 32px; font-size: 15px; -unity-text-align: middle-right; }
+
+/* Tooltips: only on stats and skills */
+.tip { position: absolute; max-width: 260px; padding: 10px 14px; border-radius: 12px; font-size: 14px; white-space: normal; background-color: rgba(20, 20, 22, 0.92); border-width: 1px; border-color: rgba(255, 255, 255, 0.14); }
+
+/* Good to bad: green at 60 or more, amber from 50, red below. v- colours text, f- colours a fill. */
+.v-hi { color: rgb(61, 220, 132); }
+.v-mid { color: rgb(255, 176, 32); }
+.v-lo { color: rgb(255, 90, 79); }
+.f-hi { background-color: rgb(61, 220, 132); }
+.f-mid { background-color: rgb(255, 176, 32); }
+.f-lo { background-color: rgb(255, 90, 79); }
+
+/* Panel buttons */
+.red.disabled, .ghost-button.disabled { opacity: 0.35; }
+.red.disabled:hover .red-fill { -unity-background-image-tint-color: rgb(255, 255, 255); }
+.ghost-button { height: 52px; flex-shrink: 0; border-radius: 20px; border-width: 1px; border-color: rgba(255, 255, 255, 0.35); align-items: center; justify-content: center; }
+.ghost-button:hover { background-color: rgba(255, 255, 255, 0.1); }
+.ghost-label { font-size: 18px; letter-spacing: 2.9px; -unity-text-align: middle-center; }
+
+/* Drivers: lineup tiles, market tools, market list, selected driver */
+.roster { flex-direction: row; flex-shrink: 0; margin-bottom: 12px; }
+.slot { flex-grow: 1; flex-basis: 0; min-height: 66px; margin-right: 8px; padding: 10px 14px; border-radius: 12px; justify-content: center; background-color: rgba(255, 255, 255, 0.08); border-width: 1px; border-color: rgba(255, 255, 255, 0); }
+.slot.last { margin-right: 0; }
+.slot:hover { background-color: rgba(255, 255, 255, 0.12); }
+.slot.sel { background-color: rgba(255, 255, 255, 0.2); }
+.slot.empty { background-color: rgba(255, 255, 255, 0); border-color: rgba(255, 255, 255, 0.2); }
+.slot.drag { opacity: 0.4; }
+.slot.over { border-color: rgba(255, 255, 255, 0.7); }
+.slot-name { font-size: 14px; letter-spacing: 0.6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.slot-line { flex-direction: row; align-items: center; justify-content: space-between; margin-top: 3px; }
+.slot-ovr { font-size: 22px; }
+.pips { flex-direction: row; align-items: center; }
+.pip { width: 6px; height: 6px; border-radius: 3px; margin-left: 4px; background-color: rgb(255, 255, 255); }
+
+.tools { flex-direction: row; flex-shrink: 0; margin-bottom: 6px; }
+.search { flex-grow: 1; flex-direction: row; align-items: center; height: 40px; padding-left: 14px; padding-right: 8px; border-radius: 12px; background-color: rgba(255, 255, 255, 0.08); }
+.search-icon { width: 16px; height: 16px; margin-right: 10px; flex-shrink: 0; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.6); }
+.search-field { flex-grow: 1; margin: 0; padding: 0; }
+.search-field .unity-base-text-field__input { flex-grow: 1; margin: 0; padding: 0; border-width: 0; background-color: rgba(0, 0, 0, 0); font-size: 15px; color: rgb(255, 255, 255); --unity-cursor-color: rgb(255, 255, 255); --unity-selection-color: rgba(255, 255, 255, 0.3); }
+.chip { height: 40px; margin-left: 8px; padding-left: 16px; padding-right: 16px; border-radius: 12px; border-width: 1px; border-color: rgba(255, 255, 255, 0.14); font-size: 13px; letter-spacing: 1.3px; color: rgba(255, 255, 255, 0.62); -unity-text-align: middle-center; }
+.chip:hover { background-color: rgba(255, 255, 255, 0.08); }
+.chip.on { background-color: rgba(255, 255, 255, 0.2); border-color: rgba(255, 255, 255, 0.55); color: rgb(255, 255, 255); }
+
+.list-head { flex-direction: row; align-items: center; flex-shrink: 0; height: 30px; padding-left: 14px; padding-right: 14px; }
+.head { font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.42); -unity-text-align: middle-right; }
+.head:hover { color: rgba(255, 255, 255, 0.75); }
+.head.on { color: rgb(255, 255, 255); }
+.cell { flex-shrink: 0; margin-left: 10px; }
+.c-name { flex-grow: 1; flex-shrink: 1; min-width: 0; margin-left: 0; }
+.c-team { width: 150px; }
+.c-age { width: 40px; }
+.c-stat { width: 104px; }
+.c-salary { width: 86px; }
+.stat-head { flex-direction: row; align-items: center; justify-content: flex-end; }
+.stat-head .chevron { width: 22px; height: 22px; border-radius: 6px; }
+.stat-head .chevron-image { width: 12px; height: 12px; }
+.stat-name { min-width: 34px; -unity-text-align: middle-center; }
+
+.market { flex-grow: 1; flex-shrink: 1; min-height: 0; margin-bottom: 12px; }
+.market-row { flex-direction: row; align-items: center; height: 35px; padding-left: 14px; padding-right: 14px; border-radius: 12px; font-size: 15px; }
+.market-row:hover { background-color: rgba(255, 255, 255, 0.08); }
+.market-row.sel { background-color: rgba(255, 255, 255, 0.2); }
+.r-name, .r-team { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -unity-text-align: middle-left; }
+.r-team { font-size: 13px; color: rgba(255, 255, 255, 0.62); }
+.r-age, .r-stat, .r-salary { -unity-text-align: middle-right; }
+.market-row.contracted .r-name, .market-row.contracted .r-age, .market-row.contracted .r-salary { color: rgba(255, 255, 255, 0.5); }
+
+.detail { flex-shrink: 0; padding: 14px 16px; border-radius: 20px; background-color: rgba(0, 0, 0, 0.18); }
+.detail-head { flex-direction: row; justify-content: space-between; align-items: flex-end; margin-bottom: 10px; }
+.detail-name { font-size: 26px; letter-spacing: 1px; }
+.detail-meta { flex-direction: row; align-items: center; margin-top: 6px; }
+.meta-item { margin-right: 16px; font-size: 14px; letter-spacing: 0.8px; color: rgba(255, 255, 255, 0.62); }
+.detail-ovr { font-size: 46px; -unity-text-align: lower-right; }
+.stats { margin-bottom: 10px; }
+.stat-row { flex-direction: row; align-items: center; height: 20px; margin-bottom: 6px; }
+.stat-label { width: 130px; margin-right: 14px; font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.62); }
+.stat-bar { flex-grow: 1; height: 6px; border-radius: 9px; overflow: hidden; background-color: rgba(255, 255, 255, 0.15); }
+.stat-fill { height: 100%; border-radius: 9px; }
+.stat-value { width: 40px; margin-left: 14px; font-size: 15px; -unity-text-align: middle-right; }
+.contract { flex-direction: row; margin-bottom: 10px; }
+.option { flex-grow: 1; flex-basis: 0; margin-right: 8px; padding: 8px 14px; border-radius: 12px; border-width: 1px; border-color: rgba(255, 255, 255, 0.14); }
+.option.last { margin-right: 0; }
+.option:hover { background-color: rgba(255, 255, 255, 0.08); }
+.option.sel { background-color: rgba(255, 255, 255, 0.2); border-color: rgba(255, 255, 255, 0.55); }
+.option-label { font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.62); }
+.option-price { font-size: 17px; }
+
+/* Crew: the panel fits its content, so more of the garage shows */
+.panel#crew { bottom: auto; }
+.crew-head { flex-direction: row; justify-content: space-between; align-items: flex-end; margin-bottom: 12px; padding-left: 4px; padding-right: 4px; }
+.crew-count { font-size: 46px; }
+.crew-cost { font-size: 21px; color: rgb(61, 220, 132); }
+.crew-head.preview > Label, .pit.preview .pit-time { opacity: 0.55; }
+.crew-row { flex-direction: row; margin-bottom: 8px; }
+.member { width: 66px; height: 66px; margin-right: 8px; border-radius: 12px; align-items: center; justify-content: center; border-width: 1px; border-color: rgba(255, 255, 255, 0.22); }
+.member.last { margin-right: 0; }
+.member-image { width: 30px; height: 30px; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.3); }
+.member.in { background-color: rgba(255, 255, 255, 0.2); border-color: rgba(255, 255, 255, 0); }
+.member.in .member-image { -unity-background-image-tint-color: rgb(255, 255, 255); }
+.member.adding { background-color: rgba(255, 255, 255, 0.08); }
+.member.adding .member-image { -unity-background-image-tint-color: rgba(255, 255, 255, 0.7); }
+.member.leaving { background-color: rgba(255, 255, 255, 0.1); }
+.member.leaving .member-image { -unity-background-image-tint-color: rgba(255, 255, 255, 0.55); }
+.member.disabled { opacity: 0.35; }
+.pit { flex-direction: row; justify-content: space-between; align-items: center; margin-top: 4px; padding: 14px 16px; border-radius: 20px; background-color: rgba(0, 0, 0, 0.18); }
+.pit-label { font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.62); }
+.pit-time { font-size: 30px; }

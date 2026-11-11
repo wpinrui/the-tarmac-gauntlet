@@ -15,7 +15,7 @@ namespace TarmacGauntlet.Management
     /// The management menus over the Team HQ building: the main menu, the hub with its top bar, car tag and Race
     /// button, screens as one panel docked to the right with the menu collapsed to an icon strip, the Escape menu
     /// and settings. Every screen change moves the camera to that screen's shot.
-    /// Screens are empty panels for now: other code fills them through <see cref="ScreenOpened"/>.
+    /// Screen panels fill their docked panel through <see cref="ScreenOpened"/>, such as <see cref="DriversPanel"/>.
     /// </summary>
     public sealed class Menus : MonoBehaviour
     {
@@ -97,6 +97,8 @@ namespace TarmacGauntlet.Management
             root.style.unityFontDefinition = FontDefinition.FromFont(semiBold);
             glass = new MenuGlass(root);
             Build();
+            gameObject.AddComponent<DriversPanel>();
+            gameObject.AddComponent<CrewPanel>();
 
             GameSession.Changed += OnGameChanged;
             if (GameSession.State != null) OnGameChanged(GameSession.State);
@@ -226,6 +228,50 @@ namespace TarmacGauntlet.Management
 
             foreach (VisualElement e in new[] { mainColumn, top, hubMenu, strip, tag, race, panel, dimmer, pauseLayer, settingsLayer })
                 e.style.display = DisplayStyle.None;
+
+            tipLayer = Layer();
+            tip = Text("", "tip");
+            tip.pickingMode = PickingMode.Ignore;
+            tip.style.unityFontDefinition = FontDefinition.FromFont(mainRegular);
+            tip.style.display = DisplayStyle.None;
+            tipLayer.Add(tip);
+        }
+
+        // ------------------------------------------------------------------ tooltips
+
+        private VisualElement tipLayer;
+        private Label tip;
+        private IVisualElementScheduledItem tipTimer;
+
+        /// <summary>
+        /// Shows <paramref name="text"/> under <paramref name="target"/> after a short hover. Only stats and skills
+        /// get tooltips, where a number needs explaining.
+        /// </summary>
+        internal void Tooltip(VisualElement target, string text)
+        {
+            target.RegisterCallback<PointerEnterEvent>(_ =>
+            {
+                tipTimer?.Pause();
+                tipTimer = target.schedule.Execute(() =>
+                {
+                    if (target.panel == null) return;
+                    tip.text = text;
+                    Rect r = target.worldBound;
+                    Vector2 p = tipLayer.WorldToLocal(new Vector2(r.xMin, r.yMax));
+                    tip.style.left = Mathf.Round(p.x);
+                    tip.style.top = Mathf.Round(p.y + 8);
+                    tip.style.display = DisplayStyle.Flex;
+                }).StartingIn(350);
+            });
+            target.RegisterCallback<PointerLeaveEvent>(_ => HideTooltip());
+            target.RegisterCallback<DetachFromPanelEvent>(_ => HideTooltip());
+        }
+
+        private void HideTooltip()
+        {
+            tipTimer?.Pause();
+            tipTimer = null;
+            if (tip != null) tip.style.display = DisplayStyle.None;
         }
 
         private VisualElement Layer(params string[] classes)
@@ -245,7 +291,7 @@ namespace TarmacGauntlet.Management
             return group;
         }
 
-        private Label Text(string text, string cls, bool isBold = false)
+        internal Label Text(string text, string cls, bool isBold = false)
         {
             var label = new Label(text);
             label.AddToClassList(cls);
@@ -272,7 +318,7 @@ namespace TarmacGauntlet.Management
             return item;
         }
 
-        private VisualElement RedButton(string text, string cls, Action onClick)
+        internal VisualElement RedButton(string text, string cls, Action onClick)
         {
             var button = new VisualElement();
             button.AddToClassList("red");
@@ -361,7 +407,7 @@ namespace TarmacGauntlet.Management
             return row;
         }
 
-        private static VisualElement Chevron(string icon, Action onClick)
+        internal static VisualElement Chevron(string icon, Action onClick)
         {
             var chevron = new VisualElement();
             chevron.AddToClassList("chevron");
@@ -417,6 +463,7 @@ namespace TarmacGauntlet.Management
 
         private void Go(Mode next, string slug = null)
         {
+            HideTooltip();
             mode = next;
             screen = next == Mode.Screen ? slug : null;
             if (next == Mode.Screen || next == Mode.Lineup || next == Mode.NewGame)
@@ -568,7 +615,7 @@ namespace TarmacGauntlet.Management
             if (root != null) RenderTag();
         }
 
-        private static string Money(double amount)
+        internal static string Money(double amount)
         {
             string digits = Math.Round(Math.Abs(amount)).ToString("N0", CultureInfo.InvariantCulture);
             return (amount < 0 ? "-$" : "$") + digits;
@@ -601,6 +648,16 @@ namespace TarmacGauntlet.Management
         {
             Event ev = Event.current;
             if (ev.type != EventType.KeyDown || root == null) return;
+            // Typing in a text field is not a shortcut; Escape just leaves the field.
+            if (root.panel?.focusController?.focusedElement is VisualElement focused && (focused is TextField || focused.GetFirstAncestorOfType<TextField>() != null))
+            {
+                if (ev.keyCode == KeyCode.Escape)
+                {
+                    focused.Blur();
+                    ev.Use();
+                }
+                return;
+            }
             switch (ev.keyCode)
             {
                 case KeyCode.Escape:

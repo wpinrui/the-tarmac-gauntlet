@@ -43,6 +43,8 @@ namespace TarmacGauntlet.Simulation
         public int SpareParts { get; init; }           // Consumable units carried over
         public int TyreSets { get; init; }             // Tyre sets carried over
         public IReadOnlyList<TransactionRecord> Transactions { get; init; } = Array.Empty<TransactionRecord>();
+        /// <summary>The player's driver ids in race order, starter first. Read it through <see cref="DriverLineup.Of"/>, which keeps it in step with the roster.</summary>
+        public IReadOnlyList<string> Lineup { get; init; } = Array.Empty<string>();
     }
 
     // --- AI Team ---
