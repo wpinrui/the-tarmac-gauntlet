@@ -394,9 +394,27 @@ sealed class Race
         }
     }
 
+    static readonly bool RearLog = Environment.GetEnvironmentVariable("RE_LOG") != null;
+    readonly Dictionary<Racer, Queue<string>> history = new Dictionary<Racer, Queue<string>>();
+    int historyTick;
+
+    /// <summary>RE_LOG: what each car was doing over its last 1.5 s, every 0.1 s, printed for the car behind at a rear-end.</summary>
+    void Remember()
+    {
+        if (!RearLog || historyTick++ % 10 != 0) return;
+        foreach (Racer r in Racers)
+        {
+            if (!history.TryGetValue(r, out var q)) history[r] = q = new Queue<string>();
+            var pc = r.Craft.Chooser;
+            q.Enqueue($"{Time,7:0.0} {Math.Max(r.Car.TrackIndex, 0) * circuit.Step,5:0} m {r.Car.Speed * 3.6f,3:0} km/h lat {r.Car.Lateral,5:0.0} thr {r.Throttle:0.00} cap {Math.Min(r.Pilot.SpeedCap, 99f) * 3.6f,3:0} {(r.Craft.Braking ? "BRK for " + r.Craft.BrakeFor + " gap " + r.Craft.BrakeGap.ToString("0.0") : "")} [{pc?.Reason} {pc?.Chosen?.Pedal} {pc?.Chosen?.Shift:0.0} {pc?.Chosen?.Rejected}@{pc?.Chosen?.BrokeBy}]");
+            while (q.Count > 15) q.Dequeue();
+        }
+    }
+
     public void Step()
     {
         Snapshot();
+        Remember();
         lodClock += Dt;
         if (Physics != null && lodClock >= 0.25f)
         {
@@ -678,6 +696,13 @@ sealed class Race
                 {
                     string Who(Racer x) => $"{Name(x)} {x.Rejoin.State}{(x.Rejoin.Yielding ? " yielding" : "")} {x.Rejoin.PastEdge:0.0} past, {x.Car.Speed * 3.6f:0} km/h, heading {x.Rejoin.Heading:0}, dist {x.Distance:0}";
                     Console.WriteLine($"  touch {Clock(Time)} {Math.Max(-vn, 0f):0.0} m/s at {Math.Max(a.TrackIndex, 0) * circuit.Step:0} m: {Who(Racers[i])} | {Who(Racers[j])}");
+                }
+                if (fresh && RearLog && Contact.NoseToTail(a, b, nx, nz) && Math.Max(-vn, 0f) > 1f)
+                {
+                    Racer back = Racers[i].Distance < Racers[j].Distance ? Racers[i] : Racers[j], front = back == Racers[i] ? Racers[j] : Racers[i];
+                    Console.WriteLine($"REAR {Clock(Time)} {Name(back)} into {Name(front)} {Math.Max(-vn, 0f):0.0} m/s");
+                    foreach (Racer x in new[] { back, front })
+                        if (history.TryGetValue(x, out var q)) foreach (string h in q) Console.WriteLine($"  {(x == back ? "B" : "F")} {h}");
                 }
                 if (fresh)
                     Contacts.Add(new Contact { Time = Time, Speed = Math.Max(-vn, 0f), RearEnd = Contact.NoseToTail(a, b, nx, nz), Where = Math.Max(a.TrackIndex, 0) * circuit.Step, A = Name(Racers[i]), B = Name(Racers[j]), Rejoining = Racers[i].Rejoin.Busy || Racers[j].Rejoin.Busy });
