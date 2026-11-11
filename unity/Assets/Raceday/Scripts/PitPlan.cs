@@ -95,6 +95,7 @@ namespace TarmacGauntlet.Raceday
         public const float DecideBefore = 450f;
         private const float StopBraking = 3.5f;     // m/s² into the box
         private const float CarLength = 4.8f;
+        private const float Reaction = 0.4f;        // s a car leaving keeps in hand behind the car ahead
         /// <summary>The car comes in before its tyres are this worn.</summary>
         public const float WearLimit = 0.9f;
 
@@ -207,7 +208,7 @@ namespace TarmacGauntlet.Raceday
                     if (Service.Done && FastLaneClear(id, cars)) State = Stage.Leaving;
                     return State == Stage.Stopped;
                 case Stage.Leaving:
-                    p.SpeedCap = Follow(p, position, id, cars, spec);
+                    p.SpeedCap = Follow(p, position, id, cars, spec, Reaction);
                     int past = c.Wrap(p.Index - boxSample);
                     if (past < c.Count / 2 && past >= c.Wrap(rejoinSample - boxSample)) State = Stage.Racing;
                     return false;
@@ -229,9 +230,10 @@ namespace TarmacGauntlet.Raceday
         /// <summary>
         /// Fastest a car driving a route may go to keep a safe gap to the nearest car ahead on it, m/s:
         /// it could stop in its own braking distance if that car stopped as hard as it can. A car
-        /// standing still beside the route, as in a box, is passed.
+        /// standing still beside the route, as in a box, is passed. With a <c>reaction</c> time it also keeps
+        /// that long in hand at its speed, so it can follow a car braking hard for the exit road's bends.
         /// </summary>
-        public static float Follow(AiPilot route, Vector3 position, int id, IReadOnlyList<CarState> cars, CarSpec spec)
+        public static float Follow(AiPilot route, Vector3 position, int id, IReadOnlyList<CarState> cars, CarSpec spec, float reaction = 0f)
         {
             RacingLine line = route.Line;
             int k = route.Index;
@@ -255,7 +257,8 @@ namespace TarmacGauntlet.Raceday
                 float gap = line.Circuit.Wrap(j - k) * line.Circuit.Step - CarLength - 2f;
                 Vector3 tj = line.Tangent[j];
                 float theirs = Mathf.Max(o.Velocity.x * tj.x + o.Velocity.z * tj.z, 0f);
-                float c = gap > 0f ? Mathf.Sqrt(theirs * theirs + 2f * brake * gap) : 0f;
+                float lag = brake * reaction;
+                float c = gap > 0f ? Mathf.Max(Mathf.Sqrt(lag * lag + theirs * theirs + 2f * brake * gap) - lag, 0f) : 0f;
                 cap = Mathf.Min(cap, c);
             }
             return cap;
