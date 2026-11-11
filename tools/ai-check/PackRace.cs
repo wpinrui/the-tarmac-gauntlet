@@ -77,6 +77,9 @@ static partial class Check
                 if (x.Laps == 0) p.Lap1Hours += Race.Dt / 3600f; else p.RestHours += Race.Dt / 3600f;
             }
             held.Step(r, p);
+            string tr = Environment.GetEnvironmentVariable("PACK_TRACE");
+            if (tr != null && (int)Math.Round(r.Time / Race.Dt) % 50 == 0 && byName.TryGetValue(tr, out Racer tx) && tx.Rejoin.Busy)
+                Console.WriteLine($"  TRACE {Race.Clock(r.Time)} {tr} {tx.Rejoin.State} cause {tx.Rejoin.Cause} ghost {tx.Ghost} lat {tx.Car.Lateral:0.0} past edge {tx.Rejoin.PastEdge:0.0} heading {tx.Rejoin.Heading:0} aim {tx.Rejoin.Aim:0.0} gap clear {tx.Rejoin.GapClear} coming {tx.Rejoin.Coming} yielding {tx.Rejoin.Yielding} {tx.Car.Speed * 3.6f:0} km/h at {Mod(tx.Distance):0} m");
             for (; seen < r.Contacts.Count; seen++)
             {
                 Contact c = r.Contacts[seen];
