@@ -150,11 +150,20 @@
 .c-stat { width: 104px; }
 .c-salary { width: 86px; }
 .stat-head { flex-direction: row; align-items: center; justify-content: flex-end; }
-.stat-head .chevron { width: 22px; height: 22px; border-radius: 6px; }
-.stat-head .chevron-image { width: 12px; height: 12px; }
-.stat-name { min-width: 34px; -unity-text-align: middle-center; }
+.stat-head:hover .head { color: rgba(255, 255, 255, 0.75); }
+.stat-head .head.on { color: rgb(255, 255, 255); }
+.caret { position: absolute; right: -14px; top: 50%; width: 10px; height: 10px; margin-top: -5px; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.6); }
+.stat-menu { position: absolute; width: 180px; padding: 6px; border-radius: 12px; background-color: rgba(24, 24, 26, 0.94); border-width: 1px; border-color: rgba(255, 255, 255, 0.14); }
+.stat-menu-item { height: 32px; padding-left: 12px; padding-right: 12px; border-radius: 8px; font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.75); -unity-text-align: middle-left; }
+.stat-menu-item:hover { background-color: rgba(255, 255, 255, 0.1); color: rgb(255, 255, 255); }
+.stat-menu-item.on { background-color: rgba(255, 255, 255, 0.2); color: rgb(255, 255, 255); }
+.section-label { flex-shrink: 0; margin-bottom: 8px; padding-left: 4px; font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.62); }
+.slot-top { flex-direction: row; align-items: center; }
+.slot-name { flex-shrink: 1; min-width: 0; }
+.grip { width: 10px; height: 14px; margin-left: auto; flex-shrink: 0; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.45); }
+.slot:hover .grip { -unity-background-image-tint-color: rgba(255, 255, 255, 0.9); }
 
-.market { flex-grow: 1; flex-shrink: 1; min-height: 0; margin-bottom: 12px; }
+.market { flex-grow: 1; flex-shrink: 1; min-height: 0; }
 .market-row { flex-direction: row; align-items: center; height: 35px; padding-left: 14px; padding-right: 14px; border-radius: 12px; font-size: 15px; }
 .market-row:hover { background-color: rgba(255, 255, 255, 0.08); }
 .market-row.sel { background-color: rgba(255, 255, 255, 0.2); }
@@ -163,19 +172,20 @@
 .r-age, .r-stat, .r-salary { -unity-text-align: middle-right; }
 .market-row.contracted .r-name, .market-row.contracted .r-age, .market-row.contracted .r-salary { color: rgba(255, 255, 255, 0.5); }
 
-.detail { flex-shrink: 0; padding: 14px 16px; border-radius: 20px; background-color: rgba(0, 0, 0, 0.18); }
-.detail-head { flex-direction: row; justify-content: space-between; align-items: flex-end; margin-bottom: 10px; }
+.side { position: absolute; right: 668px; top: 100px; width: 460px; border-radius: 24px; padding: 20px; }
+.detail { flex-shrink: 0; }
+.detail-head { flex-direction: row; justify-content: space-between; align-items: flex-end; margin-bottom: 14px; }
 .detail-name { font-size: 26px; letter-spacing: 1px; }
 .detail-meta { flex-direction: row; align-items: center; margin-top: 6px; }
 .meta-item { margin-right: 16px; font-size: 14px; letter-spacing: 0.8px; color: rgba(255, 255, 255, 0.62); }
 .detail-ovr { font-size: 46px; -unity-text-align: lower-right; }
-.stats { margin-bottom: 10px; }
+.stats { margin-bottom: 14px; }
 .stat-row { flex-direction: row; align-items: center; height: 20px; margin-bottom: 6px; }
 .stat-label { width: 130px; margin-right: 14px; font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.62); }
 .stat-bar { flex-grow: 1; height: 6px; border-radius: 9px; overflow: hidden; background-color: rgba(255, 255, 255, 0.15); }
 .stat-fill { height: 100%; border-radius: 9px; }
 .stat-value { width: 40px; margin-left: 14px; font-size: 15px; -unity-text-align: middle-right; }
-.contract { flex-direction: row; margin-bottom: 10px; }
+.contract { flex-direction: row; margin-bottom: 14px; }
 .option { flex-grow: 1; flex-basis: 0; margin-right: 8px; padding: 8px 14px; border-radius: 12px; border-width: 1px; border-color: rgba(255, 255, 255, 0.14); }
 .option.last { margin-right: 0; }
 .option:hover { background-color: rgba(255, 255, 255, 0.08); }
@@ -185,10 +195,11 @@
 
 /* Crew: the panel fits its content, so more of the garage shows */
 .panel#crew { bottom: auto; }
-.crew-head { flex-direction: row; justify-content: space-between; align-items: flex-end; margin-bottom: 12px; padding-left: 4px; padding-right: 4px; }
+.crew-head { flex-direction: row; align-items: flex-end; margin-bottom: 12px; padding-left: 4px; padding-right: 4px; }
 .crew-count { font-size: 46px; }
 .crew-cost { font-size: 21px; color: rgb(61, 220, 132); }
-.crew-head.preview > Label, .pit.preview .pit-time { opacity: 0.55; }
+.crew-head.preview > .crew-count, .crew-head.preview > .crew-cost, .pit.preview .pit-time { opacity: 0.55; }
+.crew-action { flex-grow: 1; margin-left: 16px; margin-bottom: 4px; font-size: 14px; letter-spacing: 1.1px; }
 .crew-row { flex-direction: row; margin-bottom: 8px; }
 .member { width: 66px; height: 66px; margin-right: 8px; border-radius: 12px; align-items: center; justify-content: center; border-width: 1px; border-color: rgba(255, 255, 255, 0.22); }
 .member.last { margin-right: 0; }

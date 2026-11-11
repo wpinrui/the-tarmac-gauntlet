@@ -34,6 +34,14 @@ namespace TarmacGauntlet.Management
         /// <summary>A panel opened: its slug and the element to fill. The body is emptied each time.</summary>
         public event Action<string, VisualElement> ScreenOpened;
 
+        /// <summary>
+        /// The side pane left of the docked panel, emptied with the panel each time a screen opens. It shows while a
+        /// screen is open and the pane has something in it.
+        /// </summary>
+        internal VisualElement SideBody { get; private set; }
+
+        private VisualElement side;
+
         private enum Mode { Main, NewGame, Hub, Screen, Lineup }
         private enum Overlay { None, Pause, Settings }
 
@@ -208,6 +216,13 @@ namespace TarmacGauntlet.Management
             panel.Add(panelButton);
             gameLayer.Add(panel);
 
+            // A second pane left of the docked panel, for screens that show a selected item beside a long list.
+            side = glass.Make("side", "fade");
+            SideBody = new VisualElement();
+            SideBody.AddToClassList("side-body");
+            side.Add(SideBody);
+            gameLayer.Add(side);
+
             // Escape menu and settings, over a dimmed scene.
             dimmer = Layer("dimmer", "fade");
             pauseLayer = Layer("centre", "fade");
@@ -224,7 +239,7 @@ namespace TarmacGauntlet.Management
             settingsPanel = glass.Make("settings");
             settingsLayer.Add(settingsPanel);
 
-            foreach (VisualElement e in new[] { mainColumn, top, hubMenu, strip, tag, race, panel, dimmer, pauseLayer, settingsLayer })
+            foreach (VisualElement e in new[] { mainColumn, top, hubMenu, strip, tag, race, panel, side, dimmer, pauseLayer, settingsLayer })
                 e.style.display = DisplayStyle.None;
 
             tipLayer = Layer();
@@ -537,6 +552,7 @@ namespace TarmacGauntlet.Management
             if (next == Mode.Screen || next == Mode.Lineup || next == Mode.NewGame)
             {
                 panelBody.Clear();
+                SideBody.Clear();
                 panel.name = next == Mode.Screen ? slug : next == Mode.Lineup ? LineupSlug : NewGameSlug;
                 ScreenOpened?.Invoke(panel.name, panelBody);
             }
@@ -611,6 +627,7 @@ namespace TarmacGauntlet.Management
             Show(strip, (mode == Mode.Screen || mode == Mode.Lineup) && !covered);
             Show(race, mode == Mode.Hub && !covered);
             Show(panel, (mode == Mode.Screen || mode == Mode.Lineup || mode == Mode.NewGame) && !covered);
+            Show(side, mode == Mode.Screen && SideBody.childCount > 0 && !covered);
             panelButton.style.display = mode == Mode.NewGame ? DisplayStyle.Flex : DisplayStyle.None;
             Show(dimmer, covered);
             Show(pauseLayer, overlay == Overlay.Pause);

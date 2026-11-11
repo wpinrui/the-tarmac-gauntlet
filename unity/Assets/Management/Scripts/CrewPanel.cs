@@ -19,7 +19,7 @@ namespace TarmacGauntlet.Management
 
         private Menus menus;
         private VisualElement body, head, pitBox;
-        private Label count, cost, pitTime;
+        private Label count, action, cost, pitTime;
         private readonly VisualElement[] members = new VisualElement[MaxCrew];
         private int? hover;
 
@@ -59,7 +59,9 @@ namespace TarmacGauntlet.Management
             head.AddToClassList("crew-head");
             count = menus.Text("", "crew-count", true);
             cost = menus.Text("", "crew-cost", true);
+            action = menus.Text("", "crew-action", true);
             head.Add(count);
+            head.Add(action);
             head.Add(cost);
             body.Add(head);
 
@@ -96,7 +98,7 @@ namespace TarmacGauntlet.Management
 
             pitBox = new VisualElement();
             pitBox.AddToClassList("pit");
-            Label label = menus.Text("PIT STOP", "pit-label");
+            Label label = menus.Text("AVERAGE PIT STOP TIMING", "pit-label");
             menus.Tooltip(label, "A full stop: refuel, four tyres and a driver swap, with this crew, your Engineer skill and the race car.");
             pitBox.Add(label);
             pitTime = menus.Text("", "pit-time", true);
@@ -137,6 +139,8 @@ namespace TarmacGauntlet.Management
             count.text = shown.ToString(CultureInfo.InvariantCulture);
             cost.text = Menus.Money(shown * DealerData.CrewCostPerMember);
             head.EnableInClassList("preview", preview);
+            int change = shown - current;
+            action.text = change == 0 ? "" : (change > 0 ? "HIRE " : "RELEASE ") + Math.Abs(change).ToString(CultureInfo.InvariantCulture) + " PIT CREW";
 
             for (int i = 1; i <= MaxCrew; i++)
             {
