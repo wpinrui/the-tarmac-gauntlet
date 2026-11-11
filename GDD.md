@@ -438,6 +438,8 @@ The player's **Business skill** reduces crew costs. The player's **Engineer skil
 
 Crew size is set between races and remains fixed for the duration of that race.
 
+AI teams don't hire crew. Each AI team's crew follows its prestige percentile among the AI teams: 4 at the bottom, 16 at the top, rounded to whole people. It is set when the game starts and again at each year advance, and AI teams pay for it like the player does.
+
 ---
 
 ## 6. Player Skills

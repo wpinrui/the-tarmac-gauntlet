@@ -61,19 +61,18 @@ namespace TarmacGauntlet.Simulation
             public int Count { get; init; }
             public double BudgetMin { get; init; }
             public double BudgetMax { get; init; }
-            public int CrewSize { get; init; }
             public double PrestigeMin { get; init; }
             public double PrestigeMax { get; init; }
         }
 
         private static readonly IReadOnlyList<AiTierSpec> AiTierSpecs = new[]
         {
-            new AiTierSpec { ModelIds = new[] { "f-01", "f-02", "f-03", "f-04", "f-05", "f-06" }, Count = 20, BudgetMin = 500,     BudgetMax = 4_000,   CrewSize = 0,  PrestigeMin = 5,  PrestigeMax = 15 },
-            new AiTierSpec { ModelIds = new[] { "e-07", "e-08", "e-09", "e-10", "e-11" },         Count = 20, BudgetMin = 4_000,   BudgetMax = 10_000,  CrewSize = 2,  PrestigeMin = 15, PrestigeMax = 30 },
-            new AiTierSpec { ModelIds = new[] { "d-12", "d-13", "d-14", "d-15" },                 Count = 20, BudgetMin = 10_000,  BudgetMax = 25_000,  CrewSize = 4,  PrestigeMin = 30, PrestigeMax = 50 },
-            new AiTierSpec { ModelIds = new[] { "c-16", "c-17", "c-18", "c-19", "c-20" },         Count = 15, BudgetMin = 25_000,  BudgetMax = 60_000,  CrewSize = 6,  PrestigeMin = 50, PrestigeMax = 65 },
-            new AiTierSpec { ModelIds = new[] { "b-21", "b-22", "b-23", "b-24", "b-25" },         Count = 12, BudgetMin = 60_000,  BudgetMax = 150_000, CrewSize = 8,  PrestigeMin = 65, PrestigeMax = 80 },
-            new AiTierSpec { ModelIds = new[] { "a-26", "a-27", "a-28", "a-29", "a-30" },         Count = 12, BudgetMin = 150_000, BudgetMax = 400_000, CrewSize = 12, PrestigeMin = 80, PrestigeMax = 95 },
+            new AiTierSpec { ModelIds = new[] { "f-01", "f-02", "f-03", "f-04", "f-05", "f-06" }, Count = 20, BudgetMin = 500,     BudgetMax = 4_000,   PrestigeMin = 5,  PrestigeMax = 15 },
+            new AiTierSpec { ModelIds = new[] { "e-07", "e-08", "e-09", "e-10", "e-11" },         Count = 20, BudgetMin = 4_000,   BudgetMax = 10_000,  PrestigeMin = 15, PrestigeMax = 30 },
+            new AiTierSpec { ModelIds = new[] { "d-12", "d-13", "d-14", "d-15" },                 Count = 20, BudgetMin = 10_000,  BudgetMax = 25_000,  PrestigeMin = 30, PrestigeMax = 50 },
+            new AiTierSpec { ModelIds = new[] { "c-16", "c-17", "c-18", "c-19", "c-20" },         Count = 15, BudgetMin = 25_000,  BudgetMax = 60_000,  PrestigeMin = 50, PrestigeMax = 65 },
+            new AiTierSpec { ModelIds = new[] { "b-21", "b-22", "b-23", "b-24", "b-25" },         Count = 12, BudgetMin = 60_000,  BudgetMax = 150_000, PrestigeMin = 65, PrestigeMax = 80 },
+            new AiTierSpec { ModelIds = new[] { "a-26", "a-27", "a-28", "a-29", "a-30" },         Count = 12, BudgetMin = 150_000, BudgetMax = 400_000, PrestigeMin = 80, PrestigeMax = 95 },
         };
 
         // ---------------------------------------------------------------------------
@@ -236,7 +235,6 @@ namespace TarmacGauntlet.Simulation
                 Budget = budget,
                 Prestige = prestige,
                 PrestigeHistory = new[] { prestige },
-                CrewSize = spec.CrewSize,
                 Cars = new[] { car },
                 Contracts = contracts,
                 EnteredCarId = car.Id,
@@ -310,7 +308,7 @@ namespace TarmacGauntlet.Simulation
         /// Creates a complete initial GameState.
         ///
         /// - Seeds 310 drivers with age distribution
-        /// - Creates 99 AI teams across all tiers, each with 1 car and 3 contracted drivers
+        /// - Creates 99 AI teams across all tiers, each with 1 car, 3 contracted drivers and a crew sized by prestige (AiCrew)
         /// - Creates the player team: $1,000 budget, plot armour car, no drivers, 0 crew
         /// - Generates the car market (new + used)
         /// - Year 1, newGame phase
@@ -359,9 +357,8 @@ namespace TarmacGauntlet.Simulation
                 options.TeamColour,
                 options.Skills);
 
-            // 4. All teams
-            var teams = new List<BaseTeam> { playerTeam };
-            teams.AddRange(aiTeams);
+            // 4. All teams, AI crews sized by prestige
+            var teams = AiCrew.Assign(new BaseTeam[] { playerTeam }.Concat(aiTeams));
 
             // 5. Car market
             var carModels = CarModels.All;
