@@ -84,6 +84,10 @@ namespace TarmacGauntlet.Simulation
         private static double DriverScore(Driver driver) =>
             DriverLifecycle.TotalDriverStats(DriverLifecycle.CalculateDriverStats(driver));
 
+        /// <summary>A team locked to one model only buys that model.</summary>
+        private static bool RunsModel(AITeam team, string modelId) =>
+            team.ModelId == "" || team.ModelId == modelId;
+
         private sealed record OwnedCar(CarInstance Instance, CarModel Model, double Score);
 
         /// <summary>Returns the best car the AI team currently owns (highest CarScore), or null.</summary>
@@ -215,6 +219,7 @@ namespace TarmacGauntlet.Simulation
             var fullUpgrades = new InstalledUpgrades { Power = true, Handling = true, Comfort = true };
             foreach (var model in carModels)
             {
+                if (!RunsModel(team, model.Id)) continue;
                 var potentialScore = CarScore(model, fullUpgrades);
                 if (potentialScore > currentScore)
                 {
@@ -231,6 +236,7 @@ namespace TarmacGauntlet.Simulation
             // --- Buy used car ---
             foreach (var listing in usedListings)
             {
+                if (!RunsModel(team, listing.ModelId)) continue;
                 if (!modelMap.TryGetValue(listing.ModelId, out var model)) continue;
                 var listingScore = CarScore(model, listing.InstalledUpgrades);
                 if (listingScore > currentScore)

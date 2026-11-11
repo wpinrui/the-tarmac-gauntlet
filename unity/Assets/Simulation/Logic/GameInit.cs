@@ -53,11 +53,10 @@ namespace TarmacGauntlet.Simulation
 
         /// <summary>
         /// AI teams are spread across the performance spectrum. Each tier entry defines
-        /// how many AI teams start with a car from that tier and their starting budget range.
+        /// how many AI teams race in that tier and their starting budget range.
         /// </summary>
         private sealed record AiTierSpec
         {
-            public IReadOnlyList<string> ModelIds { get; init; } = Array.Empty<string>();
             public int Count { get; init; }
             public double BudgetMin { get; init; }
             public double BudgetMax { get; init; }
@@ -67,12 +66,12 @@ namespace TarmacGauntlet.Simulation
 
         private static readonly IReadOnlyList<AiTierSpec> AiTierSpecs = new[]
         {
-            new AiTierSpec { ModelIds = new[] { "f-01", "f-02", "f-03", "f-04", "f-05", "f-06" }, Count = 20, BudgetMin = 500,     BudgetMax = 4_000,   PrestigeMin = 5,  PrestigeMax = 15 },
-            new AiTierSpec { ModelIds = new[] { "e-07", "e-08", "e-09", "e-10", "e-11" },         Count = 20, BudgetMin = 4_000,   BudgetMax = 10_000,  PrestigeMin = 15, PrestigeMax = 30 },
-            new AiTierSpec { ModelIds = new[] { "d-12", "d-13", "d-14", "d-15" },                 Count = 20, BudgetMin = 10_000,  BudgetMax = 25_000,  PrestigeMin = 30, PrestigeMax = 50 },
-            new AiTierSpec { ModelIds = new[] { "c-16", "c-17", "c-18", "c-19", "c-20" },         Count = 15, BudgetMin = 25_000,  BudgetMax = 60_000,  PrestigeMin = 50, PrestigeMax = 65 },
-            new AiTierSpec { ModelIds = new[] { "b-21", "b-22", "b-23", "b-24", "b-25" },         Count = 12, BudgetMin = 60_000,  BudgetMax = 150_000, PrestigeMin = 65, PrestigeMax = 80 },
-            new AiTierSpec { ModelIds = new[] { "a-26", "a-27", "a-28", "a-29", "a-30" },         Count = 12, BudgetMin = 150_000, BudgetMax = 400_000, PrestigeMin = 80, PrestigeMax = 95 },
+            new AiTierSpec { Count = 20, BudgetMin = 500,     BudgetMax = 4_000,   PrestigeMin = 5,  PrestigeMax = 15 },
+            new AiTierSpec { Count = 20, BudgetMin = 4_000,   BudgetMax = 10_000,  PrestigeMin = 15, PrestigeMax = 30 },
+            new AiTierSpec { Count = 20, BudgetMin = 10_000,  BudgetMax = 25_000,  PrestigeMin = 30, PrestigeMax = 50 },
+            new AiTierSpec { Count = 15, BudgetMin = 25_000,  BudgetMax = 60_000,  PrestigeMin = 50, PrestigeMax = 65 },
+            new AiTierSpec { Count = 12, BudgetMin = 60_000,  BudgetMax = 150_000, PrestigeMin = 65, PrestigeMax = 80 },
+            new AiTierSpec { Count = 12, BudgetMin = 150_000, BudgetMax = 400_000, PrestigeMin = 80, PrestigeMax = 95 },
         };
 
         // ---------------------------------------------------------------------------
@@ -189,14 +188,14 @@ namespace TarmacGauntlet.Simulation
 
         private static (AITeam Team, IReadOnlyList<Contract> Contracts) CreateAiTeam(
             int index,
-            string teamName,
+            AiTeamEntry entry,
             AiTierSpec spec,
             IReadOnlyList<Driver> drivers,
             int driverOffset,
             Func<double> random)
         {
             var teamId = $"ai-{index}";
-            var modelId = spec.ModelIds[(int)Math.Floor(random() * spec.ModelIds.Count)];
+            var modelId = entry.ModelId;
             var car = new CarInstance
             {
                 Id = NextCarId(),
@@ -231,7 +230,8 @@ namespace TarmacGauntlet.Simulation
             var team = new AITeam
             {
                 Id = teamId,
-                Name = teamName,
+                Name = entry.Name,
+                ModelId = modelId,
                 Budget = budget,
                 Prestige = prestige,
                 PrestigeHistory = new[] { prestige },
@@ -336,7 +336,7 @@ namespace TarmacGauntlet.Simulation
                 {
                     var (team, contracts) = CreateAiTeam(
                         teamIndex,
-                        AiTeamRoster.All[teamIndex].Name,
+                        AiTeamRoster.All[teamIndex],
                         spec,
                         drivers,
                         driverOffset,
