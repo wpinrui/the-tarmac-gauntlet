@@ -184,6 +184,7 @@ static partial class Check
     /// </summary>
     static string LeftTrack(SetupRun run)
     {
+        var offs = new List<string>();
         for (int i = 0; i < run.N; i++)
         {
             float racing = float.NegativeInfinity, off = 0f;
@@ -193,9 +194,9 @@ static partial class Check
                 if (on && !f.Busy[i]) racing = f.T;
                 else if (!on && f.T - racing < 0.5f) off += Race.Dt;
             }
-            if (off > 0f) return $"{run.Name(i)} left the track";
+            if (off > 0f) offs.Add(run.Name(i));
         }
-        return null;
+        return offs.Count == 0 ? null : string.Join(" and ", offs) + " left the track";
     }
 
     /// <summary>Hard limit set-ups: a bad start, any contact or a car leaving the track fails, whatever the limit's own check says.</summary>
