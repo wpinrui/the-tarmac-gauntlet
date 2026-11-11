@@ -507,24 +507,28 @@ def tip_shape():
     return soft(smooth_loop(R["exhaust"][0], 0.0003), 0.015)
 
 
+TIP_PROUD = 0.015    # each tip stands this far behind the rearmost skin round it
+TIP_LEN = 0.30       # and runs this far into the body
+
+
 def exhaust():
-    """Two tips side by side high in the middle of the tail, each in its own black pocket."""
+    """Two tips side by side high in the middle of the tail, standing out of the black band,
+    each a chrome tube with a dark inside."""
     tip = tip_shape()
-    cut, pipes, pockets = [], [], []
+    cut, pipes, holes = [], [], []
     for sgn, side in ((1, "l"), (-1, "r")):
         t = tip if sgn > 0 else flip(tip)
-        b = t.bounds
-        x_end = min(_tail_x(y, z) for y, z in np.array(t.exterior.coords)) - 0.012
-        pocket = t.buffer(0.010, join_style=1)
-        ring = body.even(np.array(pocket.exterior.coords)[:-1], 128)
-        rings = [np.column_stack([np.full(128, x), ring[:, 0], ring[:, 1]]) for x in (x_end - 0.25, x_end + 0.25)]
+        x_end = min(_tail_x(y, z) for y, z in np.array(t.exterior.coords)) - TIP_PROUD
+        hole = t.buffer(0.001)
+        ring = body.even(np.array(hole.exterior.coords)[:-1], 128)
+        rings = [np.column_stack([np.full(128, x), ring[:, 0], ring[:, 1]]) for x in (x_end - 0.05, x_end + TIP_LEN)]
         v, f = geom.close_rings(rings)
         cut.append(blend.make(f"cut_exhaust_{side}", v, f, "trim"))
-        pockets.append(pocket)
-        outer = body.even(np.array(t.buffer(-0.002).exterior.coords)[:-1], 96)
-        inner = body.even(np.array(t.buffer(-0.008).exterior.coords)[:-1], 96)
+        holes.append(hole)
+        outer = body.even(np.array(t.buffer(-0.001).exterior.coords)[:-1], 96)
+        inner = body.even(np.array(t.buffer(-0.007).exterior.coords)[:-1], 96)
         rings = []
-        for x, rg in ((x_end, inner), (x_end, outer), (x_end + 0.08, outer), (x_end + 0.08, inner)):
+        for x, rg in ((x_end, inner), (x_end, outer), (x_end + TIP_LEN, outer), (x_end + TIP_LEN, inner)):
             rings.append(np.column_stack([np.full(len(rg), x), rg[:, 0], rg[:, 1]]))
         v, f = geom.close_rings(rings, cap=False)
         m = len(rings[0])
@@ -532,14 +536,17 @@ def exhaust():
             k = (j + 1) % m
             f.append((3 * m + j, 3 * m + k, k, j))
         pipes.append(blend.make(f"exhaust_{side}", v, f, "chrome"))
-        del b
-    return cut, pipes, unary_union(pockets)
+        rg = body.even(np.array(t.buffer(-0.0075).exterior.coords)[:-1], 96)
+        rings = [np.column_stack([np.full(96, x), rg[:, 0], rg[:, 1]]) for x in (x_end + 0.06, x_end + 0.07)]
+        v, f = geom.close_rings(rings)
+        pipes.append(blend.make(f"exhaust_inner_{side}", v, f, "trim"))
+    return cut, pipes, unary_union(holes)
 
 
 def rear_parts(ref, out, pocket):
     """The black band across the tail with the tail lamp slats on it, and the diffuser."""
     fr = rear_fr()
-    band = soft(mirrored(poly(R["rear_band"])), 0.015).difference(pocket.buffer(0.012))
+    band = soft(mirrored(poly(R["rear_band"])), 0.015).difference(pocket.buffer(0.001))
     out += blend.lay(ref, "rear_band", band, fr, 0.0015, 0.0035, "grille", 0.008, along_ray=True)
     for i, (s, mat) in enumerate(zip(R["tail_slats"], ("lamp_brake", "lamp_tail"))):
         g = soft(poly(s), 0.004)
@@ -556,6 +563,8 @@ def rear_parts(ref, out, pocket):
 
 # ---------------------------------------------------------------- airbrake
 AB_T = 0.024     # the airbrake's thickness at its thickest
+FLUSH_DOWN = 0.035   # lowered, its leading edge sits this much below the raised one's
+FLUSH_DROP = 0.025   # and its trailing edge this much lower again
 
 
 def _ab_span():
@@ -566,10 +575,14 @@ def _ab_span():
 
 def airbrake(raised):
     """The airbrake: a flat wing spanning the tail. Raised, at the angle the reference model
-    shows on two black struts; flush, lying on the deck as part of the tail."""
+    shows on two black struts; lowered, nearly level with the deck as a lip over the tail."""
     a = R["airbrake"]
     plan, ymax = _ab_span()
     (xf, zf), (xb, zb) = a["front"], a["back"]
+    if raised:
+        chord = lambda x: zf + (zb - zf) * (x - xf) / (xb - xf)
+    else:
+        chord = lambda x: zf - FLUSH_DOWN - FLUSH_DROP * (x - xf) / (xb - xf)
     rings = []
     n = 24
     for y in np.linspace(-ymax, ymax, 41):
@@ -580,22 +593,18 @@ def airbrake(raised):
         s = np.linspace(0, 1, n)
         xs = x1 + (x0 - x1) * s                          # front to back
         th = AB_T * np.clip(np.sqrt(4 * s * (1 - s)), 0.25, 1)
-        if raised:
-            base = zf + (zb - zf) * (xs - xf) / (xb - xf) - AB_T / 2
-        else:
-            base = np.array([z_at(x, y) for x in xs]) + 0.002
+        base = chord(xs) - AB_T / 2
         top = np.column_stack([xs, np.full(n, y), base + th])
-        bot = np.column_stack([xs, np.full(n, y), base + (AB_T - th) * 0.35 if raised else base])
+        bot = np.column_stack([xs, np.full(n, y), base + (AB_T - th) * 0.35])
         rings.append(np.vstack([bot, top[::-1][1:-1]]))
     v, f = geom.close_rings(rings)
     obs = [blend.make("airbrake", v, f, "body")]
-    if raised:
-        for sgn, side in ((1, "l"), (-1, "r")):
-            y = 0.36 * sgn
-            x0, x1 = xb + 0.06, xb + 0.14
-            zt = zf + (zb - zf) * ((x0 + x1) / 2 - xf) / (xb - xf)
-            zd = min(z_at(x0, y), z_at(x1, y)) - 0.02
-            obs.append(_rbox(f"airbrake_strut_{side}", x0, x1, y - 0.007, y + 0.007, zd, zt, r=0.005, mat="trim"))
+    for sgn, side in ((1, "l"), (-1, "r")):
+        y = 0.36 * sgn
+        x0, x1 = xb + 0.06, xb + 0.14
+        zt = float(chord((x0 + x1) / 2))
+        zd = min(z_at(x0, y), z_at(x1, y)) - 0.02
+        obs.append(_rbox(f"airbrake_strut_{side}", x0, x1, y - 0.007, y + 0.007, zd, zt, r=0.005, mat="trim"))
     return obs
 
 
