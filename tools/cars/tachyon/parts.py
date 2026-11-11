@@ -151,6 +151,7 @@ def headlamps(ref, cutters, out, sgn):
     front = to2([v[v[:, 0].argmax()]])[0]
     back = to2([v[v[:, 0].argmin()]])[0]
     ring = inner.exterior
+    rings = []
     for i, t in enumerate((0.22, 0.48)):
         p = Point(front + (back - front) * t)
         c = ring.interpolate(ring.project(p))
@@ -159,7 +160,8 @@ def headlamps(ref, cutters, out, sgn):
         out += blend.lay(ref, f"lamp_head_{side}{i}", lens, fr, -0.0125, -0.009, "lamp_head", 0.004, along_ray=True)
         out += blend.lay(ref, f"head_reflector_{side}{i}", c.buffer(0.031, 48).difference(c.buffer(0.022, 48)).intersection(shp.buffer(-0.008)),
                          fr, -0.0122, -0.0105, "reflector", 0.004, along_ray=True)
-    blade = shp.buffer(-0.008).difference(shp.buffer(-0.018))
+        rings.append(c.buffer(0.036, 48))
+    blade = shp.buffer(-0.008).difference(shp.buffer(-0.018)).difference(unary_union(rings))
     top = LineString([front, back]).parallel_offset(0.5, "left")
     keep = blade.intersection(unary_union([top.buffer(0.49, cap_style=2)]))
     if not keep.is_empty:
@@ -327,7 +329,7 @@ def louvres(ref, out):
     b = o.bounds
     x0 = b[0] - ENGINE_FRAME + 0.004
     w = (b[3] - b[1]) / 2 - 0.02
-    panel = soft(box(LOUVRE_X1, -w, x0, w), 0.03).union(box(x0 - 0.02, -w, x0 + 0.02, w)).difference(o.buffer(ENGINE_FRAME - 0.004))
+    panel = soft(box(LOUVRE_X1, -w, x0, w), 0.03).union(box(x0 - 0.02, -w, x0 + 0.02, w)).difference(o.buffer(ENGINE_FRAME + 0.002))
     out += blend.lay(ref, "louvre_panel", panel, top_fr(), 0.0015, 0.0035, "grille", 0.01)
     for i, x in enumerate(np.linspace(LOUVRE_X1 + 0.04, x0 - 0.05, LOUVRES)):
         slat = soft(box(x - 0.011, -w + 0.03, x + 0.011, w - 0.03), 0.008)
