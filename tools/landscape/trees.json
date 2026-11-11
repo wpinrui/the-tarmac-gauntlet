@@ -1,0 +1,10 @@
+{
+  "oak": { "model": "island_tree_01", "thicken": 1.6 },
+  "beech": { "model": "island_tree_02", "thicken": 1.6 },
+  "birch": { "model": "tree_small_02", "thicken": 1.4 },
+  "pine_a": { "model": "fir_tree_01", "node": 0, "thicken": 1.2 },
+  "pine_b": { "model": "fir_tree_01", "node": 1, "thicken": 1.2 },
+  "spruce_a": { "model": "fir_sapling_medium", "node": 0, "thicken": 1.2 },
+  "spruce_b": { "model": "fir_sapling_medium", "node": 1, "thicken": 1.2 },
+  "bush": { "model": "island_tree_02", "leavesOnly": true, "thicken": 1.9 }
+}
