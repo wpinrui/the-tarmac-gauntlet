@@ -2,9 +2,10 @@
 // sits in the atlas (for the projection) and where each race number goes, in atlas pixels.
 // Front and rear lie turned a quarter in the atlas so everything fits one square.
 //
-// Run: node bake.js <views dir> <livery dir> <out dir> [--size 2048] [--sample 8] [--guides]
+// Run: node bake.js <views dir> <livery dir> <out dir> [--size 2048] [--sample 8] [--guides] [--model <asset path>]
 //   --sample draws that number in every number box, --guides lays the views' part edges
-//   over the art. Both are for previews; the game's atlas has neither.
+//   over the art. Both are for previews; the game's atlas has neither. --model names the car
+//   model the livery was drawn on, so the game never puts it on another.
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
@@ -12,7 +13,7 @@ const { chromium } = require('playwright');
 const args = process.argv.slice(2);
 const flag = (k, d) => { const i = args.indexOf(k); return i < 0 ? d : (args[i + 1] && !args[i + 1].startsWith('--') ? args[i + 1] : true); };
 const [viewsDir, liveryDir, outDir] = args;
-const SIZE = Number(flag('--size', 2048)), SAMPLE = flag('--sample', null), GUIDES = flag('--guides', false);
+const SIZE = Number(flag('--size', 2048)), SAMPLE = flag('--sample', null), GUIDES = flag('--guides', false), MODEL = flag('--model', '');
 const PAD = 8;
 const ORDER = ['left', 'right', 'top', 'front', 'rear'];
 const TURNED = new Set(['front', 'rear']);
@@ -87,6 +88,6 @@ function paint(size, pieces, numbers, sample, font) {
   await browser.close();
   fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(path.join(outDir, 'atlas.png'), Buffer.from(png.split(',')[1], 'base64'));
-  fs.writeFileSync(path.join(outDir, 'livery.json'), JSON.stringify({ size: SIZE, ppm, base: marks.base, panels, numbers }, null, 1));
+  fs.writeFileSync(path.join(outDir, 'livery.json'), JSON.stringify({ model: MODEL, size: SIZE, ppm, base: marks.base, panels, numbers }, null, 1));
   console.log('baked', outDir, `${SIZE}px at ${ppm} px/m`);
 })();

@@ -2,7 +2,7 @@
 one toggle per livery and one for the doors. The projection here is the same one the game's
 livery shader does: each paint face takes the view it faces most, blended where views meet.
 
-Run from a team's folder, e.g. python3 ../common/viewer.py <model.obj> <out.html> <title> <name>=<baked dir> ...
+Run from a team's folder, e.g. python3 ../common/viewer.py <model.obj> <out.html> <title> <name>=<baked dir> ... [--number 8]
 """
 import base64
 import gzip
@@ -34,7 +34,7 @@ button:focus-visible { outline: 2px solid var(--on); outline-offset: 2px; }
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
 <script type="text/plain" id="model">__OBJ__</script>
 <script>
-const MATS = __MATS__, DOORS = __DOORS__, LIVERIES = __LIVERIES__;
+const MATS = __MATS__, DOORS = __DOORS__, LIVERIES = __LIVERIES__, DIGITS = __DIGITS__;
 const stage = document.getElementById('stage');
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -76,13 +76,42 @@ function liveryMaterial(lv) {
   m.onBeforeCompile = sh => {
     sh.uniforms.uAtlas = { value: tex };
     sh.uniforms.uBase = { value: new THREE.Color(lv.base).convertSRGBToLinear() };
+    // The race number, drawn as the game's shader draws it.
+    const num = String(lv.number || ''), boxes = (lv.numbers || []).slice(0, 4);
+    const dg = DIGITS ? new THREE.TextureLoader().load(DIGITS.png) : null;
+    sh.uniforms.uDigits = { value: dg };
+    sh.uniforms.uNumBox = { value: [0, 1, 2, 3].map(i => boxes[i] ? new THREE.Vector4(boxes[i].x / lv.size, boxes[i].y / lv.size, boxes[i].h / lv.size, boxes[i].rotate * Math.PI / 180) : new THREE.Vector4()) };
+    sh.uniforms.uNumInk = { value: [0, 1, 2, 3].map(i => new THREE.Color(boxes[i] ? boxes[i].ink : '#fff').convertSRGBToLinear()) };
+    sh.uniforms.uNumBoxes = { value: boxes.length };
+    sh.uniforms.uNumDigits = { value: new THREE.Vector4(+num[0] || 0, +num[1] || 0, +num[2] || 0, dg ? num.length : 0) };
+    const D = DIGITS || { cell: 0, padX: 0, pad: 0, height: 1, advance: [1], w: 1, h: 1 };
+    sh.uniforms.uDigitCell = { value: new THREE.Vector4(D.cell, D.padX, D.advance[0] * D.height * D.h / D.w, D.pad) };
+    sh.uniforms.uDigitHeight = { value: D.height }; sh.uniforms.uDigitAdvance = { value: D.advance[0] };
     for (const n of ['left', 'right', 'top', 'front', 'rear']) {
       sh.uniforms[`uA_${n}`] = { value: v4(P[n].a) }; sh.uniforms[`uB_${n}`] = { value: v4(P[n].b) };
     }
     sh.vertexShader = 'varying vec3 vLp; varying vec3 vLn;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvLp = position; vLn = normal;');
     sh.fragmentShader = `varying vec3 vLp; varying vec3 vLn; uniform sampler2D uAtlas; uniform vec3 uBase;
 uniform vec4 uA_left, uB_left, uA_right, uB_right, uA_top, uB_top, uA_front, uB_front, uA_rear, uB_rear;
-vec3 lvTap(vec4 a, vec4 b, vec3 p) { vec2 uv = vec2(dot(a.xyz, p) + a.w, dot(b.xyz, p) + b.w); return texture2D(uAtlas, vec2(uv.x, 1.0 - uv.y)).rgb; }
+uniform sampler2D uDigits; uniform vec4 uNumBox[4]; uniform vec3 uNumInk[4]; uniform float uNumBoxes; uniform vec4 uNumDigits;
+uniform vec4 uDigitCell; uniform float uDigitHeight, uDigitAdvance;
+vec3 lvNumber(vec2 q, vec3 art) {
+  float count = uNumDigits.w, width = count * uDigitAdvance;
+  for (int i = 0; i < 4; i++) {
+    vec4 box = uNumBox[i]; vec2 d = q - box.xy; float s = sin(box.w), c = cos(box.w);
+    vec2 l = vec2(c * d.x + s * d.y, -s * d.x + c * d.y) / max(box.z, 1e-5);
+    float x = l.x + width / 2.0;
+    float k = clamp(floor(x / uDigitAdvance), 0.0, 2.0);
+    float digit = k < 0.5 ? uNumDigits.x : (k < 1.5 ? uNumDigits.y : uNumDigits.z);
+    float gx = clamp((x - k * uDigitAdvance) / uDigitAdvance, 0.0, 1.0);
+    vec2 g = vec2(digit * uDigitCell.x + uDigitCell.y + gx * uDigitCell.z, uDigitCell.w + clamp(l.y + 0.5, 0.0, 1.0) * uDigitHeight);
+    float inside = step(abs(l.y), 0.5) * step(0.0, x) * step(x, width) * step(float(i) + 0.5, uNumBoxes) * step(0.5, count);
+    vec2 smo = vec2(x / uDigitAdvance * uDigitCell.z, -l.y * uDigitHeight);
+    art = mix(art, uNumInk[i], textureGrad(uDigits, vec2(g.x, 1.0 - g.y), dFdx(smo), dFdy(smo)).a * inside);
+  }
+  return art;
+}
+vec3 lvTap(vec4 a, vec4 b, vec3 p) { vec2 uv = vec2(dot(a.xyz, p) + a.w, dot(b.xyz, p) + b.w); return lvNumber(uv, texture2D(uAtlas, vec2(uv.x, 1.0 - uv.y)).rgb); }
 vec3 livery(vec3 p, vec3 n) {
   vec3 k = pow(abs(n), vec3(6.0));
   float wSide = k.x, wTop = n.y > 0.0 ? k.y : 0.0, wBot = n.y < 0.0 ? k.y : 0.0, wFront = n.z > 0.0 ? k.z : 0.0, wRear = n.z < 0.0 ? k.z : 0.0;
@@ -179,8 +208,12 @@ def _mtl(path):
     return mats
 
 
-def write(obj_path, html_path, title, liveries):
-    """liveries: [(name, baked dir holding atlas.png and livery.json)]."""
+DIGITS = Path(__file__).resolve().parents[3] / "unity" / "Assets" / "Raceday" / "Resources" / "Livery"
+
+
+def write(obj_path, html_path, title, liveries, number=None):
+    """liveries: [(name, baked dir holding atlas.png and livery.json)]. number: a race number
+    drawn the game's way, for checking the game's atlas."""
     obj_path = Path(obj_path)
     obj = base64.b64encode(gzip.compress(_short(obj_path.read_text()).encode(), 9)).decode()
     doors_path = obj_path.with_suffix(".doors.json")
@@ -190,13 +223,26 @@ def write(obj_path, html_path, title, liveries):
         d = Path(d)
         meta = json.loads((d / "livery.json").read_text())
         atlas = "data:image/png;base64," + base64.b64encode((d / "atlas.png").read_bytes()).decode()
-        lvs.append({"name": name, "atlas": atlas, "base": meta["base"], "panels": meta["panels"]})
+        lvs.append({"name": name, "atlas": atlas, "base": meta["base"], "panels": meta["panels"],
+                    "size": meta["size"], "numbers": meta["numbers"], "number": number})
+    digits = None
+    if number:
+        from PIL import Image
+        digits = json.loads((DIGITS / "Digits.json").read_text())
+        w, h = Image.open(DIGITS / "Digits.png").size
+        digits.update(w=w, h=h, png="data:image/png;base64," + base64.b64encode((DIGITS / "Digits.png").read_bytes()).decode())
     html = (PAGE.replace("__TITLE__", title).replace("__OBJ__", obj).replace("__MATS__", json.dumps(_mtl(obj_path.with_suffix(".mtl"))))
-            .replace("__DOORS__", json.dumps(doors)).replace("__LIVERIES__", json.dumps(lvs)))
+            .replace("__DOORS__", json.dumps(doors)).replace("__LIVERIES__", json.dumps(lvs)).replace("__DIGITS__", json.dumps(digits)))
     Path(html_path).write_text(html)
     print("wrote", html_path, Path(html_path).stat().st_size // 1024, "KB")
 
 
 if __name__ == "__main__":
-    obj, out, title, *pairs = sys.argv[1:]
-    write(obj, out, title, [tuple(p.split("=", 1)) for p in pairs])
+    args = sys.argv[1:]
+    number = None
+    if "--number" in args:
+        i = args.index("--number")
+        number = int(args[i + 1])
+        del args[i:i + 2]
+    obj, out, title, *pairs = args
+    write(obj, out, title, [tuple(p.split("=", 1)) for p in pairs], number)
