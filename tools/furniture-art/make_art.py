@@ -3,40 +3,32 @@
 Usage: python3 -I make_art.py <repo root>
 
 Writes into unity/Assets/Raceday/Resources/Furniture:
-  boards.png               the distance boards' faces, 300, 200 and 100 side by side, each 512 by 384
+  boards.png               the distance boards' faces, 300, 200 and 100 side by side, each 720 by 384
   marshal_overalls.jpg     Team HQ's crew_overalls clothes texture with the blue overalls repainted for marshals
 The boards are black numbers on white with a clear margin round them. The overalls are orange.
-The numbers are set in Titillium Web Bold, the font the race graphics use.
+The numbers are set in D-DIN Bold (D-DIN-Bold.otf beside this script, SIL Open Font License), a free copy of the
+DIN 1451 road sign lettering that circuit boards use.
 """
 import os, sys
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 FACE, INK = (236, 236, 232), (16, 16, 18)
-# Clear space between the numbers and each edge of a face, pixels of 512 by 384.
-MARGIN_X, MARGIN_Y = 96, 88
+# Each face in pixels. The numbers fill about 440 by 206 of it, leaving a clear margin round them.
+FACE_W, FACE_H = 720, 384
 OVERALLS = (22, 1.0, 1.7)   # hue, saturation gain, value gain
 
 
 def boards(root, out):
-    face, ink = FACE, INK
-    path = os.path.join(root, 'unity/Assets/Raceday/Resources/Fonts/TitilliumWeb-Bold.ttf')
-    # The largest size at which every number fits inside the margins.
-    size = 300
-    while True:
-        font = ImageFont.truetype(path, size)
-        boxes = [ImageDraw.Draw(Image.new('RGB', (1, 1))).textbbox((0, 0), t, font=font) for t in ['300', '200', '100']]
-        if all(r - l <= 512 - 2 * MARGIN_X and b - t <= 384 - 2 * MARGIN_Y for l, t, r, b in boxes):
-            break
-        size -= 4
-    im = Image.new('RGB', (1536, 384), face)
+    font = ImageFont.truetype(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'D-DIN-Bold.otf'), 288)
+    im = Image.new('RGB', (FACE_W * 3, FACE_H), FACE)
     d = ImageDraw.Draw(im)
     for i, text in enumerate(['300', '200', '100']):
-        x0 = i * 512
+        x0 = i * FACE_W
         # A thin dark edge round each face, as on a painted aluminium board.
-        d.rectangle([x0, 0, x0 + 511, 383], outline=tuple(int(c * 0.55) for c in face), width=10)
+        d.rectangle([x0, 0, x0 + FACE_W - 1, FACE_H - 1], outline=tuple(int(c * 0.55) for c in FACE), width=10)
         l, t, r, b = d.textbbox((0, 0), text, font=font)
-        d.text((x0 + 256 - (l + r) / 2, 192 - (t + b) / 2), text, font=font, fill=ink)
+        d.text((x0 + FACE_W / 2 - (l + r) / 2, FACE_H / 2 - (t + b) / 2), text, font=font, fill=INK)
     im.save(out)
 
 

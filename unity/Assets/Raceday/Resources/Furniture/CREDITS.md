@@ -8,5 +8,5 @@
 
 ## Other
 
-- **boards.png**: drawn by tools/furniture-art/make_art.py with Titillium Web Bold (SIL Open Font License, see
-  ../Fonts/TitilliumWeb-LICENSE.txt).
+- **boards.png**: drawn by tools/furniture-art/make_art.py with D-DIN Bold by Datto, Inc. (SIL Open Font License
+  1.1, https://openfontlicense.org; the licence travels inside tools/furniture-art/D-DIN-Bold.otf).

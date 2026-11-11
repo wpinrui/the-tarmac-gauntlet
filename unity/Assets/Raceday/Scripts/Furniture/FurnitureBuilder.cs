@@ -28,7 +28,7 @@ namespace TarmacGauntlet.Raceday
         private const float PanelSize = 1.0f;
         private const float PanelHeight = 2.4f;      // panel centre above the ground
         // Distance boards.
-        private const float BoardWidth = 1.5f;
+        private const float BoardWidth = 2.1f;    // the numbers fill about 1.3 m of it
         private const float BoardHeight = 1.1f;
         private const float BoardLift = 0.9f;        // ground to the board's bottom edge
 
@@ -230,7 +230,7 @@ namespace TarmacGauntlet.Raceday
             Vector3 facing = board.Facing;
             Vector3 right = Vector3.Cross(facing, Vector3.up).normalized;   // the viewer's right, looking at the face
             Vector3 p = board.Base;
-            foreach (float x in new[] { -0.5f, 0.5f })
+            foreach (float x in new[] { -0.7f, 0.7f })
                 Beam(legs, p + right * x - Vector3.up * 0.4f, p + right * x + Vector3.up * (BoardLift + BoardHeight - 0.05f) - facing * 0.06f, 0.07f);
             Vector3 mid = p + Vector3.up * (BoardLift + BoardHeight / 2);
             Block(backs, mid - Vector3.up * BoardHeight / 2, BoardHeight, facing, right, 0.05f, BoardWidth);
