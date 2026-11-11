@@ -104,7 +104,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Score for covering the inside of the next corner with a car close behind (H4), s; how far across counts as covering it, m; and how close behind, s, but no closer than a car it has just passed, m.</summary>
         private static readonly float Defend = Knob("DEFEND", 0.3f), DefendCover = Knob("DCOVER", 3f), DefendWithin = Knob("DWITHIN", 0.45f), DefendFrom = Knob("DFROM", 10f);
         /// <summary>H4: the defensive move waits until the attacker would be on the tail within the move's time plus this, s.</summary>
-        private static readonly float DefendLate = Knob("DLATE", 1f), DefendSlack = Knob("DSLACK", 0.5f);
+        private static readonly float DefendLate = Knob("DLATE", 1f), DefendSlack = Knob("DSLACK", 0.2f);
         /// <summary>Gap kept nose to tail when moving across in front of a car behind, m: never across its nose (T8).</summary>
         private static readonly float SwipeGap = Knob("SWIPE", 1f);
         /// <summary>How far ahead of where the car is the line leaving a car its width may aim, m (H2).</summary>
@@ -112,6 +112,8 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Room owed only to a car alongside and only on the track (Ivan, H2).</summary>
         /// <summary>T18b: seconds of the racing line ahead that the committed room to a car on the inside is kept from.</summary>
         private static readonly float OweAhead = Knob("OWEAHEAD", 0.75f);
+        /// <summary>H8, T6b: a path braking for a corner may tuck in behind a car ahead at no less than the gap it has now, and this many seconds clear, s.</summary>
+        private static readonly float Tuck = Knob("TUCK", 0.03f);
         private static readonly bool OweTrack = Knob("OWETRACK", 0f) > 0f, OweH1 = Knob("OWEH1", 1f) > 0f, OweCommit = Knob("OWECOMMIT", 1f) > 0f, OweEdge = Knob("OWEEDGE", 1f) > 0f;
         /// <summary>Score per second a pull-out waits: of two near-equal moves, the later one, so the car stays in the tow until it must move.</summary>
         private static readonly float LateBonus = Knob("LATE", 0.1f);
@@ -248,7 +250,7 @@ namespace TarmacGauntlet.Raceday
                 float threat = RealPace && o.LapPace > 0f ? Mathf.Max(closing, mySpeed * (pilot.Profile.LapTime / o.LapPace - 1f)) : closing;
                 // Only a car with a real attacker behind defends: a train of equal cars doesn't all chop (T9).
                 bool attacker = !RealPace || threat > DefendThreat;
-                if (g < -CarL && !lapping && -g < mySpeed * 1f && o.Speed > mySpeed - 5f && attacker && (!defending || g > attackerGap)) { defending = true; attackerGap = g; attackerLateral = o.Lateral; attackerClosing = threat; }
+                if (g < -CarL && !lapping && -g < mySpeed * 1f && o.Speed > mySpeed - 5f && attacker && (!defending || g > attackerGap)) { defending = true; attackerGap = g; attackerLateral = o.Lateral; attackerClosing = closing; }
                 if (g < -CarL && !lapping && threat > Endurance.NoDefendClosing && -g < threat * 2f) fastBehind = true;
                 if (g > CarL && g < mySpeed * 1f && o.Speed < freeSpeed) passing = true;
                 if (g > 0f && g < aheadGap && Mathf.Abs(o.Lateral - me.Lateral) < CarW + RoomMargin && !(stopped[j] && mySpeed < GhostCrawl + 1f)) { aheadGap = g; ahead = j; aheadInLane = o.Speed; }
@@ -508,6 +510,7 @@ namespace TarmacGauntlet.Raceday
             float d = me.Distance, lat = me.Lateral, v = me.Speed;
             float holdOffset = me.Lateral - line.Lateral[c.IndexOf(Mathf.Repeat(d, lap))], off = holdOffset;
             float over = 0f, risk = 0f, yellow = 0f, lifted = 0f;
+            bool tuckZone = BrakingZone(pilot);   // H8, T6b: only braking for the corner
             bool onTrack = OnTrack(c, me.Lateral, me.Distance);
             float turnIn = NextCornerStart(c, Mathf.Repeat(d, lap));
             bool turnedIn = false;
@@ -600,7 +603,10 @@ namespace TarmacGauntlet.Raceday
                         float owedRoom = side > 0f ? c.HalfWidth(k) - (lat + 0.5f * CarW) : lat - 0.5f * CarW + c.HalfWidth(k);
                         leftRoom = owedRoom >= CarW + RoomMargin && apart > CarW;
                     }
-                    if (!leftRoom && g > (behind ? -CarL - SwipeGap : -0.3f * CarL) && g < CarL + (g > 0f ? buffer : 0f) && apart < need && into && (!touching || apart < Mathf.Min(start - 0.1f, need) || apart < CarW + 0.05f && (TouchClose <= 0f || g < from - TouchClose))) { broke = "H1"; by = others[j].Id; brokeBehind = behind; }
+                    // H8, T6b: tucking in behind a car ahead is no closer to it than now, which is all a car already
+                    // inside the following gap can keep: it rejoins the line behind rather than holding a lane beside (Ivan).
+                    bool tuck = Tuck > 0f && tuckZone && g > CarL + margin + Tuck * v && g >= from - 0.1f;
+                    if (!leftRoom && !tuck && g > (behind ? -CarL - SwipeGap : -0.3f * CarL) && g < CarL + (g > 0f ? buffer : 0f) && apart < need && into && (!touching || apart < Mathf.Min(start - 0.1f, need) || apart < CarW + 0.05f && (TouchClose <= 0f || g < from - TouchClose))) { broke = "H1"; by = others[j].Id; brokeBehind = behind; }
                     else if (!stopped[j] && Mathf.Abs(g) < CarL && OnTrack(c, ol[j, s], od[j, s]))
                     {
                         // H2 and H3: room for a car alongside, on the inside always, on the outside once its front is level or ahead.
