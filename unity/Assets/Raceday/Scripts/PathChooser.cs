@@ -138,10 +138,18 @@ namespace TarmacGauntlet.Raceday
         private readonly List<bool> stopped = new List<bool>();
         private float[,] od = new float[0, 0], ol = new float[0, 0], ov = new float[0, 0];
         private readonly List<int> order = new List<int>();
+        private bool placed;
 
         /// <summary>Picks a path if it is time to, and returns whether it did.</summary>
         public bool Plan(AiPilot pilot, TrafficCar me, IReadOnlyList<TrafficCar> field, float dt)
         {
+            // A car placed off its line starts steering where it is, not for the line: three placed
+            // abreast would otherwise all swerve for it at once (H1).
+            if (!placed && pilot.Index >= 0)
+            {
+                placed = true;
+                pilot.Offset = Mathf.Clamp(me.Lateral - pilot.Line.Lateral[pilot.Index], AiPilot.LaneShifts[0], AiPilot.LaneShifts[AiPilot.LaneShifts.Length - 1]);
+            }
             clock += dt;
             float every = pilot.Gliding ? FarEvery : NearEvery;
             if (clock < every - 1e-4f) return false;
