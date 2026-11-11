@@ -305,8 +305,13 @@ def glass_parts(ref, cutters, out):
     opening, panes, _k = side_shapes()
     for sgn, side in ((1, "l"), (-1, "r")):
         fr, lift = side_frame(sgn)
-        trim = lift(opening.difference(unary_union([p.buffer(-0.004) for p in panes])))
-        out += blend.lay(ref, f"window_trim_{side}", trim, fr, 0.0015, 0.0035, "trim", 0.01, along_ray=True)
+        # laid already split at the door's shut line: a boolean on this thin sheet is unreliable
+        trim = opening.difference(unary_union([p.buffer(-0.004) for p in panes]))
+        bits = trim.intersection(door_outline().buffer(-DOOR_GAP))
+        on_door = max(getattr(bits, "geoms", [bits]), key=lambda g: g.area)  # slivers stay on the body
+        for tag, piece in (("", trim.difference(on_door.buffer(2 * DOOR_GAP))), ("_door", on_door)):
+            out += blend.lay(ref, f"window_trim_{side}{tag}", lift(piece), fr, 0.0015, 0.0035, "trim", 0.01,
+                             along_ray=True)
         for i, p in enumerate(panes):
             g = lift(p)
             cutters += blend.lay(ref, f"cut_side_{side}{i}", g.buffer(-0.002), fr, -0.08, 0.006, "trim", along_ray=True)
@@ -475,16 +480,15 @@ DOOR_PICK = "Up and forward"
 
 
 def door(ref, shell, obs, floor, sgn=1):
-    """Cut the left (sgn 1) or right (sgn -1) door free of the body and its window trim; the
-    door glass, card, mirror arm and mirror glass go with it. Returns the door's pieces."""
+    """Cut the left (sgn 1) or right (sgn -1) door free of the body; the door's window trim,
+    glass, card, mirror arm and mirror glass go with it. Returns the door's pieces."""
     side = "l" if sgn > 0 else "r"
     o = door_outline()
     regions = [(o.intersection(box(-5, -1, 5, floor + 0.02)), DOOR_DEPTH),
                (o.intersection(box(-5, floor + 0.02, 5, 5)), DOOR_WALL), (mirror_footprint(), -0.004)]
-    trim = [t for t in obs if t.name == f"window_trim_{side}"]
-    roles = {f"side_glass_{side}0": "glass", f"mirror_glass_{side}": "mirror", f"mirror_arm_{side}": "arm",
-             f"door_card_{side}": "card"}
-    return blend.free_door(ref, side_fr(sgn), regions, DOOR_GAP, shell, trim, roles, o.union(mirror_footprint()),
+    roles = {f"window_trim_{side}_door": "trim", f"side_glass_{side}0": "glass", f"mirror_glass_{side}": "mirror",
+             f"mirror_arm_{side}": "arm", f"door_card_{side}": "card"}
+    return blend.free_door(ref, side_fr(sgn), regions, DOOR_GAP, shell, [], roles, o.union(mirror_footprint()),
                            name=f"door_{side}")
 
 
