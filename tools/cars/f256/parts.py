@@ -161,22 +161,23 @@ def shell():
 
 
 def bargeboards():
-    """A curved board in front of each sidepod, turning air round the pod."""
+    """A curved board in front of each sidepod, turning air round the pod. Its top drops
+    towards the front."""
     obs = []
     for sgn in (1, -1):
-        t = np.linspace(0, 1, 16)
+        t = np.linspace(0, 1, 24)
         x = 0.90 - 0.36 * t
         y = 0.40 + 0.20 * t ** 1.6
-        line = np.column_stack([x, y])
+        top = np.interp(x, [0.54, 0.70, 0.90], [0.25, 0.25, 0.12])
         nrm = np.column_stack([np.gradient(y), -np.gradient(x)])
         nrm /= np.linalg.norm(nrm, axis=1, keepdims=True)
-        g = Polygon(np.vstack([line + nrm * 0.004, (line - nrm * 0.004)[::-1]]))
-        if sgn < 0:
-            g = sscale(g, 1, -1, origin=(0, 0))
-        side = Polygon([(0.54, 0.06), (0.90, 0.06), (0.90, 0.12), (0.70, 0.25), (0.54, 0.25)])
-        b = extrude("bb", g, "z", 0.06, 0.34, "carbon", 64)
-        blend.boolean(b, extrude("bb_trim", soft(side, 0.04), "y", -1, 1, "carbon", 48), "INTERSECT")
-        obs.append(b)
+        rings = []
+        for i in range(len(t)):
+            c = np.array([x[i], y[i]])
+            a0, a1 = c + nrm[i] * 0.004, c - nrm[i] * 0.004
+            rings.append(np.array([(*a0, 0.06), (*a1, 0.06), (*a1, top[i]), (*a0, top[i])]) * [1, sgn, 1])
+        v, f = geom.close_rings(rings)
+        obs.append(blend.make("bb", v, f, "carbon"))
     return merge(obs, "bargeboards")
 
 

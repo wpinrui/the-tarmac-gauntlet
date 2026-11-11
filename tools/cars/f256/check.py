@@ -7,6 +7,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "common"))
+import bpy  # noqa: E402,F401  (loads Blender before check needs bmesh)
 import check  # noqa: E402
 
 if __name__ == "__main__":
