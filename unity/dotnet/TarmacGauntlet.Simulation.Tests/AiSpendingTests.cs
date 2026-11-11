@@ -108,6 +108,16 @@ namespace TarmacGauntlet.Simulation.Tests
         // ---------------------------------------------------------------------------
 
         [Test]
+        public void LockedTeam_BuysOnlyItsOwnModel()
+        {
+            var team = MakeAiTeam("t1", 1_000_000, new[] { MakeInstance("car1", "m1") }) with { ModelId = "m1" };
+            var models = new[] { MakeModel("m1", 50_000, 40, 40), MakeModel("m2", 60_000, 90, 90) };
+            var used = new[] { new UsedCarListing { Id = "u1", ModelId = "m2", Age = 1, Condition = 90, InstalledUpgrades = new InstalledUpgrades(), Price = 10_000 } };
+            var result = Run(team, models, used: used);
+            Assert.That(result.UpdatedTeam.Cars.Select(c => c.ModelId), Is.All.EqualTo("m1"));
+        }
+
+        [Test]
         public void Hiring_FillsEmptySlotsUpTo3()
         {
             var team = MakeAiTeam("t1", 1_000_000, new[] { MakeInstance("car1", "m1") });

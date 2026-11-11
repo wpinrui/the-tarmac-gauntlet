@@ -878,9 +878,9 @@ def options(ref):
     up, back = (0, 0, 1), (-1, 0, 0)     # a bonnet badge reads from ahead: its top faces the screen
     out = []
 
-    def add(group, n, objs):
+    def add(group, n, objs, tags=None):
         for i, ob in enumerate(objs):
-            ob.name = f"opt_{group}_{n}_{i}"
+            ob.name = f"opt_{group}_{n}_" + (tags[i] if tags else str(i))
             out.append(ob)
     ib = intake_shape().bounds
     _x, ty, tz, tr = R["tail_lamp"]
@@ -896,9 +896,11 @@ def options(ref):
     cap = 0.05
     add("name", 1, _flat(ref, nm, cap, rear_fr(), -0.42, tz - 0.17, up, "nm", 0.0012, NAME_T, "chrome"))
     add("name", 2, _flat(ref, nm, cap, rear_fr(), 0, tz + 0.06, up, "nm", 0.0012, NAME_T, "chrome"))
-    q = []
-    for sgn in (1, -1):
-        q += _flat(ref, nm, cap, side_fr(sgn), W["front_x"] - W["arch_f"] - 0.16, 0.55, up, "nm", 0.0012, NAME_T, "chrome")
-    add("name", 3, q)
+    q, tags = [], []
+    for sgn in (1, -1):        # on the doors, so each swings with its door
+        g = _flat(ref, nm, cap, side_fr(sgn), W["front_x"] - W["arch_f"] - 0.16, 0.55, up, "nm", 0.0012, NAME_T, "chrome")
+        q += g
+        tags += [f"door_{'l' if sgn > 0 else 'r'}_name" + (f"_{k}" if k else "") for k in range(len(g))]
+    add("name", 3, q, tags)
     add("name", 4, _flat(ref, nm, cap, rear_fr(), 0, tz - 0.115, up, "nm", 0.0012, NAME_T, "chrome"))   # under rear badge 1 and 2
     return out

@@ -209,6 +209,19 @@ namespace TarmacGauntlet.Simulation.Tests
         }
 
         [Test]
+        public void InitializeGame_EachAiTeamRunsItsRosterModel()
+        {
+            var game = InitializeGame(Options, Stable);
+            foreach (var team in game.Teams.OfType<AITeam>())
+            {
+                var entry = AiTeamRoster.All.Single(e => e.Name == team.Name);
+                Assert.That(team.ModelId, Is.EqualTo(entry.ModelId));
+                Assert.That(team.Cars.Single().ModelId, Is.EqualTo(entry.ModelId));
+                Assert.That(game.CarModels.Single(m => m.Id == entry.ModelId).CarClass, Is.EqualTo(entry.CarClass));
+            }
+        }
+
+        [Test]
         public void InitializeGame_CarMarketHasNewListingsForAllModels()
         {
             var game = InitializeGame(Options, Stable);
