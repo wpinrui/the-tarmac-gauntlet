@@ -94,10 +94,10 @@ need after a hard hit on a barrier. `C` cycles the chase, bonnet and bumper view
 The car's physics come from its game stats (`Raceday/Scripts/CarSpec.cs`): Power sets the engine,
 Handling sets tyre grip and downforce. Grass and gravel have less grip and slow the car.
 
-Every race rolls its own weather (`Weather.cs`, `WeatherPlan`): a midsummer day at 50 degrees north whose kind of
-weekend (settled, thundery, changeable or unsettled) sets the cloud and how ready the air is to shower. Fronts cross with
-hours of thickening cloud, a band of rain and showers behind; showers build most in the afternoon; low cloud can drizzle
-before dawn. The track holds a film of water that rain fills, the surplus drains off and the sun, wind and cars dry. A wet
+Every race rolls its own weather (`Weather.cs`, `WeatherPlan`): a late October day at 50 degrees north whose kind of
+weekend (settled, thundery, changeable or unsettled) sets the cloud and how ready the air is to shower. Fronts come often, with
+hours of thickening cloud, a band of rain and showers behind; showers build most in the early afternoon; low cloud can drizzle
+through the night. The track holds a film of water that rain fills, the surplus drains off and the sun, wind and cars dry. A wet
 track (`RaceWeather.cs`) costs grip, about a quarter when fully wet, through `Consumables.GripScale`, so every car, driven
 or gliding, laps about 13% slower, wears its tyres less and makes more mistakes. `WeatherView.cs` plays it: the sky greys
 and loses its sun and shadows (`WeatherSky.cs`), the track darkens and shines, rain falls round the camera and the dozen

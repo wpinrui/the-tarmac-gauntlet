@@ -133,6 +133,18 @@ namespace TarmacGauntlet.Simulation.Tests
         }
 
         [Test]
+        public void InitializeGame_AiCrewsRunFrom4To16ByPrestige()
+        {
+            var game = InitializeGame(Options, DefaultRandom.Next);
+            var ai = game.Teams.OfType<AITeam>().OrderBy(t => t.Prestige).ToList();
+            Assert.That(ai.Select(t => t.CrewSize), Is.All.InRange(4, 16));
+            Assert.That(ai.First().CrewSize, Is.EqualTo(4));
+            Assert.That(ai.Last().CrewSize, Is.EqualTo(16));
+            for (int i = 1; i < ai.Count; i++)
+                Assert.That(ai[i].CrewSize, Is.GreaterThanOrEqualTo(ai[i - 1].CrewSize));
+        }
+
+        [Test]
         public void InitializeGame_PlayerTeamHasNoCrewContractsSparePartsOrTyreSets()
         {
             var game = InitializeGame(Options, Stable);

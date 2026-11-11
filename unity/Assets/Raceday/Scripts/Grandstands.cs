@@ -4,6 +4,19 @@ using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
 {
+    /// <summary>A place to hang a floodlight: its lens, the point its bracket fixes to, and the spot it aims at.</summary>
+    public readonly struct LampMount
+    {
+        public readonly Vector3 Position, Anchor, Target;
+
+        public LampMount(Vector3 position, Vector3 anchor, Vector3 target)
+        {
+            Position = position;
+            Anchor = anchor;
+            Target = target;
+        }
+    }
+
     public enum MainStandShape { Cantilever, Barrel, Open }
     public enum CornerStandShape { Bleachers, Terrace, Covered }
     public enum StandColours { Green, Blue, Cream }
@@ -89,6 +102,8 @@ namespace TarmacGauntlet.Raceday
         public readonly List<StandFootprint> Footprints = new List<StandFootprint>();
         /// <summary>How many fans were seated.</summary>
         public int Fans { get; private set; }
+        /// <summary>Where floodlights hang under the front edge of each covered stand's roof, one a bay, aimed at the track.</summary>
+        public readonly List<LampMount> RoofLamps = new List<LampMount>();
 
         private readonly Circuit c;
         private readonly CircuitBuilder track;
@@ -111,6 +126,7 @@ namespace TarmacGauntlet.Raceday
         public List<CircuitPart> Build()
         {
             parts.Clear();
+            RoofLamps.Clear();
             for (int i = 0; i < Sites.Length; i++) Stand(Sites[i], i);
             Emit("Stand concrete", concrete, m?.Concrete, true);
             Emit("Stand steel", steel, m?.Steel, true);
@@ -173,6 +189,8 @@ namespace TarmacGauntlet.Raceday
         {
             public Vector3[] Point, Out;
             public float[] S, Base;
+            /// <summary>How far the stand's front edge is from the track's centre line, m.</summary>
+            public float Front;
             public float Length => S[S.Length - 1];
 
             public void At(float s, out Vector3 p, out Vector3 o, out float b)
@@ -190,7 +208,7 @@ namespace TarmacGauntlet.Raceday
         private Guide Line(List<int> ks, int side, float front, Profile profile)
         {
             float sign = side == 0 ? 1f : -1f;
-            var g = new Guide { Point = new Vector3[ks.Count], Out = new Vector3[ks.Count], S = new float[ks.Count], Base = new float[ks.Count] };
+            var g = new Guide { Point = new Vector3[ks.Count], Out = new Vector3[ks.Count], S = new float[ks.Count], Base = new float[ks.Count], Front = front };
             var ground = new float[ks.Count];
             for (int i = 0; i < ks.Count; i++)
             {
@@ -496,6 +514,21 @@ namespace TarmacGauntlet.Raceday
                     s.steel.Face(P(a, uf, rf - 0.6f), P(a, uf + 0.15f, rf - 0.6f), P(a, uf, rf), P(a, uf + 0.15f, rf), P(a + inward, uf, rf));
                 }
                 Columns(ub + 0.25f, rb, true);
+                RoofLamps();
+            }
+
+            /// <summary>A floodlight in each bay, hung just in front of the fascia's foot, aimed at the track's centre line.</summary>
+            private void RoofLamps()
+            {
+                int bays = Mathf.Max(1, Mathf.RoundToInt(g.Length / Bay));
+                for (int i = 0; i < bays; i++)
+                {
+                    float a = g.Length * (i + 0.5f) / bays;
+                    Vector3 anchor = P(a, RoofFrontU - 0.1f, RoofFront - 0.6f);
+                    Vector3 head = P(a, RoofFrontU - 0.55f, RoofFront - 1.05f);
+                    g.At(a, out Vector3 q, out Vector3 o, out _);
+                    s.RoofLamps.Add(new LampMount(head, anchor, q - o * g.Front));
+                }
             }
 
             /// <summary>Columns every bay along the back, each with a beam out under the roof and a tie.</summary>

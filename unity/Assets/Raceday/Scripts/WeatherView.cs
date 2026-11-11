@@ -18,6 +18,8 @@ namespace TarmacGauntlet.Raceday
         [NonSerialized] public Func<float> RaceSeconds;
         [NonSerialized] public CircuitMaterials Materials;
         [NonSerialized] public RaceCar[] Cars;
+        /// <summary>How far night has fallen, 0 to 1 (<see cref="SkyClock"/>): rain and spray catch the floodlights.</summary>
+        [NonSerialized] public Func<float> Night;
 
         /// <summary>The weather now.</summary>
         public WeatherState Now { get; private set; } = WeatherState.Dry;
@@ -82,6 +84,7 @@ namespace TarmacGauntlet.Raceday
             Camera cam = Camera.main;
             if (cam == null) return;
             Color light = RenderSettings.fogColor * 1.35f + RenderSettings.ambientSkyColor * 0.3f;
+            if (Night != null) light += NightLook.Flood * (0.35f * NightLook.On(Night()));
             Rain(cam.transform, light);
             Spray(cam.transform.position, light);
         }

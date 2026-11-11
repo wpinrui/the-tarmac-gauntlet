@@ -4,7 +4,7 @@ using System.Linq;
 using TarmacGauntlet.Raceday;
 
 /// <summary>
-/// Rolls the weather for thousands of races and checks it reads as a European midsummer: how often it
+/// Rolls the weather for thousands of races and checks it reads as a European late October: how often it
 /// rains, when the showers come, that fronts bring hours of rain, that the track dries again, that the
 /// grip falls the right amount and that nothing jumps.
 /// </summary>
@@ -53,9 +53,9 @@ public static class Check
                     maxCloudStep = Math.Max(maxCloudStep, Math.Abs(w.Cloud - prev.Cloud));
                     maxWaterStep = Math.Max(maxWaterStep, Math.Abs(w.Water - prev.Water));
                 }
-                // A wet track that stops getting rain in the daytime should be dry within two hours.
+                // A wet track that stops getting rain in the daytime should be dry within three hours, even in the cool autumn air.
                 float local = (Start + m / 60f) % 24f;
-                bool day = local > 9f && local < 19f;
+                bool day = local > 9f && local < 16.5f;
                 if (prev.Rain > 0f && w.Rain == 0f && w.Water > 0.3f && day) dryingSince = m;
                 if (dryingSince >= 0f)
                 {
@@ -64,7 +64,7 @@ public static class Check
                     {
                         dries++;
                         worstDry = Math.Max(worstDry, m - dryingSince);
-                        if (m - dryingSince > 120f) slowDries++;
+                        if (m - dryingSince > 180f) slowDries++;
                         dryingSince = -1f;
                     }
                 }
@@ -82,21 +82,21 @@ public static class Check
         }
 
         string shares = string.Join(", ", Enum.GetNames(typeof(WeatherKind)).Select((n, i) => $"{n} {100f * kinds[i] / Races:0}%"));
-        Expect("every kind of weekend comes up", kinds.All(k => k > Races / 20), shares);
+        Expect("every kind of weekend comes up", kinds.All(k => k > Races / 40), shares);
         float wetShare = 100f * wetRaces / Races;
-        Expect("rain falls in most races but not all", wetShare > 40f && wetShare < 70f, $"{wetShare:0}% of races see rain");
+        Expect("rain falls in most races but not all", wetShare > 55f && wetShare < 92f, $"{wetShare:0}% of races see rain");
         float wetTime = (float)(100.0 * wetMinutes / minutes);
-        Expect("the track is wet for a modest share of the time", wetTime > 4f && wetTime < 20f, $"{wetTime:0.0}% of race time wet, {100.0 * soakedMinutes / minutes:0.0}% soaked");
+        Expect("the track is wet for a fair share of the time", wetTime > 8f && wetTime < 35f, $"{wetTime:0.0}% of race time wet, {100.0 * soakedMinutes / minutes:0.0}% soaked");
         float frontShare = 100f * frontRaces / Races;
-        Expect("a front crosses in some races", frontShare > 15f && frontShare < 50f, $"{frontShare:0}% of races");
+        Expect("a front crosses in some races", frontShare > 20f && frontShare < 65f, $"{frontShare:0}% of races");
         float afternoon = 100f * afternoonShowers / Math.Max(showersTotal, 1);
-        Expect("showers come mostly between 11:00 and 20:00", afternoon > 65f, $"{afternoon:0}% of {showersTotal} showers");
+        Expect("showers come most often between 11:00 and 20:00", afternoon > 45f, $"{afternoon:0}% of {showersTotal} showers");
         double mean = rainTotal / Races;
-        Expect("a race's rain is a summer day's worth", mean > 1.5 && mean < 8, $"{mean:0.0} mm a race on average");
-        Expect("a daytime track dries within two hours of the rain", dries > 100 && slowDries <= dries / 20, $"{dries} dryings, {slowDries} slower, slowest {worstDry:0} min");
+        Expect("a race's rain is an autumn day's worth", mean > 2 && mean < 10, $"{mean:0.0} mm a race on average");
+        Expect("a daytime track dries within three hours of the rain", dries > 100 && slowDries <= dries / 20, $"{dries} dryings, {slowDries} slower, slowest {worstDry:0} min");
         Expect("cloud never jumps", maxCloudStep < 0.06f, $"largest change {maxCloudStep:0.000} a minute");
         Expect("the water film never jumps", maxWaterStep < 0.6f, $"largest change {maxWaterStep:0.00} mm a minute");
-        Expect("rain stays within summer extremes", maxRain <= 45f && maxWater <= WeatherPlan.Flooded + 1e-4f, $"heaviest {maxRain:0.0} mm/h, deepest {maxWater:0.00} mm");
+        Expect("rain stays within autumn extremes", maxRain <= 45f && maxWater <= WeatherPlan.Flooded + 1e-4f, $"heaviest {maxRain:0.0} mm/h, deepest {maxWater:0.00} mm");
         Expect("no value goes out of range", finite, "");
 
         var a = new WeatherPlan(77, Start);

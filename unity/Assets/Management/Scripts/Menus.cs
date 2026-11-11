@@ -441,6 +441,9 @@ namespace TarmacGauntlet.Management
             graphics.Add(Stepper("Resolution", sizes.Select(r => r.x + " × " + r.y).ToArray(), sizes.ToList().IndexOf(GameSettings.Resolution), i => GameSettings.Resolution = sizes[i]));
             graphics.Add(Stepper("Quality", GameSettings.QualityNames, GameSettings.Quality, i => GameSettings.Quality = i));
             graphics.Add(Stepper("V-sync", new[] { "Off", "On" }, GameSettings.VSync ? 1 : 0, i => GameSettings.VSync = i == 1));
+            int most = GameSettings.MostRealLights;
+            graphics.Add(Slider("Real lights", GameSettings.RealLights / (float)most, v => GameSettings.RealLights = Mathf.RoundToInt(v * most),
+                v => Mathf.RoundToInt(v * most).ToString(CultureInfo.InvariantCulture)));
             settingsPanel.Add(graphics);
 
             VisualElement audio = SettingsGroup(1);
@@ -483,7 +486,8 @@ namespace TarmacGauntlet.Management
             return row;
         }
 
-        private VisualElement Slider(string label, float value01, Action<float> set)
+        /// <param name="shown">The number beside the slider for a value; a percentage when not given.</param>
+        private VisualElement Slider(string label, float value01, Action<float> set, Func<float, string> shown = null)
         {
             VisualElement row = Setting(label);
             var slider = new VisualElement();
@@ -508,7 +512,7 @@ namespace TarmacGauntlet.Management
             {
                 fill.style.width = Length.Percent(v * 100);
                 knob.style.left = Length.Percent(v * 100);
-                number.text = Mathf.RoundToInt(v * 100).ToString(CultureInfo.InvariantCulture);
+                number.text = shown != null ? shown(v) : Mathf.RoundToInt(v * 100).ToString(CultureInfo.InvariantCulture);
             }
             void SetFrom(Vector2 local)
             {

@@ -4,12 +4,12 @@ using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
 {
-    /// <summary>The kind of summer the race weekend gets.</summary>
+    /// <summary>The kind of autumn weather the race weekend gets.</summary>
     public enum WeatherKind
     {
-        /// <summary>High pressure: fair weather cumulus, a stray afternoon shower at most.</summary>
+        /// <summary>High pressure: sunny spells, a stray shower at most, and low cloud and drizzle can sit in overnight.</summary>
         Settled,
-        /// <summary>A hot spell: sunny mornings, and thunderstorms can break out in the afternoon.</summary>
+        /// <summary>A rare mild, humid spell: bright mornings, and heavy thundery showers can break out in the afternoon.</summary>
         Thundery,
         /// <summary>Fronts and showers come and go between sunny spells.</summary>
         Changeable,
@@ -19,12 +19,13 @@ namespace TarmacGauntlet.Raceday
 
     /// <summary>
     /// The weather over the circuit for one race, rolled from a seed when the race starts, so every
-    /// race gets its own. A midsummer day at 50 degrees north: the kind of weekend sets how cloudy it
-    /// is and how ready the air is to shower. Fronts cross with hours of thickening cloud ahead of a
-    /// band of steady rain, then clear to sunshine and showers behind. Showers build most in the
-    /// afternoon heat and are heavier in a hot spell. Low cloud can bring drizzle before dawn. The
-    /// track holds a film of water: rain fills it, the surplus drains off, and the sun, the wind and
-    /// the cars dry it, slowly at night. The race's first hours are worked out from six hours before
+    /// race gets its own. A late October day at 50 degrees north, as the sky is (<see cref="SkyClock"/>):
+    /// the kind of weekend sets how cloudy it is and how ready the air is to shower. Fronts come
+    /// through often, with hours of thickening cloud ahead of a band of steady rain, then clear to
+    /// sunshine and showers behind. Showers build most in the early afternoon. Low cloud can bring
+    /// drizzle through the night and morning. The track holds a film of water: rain fills it, the
+    /// surplus drains off, and the low sun, the wind and the cars dry it, slowly in the cool air
+    /// and slower still at night. The race's first hours are worked out from six hours before
     /// the start, so the track at the green follows from the morning's weather. Everything is
     /// tabulated once a minute up front, so the weather is the same at any race speed.
     /// </summary>
@@ -63,10 +64,10 @@ namespace TarmacGauntlet.Raceday
             wind = new float[n];
 
             double roll = random.NextDouble();
-            Kind = roll < 0.32 ? WeatherKind.Settled : roll < 0.45 ? WeatherKind.Thundery : roll < 0.83 ? WeatherKind.Changeable : WeatherKind.Unsettled;
-            float cover = Kind switch { WeatherKind.Settled => 0.15f, WeatherKind.Thundery => 0.12f, WeatherKind.Changeable => 0.42f, _ => 0.66f };
-            float unstable = Kind switch { WeatherKind.Settled => 0.08f, WeatherKind.Thundery => 0.4f, WeatherKind.Changeable => 0.3f, _ => 0.55f };
-            float frontsExpected = Kind switch { WeatherKind.Settled => 0.08f, WeatherKind.Thundery => 0.25f, WeatherKind.Changeable => 0.8f, _ => 1.4f };
+            Kind = roll < 0.28 ? WeatherKind.Settled : roll < 0.32 ? WeatherKind.Thundery : roll < 0.73 ? WeatherKind.Changeable : WeatherKind.Unsettled;
+            float cover = Kind switch { WeatherKind.Settled => 0.22f, WeatherKind.Thundery => 0.25f, WeatherKind.Changeable => 0.5f, _ => 0.72f };
+            float unstable = Kind switch { WeatherKind.Settled => 0.05f, WeatherKind.Thundery => 0.35f, WeatherKind.Changeable => 0.22f, _ => 0.42f };
+            float frontsExpected = Kind switch { WeatherKind.Settled => 0.12f, WeatherKind.Thundery => 0.3f, WeatherKind.Changeable => 1f, _ => 1.6f };
 
             var instability = new float[n];
             Wave baseCloud = new Wave(random, 11f, 5.3f, 2.1f), baseWind = new Wave(random, 9f, 3.7f, 1.3f);
@@ -87,7 +88,7 @@ namespace TarmacGauntlet.Raceday
             for (int i = 0; i < n; i++)
                 cloud[i] = Mathf.Clamp01(cloud[i] + 0.35f * instability[i] * (Afternoon(Local(HourAt(i))) - 0.1f));
 
-            // Showers: rolled ten minutes at a time, most likely in the afternoon heat and in unstable air.
+            // Showers: rolled ten minutes at a time, most likely in the early afternoon and in unstable air.
             const float roll10 = 1f / 6f;
             for (float h = -Before; h < After; h += roll10)
             {
@@ -96,12 +97,12 @@ namespace TarmacGauntlet.Raceday
                 if (random.NextDouble() < rate * roll10) AddShower(h);
             }
 
-            // Low cloud and drizzle in the small hours.
-            if ((Kind == WeatherKind.Changeable || Kind == WeatherKind.Unsettled) && random.NextDouble() < 0.35)
+            // Low cloud and drizzle through the long night and the morning.
+            if (random.NextDouble() < (Kind == WeatherKind.Settled ? 0.3 : 0.4))
             {
-                float local = Range(1.5f, 6.5f);
+                float local = Range(0f, 8f);
                 float start = Mathf.Repeat(local - StartHour, 24f);
-                AddDrizzle(start, Range(2f, 5f), flicker);
+                AddDrizzle(start, Range(2f, 6f), flicker);
             }
 
             for (int i = 0; i < n; i++)
@@ -129,12 +130,12 @@ namespace TarmacGauntlet.Raceday
         private int IndexAt(float h) => Mathf.Clamp(Mathf.RoundToInt((h + Before) / Step), 0, cloud.Length - 1);
         private float Local(float h) => Mathf.Repeat(StartHour + h, 24f);
 
-        /// <summary>How ready the air is to shower at a local time: little at night, most at about half past three.</summary>
+        /// <summary>How ready the air is to shower at a local time: some at night, most at about two in the afternoon.</summary>
         private static float Afternoon(float local)
         {
-            float d = Mathf.Abs(local - 15.5f);
+            float d = Mathf.Abs(local - 14f);
             if (d > 12f) d = 24f - d;
-            return 0.1f + 0.9f * Mathf.Exp(-(d / 3.2f) * (d / 3.2f));
+            return 0.3f + 0.7f * Mathf.Exp(-(d / 3.5f) * (d / 3.5f));
         }
 
         private void AddFront(float at, float[] instability, Wave flicker)
@@ -169,9 +170,9 @@ namespace TarmacGauntlet.Raceday
         private void AddShower(float at)
         {
             Showers.Add(at);
-            bool storm = Kind == WeatherKind.Thundery || random.NextDouble() < 0.12;
+            bool storm = Kind == WeatherKind.Thundery || random.NextDouble() < 0.04;
             float length = storm ? Range(0.25f, 0.75f) : Range(0.12f, 0.5f);
-            float peak = Mathf.Min((float)(-Math.Log(1.0 - random.NextDouble())) * (storm ? 14f : 5f) + 1f, 40f);
+            float peak = Mathf.Min((float)(-Math.Log(1.0 - random.NextDouble())) * (storm ? 10f : 3.5f) + 0.8f, 40f);
             float build = Range(0.6f, 1.4f);
             float end = at + length, top = at + 0.25f * length;
             for (int i = IndexAt(at - build); i <= IndexAt(end + 1.2f); i++)
@@ -199,8 +200,8 @@ namespace TarmacGauntlet.Raceday
 
         /// <summary>
         /// Runs the track's water film through the table: rain fills it, anything above what the
-        /// surface holds drains off within minutes, and it dries by evaporation, fastest in sunshine,
-        /// and with the cars running on it.
+        /// surface holds drains off within minutes, and it dries by evaporation: slowly in the cool
+        /// autumn air, faster in sunshine and wind, and with the cars running on it.
         /// </summary>
         private void Dry()
         {
@@ -210,7 +211,7 @@ namespace TarmacGauntlet.Raceday
             {
                 float h = HourAt(i);
                 float sun = Mathf.Max(SkyClock.Direction(Local(h), SkyClock.Declination).y, 0f);
-                float evaporate = 0.06f + 0.55f * sun * (1f - 0.8f * cloud[i]) + 0.1f * (wind[i] - 0.75f) + (h >= 0f ? 0.35f : 0.04f);
+                float evaporate = 0.03f + 0.35f * sun * (1f - 0.8f * cloud[i]) + 0.08f * (wind[i] - 0.75f) + (h >= 0f ? 0.3f : 0.03f);
                 if (rain[i] > 0f) evaporate *= 0.25f;
                 w += rain[i] * dt;
                 w -= Mathf.Max(w - Holds, 0f) * (1f - Mathf.Exp(-dt / 0.2f));

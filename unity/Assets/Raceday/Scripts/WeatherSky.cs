@@ -12,7 +12,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Colour of the floodlights' glow on the night sky.</summary>
         private static readonly Color Floodlit = new Color(0.52f, 0.5f, 0.46f);
         /// <summary>How much the floodlights' glow lifts the night: on a clear night, and more under cloud.</summary>
-        public const float NightGlow = 0.26f, CloudGlow = 0.2f;
+        public const float NightGlow = 0.08f, CloudGlow = 0.2f;
 
         /// <summary>Cloud density threshold for the sky shader, from the share of the sky under cloud: lower is more cloud.</summary>
         public static float Cover(float cloud) => Mathf.Lerp(0.8f, 0.1f, cloud);
