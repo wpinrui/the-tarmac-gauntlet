@@ -29,6 +29,10 @@ namespace TarmacGauntlet.Raceday
         public readonly float Duration;
         public float Elapsed { get; private set; }
         public bool Done => Elapsed >= Duration;
+        /// <summary>True once the fuel is in.</summary>
+        public bool Fuelled { get; private set; }
+        /// <summary>True when the stop changes the tyres, and when it changes the driver.</summary>
+        public readonly bool NewTyres, NewDriver;
 
         private readonly Consumables supplies;
         private readonly float startFuel, litres, scale;
@@ -43,6 +47,8 @@ namespace TarmacGauntlet.Raceday
             scale = 0.85f + 0.3f * (float)spec.Stats.PitStopTime / 100f;
             PitWork work = supplies.Log?.Pit(orders.Tyres);
             tyres = work == null ? orders.Tyres : work.ChangeTyres;
+            NewTyres = tyres;
+            NewDriver = work?.NewDriver != null;
             orders.Reset();
             if (work != null) scale *= (float)work.CrewMultiplier;
             float extra = work != null ? (float)work.ExtraSeconds : 0f;
@@ -58,6 +64,7 @@ namespace TarmacGauntlet.Raceday
             Elapsed += dt;
             float refuel = Mathf.Clamp01((Elapsed / scale - Settle) / Mathf.Max(litres / RefuelRate, 0.01f));
             supplies.Fuel = startFuel + litres * refuel;
+            Fuelled = refuel >= 1f;
             if (!Done) return;
             supplies.Fuel = startFuel + litres;
             if (tyres) supplies.Wear = 0f;
