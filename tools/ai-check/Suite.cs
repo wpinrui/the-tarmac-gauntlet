@@ -69,6 +69,22 @@ static partial class Check
             }
             return t;
         }
+        /// <summary>
+        /// Seconds car i ran more than a metre off its line from time <paramref name="from"/> on, with no car
+        /// overlapping it: room it gave away for nothing (Ivan: get back on the racing line once clear).
+        /// </summary>
+        public float OffLineClear(int i, float from)
+        {
+            float t = 0f;
+            foreach (Frame f in Frames)
+            {
+                if (f.T < from || Math.Abs(f.Off[i]) < 1f || f.Busy[i]) continue;
+                bool overlapped = false;
+                for (int j = 0; j < N; j++) if (j != i && Math.Abs(Gap(f, i, j)) < CarL + 1f) overlapped = true;
+                if (!overlapped) t += Race.Dt;
+            }
+            return t;
+        }
         /// <summary>Lap distance, m.</summary>
         public float At(Frame f, int i) => ((f.D[i] % circuit.Lap) + circuit.Lap) % circuit.Lap;
         /// <summary>On the track as F1 counts it: some part of a tyre on the tarmac or its white line. Kerbs are not track.</summary>
@@ -335,7 +351,7 @@ static partial class Check
             {
                 int alongside = fs.Count(f => Math.Abs(run.Gap(f, 0, 1)) < CarL && run.At(f, 0) >= T7Start && run.At(f, 0) <= T7End);
                 if (alongside * Race.Dt < 0.3f) return (false, "never alongside in the corner: did not bind");
-                return (true, $"{alongside * Race.Dt:0.0} s alongside in the corner, on the track");
+                return (true, $"{alongside * Race.Dt:0.0} s alongside in the corner, on the track; off the line once clear {run.OffLineClear(0, 0f):0.0} s and {run.OffLineClear(1, 0f):0.0} s");
             }
             case "H8":
             {
@@ -347,7 +363,7 @@ static partial class Check
                 float g = run.Gap(f, 0, 1);
                 bool overlapped = g < CarL;
                 bool backedOut = Math.Abs(f.L[1] - f.L[0]) < 1.5f || g > 10f;
-                return (overlapped || backedOut, $"at turn-in {(overlapped ? "overlapped" : backedOut ? "backed out" : $"{g - CarL:0.0} m short of overlapping")}");
+                return (overlapped || backedOut, $"at turn-in {(overlapped ? "overlapped" : backedOut ? "backed out" : $"{g - CarL:0.0} m short of overlapping")}; off the line once clear {run.OffLineClear(0, 0f):0.0} s, {(run.Gap(fs[fs.Count - 1], 0, 1) < 0f ? "kept the place" : "repassed")}");
             }
             case "H9":
             {
@@ -424,7 +440,10 @@ static partial class Check
                 float share = follow > 0 ? (float)onLine / follow : 0f;
                 // Flat in the tow, not lifting to sit at the speed of the car ahead (Ivan).
                 float lifted = run.LiftedBehind(0, 1);
-                return (Clamp100(Math.Min(100f * share, Scale(lifted, 0.3f, 2f)) - 25f * hits), $"on the line {100f * share:0}% of {follow * Race.Dt:0.0} s following, lifted behind it {lifted:0.0} s, {hits} contacts");
+                // Once past, back on the line.
+                Frame past = fs.FirstOrDefault(f => run.Gap(f, 0, 1) < 0f);
+                float offClear = past == null ? 0f : run.OffLineClear(0, past.T);
+                return (Clamp100(Math.Min(Math.Min(100f * share, Scale(lifted, 0.3f, 2f)), Scale(offClear, 0.5f, 3f)) - 25f * hits), $"on the line {100f * share:0}% of {follow * Race.Dt:0.0} s following, lifted behind it {lifted:0.0} s, off the line once past and clear {offClear:0.0} s, {hits} contacts");
             }
             case "T2":
             case "T12":
@@ -534,7 +553,8 @@ static partial class Check
                 if (clear == null) return (0f, "never cleared the other car");
                 Frame turn = fs.FirstOrDefault(f => f.T >= clear.T && Math.Abs(f.Off[0]) < Math.Abs(clear.Off[0]) - 0.3f);
                 float took = turn == null ? 99f : turn.T - clear.T;
-                return (hits > 0 || swiped ? 0f : Scale(took, 0.3f, 2f), $"started back {(turn == null ? "never" : $"{took:0.0} s after clearing")}, {(swiped ? "swiped across" : "no swipe")}, {hits} contacts");
+                float offClear8 = run.OffLineClear(0, clear.T);
+                return (hits > 0 || swiped ? 0f : Math.Min(Scale(took, 0.3f, 2f), Scale(offClear8, 0.5f, 3f)), $"started back {(turn == null ? "never" : $"{took:0.0} s after clearing")}, off the line once clear {offClear8:0.0} s, {(swiped ? "swiped across" : "no swipe")}, {hits} contacts");
             }
             case "T9":
             {

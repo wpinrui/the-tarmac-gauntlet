@@ -15,6 +15,8 @@ namespace TarmacGauntlet.Career
         public string CareerId { get; init; } = "";
         public string TeamName { get; init; } = "";
         public string PlayerName { get; init; } = "";
+        public string? Logo { get; init; }
+        public string TeamColour { get; init; } = "";
         public int Year { get; init; }
         public string LastSavedAt { get; init; } = ""; // ISO 8601, UTC
     }
@@ -81,6 +83,8 @@ namespace TarmacGauntlet.Career
                 CareerId = careerId,
                 TeamName = player?.Name ?? "",
                 PlayerName = player?.PlayerName ?? "",
+                Logo = player?.Logo,
+                TeamColour = player?.TeamColour ?? "",
                 Year = game.CurrentYear,
                 LastSavedAt = stamp,
             };

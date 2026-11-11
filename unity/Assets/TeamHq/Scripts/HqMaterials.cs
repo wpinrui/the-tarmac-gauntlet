@@ -46,9 +46,7 @@ namespace TarmacGauntlet.TeamHq
                 case "leather": return Make(key, Hex(0x1f2224), 0.45f);
                 case "cabinet": return Make(key, Hex(0x5b6366), 0.55f, 0.35f);
                 case "plinth": return Make(key, Hex(0x1f2122), 0.5f);
-                case "race": return Make(key, Hex(0xc2362b), 0.7f, 0.3f);
-                case "owned": return Make(key, Hex(0x4f6478), 0.7f, 0.3f);
-                case "spare": return Make(key, Hex(0x2c4a6e), 0.75f, 0.6f);
+                case "grey": return Make(key, Hex(0x8d9194), 0.45f, 0.15f);
                 default: return Make(key, Color.magenta, 0.5f);
             }
         }

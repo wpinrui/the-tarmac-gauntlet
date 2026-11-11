@@ -20,11 +20,10 @@ namespace TarmacGauntlet.TeamHq
         public bool Warm;
     }
 
-    /// <summary>A car bay: where the car stands, and its paint (the stand-in's when no model is loaded). No paint: the bay holds a prop.</summary>
+    /// <summary>A car bay: where the car stands. <see cref="HqCars"/> puts the cars in them.</summary>
     public struct HqBay
     {
         public Vector3 Position;
-        public string Paint;
     }
 
     /// <summary>A placed copy of a prop from Resources/Props: where it stands, its turn about Y in degrees, and its size.</summary>
@@ -68,6 +67,9 @@ namespace TarmacGauntlet.TeamHq
         public static readonly float[] BayX = { -8f, -3f, 2f, 7f };
         /// <summary>Bay centres from the doors, in the viewer's frame (Unity's Z is the negative).</summary>
         public const float CarZ = 1.5f;
+        /// <summary>The newspaper on the coffee table: its centre in the viewer's frame, and its width and depth.</summary>
+        public static readonly Vector3 PaperCentre = new Vector3(8.1f, MZ + 0.395f, -3.4f);
+        public static readonly Vector2 PaperSize = new Vector2(0.45f, 0.32f);
         /// <summary>The bay that holds the race car.</summary>
         public const int RaceBay = 1;
         private const float DoorW = 3.6f, DoorH = 3.4f, DadoH = 1.2f;
@@ -240,14 +242,11 @@ namespace TarmacGauntlet.TeamHq
             Prop("korean_fire_extinguisher_01", -5.5f, 0, Z1 - 0.3f, 180);
             Prop("korean_fire_extinguisher_01", 4.5f, 0, Z1 - 0.3f, 180);
             Prop("fire_alarm", -0.5f, 1.5f, Z1, 180);
-            Prop("covered_car", BayX[2], 0, CarZ);
 
             // A soft shadow under every car, where the floor meets the tyres.
             foreach (float b in BayX) Plane("blob", 2.7f, 5.6f, V(b, 0.004f, CarZ), Rot.X(-90), 0);
 
-            // Bay 3 holds the covered car, a prop; the dealer's bay shows a repainted car.
-            string[] paint = { "owned", "race", "", "spare" };
-            for (int i = 0; i < BayX.Length; i++) Bays.Add(new HqBay { Position = V(BayX[i], 0, CarZ), Paint = paint[i] });
+            foreach (float b in BayX) Bays.Add(new HqBay { Position = V(b, 0, CarZ) });
         }
 
         private void Office()
@@ -291,7 +290,7 @@ namespace TarmacGauntlet.TeamHq
             Prop("sofa_02", 8, f, -4.75f);
             Prop("modern_arm_chair_01", 6.1f, f, -3.7f, 70);
             Prop("modern_coffee_table_01", 8, f, -3.4f, 90);
-            Box("paper", 0.45f, 0.01f, 0.32f, V(8.1f, f + 0.395f, -3.4f));
+            Box("paper", PaperSize.x, 0.01f, PaperSize.y, PaperCentre);
             Prop("potted_plant_01", -6.4f, f, -6.5f);
             Prop("korean_fire_extinguisher_01", 9.3f, f, Z0 + 0.25f);
 

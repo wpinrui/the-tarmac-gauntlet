@@ -29,10 +29,13 @@ namespace TarmacGauntlet.Management
         /// <summary>Panels that are not hub screens.</summary>
         public const string NewGameSlug = "new-game", LineupSlug = "lineup";
 
-        private const string MainShot = "main-menu", HubShot = "hub";
+        private const string MainShot = "main-menu", HubShot = "hub", PaperSlug = "newspaper";
 
         /// <summary>A panel opened: its slug and the element to fill. The body is emptied each time.</summary>
         public event Action<string, VisualElement> ScreenOpened;
+
+        /// <summary>A hub screen closed: its slug. Another screen may open straight after.</summary>
+        public event Action<string> ScreenClosed;
 
         /// <summary>
         /// The side pane left of the docked panel, emptied with the panel each time a screen opens. It shows while a
@@ -42,22 +45,23 @@ namespace TarmacGauntlet.Management
 
         private VisualElement side;
 
-        private enum Mode { Main, NewGame, Hub, Screen, Lineup }
-        private enum Overlay { None, Pause, Settings }
+        private enum Mode { Main, NewGame, Hub, Screen, Lineup, Paper }
+        private enum Overlay { None, Pause, Settings, Dialog }
 
         private static readonly string[] Order = Groups.SelectMany(g => g.Select(s => s.Slug)).ToArray();
         private static bool booted;
 
         private HqCamera hqCamera;
         private Camera cam;
+        private NewspaperView paper;
         private MenuGlass glass;
         private Font semiBold, bold, mainMedium, mainRegular;
         private readonly HashSet<VisualElement> shown = new HashSet<VisualElement>();
 
-        private VisualElement root, mainColumn, continueItem, gameLayer, top, hubMenu, strip, tag, tagFill, race, panel, panelBody, panelButton;
+        private VisualElement root, mainColumn, continueItem, gameLayer, top, hubMenu, strip, tag, tagFill, race, panel, panelBody;
         private VisualElement catcher, lineup, lineupBody;
         private Label tagClass;
-        private VisualElement dimmer, pauseLayer, settingsLayer, settingsPanel;
+        private VisualElement dimmer, pauseLayer, settingsLayer, settingsPanel, dialogLayer, dialog, dialogBody, dialogButtons, badge;
         private Label continueSub, teamName, year, money, tagName, tagPercent;
         private readonly Dictionary<string, VisualElement> hubItems = new Dictionary<string, VisualElement>(), stripIcons = new Dictionary<string, VisualElement>();
 
@@ -114,11 +118,24 @@ namespace TarmacGauntlet.Management
             gameObject.AddComponent<RaceHistoryPanel>();
             gameObject.AddComponent<StandingsPanel>();
             gameObject.AddComponent<ScoutingPanel>();
+            gameObject.AddComponent<NewGamePanel>();
+            gameObject.AddComponent<GarageBays>();
+            gameObject.AddComponent<WorkshopPanel>();
+            gameObject.AddComponent<DealerPanel>();
 
             GameSession.Changed += OnGameChanged;
             if (GameSession.State != null) OnGameChanged(GameSession.State);
-            Go(GameSession.State != null ? Mode.Hub : Mode.Main);
-            hqCamera.Cut(hqCamera.Current == null ? MainShot : hqCamera.Current);
+            if (GameSession.State == null)
+            {
+                Go(Mode.Main);
+                hqCamera.Cut(MainShot);
+            }
+            else
+            {
+                // Back from a race the camera starts on the hub, so it can glide to the paper.
+                hqCamera.Cut(HubShot);
+                EnterGame();
+            }
         }
 
         private void OnDestroy()
@@ -134,13 +151,13 @@ namespace TarmacGauntlet.Management
             var mainLayer = Layer();
             mainColumn = glass.Make("main-column", "fade");
             mainColumn.Add(BuildWordmark());
-            continueItem = MainItem("Continue", () => { if (GameSession.ContinueLatest()) Go(Mode.Hub); });
+            continueItem = MainItem("Continue", () => { if (GameSession.ContinueLatest()) EnterGame(); });
             continueSub = new Label();
             continueSub.AddToClassList("sub");
             continueSub.style.unityFontDefinition = FontDefinition.FromFont(mainRegular);
             continueItem.Add(continueSub);
             mainColumn.Add(continueItem);
-            mainColumn.Add(MainItem("New game", () => Go(Mode.NewGame)));
+            mainColumn.Add(MainItem("New game", NewGame));
             mainColumn.Add(MainItem("Settings", OpenSettings));
             mainColumn.Add(MainItem("Quit game", Quit));
             mainLayer.Add(mainColumn);
@@ -157,9 +174,8 @@ namespace TarmacGauntlet.Management
             top.AddToClassList("fade");
             var team = new VisualElement();
             team.AddToClassList("team");
-            var badge = new VisualElement();
+            badge = new VisualElement();
             badge.AddToClassList("badge");
-            badge.style.backgroundImage = Resources.Load<Texture2D>("MenuIcons/badge");
             team.Add(badge);
             teamName = Text("", "team-name", true);
             team.Add(teamName);
@@ -229,8 +245,6 @@ namespace TarmacGauntlet.Management
             panelBody = new VisualElement();
             panelBody.AddToClassList("panel-body");
             panel.Add(panelBody);
-            panelButton = RedButton("Start", "panel-button", StartNewGame);
-            panel.Add(panelButton);
             gameLayer.Add(panel);
 
             // The lineup: a small panel where the Race button was.
@@ -262,15 +276,91 @@ namespace TarmacGauntlet.Management
             settingsPanel = glass.Make("settings");
             settingsLayer.Add(settingsPanel);
 
-            foreach (VisualElement e in new[] { mainColumn, top, hubMenu, strip, tag, race, panel, side, catcher, lineup, dimmer, pauseLayer, settingsLayer })
+            // The newspaper, over everything but the Escape menu.
+            paper = new NewspaperView(Layer(), hqCamera, glass);
+
+            // A dialog over whatever is showing: a body and two buttons.
+            // It takes every click outside the dialog, so the screen behind can't be used while it shows.
+            dialogLayer = Layer("centre", "fade");
+            dialogLayer.pickingMode = PickingMode.Position;
+            dialog = glass.Make("dialog");
+            dialogBody = new VisualElement();
+            dialogBody.AddToClassList("dialog-body");
+            dialog.Add(dialogBody);
+            dialogButtons = new VisualElement();
+            dialogButtons.AddToClassList("dialog-buttons");
+            dialog.Add(dialogButtons);
+            dialogLayer.Add(dialog);
+
+            foreach (VisualElement e in new[] { mainColumn, top, hubMenu, strip, tag, race, panel, side, catcher, lineup, dimmer, pauseLayer, settingsLayer, dialogLayer })
                 e.style.display = DisplayStyle.None;
 
+            Popups = Layer();
             tipLayer = Layer();
             tip = Text("", "tip");
             tip.pickingMode = PickingMode.Ignore;
             tip.style.unityFontDefinition = FontDefinition.FromFont(mainRegular);
             tip.style.display = DisplayStyle.None;
             tipLayer.Add(tip);
+        }
+
+        /// <summary>A layer over every panel for drop-down lists, emptied each time the menus change screen.</summary>
+        internal VisualElement Popups { get; private set; }
+
+        // ------------------------------------------------------------------ dialogs
+
+        /// <summary>Shows a dialog over the current screen. Cancel and Escape close it; confirm closes it and runs <paramref name="onConfirm"/>.</summary>
+        internal void Dialog(Action<VisualElement> fill, string cancel, string confirm, Action onConfirm)
+        {
+            dialogBody.Clear();
+            fill(dialogBody);
+            dialogButtons.Clear();
+            dialogButtons.Add(GhostButton(cancel, "dialog-button", () => SetOverlay(Overlay.None)));
+            VisualElement ok = RedButton(confirm, "dialog-button", () =>
+            {
+                SetOverlay(Overlay.None);
+                onConfirm();
+            });
+            ok.AddToClassList("last");
+            dialogButtons.Add(ok);
+            SetOverlay(Overlay.Dialog);
+        }
+
+        internal VisualElement GhostButton(string text, string cls, Action onClick)
+        {
+            var button = new VisualElement();
+            button.AddToClassList("ghost-button");
+            button.AddToClassList(cls);
+            Label label = Text(text.ToUpperInvariant(), "ghost-label", true);
+            label.pickingMode = PickingMode.Ignore;
+            button.Add(label);
+            button.RegisterCallback<ClickEvent>(_ => onClick());
+            return button;
+        }
+
+        /// <summary>A new game overwrites the current career, so the career on disk is shown for a yes first.</summary>
+        private void NewGame()
+        {
+            CareerInfo latest = GameSession.Store.Latest();
+            if (latest == null)
+            {
+                Go(Mode.NewGame);
+                return;
+            }
+            Dialog(body =>
+            {
+                var career = new VisualElement();
+                career.AddToClassList("dialog-career");
+                var mark = new VisualElement();
+                mark.AddToClassList("dialog-badge");
+                Badges.Paint(mark, latest.Logo, latest.TeamColour);
+                career.Add(mark);
+                var words = new VisualElement();
+                words.Add(Text(latest.TeamName.ToUpperInvariant(), "dialog-title", true));
+                words.Add(Text("YEAR " + latest.Year.ToString(CultureInfo.InvariantCulture), "dialog-sub"));
+                career.Add(words);
+                body.Add(career);
+            }, "Cancel", "Overwrite", () => Go(Mode.NewGame));
         }
 
         // ------------------------------------------------------------------ tooltips
@@ -303,7 +393,7 @@ namespace TarmacGauntlet.Management
             target.RegisterCallback<DetachFromPanelEvent>(_ => HideTooltip());
         }
 
-        private void HideTooltip()
+        internal void HideTooltip()
         {
             tipTimer?.Pause();
             tipTimer = null;
@@ -575,8 +665,11 @@ namespace TarmacGauntlet.Management
         private void Go(Mode next, string slug = null)
         {
             HideTooltip();
+            Popups.Clear();
+            string closing = screen;
             mode = next;
             screen = next == Mode.Screen ? slug : null;
+            if (closing != null) ScreenClosed?.Invoke(closing);
             if (next == Mode.Screen || next == Mode.NewGame)
             {
                 panelBody.Clear();
@@ -589,20 +682,71 @@ namespace TarmacGauntlet.Management
                 lineupBody.Clear();
                 ScreenOpened?.Invoke(LineupSlug, lineupBody);
             }
-            hqCamera.Show(next == Mode.Main || next == Mode.NewGame ? MainShot : next == Mode.Screen ? slug : HubShot);
+            hqCamera.Show(next == Mode.Main || next == Mode.NewGame ? MainShot : next == Mode.Screen ? slug : next == Mode.Paper ? PaperSlug : HubShot);
             Render();
+        }
+
+        /// <summary>Closes the open screen and goes back to the hub.</summary>
+        internal void CloseScreen()
+        {
+            if (mode == Mode.Screen) Go(Mode.Hub);
         }
 
         private void OpenScreen(string slug)
         {
-            if (mode == Mode.Screen && screen == slug) Go(Mode.Hub);
+            if (slug == PaperSlug) OpenPaper();
+            else if (mode == Mode.Screen && screen == slug) Go(Mode.Hub);
             else Go(Mode.Screen, slug);
         }
 
         private void Cycle(int step)
         {
             int i = mode == Mode.Screen ? Array.IndexOf(Order, screen) : (step > 0 ? -1 : Order.Length);
-            OpenScreen(Order[(i + step + Order.Length) % Order.Length]);
+            string next;
+            do
+            {
+                i = (i + step + Order.Length) % Order.Length;
+                next = Order[i];
+            } while (next == PaperSlug);
+            OpenScreen(next);
+        }
+
+        /// <summary>Into the career: the paper first if the race just run hasn't been read yet, else the hub.</summary>
+        private void EnterGame()
+        {
+            GameState game = GameSession.State;
+            if (game?.Phase == GamePhase.PostRace)
+            {
+                if (game.Newspaper != null)
+                {
+                    OpenPaper();
+                    return;
+                }
+                EndYear();
+            }
+            Go(Mode.Hub);
+        }
+
+        /// <summary>The camera glides to the coffee table and the latest paper fills the screen.</summary>
+        private void OpenPaper()
+        {
+            Newspaper latest = GameSession.State?.Newspaper;
+            if (latest == null) return;
+            Go(Mode.Paper);
+            paper.Open(latest, ClosedPaper);
+        }
+
+        /// <summary>Putting down the paper after a race ends the year.</summary>
+        private void ClosedPaper()
+        {
+            if (GameSession.State?.Phase == GamePhase.PostRace) EndYear();
+            Go(Mode.Hub);
+        }
+
+        private static void EndYear()
+        {
+            GameSession.Apply(g => Season.AdvanceYear(g));
+            GameSession.Flush();
         }
 
         private void OpenSettings()
@@ -618,15 +762,16 @@ namespace TarmacGauntlet.Management
             Render();
         }
 
-        private void StartNewGame()
+        /// <summary>Starts a new career, replacing the current one, and opens the hub.</summary>
+        internal void StartCareer(NewGameOptions options)
         {
-            // The new game panel's fields come later; until then a career starts with blank names.
-            GameSession.NewCareer(new NewGameOptions());
+            GameSession.NewCareer(options);
             Go(Mode.Hub);
         }
 
         private void QuitToMainMenu()
         {
+            paper.Hide();
             GameSession.Close();
             overlay = Overlay.None;
             Go(Mode.Main);
@@ -645,7 +790,8 @@ namespace TarmacGauntlet.Management
         private void Render()
         {
             bool inGame = mode == Mode.Hub || mode == Mode.Screen || mode == Mode.Lineup;
-            bool covered = overlay != Overlay.None;
+            // A dialog sits over the screen it was opened from; pause and settings replace it.
+            bool covered = overlay == Overlay.Pause || overlay == Overlay.Settings;
             bool hasSave = GameSession.Store.Latest() != null;
 
             Show(mainColumn, mode == Mode.Main && !covered);
@@ -663,12 +809,15 @@ namespace TarmacGauntlet.Management
             Show(lineup, mode == Mode.Lineup && !covered);
             Show(catcher, mode == Mode.Lineup && !covered);
             Show(side, mode == Mode.Screen && SideBody.childCount > 0 && !covered);
-            panelButton.style.display = mode == Mode.NewGame ? DisplayStyle.Flex : DisplayStyle.None;
-            Show(dimmer, covered);
+            Show(dimmer, overlay != Overlay.None);
             Show(pauseLayer, overlay == Overlay.Pause);
             Show(settingsLayer, overlay == Overlay.Settings);
+            Show(dialogLayer, overlay == Overlay.Dialog);
             foreach (KeyValuePair<string, VisualElement> icon in stripIcons)
                 icon.Value.EnableInClassList("on", mode == Mode.Screen && icon.Key == screen);
+            bool noPaper = GameSession.State?.Newspaper == null;
+            hubItems[PaperSlug].EnableInClassList("dim", noPaper);
+            stripIcons[PaperSlug].EnableInClassList("dim", noPaper);
             RenderTag();
         }
 
@@ -717,6 +866,7 @@ namespace TarmacGauntlet.Management
             PlayerTeam p = Player;
             if (p == null) return;
             teamName.text = p.Name.ToUpperInvariant();
+            Badges.Paint(badge, p.Logo, p.TeamColour);
             year.text = "YEAR " + game.CurrentYear.ToString(CultureInfo.InvariantCulture);
             money.text = Money(p.Budget);
 
@@ -749,6 +899,7 @@ namespace TarmacGauntlet.Management
         {
             if (root == null) return;
             RollWordmark();
+            paper.Tick();
             if (TagWanted() != tagWasShown) RenderTag();
             if (tagWasShown) PlaceTag();
             glass.Refresh();
@@ -784,8 +935,10 @@ namespace TarmacGauntlet.Management
             switch (ev.keyCode)
             {
                 case KeyCode.Escape:
-                    if (overlay == Overlay.Settings) SetOverlay(settingsFrom);
+                    if (overlay == Overlay.Dialog) SetOverlay(Overlay.None);
+                    else if (overlay == Overlay.Settings) SetOverlay(settingsFrom);
                     else if (overlay == Overlay.Pause) SetOverlay(Overlay.None);
+                    else if (mode == Mode.Paper) paper.Close();
                     else if (mode == Mode.Screen || mode == Mode.Lineup) Go(Mode.Hub);
                     else if (mode == Mode.NewGame) Go(Mode.Main);
                     else if (mode == Mode.Hub) SetOverlay(Overlay.Pause);

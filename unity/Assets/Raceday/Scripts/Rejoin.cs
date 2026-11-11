@@ -325,9 +325,12 @@ namespace TarmacGauntlet.Raceday
             bool losing = speed > SpinSpeed && (slip > SpinSlip || Mathf.Abs(yawRate) > SpinYawRate);
             SinceLostControl = losing ? 0f : SinceLostControl + dt;
             bool spun = SinceLostControl < LostControlMemory && Mathf.Abs(Heading) > SpunAngle;
-            GapClear = Clear(me, field, circuit.Lap);
+            // T17 (Ivan): a gap in the traffic is wishful thinking. Under E1 and E2 a car rejoins at its safe
+            // angle whenever it is ready, and the cars on the line avoid it as a ghost (H12).
+            bool waits = !Experiments.Is(1) && !Experiments.Is(2);
+            GapClear = !waits || Clear(me, field, circuit.Lap);
             Coming = CarComing(me, field, circuit.Lap, half);
-            bool yielding = Yielding = State == Stage.Rejoining && PastEdge > YieldFrom && PastEdge < NearEdge && !RoomToJoin(me, field, circuit.Lap, speed, half);
+            bool yielding = Yielding = waits && State == Stage.Rejoining && PastEdge > YieldFrom && PastEdge < NearEdge && !RoomToJoin(me, field, circuit.Lap, speed, half);
 
             switch (State)
             {
