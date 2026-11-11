@@ -44,21 +44,9 @@ namespace TarmacGauntlet.Management
             double net = income + expenses;
 
             VisualElement hero = Box("fin-hero");
-            Label netLabel = Menus.Text(Signed(net), "fin-net", true);
-            netLabel.AddToClassList(net >= 0 ? "of-green" : "of-red");
-            hero.Add(netLabel);
-            // With only one side, the net already says it.
-            if (income > 0 && expenses < 0)
-            {
-                VisualElement sub = Box("fin-sub");
-                Label inLabel = Menus.Text(Signed(income), "fin-sub-line", true);
-                inLabel.AddToClassList("of-green");
-                Label outLabel = Menus.Text(Menus.Money(expenses), "fin-sub-line", true);
-                outLabel.AddToClassList("of-red");
-                sub.Add(inLabel);
-                sub.Add(outLabel);
-                hero.Add(sub);
-            }
+            hero.Add(Figure(Signed(net), "NET", net >= 0 ? "of-green" : "of-red", "fin-net"));
+            hero.Add(Figure(Signed(income), "INCOME", "of-green", "fin-sub-line"));
+            hero.Add(Figure(Menus.Money(expenses), "SPENDING", "of-red", "fin-sub-line"));
             Body.Add(hero);
 
             ScrollView rows = Scroll("rs-scroll");
@@ -77,12 +65,23 @@ namespace TarmacGauntlet.Management
             RenderPrizes(game);
         }
 
+        private VisualElement Figure(string value, string label, string colour, string size)
+        {
+            VisualElement figure = Box("fin-figure");
+            Label v = Menus.Text(value, size, true);
+            v.AddToClassList(colour);
+            figure.Add(v);
+            figure.Add(Menus.Text(label, "rs-stat-label"));
+            return figure;
+        }
+
         /// <summary>All 100 places in four columns, read down. The player's last finish is marked.</summary>
         private void RenderPrizes(GameState game)
         {
             int last = game.RaceHistory.LastOrDefault()?.Results.FirstOrDefault(r => r.TeamId == GameActions.PlayerTeamId)?.Position ?? 0;
             IReadOnlyList<double> table = PostRace.PrizeTable;
             int perColumn = (table.Count + PrizeColumns - 1) / PrizeColumns;
+            Menus.SideBody.Add(Menus.Text("PRIZE MONEY BY FINISH", "section-label"));
             VisualElement grid = Box("prizes");
             for (int c = 0; c < PrizeColumns; c++)
             {

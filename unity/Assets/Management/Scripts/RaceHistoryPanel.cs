@@ -46,9 +46,11 @@ namespace TarmacGauntlet.Management
             RaceSummary race = RaceReplay.FromHistory(game, entry);
             VisualElement tabs = Box("rs-tabs");
             Body.Add(tabs);
+            VisualElement head = Box("of-head-row");
+            Body.Add(head);
             ScrollView results = Scroll("rs-scroll");
             Body.Add(results);
-            RenderResults(race, tabs, results);
+            RenderResults(race, tabs, head, results);
 
             if (race.Player != null) RenderPlayer(game, race, entry);
         }
@@ -62,7 +64,7 @@ namespace TarmacGauntlet.Management
 
         // ------------------------------------------------------------------ results
 
-        private void RenderResults(RaceSummary race, VisualElement tabs, ScrollView list)
+        private void RenderResults(RaceSummary race, VisualElement tabs, VisualElement head, ScrollView list)
         {
             CarClass[] classes = ClassLabels.Order.Where(c => race.Classification.Any(r => r.CarClass == c)).ToArray();
             if (resultsView != "all" && resultsView != "podiums" && !classes.Any(c => c.ToString() == resultsView)) resultsView = "all";
@@ -70,7 +72,7 @@ namespace TarmacGauntlet.Management
             void Show(string view)
             {
                 resultsView = view;
-                RenderResults(race, tabs, list);
+                RenderResults(race, tabs, head, list);
                 list.scrollOffset = Vector2.zero;
             }
 
@@ -88,6 +90,13 @@ namespace TarmacGauntlet.Management
             podiums.AddToClassList("rs-tab-end");
             podiums.Add(Icon("trophy", "rs-tab-icon"));
             tabs.Add(podiums);
+
+            head.Clear();
+            head.style.display = resultsView == "podiums" ? DisplayStyle.None : DisplayStyle.Flex;
+            head.Add(Menus.Text(resultsView == "all" ? "POS" : "CLASS POS", "rh-head-pos"));
+            head.Add(Box("of-fill"));
+            head.Add(Menus.Text("LAPS", "rh-head-laps"));
+            head.Add(Menus.Text("PRIZE", "rh-head-prize"));
 
             list.Clear();
             if (resultsView == "podiums")
@@ -185,6 +194,7 @@ namespace TarmacGauntlet.Management
                 readout.text = "L" + Num(lap) + "   P" + Num(position);
             };
             side.Add(chartBox);
+            side.Add(Legend(race));
 
             VisualElement log = Box("rh-log");
             VisualElement tabs = Box("rs-tabs");
@@ -193,6 +203,28 @@ namespace TarmacGauntlet.Management
             log.Add(list);
             side.Add(log);
             RenderLog(game, race, tabs, list);
+        }
+
+        /// <summary>Names each driver's colour, and the issue dots and stop ticks on the chart.</summary>
+        private VisualElement Legend(RaceSummary race)
+        {
+            VisualElement legend = Box("rh-legend");
+            foreach (StintRecord s in race.Stints.GroupBy(x => x.DriverId).Select(g => g.First()))
+            {
+                VisualElement item = Box("rh-legend-item");
+                item.Add(Swatch(Colour(s.DriverId)));
+                item.Add(Menus.Text(s.DriverName, "rh-legend-text"));
+                legend.Add(item);
+            }
+            VisualElement issue = Box("rh-legend-item");
+            issue.Add(Box("rh-legend-dot"));
+            issue.Add(Menus.Text("ISSUE", "rh-legend-text"));
+            legend.Add(issue);
+            VisualElement stop = Box("rh-legend-item");
+            stop.Add(Box("rh-legend-tick"));
+            stop.Add(Menus.Text("PIT STOP", "rh-legend-text"));
+            legend.Add(stop);
+            return legend;
         }
 
         private Color Colour(string driverId) => colours.TryGetValue(driverId, out Color c) ? c : Color.white;

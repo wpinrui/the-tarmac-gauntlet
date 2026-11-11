@@ -345,9 +345,9 @@
 .of-head.on { color: rgb(255, 255, 255); }
 
 .fin-hero { flex-direction: row; align-items: flex-end; flex-shrink: 0; margin-bottom: 6px; padding-left: 12px; padding-right: 12px; }
-.fin-net { font-size: 46px; margin-right: 22px; }
-.fin-sub { margin-bottom: 4px; }
-.fin-sub-line { font-size: 16px; }
+.fin-figure { margin-right: 28px; }
+.fin-net { font-size: 46px; }
+.fin-sub-line { font-size: 20px; }
 .fin-icon { width: 18px; height: 18px; margin-right: 14px; flex-shrink: 0; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.75); }
 .fin-amount { margin-left: 14px; }
 .prizes { flex-direction: row; }
@@ -367,6 +367,15 @@
 .rh-hero .rs-hero-prize, .rh-hero .rs-hero-dnf { font-size: 22px; }
 .rh-chart { height: 190px; flex-shrink: 0; margin-bottom: 14px; }
 .rh-chart .rs-readout { top: -4px; right: 0; }
+.rh-head-pos { width: 90px; font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.42); -unity-text-align: middle-left; }
+.rh-head-laps { width: 52px; font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.42); -unity-text-align: middle-right; }
+.rh-head-prize { width: 100px; font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.42); -unity-text-align: middle-right; }
+.rh-legend { flex-direction: row; flex-wrap: wrap; flex-shrink: 0; margin-top: -8px; margin-bottom: 12px; }
+.rh-legend-item { flex-direction: row; align-items: center; margin-right: 16px; margin-bottom: 4px; }
+.rh-legend-item .rs-swatch { margin-right: 6px; }
+.rh-legend-text { font-size: 12px; color: rgba(255, 255, 255, 0.62); }
+.rh-legend-dot { width: 9px; height: 9px; margin-right: 6px; border-radius: 5px; background-color: rgb(255, 176, 32); }
+.rh-legend-tick { width: 2px; height: 10px; margin-right: 6px; background-color: rgba(255, 255, 255, 0.6); }
 .rh-log { flex-grow: 1; flex-shrink: 1; min-height: 0; max-height: 300px; }
 .rh-log .rs-row { height: 32px; }
 .rh-issue-name { flex-grow: 1; flex-shrink: 1; min-width: 0; margin-right: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -375,7 +384,7 @@
 .st-rank { width: 36px; margin-right: 12px; -unity-text-align: middle-right; }
 .st-row .cls { margin-right: 12px; }
 .st-prestige { width: 64px; margin-left: 12px; -unity-text-align: middle-right; }
-.st-trend { width: 72px; margin-left: 12px; flex-direction: row; align-items: center; justify-content: flex-end; }
+.st-trend { width: 72px; margin-left: 12px; -unity-text-align: middle-right; flex-direction: row; align-items: center; justify-content: flex-end; }
 .st-arrow { width: 12px; height: 12px; margin-right: 6px; -unity-background-scale-mode: scale-to-fit; }
 .st-pin { position: absolute; left: 0; right: 0; background-color: rgb(74, 77, 77); }
 .st-pin.top { top: 28px; }
@@ -390,5 +399,7 @@
 .sc-det-car .cls { margin-right: 10px; }
 .sc-det-meta { flex-direction: row; margin-top: 8px; margin-bottom: 10px; font-size: 14px; letter-spacing: 0.8px; color: rgba(255, 255, 255, 0.62); }
 .sc-det-meta-value { margin-left: 6px; color: rgb(255, 255, 255); }
+.sc-driver-head { height: 22px; padding-left: 4px; padding-right: 4px; }
+.sc-ovr-head { width: 48px; -unity-text-align: middle-right; }
 .sc-driver { height: 40px; padding-left: 4px; padding-right: 4px; }
 .sc-ovr { width: 48px; font-size: 22px; -unity-text-align: middle-right; }

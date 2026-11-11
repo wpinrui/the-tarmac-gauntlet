@@ -42,7 +42,9 @@ namespace TarmacGauntlet.Management
             prestige.AddToClassList("st-prestige");
             Menus.Tooltip(prestige, PrestigeTip);
             header.Add(prestige);
-            header.Add(Box("st-trend"));
+            Label change = Menus.Text("CHANGE", "of-head");
+            change.AddToClassList("st-trend");
+            header.Add(change);
             Body.Add(header);
 
             List<BaseTeam> ranked = game.Teams.OrderByDescending(t => t.Prestige).ToList();

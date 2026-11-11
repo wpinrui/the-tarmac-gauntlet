@@ -154,9 +154,18 @@ namespace TarmacGauntlet.Management
             car.Add(Menus.Text(s.Car, "sc-det-car-name", true));
             side.Add(car);
             VisualElement meta = Box("sc-det-meta");
-            meta.Add(Menus.Text("AGE", "sc-det-meta-label"));
+            meta.Add(Menus.Text("CAR AGE", "sc-det-meta-label"));
             meta.Add(Menus.Text(Num(s.Age), "sc-det-meta-value", true));
             side.Add(meta);
+            if (s.Drivers.Count > 0)
+            {
+                VisualElement head = Box("of-head-row", "sc-driver-head");
+                head.Add(Box("of-fill"));
+                Label ovrHead = Menus.Text("OVR", "of-head");
+                ovrHead.AddToClassList("sc-ovr-head");
+                head.Add(ovrHead);
+                side.Add(head);
+            }
             foreach ((string name, int ovr) in s.Drivers)
             {
                 VisualElement row = Box("of-row", "sc-driver");
