@@ -79,6 +79,20 @@ namespace TarmacGauntlet.TeamHq
         private readonly Texture2D[] maps, normals;
         private readonly Dictionary<int, Material[]> palettes = new Dictionary<int, Material[]>();
 
+        /// <summary>Submeshes in the mesh, one a part: a material can have more than one.</summary>
+        internal int Submeshes => info.parts.Length;
+
+        /// <summary>The name of the material a submesh is drawn with.</summary>
+        internal string MaterialName(int submesh) => info.mats[info.parts[submesh].mat].name;
+
+        /// <summary>One material a submesh, from a material a body material.</summary>
+        internal Material[] PartMaterials(Material[] byMaterial)
+        {
+            var m = new Material[info.parts.Length];
+            for (int s = 0; s < m.Length; s++) m[s] = byMaterial[info.parts[s].mat];
+            return m;
+        }
+
         private HqCrewBody(string id, Info info, byte[] meshData, byte[] animData)
         {
             Id = id;
@@ -150,7 +164,7 @@ namespace TarmacGauntlet.TeamHq
             r.bones = bones;
             r.rootBone = rig.Find("Hips") ?? root.transform;
             r.sharedMesh = mesh;
-            r.sharedMaterials = Palette(colour);
+            r.sharedMaterials = PartMaterials(Palette(colour));
             r.shadowCastingMode = ShadowCastingMode.On;
             r.receiveShadows = true;
             // The root moves under the clips (sitting, crouching), so keep the bounds following the bones.
@@ -229,7 +243,7 @@ namespace TarmacGauntlet.TeamHq
         }
 
         /// <summary>The materials for one colourway, made the first time someone wears it. 0 is the body's own look.</summary>
-        private Material[] Palette(int colour)
+        internal Material[] Palette(int colour)
         {
             if (palettes.TryGetValue(colour, out Material[] p)) return p;
             p = new Material[info.mats.Length];

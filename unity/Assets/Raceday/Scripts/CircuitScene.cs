@@ -5,7 +5,8 @@ using UnityEngine;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// Builds the circuit, the country round it (<see cref="Landscape"/>), the trackside furniture (<see cref="Trackside"/>), the sky and its sun (<see cref="TimeOfDay"/>), the career's field and the cameras when the scene starts. The
+    /// Builds the circuit, the country round it (<see cref="Landscape"/>), the trackside furniture (<see cref="Trackside"/>), the pit crews (<see cref="PitCrews"/>), the sky and its sun (<see cref="TimeOfDay"/>), the race's weather (<see cref="WeatherPlan"/>), the floodlights
+    /// that come on at night (<see cref="NightLights"/>), the career's field and the cameras when the scene starts. The
     /// field is every team with a car, from <see cref="RaceWeekend.Setup"/>, gridded by prestige: each
     /// car on a full tank and new tyres, its starting driver at the wheel. Run on its own, the scene
     /// makes a new career in which the player owns the Cheonma. The <see cref="RaceDirector"/> keeps
@@ -30,6 +31,9 @@ namespace TarmacGauntlet.Raceday
         /// from the pit lane one car at a time.
         /// </summary>
         [SerializeField] private StartMode start = StartMode.Rolling;
+
+        /// <summary>Seed for the race's weather; 0 rolls a new one each race.</summary>
+        [SerializeField] private int weatherSeed;
 
         private KeyboardState keys;
         private AiDriver ai;
@@ -67,12 +71,14 @@ namespace TarmacGauntlet.Raceday
         private void Awake()
         {
             Time.fixedDeltaTime = 0.01f;
+            RaceWeather.Now = WeatherState.Dry;
             var circuit = new Circuit(CircuitData.Load());
             var track = new GameObject("Circuit");
             var materials = new CircuitMaterials();
             var builder = new CircuitBuilder(circuit, materials);
             List<CircuitPart> parts = builder.Build();
-            var stands = new Grandstands(circuit, builder, new StandMaterials(StandLook.Colours), StandLook.Main, StandLook.Corners);
+            var standMaterials = new StandMaterials(StandLook.Colours);
+            var stands = new Grandstands(circuit, builder, standMaterials, StandLook.Main, StandLook.Corners);
             parts.AddRange(stands.Build());
             foreach (CircuitPart part in parts) AddPart(track.transform, part);
             Landscape.Build(circuit, builder, materials, LandscapeLooks.Current);
@@ -86,6 +92,16 @@ namespace TarmacGauntlet.Raceday
             view.Sky = sky;
             view.Materials = pitMaterials;
             Trackside trackside = Trackside.Build(circuit, builder, stands.Footprints);
+            var floodMaterials = new FloodMaterials();
+            var floods = new Floodlights(circuit, Complex, stands.RoofLamps, builder.PitWallRuns, parts, GantrySpan.Of(circuit, trackside.Placed));
+            var lit = new GameObject("Floodlights");
+            foreach (CircuitPart part in floods.Build(floodMaterials.Steel, floodMaterials.Lens, floodMaterials.Pool))
+                AddPart(lit.transform, part);
+            NightLights night = lit.AddComponent<NightLights>();
+            night.Sky = sky;
+            night.Layout = floods;
+            night.Materials = floodMaterials;
+            night.Stands = standMaterials;
 
             keys = new GameObject("Keyboard").AddComponent<KeyboardState>();
             var line = new RacingLine(circuit);
@@ -170,8 +186,23 @@ namespace TarmacGauntlet.Raceday
             RaceTower tower = Tower(circuit, racing, field, teams, watched, starter);
             if (player >= 0 && TeamColour(setup.Game, grid[player].TeamId) is Color own) tower.Colours[player] = own;
             view.Fit(Complex, tower.Colours, pits.Garages);
+            // Each team's hired crew wait in its garage and work its stops.
+            var crewSizes = new int[grid.Count];
+            for (int i = 0; i < grid.Count; i++) crewSizes[i] = grid[i].CrewSize;
+            new GameObject("Pit crews").AddComponent<PitCrews>().Build(Complex, pits, racing, drivers, tower.Colours, crewSizes);
             tv.Classes = tower.Classes;
             sky.RaceSeconds = () => tower.RaceTime;
+            // Every race rolls its own weather (WeatherPlan), played on the race clock.
+            int seed = weatherSeed != 0 ? weatherSeed : new System.Random().Next(1, int.MaxValue);
+            var weather = new WeatherPlan(seed, TimeOfDay.StartHour);
+            Debug.Log($"Weather {seed}: {weather.Kind}");
+            WeatherView rain = sky.gameObject.AddComponent<WeatherView>();
+            rain.Plan = weather;
+            rain.RaceSeconds = () => tower.RaceTime;
+            rain.Materials = materials;
+            rain.Cars = racing;
+            rain.Night = () => SkyClock.At(sky.Hour, SkyClock.Look).Night;
+            sky.Weather = () => weather.At(tower.RaceTime);
             trackside.Cars = racing;
             trackside.Racing = tower.Racing;
             if (starter is RaceStart formation) trackside.PaceCarOut = () => !formation.Racing;

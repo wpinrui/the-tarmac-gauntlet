@@ -63,6 +63,7 @@ Lamp parts and materials are named so the game can light them: `lamp_head`, `lam
 Parts that swing with a door start with its name: `door_l_glass`, `door_l_card`, `door_l_mirror`.
 The interior gets a firewall, a dash meeting it, seats, door cards and a mirror.
 Door mirrors get a separate recessed glass part.
+Every car is left-hand drive: the driver's seat and wheel sit on the left, because the pit lane is on the left. Both doors open, so the car stays symmetrical.
 Lay each window's glass, black band and cutter along that window's own normal, never along the car's axes. A shallow window projected from straight behind or above stretches its band.
 Rebuild each window outline from plain fits: one even curve for each long edge and a straight line for each side. A measured outline carries the reference's waves into the band.
 Every inner face uses an interior material.

@@ -60,8 +60,8 @@ namespace TarmacGauntlet.Raceday
         public const float ClearDepth = 6.5f;
         /// <summary>Bays the race offices span, centred on the garage beside the start line.</summary>
         public const int OfficeBays = 6;
-        /// <summary>Most crew a garage has spots for, waiting inside.</summary>
-        public const int StandbySpots = 12;
+        /// <summary>Most crew a garage has spots for, waiting inside: as many as a team can hire.</summary>
+        public const int StandbySpots = 16;
         /// <summary>Half a garage side wall's thickness, as the circuit builder lays them.</summary>
         public const float WallHalf = 0.15f;
 
@@ -176,7 +176,7 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>
-        /// Where the crew wait inside the garage, in two rows across the clear front, facing the door. Spot 0 is
+        /// Where the crew wait inside the garage, in rows of six across the clear front, facing the door. Spot 0 is
         /// nearest the door in the middle; later spots work outwards and back.
         /// </summary>
         public CrewSpot Standby(int garage, int spot)
@@ -186,22 +186,6 @@ namespace TarmacGauntlet.Raceday
             float x = (col % 2 == 0 ? 1f : -1f) * (0.7f + 1.4f * (col / 2));
             float z = Depth * 0.5f - 1.4f - row * 1.6f;
             return new CrewSpot(f.At(x, 0f, z), f.Out);
-        }
-
-        /// <summary>Where the four fresh tyres wait for a stop, on the floor inside the door, by the -x wall.</summary>
-        public CrewSpot FreshTyres(int garage, int wheel)
-        {
-            GarageFrame f = frames[garage];
-            float x = Width * 0.5f - 1.2f;
-            float z = Depth * 0.5f - 1.4f - wheel * 0.9f;
-            return new CrewSpot(f.At(-x, 0f, z), f.Out);
-        }
-
-        /// <summary>The fuel rig's nozzle rest, inside the door by the +x wall, where the refueller picks it up.</summary>
-        public CrewSpot FuelRig(int garage)
-        {
-            GarageFrame f = frames[garage];
-            return new CrewSpot(f.At(RightWall(garage, Depth * 0.5f) - 0.5f, 0f, Depth * 0.5f - 0.6f), f.Out);
         }
 
         /// <summary>Inner face of a garage's -x wall, its own.</summary>

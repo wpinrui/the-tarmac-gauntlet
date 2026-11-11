@@ -26,7 +26,7 @@ namespace TarmacGauntlet.Raceday
     /// <summary>
     /// Builds the pit complex's meshes from <see cref="PitComplex"/>: the pit building along the top of the garages,
     /// the race offices over the garages beside the start line, and each garage's fit-out (team colour on the back
-    /// wall and the raised door, tool cabinets, a tyre rack, four fresh tyres in blankets and a fuel rig). The
+    /// wall and the raised door, tool cabinets, a tyre rack, a fuel rig and the boom over its box, <see cref="PitBoxKit"/>). The
     /// building is one cross-section carried along the row's stations, so it runs on smoothly over the garages'
     /// stepped roofs and round the bend in the row. Everything in team colours is drawn with one palette material:
     /// its UVs pick the garage's texel, so all 100 garages take two draw calls a chunk.
@@ -52,6 +52,7 @@ namespace TarmacGauntlet.Raceday
 
         private readonly PitComplex pc;
         private readonly PitMaterials m;
+        private readonly PitBoxKit boxKit;
         private readonly List<CircuitPart> parts = new List<CircuitPart>();
 
         private readonly MeshKit concrete = new MeshKit(), glass = new MeshKit(), steel = new MeshKit();
@@ -62,6 +63,7 @@ namespace TarmacGauntlet.Raceday
         {
             pc = complex;
             m = materials;
+            boxKit = new PitBoxKit(complex);
         }
 
         public List<CircuitPart> Build()
@@ -154,24 +156,13 @@ namespace TarmacGauntlet.Raceday
                 for (int t = 0; t < 10; t++)
                     Tyre(rubber, f.At(rx, 0.14f + s * 0.85f + 0.33f, -7.17f + t * 0.36f), f.Out, 0.33f, 0.28f);
 
-            // Four fresh tyres in blankets of the team's colour, standing inside the door by the -x wall.
-            for (int w = 0; w < 4; w++)
-            {
-                Vector3 at = pc.FreshTyres(g, w).Position + Vector3.up * 0.34f;
-                Tyre(team, at, f.Out, 0.34f, 0.3f, flat);
-                Tyre(rubber, at, f.Out, 0.3f, 0.32f);
-            }
-
-            // The fuel rig by the +x wall inside the door: a tank tower, a mast and a boom out to the door, the hose hanging to its rest.
-            CrewSpot rest = pc.FuelRig(g);
-            float right = pc.RightWall(g, door);
-            Block(fit, f, right - 0.5f, door - 2.4f, 0.9f, 1.0f, 0f, 2.4f);
-            Block(team, f, right - 0.5f, door - 1.88f, 0.92f, 0.04f, 1.7f, 2.2f, paint);
-            Block(metal, f, right - 0.5f, door - 2.4f, 0.15f, 0.15f, 2.4f, 4.6f);
-            Block(metal, f, right - 0.5f, door - 1.5f, 0.12f, 1.95f, 4.45f, 4.6f);
-            float rx2 = Dot(rest.Position - f.Floor, f.Side), rz = Dot(rest.Position - f.Floor, f.Out);
-            Block(fit, f, rx2, rz, 0.07f, 0.07f, 1.0f, 4.45f);
-            Block(metal, f, rx2, rz, 0.3f, 0.3f, 0f, 1.0f);
+            // The fuel rig by the +x wall inside the door: a tank tower with a band of the team's colour. Its hose
+            // runs up to the boom over the box, which carries it and the wheel guns' air lines out to the car.
+            Vector2 rig = boxKit.FuelRigAt(g);
+            Block(fit, f, rig.x, rig.y, 0.9f, 1.0f, 0f, PitBoxKit.FuelRigHeight);
+            Block(team, f, rig.x, rig.y + 0.52f, 0.92f, 0.04f, 1.7f, 2.2f, paint);
+            Block(metal, f, rig.x, rig.y + 0.3f, 0.16f, 0.16f, PitBoxKit.FuelRigHeight, PitBoxKit.FuelRigHeight + 0.08f);
+            boxKit.Boom(g, metal, null, rubber);
 
             // Strip lights across the ceiling.
             foreach (float lz in new[] { -5.0f, -1.5f, 2.0f, 5.5f })

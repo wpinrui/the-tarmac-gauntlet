@@ -100,6 +100,7 @@ sealed class Race
     const float KerbWidth = 1.5f;
 
     public readonly List<Racer> Racers = new List<Racer>();
+    public static long ThinkStepTicks;
     public readonly List<Contact> Contacts = new List<Contact>();
     /// <summary>One line per change of order between two cars running within 100 m of each other.</summary>
     public readonly List<string> Passes = new List<string>();
@@ -193,7 +194,7 @@ sealed class Race
                 Id = id++,
                 Entry = e,
                 Car = new StandInCar(spec, line),
-                Pilot = new AiPilot(line, spec, e.Pace, e.Consistency, e.Safety, e.Seed),
+                Pilot = new AiPilot(line, spec, e.Pace, e.Consistency, e.Safety, e.Seed).BuildPlaces(),
                 Craft = new Racecraft(),
             };
             int k = circuit.IndexOf(e.Start);
@@ -448,7 +449,9 @@ sealed class Race
                 r.ModeTime[r.Craft.State] = (r.ModeTime.TryGetValue(r.Craft.State, out float g) ? g : 0f) + Dt;
                 continue;
             }
+            long tk = System.Diagnostics.Stopwatch.GetTimestamp();
             r.Craft.Think(r.Pilot, field[i], sorted, Dt);
+            ThinkStepTicks += System.Diagnostics.Stopwatch.GetTimestamp() - tk;
             if (DecisionStats && Time > 20f && r.Craft.Chooser?.Chosen != null && !r.Rejoin.Busy) Tally(r.Craft.Chooser);
             if (Time > 20f && !r.Rejoin.Busy && r.Car.Speed < 5f && r.Pilot.Index >= 0)
             {

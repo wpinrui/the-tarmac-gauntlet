@@ -59,7 +59,7 @@ namespace TarmacGauntlet.Management
         private Font mainMedium, mainRegular;
         private readonly HashSet<VisualElement> shown = new HashSet<VisualElement>();
 
-        private VisualElement root, mainColumn, continueItem, gameLayer, top, hubMenu, strip, tag, tagCondition, race, panel, panelBody;
+        private VisualElement root, mainColumn, continueItem, gameLayer, top, hubMenu, strip, carTag, tagCondition, race, panel, panelBody;
         private VisualElement catcher, lineup, lineupBody;
         private Label tagClass;
         private VisualElement dimmer, pauseLayer, settingsLayer, settingsPanel, dialogLayer, dialog, dialogBody, dialogButtons, badge;
@@ -198,16 +198,16 @@ namespace TarmacGauntlet.Management
             gameLayer.Add(hubMenu);
             gameLayer.Add(strip);
 
-            tag = glass.Make("tag", "fade");
+            carTag = glass.Make("tag", "fade");
             VisualElement tagTop = Box("tag-top");
             tagClass = ClassLabels.Make(CarClass.F, "cls-sm");
             tagTop.Add(tagClass);
             tagName = Text("", "tag-name", true);
             tagTop.Add(tagName);
-            tag.Add(tagTop);
+            carTag.Add(tagTop);
             tagCondition = Box("tag-condition");
-            tag.Add(tagCondition);
-            gameLayer.Add(tag);
+            carTag.Add(tagCondition);
+            gameLayer.Add(carTag);
 
             race = RedButton("Race", "big-button", () => Go(Mode.Lineup));
             race.AddToClassList("corner");
@@ -265,7 +265,7 @@ namespace TarmacGauntlet.Management
             dialog.Add(dialogButtons);
             dialogLayer.Add(dialog);
 
-            foreach (VisualElement e in new[] { mainColumn, top, hubMenu, strip, tag, race, panel, side, catcher, lineup, dimmer, pauseLayer, settingsLayer, dialogLayer })
+            foreach (VisualElement e in new[] { mainColumn, top, hubMenu, strip, carTag, race, panel, side, catcher, lineup, dimmer, pauseLayer, settingsLayer, dialogLayer })
                 e.style.display = DisplayStyle.None;
 
             Popups = Layer();
@@ -441,6 +441,9 @@ namespace TarmacGauntlet.Management
             graphics.Add(Stepper("Resolution", sizes.Select(r => r.x + " × " + r.y).ToArray(), sizes.ToList().IndexOf(GameSettings.Resolution), i => GameSettings.Resolution = sizes[i]));
             graphics.Add(Stepper("Quality", GameSettings.QualityNames, GameSettings.Quality, i => GameSettings.Quality = i));
             graphics.Add(Stepper("V-sync", new[] { "Off", "On" }, GameSettings.VSync ? 1 : 0, i => GameSettings.VSync = i == 1));
+            int most = GameSettings.MostRealLights;
+            graphics.Add(Slider("Real lights", GameSettings.RealLights / (float)most, v => GameSettings.RealLights = Mathf.RoundToInt(v * most),
+                v => Mathf.RoundToInt(v * most).ToString(CultureInfo.InvariantCulture)));
             settingsPanel.Add(graphics);
 
             VisualElement audio = SettingsGroup(1);
@@ -483,7 +486,8 @@ namespace TarmacGauntlet.Management
             return row;
         }
 
-        private VisualElement Slider(string label, float value01, Action<float> set)
+        /// <param name="shown">The number beside the slider for a value; a percentage when not given.</param>
+        private VisualElement Slider(string label, float value01, Action<float> set, Func<float, string> shown = null)
         {
             VisualElement row = Setting(label);
             var slider = new VisualElement();
@@ -508,7 +512,7 @@ namespace TarmacGauntlet.Management
             {
                 fill.style.width = Length.Percent(v * 100);
                 knob.style.left = Length.Percent(v * 100);
-                number.text = Mathf.RoundToInt(v * 100).ToString(CultureInfo.InvariantCulture);
+                number.text = shown != null ? shown(v) : Mathf.RoundToInt(v * 100).ToString(CultureInfo.InvariantCulture);
             }
             void SetFrom(Vector2 local)
             {
@@ -696,7 +700,7 @@ namespace TarmacGauntlet.Management
         private void RenderTag()
         {
             tagWasShown = TagWanted();
-            Show(tag, tagWasShown);
+            Show(carTag, tagWasShown);
         }
 
         /// <summary>Fades an element in, or hides it at once.</summary>
@@ -762,8 +766,8 @@ namespace TarmacGauntlet.Management
             Vector3 s = cam.WorldToScreenPoint(anchor);
             if (s.z <= 0 || root.panel == null) return;
             Vector2 p = RuntimePanelUtils.ScreenToPanel(root.panel, new Vector2(s.x, Screen.height - s.y));
-            tag.style.left = Mathf.Round(p.x + 24);
-            tag.style.top = Mathf.Round(p.y - 60);
+            carTag.style.left = Mathf.Round(p.x + 24);
+            carTag.style.top = Mathf.Round(p.y - 60);
         }
 
         // Keys come through IMGUI events, so this works with either of Unity's input systems.

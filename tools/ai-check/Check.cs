@@ -13,6 +13,8 @@
 //   pace orders      a Pace 100 driver is faster than a Pace 50 driver in the same car
 //   consistency      lap times spread more for a Consistency 0 driver than a Consistency 100 driver
 //   mistakes         a Safety 0 driver overcooks corners, and still finishes every lap
+//   wet laps         on a fully wet track every class laps 7 to 18% slower without leaving the track, and
+//                    a Safety 60 driver overcooks more corners than in the dry; pass "wet" to run only that
 //   rejoins          see RejoinChecks.cs; pass "rejoin" to run only those, with every run printed
 //   timing tower     see TowerChecks.cs; pass "tower" to run only that
 //
@@ -66,7 +68,8 @@ static partial class Check
         circuit = new Circuit(data);
         line = new RacingLine(circuit);
         // The experiment to run with, as the debug menu's switch: AI_EXPERIMENT=3 is E3.
-        if (int.TryParse(Environment.GetEnvironmentVariable("AI_EXPERIMENT"), out int experiment)) Experiments.On = experiment;
+        // Unset, the checker runs E0 as it always has, though the game itself starts on E1.
+        Experiments.On = int.TryParse(Environment.GetEnvironmentVariable("AI_EXPERIMENT"), out int experiment) ? experiment : 0;
 
         if (args.Length > 2 && args[1] == "line")
         {
@@ -92,6 +95,17 @@ static partial class Check
                 Run r = Drive(args[2], pace, 100f, 100f, 3, 1);
                 Console.WriteLine($"{args[2]} pace {pace}: {string.Join(" ", r.Laps.Select(Time))}");
             }
+            return 0;
+        }
+        if (args.Length > 1 && args[1] == "fatigue")
+        {
+            string model = args.Length > 2 ? args[2] : "a-29";
+            foreach (float pace in new[] { 50f, 80f, 100f })
+                foreach (float tired in new[] { 0f, 50f, 100f })
+                {
+                    Run r = Drive(model, pace, 100f, 100f, 3, 1, fatigue: tired);
+                    Console.WriteLine($"{model} pace {pace} fatigue {tired}: {string.Join(" ", r.Laps.Select(Time))}, race maths x{LapTime.FatigueLapFactor(pace, tired):0.000}");
+                }
             return 0;
         }
         if (args.Length > 1 && args[1] == "racecraft")
@@ -186,11 +200,18 @@ static partial class Check
             FlippedCars(verbose: true);
             return failed ? 1 : 0;
         }
+        if (args.Length > 1 && args[1] == "wet")
+        {
+            WetLaps();
+            return failed ? 1 : 0;
+        }
         if (args.Length > 1 && args[1] == "supplies")
         {
             SuppliesCheck(verbose: true);
             return failed ? 1 : 0;
         }
+        if (args.Length > 1 && args[1] == "pack") { PackRace(); return 0; }
+        if (args.Length > 1 && args[1] == "perf") { PerfStart(); return 0; }
         if (args.Length > 1 && args[1] == "race")
         {
             RacePack(args.Length > 2 ? int.Parse(args[2]) : 4, verbose: true, reversed: Environment.GetEnvironmentVariable("AI_REVERSED") != null);
@@ -209,6 +230,7 @@ static partial class Check
         PaceOrders();
         ConsistencySpreads();
         Mistakes();
+        WetLaps();
         HoldsGap();
         QuickerGetsBy();
         LapsAtHairpin();
@@ -406,12 +428,14 @@ static partial class Check
         Report($"laps at the hairpin (by at {where:0} m, hairpin 1442 to 1489 m)", problems);
     }
 
-    static Run Drive(string modelId, float pace, float consistency, float safety, int laps, int seed, Action<StandInCar, AiPilot, AiPilot.Controls> watch = null)
+    static Run Drive(string modelId, float pace, float consistency, float safety, int laps, int seed, Action<StandInCar, AiPilot, AiPilot.Controls> watch = null, bool supplies = false, float fatigue = 0f)
     {
         CarSpec spec = CarSpec.For(modelId);
         RacingLine line = LineFor(modelId);
-        var pilot = new AiPilot(line, spec, pace, consistency, safety, seed);
+        var pilot = new AiPilot(line, spec, pace, consistency, safety, seed) { Fatigue = fatigue };
         var car = new StandInCar(spec, line);
+        // With supplies the tyres carry the weather's grip, as they do in the game.
+        if (supplies) car.Supplies = Consumables.For(spec, pilot.Profile, 60f);
         GridSlot pole = circuit.Data.grid.slots[0];
         car.PlaceAt(circuit.IndexOf(pole.d - 2.6f), pole.lateral);
         var run = new Run { Predicted = pilot.Profile.LapTime, Name = spec.Name };
@@ -421,6 +445,7 @@ static partial class Check
         float limit = pilot.Profile.LapTime * (laps + 2) * 2f;
         while (run.Laps.Count < laps && time < limit)
         {
+            if (car.Supplies != null) pilot.Grip = car.Supplies.GripScale;
             AiPilot.Controls c = pilot.Drive(car.Position, car.Forward, car.Velocity, car.YawRate);
             watch?.Invoke(car, pilot, c);
             car.Step(Dt, c.Throttle, c.Brake, c.Steer);
@@ -534,6 +559,38 @@ static partial class Check
         if (!careful.Stuck && !r.Stuck && careful.Laps.Sum() >= r.Laps.Sum()) problems.Add("overcooking corners cost no time");
         physicsMistakeCost = r.Mistakes > 0 ? (r.Laps.Sum() - careful.Laps.Sum()) / r.Mistakes : float.NaN;
         Report($"mistakes ({r.Mistakes} overcooked corners in 6 laps cost {r.Laps.Sum() - careful.Laps.Sum():0.0} s, furthest {Math.Max(r.WorstOff, 0f):0.0} m past the edge)", problems);
+    }
+
+    /// <summary>
+    /// On a fully wet track (1 mm of water) every class laps slower by about what the lost grip
+    /// costs, without leaving the track, and a middling driver overcooks more corners than in the dry.
+    /// </summary>
+    static void WetLaps()
+    {
+        var problems = new List<string>();
+        var rows = new List<string>();
+        WeatherState wet = new WeatherState { Cloud = 1f, Rain = 3f, Water = 1f, Wind = 1f };
+        foreach (string id in new[] { "a-29", "b-21", "c-19", "d-15", "e-07", "f-01" })
+        {
+            RaceWeather.Now = WeatherState.Dry;
+            Run dry = Drive(id, 90f, 100f, 100f, 2, 1, supplies: true);
+            RaceWeather.Now = wet;
+            Run r = Drive(id, 90f, 100f, 100f, 2, 1, supplies: true);
+            RaceWeather.Now = WeatherState.Dry;
+            if (dry.Stuck || r.Stuck) { problems.Add($"{id} did not finish two laps"); continue; }
+            float slower = (r.Laps[1] - dry.Laps[1]) / dry.Laps[1];
+            rows.Add($"    {id,-6} dry {Time(dry.Laps[1])}  wet {Time(r.Laps[1])}  {slower * 100f:+0.0}%  past edge {Math.Max(r.WorstOff, 0f):0.0} m");
+            if (r.OffTrack > 0) problems.Add($"{id} left the wet track ({r.WorstOff:0.0} m past the edge)");
+            if (slower < 0.07f || slower > 0.18f) problems.Add($"{id} wet lap {slower * 100f:+0.0}% against the dry");
+        }
+        RaceWeather.Now = WeatherState.Dry;
+        Run dryCareless = Drive("a-29", 90f, 100f, 60f, 6, 7, supplies: true);
+        RaceWeather.Now = wet;
+        Run wetCareless = Drive("a-29", 90f, 100f, 60f, 6, 7, supplies: true);
+        RaceWeather.Now = WeatherState.Dry;
+        if (wetCareless.Mistakes <= dryCareless.Mistakes) problems.Add($"Safety 60 overcooked {wetCareless.Mistakes} corners wet, {dryCareless.Mistakes} dry");
+        Report($"wet laps (Safety 60 overcooks {dryCareless.Mistakes} corners in 6 dry laps, {wetCareless.Mistakes} wet)", problems);
+        foreach (string row in rows) Console.WriteLine(row);
     }
 
     static void Detail(string modelId)
