@@ -62,7 +62,7 @@ static partial class Check
             string[] parts = only.Split(':');
             int id = parts.Length > 1 ? int.Parse(parts[1]) : 50;
             float until = parts.Length > 2 ? float.Parse(parts[2]) : 120f;
-            Race r = new Race(circuit, ClassField(11), LineFor);
+            Race r = new Race(circuit, ClassField(parts.Length > 3 ? int.Parse(parts[3]) : 11), LineFor);
             float JamFrom = float.TryParse(Environment.GetEnvironmentVariable("JAM_FROM"), out float jf) ? jf : 700f;
             int tick = 0;
             while (r.Time < until)

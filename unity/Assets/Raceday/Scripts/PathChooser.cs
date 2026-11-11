@@ -52,6 +52,8 @@ namespace TarmacGauntlet.Raceday
         private float lapLength;
         /// <summary>Below this speed a ghost is a stopped car on the track: an obstacle to slow for and go round, m/s.</summary>
         private const float StoppedSpeed = 10f;
+        /// <summary>Speed below which a car may pass through a stopped ghost it can't get round, m/s.</summary>
+        private static readonly float GhostCrawl = Knob("CRAWL", 6f);
         /// <summary>Gap to a car alongside, side to side, inside which TORCS's parallel steering still takes over, m (spec: 2 m).</summary>
         public const float SideFilterGap = 2f;
         /// <summary>Seconds of score per second spent lifting or braking for a car ahead below its lane's speed.</summary>
@@ -170,7 +172,7 @@ namespace TarmacGauntlet.Raceday
                 float closing = o.Speed - mySpeed;
                 if (g < -CarL && !lapping && closing > Endurance.NoDefendClosing && -g < closing * 2f) fastBehind = true;
                 if (g > CarL && g < mySpeed * 1f && o.Speed < freeSpeed) passing = true;
-                if (g > 0f && g < aheadGap && Mathf.Abs(o.Lateral - me.Lateral) < CarW + RoomMargin) { aheadGap = g; ahead = j; aheadInLane = o.Speed; }
+                if (g > 0f && g < aheadGap && Mathf.Abs(o.Lateral - me.Lateral) < CarW + RoomMargin && !(stopped[j] && mySpeed < GhostCrawl + 1f)) { aheadGap = g; ahead = j; aheadInLane = o.Speed; }
                 if (g > CarL && g < wideGap && Mathf.Abs(o.Lateral - me.Lateral) < WideAhead * CarW) { wideGap = g; aheadWide = j; }
                 // A car alongside and level or ahead: one this car drops back from. One behind drops back itself.
                 if (g > (BesideBrake >= 2f ? 0f : -CarL - 1f) && g < CarL + 1f && Mathf.Abs(o.Lateral - me.Lateral) < 2f * CarW) besideSpeed = Mathf.Min(besideSpeed, o.Speed);
@@ -381,6 +383,8 @@ namespace TarmacGauntlet.Raceday
                 for (int j = 0; j < others.Count && broke == null; j++)
                 {
                     float g = Road(od[j, s] - d, lap);
+                    // A stopped ghost with no way round: slowed to a crawl, this car may pass through it (H12's safety net).
+                    if (stopped[j] && v < GhostCrawl) continue;
                     float side = ol[j, s] - lat;
                     float apart = Mathf.Abs(side);
                     // H1: never into a car ahead or alongside, with a margin kept: a passing margin past a
