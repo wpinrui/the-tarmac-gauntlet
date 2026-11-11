@@ -17,7 +17,7 @@ from livery import Livery  # noqa: E402
 livery.FONTS["Marker"] = HERE / "fonts" / "PermanentMarker-Regular.ttf"
 livery.FONTS["Caveat"] = HERE / "fonts" / "Caveat.ttf"
 LOGO = HERE / "logo.svg"
-BOOT_LINE = "oh no we did it again"
+BUMPER_LINE = "oh no we did it again"
 
 INK = "#1d1b17"
 WHITE = "#f6f3ea"
@@ -25,10 +25,6 @@ MUD = ["#5b4630", "#7a6040", "#3f3123", "#8a7556"]
 
 # Collier landmarks in OBJ metres: z along the car (+ nose), y up. Read off the true-scale views.
 FRONT_AXLE, REAR_AXLE, WHEEL_R = 1.268, -1.27, 0.34
-# Bonnet seen from above (z, x) and from the front (x, y).
-BONNET_TOP = [(0.87, 0.66), (1.38, 0.66), (1.55, 0.60), (1.70, 0.47), (1.80, 0.25), (1.82, 0.0),
-              (1.80, -0.25), (1.70, -0.47), (1.55, -0.60), (1.38, -0.66), (0.87, -0.66)]
-BONNET_FRONT = [(-0.68, 1.06), (0.68, 1.06), (0.64, 0.85), (0.45, 0.75), (-0.45, 0.75), (-0.64, 0.85)]
 # Boot lid below the rear window (x, y).
 BOOT_LID = [(0.60, 1.01), (-0.60, 1.01), (-0.50, 0.46), (0.50, 0.46)]
 
@@ -76,6 +72,37 @@ def mud(lv, seed, amount=1.0):
             dot(lv, view, (r.uniform(-0.95, 0.95), 0.12 + t * 0.3, 0), 0.004 + r.random() * 0.01 * (1 - t), r.choice(MUD), 0.4 + 0.5 * (1 - t))
 
 
+def mud_patch(lv, view, centre, radii, seed, fill="#4a3826"):
+    """A rough patch of mud with soft edges: a ragged blob, blurred, with clots and spatter
+    round it. centre and radii are (u, v) in the view's own metres."""
+    r = random.Random(seed)
+    cu, cv = centre
+    ru, rv = radii
+    waves = [(k, r.uniform(0.04, 0.16), r.uniform(0, 6.3)) for k in (2, 3, 5, 7, 11)]
+    pts = []
+    for i in range(96):
+        a = i / 96 * 2 * math.pi
+        k = 1 + sum(amp * math.sin(n * a + ph) for n, amp, ph in waves)
+        pts.append((cu + math.cos(a) * ru * k, cv + math.sin(a) * rv * k))
+    d = "M" + " L".join(f"{u:.4f},{v:.4f}" for u, v in pts) + " Z"
+    blur = 0.03 * min(ru, rv) / 0.3
+    art = lv.art[view]
+    art.append(f'<defs><filter id="soft-{view}-{seed}" x="-30%" y="-30%" width="160%" height="160%">'
+               f'<feGaussianBlur stdDeviation="{blur:.4f}"/></filter></defs>')
+    blobs = [f'<path d="{d}"/>']
+    for _ in range(14):  # clots breaking off the edge
+        a = r.uniform(0, 2 * math.pi)
+        k = r.uniform(0.85, 1.25)
+        blobs.append(f'<ellipse cx="{cu + math.cos(a) * ru * k:.4f}" cy="{cv + math.sin(a) * rv * k:.4f}" '
+                     f'rx="{ru * r.uniform(0.08, 0.22):.4f}" ry="{rv * r.uniform(0.08, 0.22):.4f}"/>')
+    art.append(f'<g fill="{fill}" opacity="0.92" filter="url(#soft-{view}-{seed})">{"".join(blobs)}</g>')
+    for _ in range(160):  # spatter thrown past the edge
+        a = r.uniform(0, 2 * math.pi)
+        k = 1.0 + r.random() ** 1.5 * 0.6
+        art.append(f'<circle cx="{cu + math.cos(a) * ru * k:.4f}" cy="{cv + math.sin(a) * rv * k:.4f}" '
+                   f'r="{0.003 + r.random() * 0.012 * (1.6 - k):.4f}" fill="{r.choice(MUD)}" opacity="0.8"/>')
+
+
 def marks(lv, door_ink=None, plate_fill=WHITE, num_ink=INK, bonnet_ink=WHITE):
     lv.side_mark(LOGO, LOGO_Z, LOGO_Y, LOGO_H, door_ink)
     plate(lv, NUM_Z, NUM_Y, NUM_W + 0.1, NUM_H + 0.08, plate_fill)
@@ -85,8 +112,8 @@ def marks(lv, door_ink=None, plate_fill=WHITE, num_ink=INK, bonnet_ink=WHITE):
 
 def debris_flag(views):
     """Marshal's slippery-surface flag: yellow, red stripes from the door's rear edge to the tail,
-    black bonnet."""
-    Y, R, K = "#f2c200", "#d62718", "#151412"
+    a clear boot lid, mud on the bonnet."""
+    Y, R = "#f2c200", "#d62718"
     lv = Livery(views, Y)
     for i in range(7):
         z1 = -0.50 - i * 0.24
@@ -95,11 +122,12 @@ def debris_flag(views):
     for i in range(8):
         x = -0.90 + i * 0.24
         lv.poly("rear", [(x, 0.47, 0), (x + 0.12, 0.47, 0), (x + 0.12, 1.7, 0), (x, 1.7, 0)], R)
-    lv.poly("top", [(x, 0, z) for z, x in BONNET_TOP], K)
-    lv.poly("front", [(x, y, 0) for x, y in BONNET_FRONT], K)
+    mud_patch(lv, "top", lv.uv("top", (0.0, 0, 1.33)), (0.40, 0.50), 31)  # on the bonnet
+    mud_patch(lv, "front", lv.uv("front", (0.0, 0.90, 0)), (0.52, 0.11), 32)
     lv.poly("rear", [(x, y, 0) for x, y in BOOT_LID], Y)  # stripes stop at the boot lid
-    lv.mark("rear", LOGO, (0, 0.72, 0), 0.24)
-    lv.text("rear", BOOT_LINE, (0, 0.565, 0), 0.042, INK, font="Marker")
+    lv.mark("rear", LOGO, (0.10, 0.68, 0), 0.30)  # nudged off the Collier script
+    # Across the rear bumper's plate recess (x -0.81 to 0.81, y 0.25 to 0.47), padded each side.
+    lv.text("rear", BUMPER_LINE, (0, 0.36, 0), 0.075, INK, font="Marker")
     mud(lv, 11)
     marks(lv)
     return lv
