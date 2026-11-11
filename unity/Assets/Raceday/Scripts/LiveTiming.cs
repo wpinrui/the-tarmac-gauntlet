@@ -10,7 +10,8 @@ namespace TarmacGauntlet.Raceday
     /// onboard and the track map, then your car's driver, fuel, tyres and condition with the laps
     /// they last on the engine map in use (the one that runs out first in amber), the engine map, and
     /// the next stop: litres, tyres, next driver and Pit now (<see cref="PitOrders"/>). Left alone the
-    /// car still pits and chooses for itself. The red button top right, or T, returns to the race.
+    /// car still pits and chooses for itself. The red button top right, or T, returns to the race, and
+    /// the button beside it skips to your next stint, while a teammate drives.
     /// Laid out on a 1920 by 1080 screen and scaled to the screen's height.
     /// </summary>
     public sealed class LiveTiming : MonoBehaviour
@@ -32,6 +33,10 @@ namespace TarmacGauntlet.Raceday
         public KeyboardState Keys;
         /// <summary>The career, for the drivers' names.</summary>
         public GameState Game;
+        /// <summary>True when skipping to your next stint can be offered: the button left of the way back to the race.</summary>
+        public System.Func<bool> CanSkip;
+        /// <summary>Skips to your next stint.</summary>
+        public System.Action Skip;
 
         public bool Open { get; private set; }
 
@@ -64,7 +69,7 @@ namespace TarmacGauntlet.Raceday
 
         private Font bold, semiBold;
         private GUIStyle big, text, small, right;
-        private Texture2D slash, disc, map;
+        private Texture2D slash, disc, arrow, map;
         private RenderTexture pip;
         private Camera onboard;
         private Vector2 mapMin, mapMax;
@@ -84,6 +89,7 @@ namespace TarmacGauntlet.Raceday
             // The tower's slash: a bar leaning at 24 degrees.
             float lean = Mathf.Tan(24f * Mathf.Deg2Rad);
             slash = RaceTower.Shape(0.42f + 1.25f * lean, 1.25f, (x, y) => x >= y * lean && x <= y * lean + 0.42f);
+            arrow = RaceTower.Shape(0.72f, 1f, (x, y) => x <= 0.72f * (1f - 2f * Mathf.Abs(y - 0.5f)));
             disc = RaceTower.Shape(1f, 1f, (x, y) => (x - 0.5f) * (x - 0.5f) + (y - 0.5f) * (y - 0.5f) < 0.25f);
             map = TrackMap();
             pip = new RenderTexture(PipWidth, PipHeight, 24) { hideFlags = HideFlags.DontSave };
@@ -156,6 +162,22 @@ namespace TarmacGauntlet.Raceday
                 GUI.DrawTexture(screen, Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, Color.white, Vector4.one * 2.2f * k, Vector4.one * 3f * k);
             }
             if (Click(live)) Show(false);
+            if (CanSkip != null && CanSkip())
+            {
+                Rect skip = R(1756f, 40f, 56f, 44f);
+                if (paint)
+                {
+                    Fill(skip, new Color(1f, 1f, 1f, 0.1f), 9f);
+                    float h = 18f * k, w = 13f * k;
+                    GUI.DrawTexture(new Rect(skip.center.x - w, skip.center.y - h / 2f, w, h), arrow, ScaleMode.StretchToFill, true, 0f, Color.white, 0f, 0f);
+                    GUI.DrawTexture(new Rect(skip.center.x, skip.center.y - h / 2f, w, h), arrow, ScaleMode.StretchToFill, true, 0f, Color.white, 0f, 0f);
+                }
+                if (Click(skip))
+                {
+                    Show(false);
+                    Skip?.Invoke();
+                }
+            }
 
             Timing(R(40f, 104f, 820f, 936f), paint);
 
@@ -520,6 +542,7 @@ namespace TarmacGauntlet.Raceday
         {
             if (slash != null) Destroy(slash);
             if (disc != null) Destroy(disc);
+            if (arrow != null) Destroy(arrow);
             if (map != null) Destroy(map);
             if (pip != null) pip.Release();
         }

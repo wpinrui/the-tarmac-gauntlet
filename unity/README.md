@@ -54,6 +54,10 @@ next pit entry, and the stop puts in the litres and tyres asked for and the next
 `Consumables.cs`). Left alone the car pits and chooses for itself, and each stop puts the orders back to a full
 tank and new tyres. The red button top right, or `T`, returns to the race.
 
+While a teammate drives, `N` or the button beside the red one skips to your next stint: the race runs at 32x until
+the stop that puts you in is over and the car is back on track, then hands you the wheel. `F` or `I` stops the
+skip. When a stop puts a teammate in while you drive, the AI takes the car once you have driven out of the pit lane.
+
 `F` cycles normal speed, 4x and 16x while the AI drives, and `I` drops back to normal speed. Only cars
 near the camera, and near your car while you drive it, run full physics (`PhysicsRange.cs`: the
 nearest 24 within 300 m at normal speed, 8 within 120 m at 4x, none at 16x). The rest glide along
