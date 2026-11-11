@@ -188,6 +188,10 @@ namespace TarmacGauntlet.Raceday
             public float Score;
             /// <summary>What the score is made of, in seconds: ground covered, closeness to cars, time stuck behind one.</summary>
             public float Gain, Risk, Stuck;
+            /// <summary>Metres still off the line at the next braking zone, on the free stretch.</summary>
+            public float Unplaced;
+            /// <summary>Offset from the racing line where the path ends.</summary>
+            public float EndOff;
             /// <summary>Step at which it first broke its limit, for when every path breaks one.</summary>
             public int BrokeAt;
             /// <summary>The car whose limit it broke, or -1.</summary>
@@ -430,7 +434,8 @@ namespace TarmacGauntlet.Raceday
                     // In the tow on a straight, of near-equal moves the later one wins, while a still later one
                     // is open too: the car moves out at its last safe moment with a step in hand, as it lags its plan.
                     // Only a move off the line waits: a move back to it is made at once.
-                    if (!defending && !zone && Mathf.Abs(cand.Shift) > Mathf.Abs(myOffset))
+                    // Where it ends up, not the lane it aims for: a lane past the track's edge is the edge (T8).
+                    if (!defending && !zone && (EndWait ? Mathf.Abs(cand.EndOff) > Mathf.Abs(myOffset) + 0.25f : Mathf.Abs(cand.Shift) > Mathf.Abs(myOffset)))
                         for (int i = Candidates.Count - Delays.Length; i < Candidates.Count - 1; i++)
                             if (Candidates[i + 1].Rejected == null) Candidates[i].Score += LateBonus * Candidates[i].Delay;
                 }
@@ -781,6 +786,7 @@ namespace TarmacGauntlet.Raceday
             // The lane it ends in, over the next stretch, against the racing line.
             int kEnd = c.IndexOf(Mathf.Repeat(d, lap));
             float offEnd = lat - line.Lateral[kEnd];
+            cand.EndOff = offEnd;
             // It goes back to the line from there, unless a car beside it on the line's side keeps it out.
             bool heldOut = false;
             for (int j = 0; j < others.Count && !heldOut; j++)
@@ -803,6 +809,16 @@ namespace TarmacGauntlet.Raceday
             // the straight left to get by before braking: the time lost staying there until the next
             // place to pass. Ending ahead of a car that was ahead: a pass, which must gain enough to be worth it.
             float toBrake = ToBraking(pilot, Mathf.Repeat(d, lap));
+            // H14, T4, T8: off the line is free between corners, but not being back in place by the next
+            // braking zone is not. What it can't get back across in the road left costs (Ivan).
+            cand.Unplaced = 0f;
+            if (InPlace > 0f && FreeStretch(pilot))
+            {
+                // From here, not from the path's end, which may already be past it.
+                float room = Mathf.Max(ToBraking(pilot, Mathf.Repeat(me.Distance, lap)) - (d - me.Distance) - InPlaceLead * Mathf.Max(v, 10f), 0f);
+                cand.Unplaced = Mathf.Max(Mathf.Abs(offEnd) - Endurance.OvertakeOffsetRate / Mathf.Max(v, 10f) * room, 0f);
+                score -= InPlace * cand.Unplaced;
+            }
             float stuck = 0f;
             for (int j = 0; j < others.Count; j++)
             {
@@ -1031,7 +1047,10 @@ namespace TarmacGauntlet.Raceday
             return TurnAt(c, k * c.Step) == 0 || p.Speed[c.Wrap(k + Mathf.RoundToInt(10f / c.Step))] > p.Speed[k];
         }
         private static readonly bool Free = Knob("FREE", 1f) > 0f;
-        private static readonly float FreeOff = Knob("FREEOFF", 1f);
+        private static readonly float FreeOff = Knob("FREEOFF", 0f);
+        private static readonly bool EndWait = Knob("ENDWAIT", 1f) > 0f;
+        /// <summary>Cost a metre still off the line at the next braking zone, and how early it must be back, s.</summary>
+        private static readonly float InPlace = Knob("INPLACE", 0.1f), InPlaceLead = Knob("INLEAD", 0.3f);
         private static readonly bool NoWait = Knob("NOWAIT", 1f) > 0f;
         /// <summary>H1: a fixed place is reached across the track at the overtake rate, not the line's offset.</summary>
         public static readonly bool FixedAbs = Knob("FIXEDABS", 1f) > 0f;
@@ -1042,7 +1061,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>A fixed or held place goes at the speeds of its own path, which bends with the track.</summary>
         public static readonly bool PlaceSpeeds = Knob("PLACESPEED", 1f) > 0f;
         private static readonly bool holdKnobs = SetHold();
-        private static bool SetHold() { AiPilot.HoldBend = Knob("HOLDBEND", 1f); AiPilot.HoldHead = Knob("HOLDHEAD", 1f); AiPilot.PlaceSpeeds = PlaceSpeeds; return true; }
+        private static bool SetHold() { AiPilot.HoldBend = Knob("HOLDBEND", 1f); AiPilot.HoldHead = Knob("HOLDHEAD", 1f); AiPilot.PlaceSpeeds = PlaceSpeeds; AiPilot.LagSpeeds = Knob("LAGSPEED", 1f) > 0f; return true; }
         /// <summary>The fixed place across the track the chosen path holds, when it holds one.</summary>
         public bool FixedOn => fixedOn;
         public float FixedLat => fixedLat;
