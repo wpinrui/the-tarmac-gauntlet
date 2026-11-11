@@ -359,25 +359,33 @@ def door_path():
 
 def bonnet_path():
     """The bonnet shut line in plan: out of the windscreen trim at its lower corner, straight
-    forward to the head lamp, along the lamp's inner edge, and across the nose. The lid runs
+    forward to the head lamp, along the lamp's inner edge as one straight fit, and across the
+    nose, all through a few control points so the line runs as one smooth curve. The lid runs
     under the windscreen, so the line has no rear edge."""
     o, _g, _t = screen_shapes()
     c = np.array(o.exterior.coords)
     corner = c[np.argmax(c[:, 1] - 0.3 * c[:, 0])]            # the screen's lower side corner
     h = np.array(R["head"]).reshape(-1, 3)
     lamp = Polygon(h[:, :2]).convex_hull.buffer(BONNET_GAP)
-    xs = np.linspace(h[:, 0].min() + 0.05, h[:, 0].max() - 0.02, 7)
-    inner = []
-    for x in xs:                                              # the lamp's inner edge, kept clear
-        g = lamp.intersection(LineString([(x, 0), (x, 2)]))
-        inner.append((x, g.bounds[1]))
-    inner = np.array(inner)
-    side_y = min(corner[1] - 0.02, inner[0, 1])
-    half = [(corner[0] + 0.01, corner[1] - 0.01), (corner[0] + 0.12, side_y)] + \
-           [(x, min(y, side_y)) for x, y in inner] + [(R["badge_front"][0] + 0.03, 0.30), (R["badge_front"][0] + 0.05, 0.0)]
-    half = np.array(half)
+    xs = np.linspace(h[:, 0].min() + 0.05, h[:, 0].max() - 0.02, 9)
+    ys = [lamp.intersection(LineString([(x, 0), (x, 2)])).bounds[1] for x in xs]
+    k = np.polyfit(xs, ys, 1)                                 # the lamp's inner edge, one line
+    k[1] -= max(0.0, max(np.polyval(k, xs) - ys))             # kept clear of the lamp everywhere
+    xa, xb = xs[0], xs[-1]
+    side_y = min(corner[1] - 0.02, np.polyval(k, xa))
+    xn = R["badge_front"][0] + 0.05
+    xm = (xa + xb) / 2
+    half = np.array([(corner[0] + 0.01, corner[1] - 0.01), ((corner[0] + xa) / 2, side_y),
+                     (xa, np.polyval(k, xa) - 0.005), (xm + 0.12, np.polyval(k, xm + 0.12)),
+                     (xn - 0.06, 0.42), (xn, 0.0)])
     pts = np.vstack([half, (half[-2::-1] * [1, -1])])
-    return np.array(geom.catmull_open([tuple(p) for p in pts], 8))
+    from scipy.interpolate import splev, splprep
+    tck, _u = splprep([pts[:, 0], pts[:, 1]], s=0.0015, k=3)
+    x, y = splev(np.linspace(0, 1, 480), tck)
+    q = np.column_stack([x, y])
+    q = q[: int(np.argmax(q[:, 1] <= 0))]                   # one half, mirrored, so both sides match
+    q = np.vstack([q, [[q[-1, 0], 0.0]]])
+    return np.vstack([q, (q[-2::-1] * [1, -1])])
 
 
 def engine_loop():
