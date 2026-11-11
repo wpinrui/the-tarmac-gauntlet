@@ -115,7 +115,8 @@ vec3 lvTap(vec4 a, vec4 b, vec3 p) { vec2 uv = vec2(dot(a.xyz, p) + a.w, dot(b.x
 vec3 livery(vec3 p, vec3 n) {
   vec3 k = pow(abs(n), vec3(6.0));
   float wSide = k.x, wTop = n.y > 0.0 ? k.y : 0.0, wBot = n.y < 0.0 ? k.y : 0.0, wFront = n.z > 0.0 ? k.z : 0.0, wRear = n.z < 0.0 ? k.z : 0.0;
-  vec3 side = p.x > 0.0 ? lvTap(uA_left, uB_left, p) : lvTap(uA_right, uB_right, p);
+  // Which side by where the face is; faces turned in towards the middle keep the base colour.
+  vec3 side = n.x * p.x < 0.0 ? uBase : (p.x > 0.0 ? lvTap(uA_left, uB_left, p) : lvTap(uA_right, uB_right, p));
   vec3 c = side * wSide + lvTap(uA_top, uB_top, p) * wTop + uBase * wBot + lvTap(uA_front, uB_front, p) * wFront + lvTap(uA_rear, uB_rear, p) * wRear;
   return c / max(wSide + wTop + wBot + wFront + wRear, 1e-4);
 }

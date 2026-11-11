@@ -1,7 +1,8 @@
 // A team's livery on a car's paint. The livery is flat art drawn on the car's five views (left,
 // right, top, front, rear) and baked into one atlas by tools/liveries/common/bake.js. Each paint
-// face takes the view it faces most, blended where views meet; faces pointing down keep the base
-// colour. The race number is drawn into the livery's number boxes from the Digits atlas.
+// face takes the view it faces most, blended where views meet; faces pointing down, and side
+// faces turned in towards the middle, keep the base colour. The race number is drawn into the
+// livery's number boxes from the Digits atlas.
 // Keep in step with the projection in tools/liveries/common/viewer.py. See docs/car-paint.md.
 Shader "TarmacGauntlet/Livery"
 {
@@ -99,10 +100,13 @@ Shader "TarmacGauntlet/Livery"
             float3 k = pow(abs(n), float3(6, 6, 6));
             float wSide = k.x, wTop = n.y > 0 ? k.y : 0, wBottom = n.y < 0 ? k.y : 0;
             float wFront = n.z > 0 ? k.z : 0, wRear = n.z < 0 ? k.z : 0;
-            // Which side by where the face is, so door shuts and inner faces take their own side.
+            // Which side by where the face is. Faces turned in towards the middle (vent and
+            // channel walls, inner door skins) keep the base colour: the side's art on them would
+            // show back to front.
             float2 uvSide = p.x > 0 ? AtlasUv(_ALeft, _BLeft, p) : AtlasUv(_ARight, _BRight, p);
             float2 uvTop = AtlasUv(_ATop, _BTop, p), uvFront = AtlasUv(_AFront, _BFront, p), uvRear = AtlasUv(_ARear, _BRear, p);
-            fixed3 col = Number(uvSide, Tap(uvSide)) * wSide + Number(uvTop, Tap(uvTop)) * wTop + _Base.rgb * wBottom
+            fixed3 side = n.x * p.x < 0 ? _Base.rgb : Number(uvSide, Tap(uvSide));
+            fixed3 col = side * wSide + Number(uvTop, Tap(uvTop)) * wTop + _Base.rgb * wBottom
                 + Number(uvFront, Tap(uvFront)) * wFront + Number(uvRear, Tap(uvRear)) * wRear;
             o.Albedo = col / max(wSide + wTop + wBottom + wFront + wRear, 1e-4);
             o.Metallic = _Metallic;

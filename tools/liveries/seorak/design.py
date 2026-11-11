@@ -18,9 +18,6 @@ NAVY = "#1c2a3a"
 GOLD = "#d9a443"
 RED = "#c63d2a"  # the A's core
 
-# Side art keeps out of the rear haunch (z -1.7 to -0.55): the vent channels behind the cockpit
-# have walls facing inward that take the side views, and anything drawn there shows on them
-# back to front. Flat colour is fine there; marks and numbers are not.
 # Team stack on the door under the window, number on the front fender.
 STACK_Z, STACK_Y, STACK_H = -0.03, 0.425, 0.25
 NUM_Z, NUM_Y, NUM_W, NUM_H = 0.80, 0.38, 0.44, 0.26
@@ -41,10 +38,10 @@ RIDGE = [(2.5, 0.20), (1.95, 0.25), (1.60, 0.20), (1.20, 0.24), (0.85, 0.19), (0
 
 
 # Seorak's A from the wordmark (units: base 88 wide, 72 tall), laid on the rear deck as the base
-# layer: its base spans the car at A_BASE_Z, its point reaches A_APEX_Z behind the cockpit.
+# layer: its base spans the car at A_BASE_Z, its point meets the windscreen at A_APEX_Z.
 A_OUTER = [(-44, 0), (0, 72), (44, 0), (22.15, 0), (0, 32.1), (-22.15, 0)]
 A_CORE = [(0, 30.24), (16, 0), (-16, 0)]
-A_BASE_Z, A_APEX_Z, A_HALF = -1.25, 0.05, 0.98
+A_BASE_Z, A_APEX_Z, A_HALF = -0.876, 0.424, 0.98  # point on the windscreen's top edge
 
 
 def seorak_a(lv):
