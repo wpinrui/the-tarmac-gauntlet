@@ -62,6 +62,10 @@ namespace TarmacGauntlet.Raceday
         private static readonly float GhostNear = Knob("GHOSTNEAR", 3f);
         private static readonly bool Commit = Knob("COMMIT", 1f) > 0f;
         private static readonly bool AvoidGhosts = Knob("AVOIDGHOSTS", 1f) > 0f;
+        /// <summary>H12: a recovering ghost keeps off the racing line, on its own side of it, until it is back up to speed (Ivan).</summary>
+        private static readonly float AltLine = Knob("ALTLINE", 5f), AltClear = Knob("ALTCLEAR", CarW + RoomMargin + 1f);
+        /// <summary>H12: a stopped car ahead caps the speed, braking to the yellow flag's share by <see cref="YellowReach"/> before it.</summary>
+        private static readonly bool YellowCap = Knob("YELLOWCAP", 1f) > 0f;
         /// <summary>Gap to a car alongside, side to side, inside which TORCS's parallel steering still takes over, m (spec: 2 m).</summary>
         public const float SideFilterGap = 2f;
         /// <summary>Seconds of score per second spent lifting or braking for a car ahead below its lane's speed.</summary>
@@ -153,6 +157,8 @@ namespace TarmacGauntlet.Raceday
         private float[,] od = new float[0, 0], ol = new float[0, 0], ov = new float[0, 0];
         private readonly List<int> order = new List<int>();
         private bool placed;
+        /// <summary>H12: the side of the racing line a recovering car keeps to, or 0 when it is not recovering.</summary>
+        private float altSide;
 
         /// <summary>Picks a path if it is time to, and returns whether it did.</summary>
         public bool Plan(AiPilot pilot, TrafficCar me, IReadOnlyList<TrafficCar> field, float dt)
@@ -220,6 +226,21 @@ namespace TarmacGauntlet.Raceday
             // What it can slow at: the brakes, or the tyres with the downforce if they give out first.
             float brakes = Mathf.Min(pilot.Spec.BrakeDecel * G, pilot.TyreGrip(me.Speed)) * AiPilot.LimitFor(pilot.Pace);
 
+            // H12: a ghost getting back up to speed takes the alternative line, clear of the racing line on its
+            // own side, and leaves the line to the cars coming (Ivan).
+            float lineHere = line.Lateral[pilot.Index], edgeHere = Mathf.Max(c.HalfWidth(pilot.Index) - RacingLine.EdgeMargin, 0f);
+            bool recovering = AltLine > 0f && me.Ghost && mySpeed < Rejoin.GhostSpeedShare * pilot.Profile.Speed[pilot.Index];
+            // The side it came back from, kept until it is up to speed: it never crosses the line meanwhile.
+            if (!recovering) altSide = 0f;
+            else if (altSide == 0f) altSide = Mathf.Abs(myOffset) > 0.5f ? Mathf.Sign(myOffset) : -Mathf.Sign(lineHere);
+            float mySide = altSide;
+            float AltCost(float shift)
+            {
+                if (!recovering) return 0f;
+                float to = Mathf.Clamp(lineHere + shift, -edgeHere, edgeHere) - lineHere;
+                return Mathf.Abs(to) < AltClear || mySide != 0f && Mathf.Sign(to) != mySide ? AltLine : 0f;
+            }
+
             Candidates.Clear();
             float[] shifts = pilot.Gliding ? FarShifts : NearShifts;
             int pedals = pilot.Gliding ? 2 : 3;
@@ -251,7 +272,7 @@ namespace TarmacGauntlet.Raceday
                     cand.Score -= (zone ? Hysteresis + ZoneHyst : Hysteresis) * LineChange(cand.Shift, lastShift) + (cand.Pedal != lastPedal ? 0.01f : 0f) + OffLine * Mathf.Abs(cand.Shift);
                     // Changing sides of the car ahead mid-move weaves across the cars behind: only for a clearly better path.
                     if (Mathf.Abs(cand.Shift) > 1f && Mathf.Abs(lastShift) > 1f && Mathf.Sign(cand.Shift) != Mathf.Sign(lastShift)) cand.Score -= SideSwitch;
-                    cand.Score += CoverBonus(cand.Shift);
+                    cand.Score += CoverBonus(cand.Shift) - AltCost(cand.Stay ? myOffset : cand.Owe ? 0f : cand.Shift);
                     // Once braking for a car in the braking zone, it stays on the brakes rather than flick back on the throttle.
                     if (zone && lastPedal == Pedal.Brake && cand.Pedal == Pedal.Go) cand.Score -= ZoneSwitch;
                     Candidates.Add(cand);
@@ -264,7 +285,7 @@ namespace TarmacGauntlet.Raceday
                         else later.Rejected = cand.Rejected;
                         Simulate(pilot, me, later, ahead, nextTurn, margin, brakes, riskWeight, passCost, freeSpeed);
                         later.Score -= (zone ? Hysteresis + ZoneHyst : Hysteresis) * LineChange(later.Shift, lastShift) + OffLine * Mathf.Abs(later.Shift);
-                        later.Score += CoverBonus(later.Shift);
+                        later.Score += CoverBonus(later.Shift) - Mathf.Max(AltCost(later.Shift), AltCost(myOffset));   // it holds where it is meanwhile
                         Candidates.Add(later);
                     }
                     // In the tow on a straight, of near-equal moves the later one wins, while a still later one
@@ -320,6 +341,16 @@ namespace TarmacGauntlet.Raceday
             }
             Target = best.Owe ? owe : best.Delay > 0f ? pilot.Offset : best.Shift;
             Cap = CapAt(best.Pedal, ahead, 0, mySpeed, me.Distance, margin);
+            if (YellowCap)
+                for (int j = 0; j < others.Count; j++)
+                {
+                    // A stopped car on the track ahead: down to the yellow flag's share of its racing speed by
+                    // YellowReach before it, until past it (H12).
+                    float g = Road(others[j].Distance - me.Distance, lap);
+                    if (!stopped[j] || g < -CarL) continue;
+                    float yellowSpeed = YellowShare * pilot.Profile.Speed[pilot.Index];
+                    Cap = Mathf.Min(Cap, Mathf.Sqrt(yellowSpeed * yellowSpeed + 2f * 0.8f * brakes * Mathf.Max(g - YellowReach, 0f)));
+                }
             lastShift = best.Shift;
             lastPedal = best.Pedal;
             lastBraking = braking;
