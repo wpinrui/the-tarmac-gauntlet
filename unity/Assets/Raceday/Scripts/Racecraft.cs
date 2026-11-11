@@ -499,7 +499,10 @@ namespace TarmacGauntlet.Raceday
                 // H2, H3: on the outside of a corner it keeps its committed line, and opens its steering for the car
                 // on its inside only when a contact is about to happen (Ivan).
                 int bend = TurnAt(c, here) != 0 || BrakingZone(pilot) ? PathChooser.NextTurnAt(c, here) : 0;
-                if (Experiments.Is(PathChooser.Experiment) && PathChooser.SideImminent > 0f && bend != 0 && (!PathChooser.SideOweOnly || chooser?.Chosen != null && chooser.Chosen.Owe) && Mathf.Sign(side.Lateral - me.Lateral) == -bend)
+                bool outsideCar = bend != 0 && Mathf.Sign(side.Lateral - me.Lateral) == -bend && (!PathChooser.SideOweOnly || chooser?.Chosen != null && chooser.Chosen.Owe);
+                // The inside car, level with the outside one, likewise keeps its tight line, owed its room: steering parallel to a car turning in cuts it off the inside of the track (Ivan).
+                bool insideCar = PathChooser.SideInside && bend != 0 && Mathf.Sign(side.Lateral - me.Lateral) == bend && Mathf.Abs(Mathf.Repeat(side.Distance - me.Distance + 0.5f * lap, lap) - 0.5f * lap) < CarLength;
+                if (Experiments.Is(PathChooser.Experiment) && PathChooser.SideImminent > 0f && (outsideCar || insideCar))
                     reach = PathChooser.SideImminent;
                 if (d < reach && diffAngle * (side.Lateral - me.Lateral) < 0f)
                 {

@@ -81,6 +81,8 @@ namespace TarmacGauntlet.Raceday
         /// </summary>
         public static readonly float SideImminent = Knob("SIDEGAP", 0.5f);
         public static readonly bool SideOweOnly = Knob("SIDEOWE", 1f) > 0f;
+        public static readonly bool SideInside = Knob("SIDEIN", 1f) > 0f;
+        private static readonly bool InsideRaces = Knob("INSIDERACES", 0f) > 0f;
         /// <summary>Seconds of score per second spent lifting or braking for a car ahead below its lane's speed.</summary>
         private static readonly float LiftCost = Knob("LIFT", 0.1f);
         /// <summary>Deceleration, m/s², braking plans to open a short gap with.</summary>
@@ -213,6 +215,7 @@ namespace TarmacGauntlet.Raceday
             aheadWide = -1;
             float wideGap = 60f;
             float freeSpeed = Mathf.Max(mySpeed, pilot.FreeSpeed);
+            int turnSoon = NextTurn(c, here);
             for (int j = 0; j < others.Count; j++)
             {
                 TrafficCar o = others[j];
@@ -231,7 +234,9 @@ namespace TarmacGauntlet.Raceday
                 if (g > 0f && g < aheadGap && Mathf.Abs(o.Lateral - me.Lateral) < CarW + RoomMargin && !(stopped[j] && mySpeed < GhostCrawl + 1f)) { aheadGap = g; ahead = j; aheadInLane = o.Speed; }
                 if (g > CarL && g < wideGap && Mathf.Abs(o.Lateral - me.Lateral) < WideAhead * CarW) { wideGap = g; aheadWide = j; }
                 // A car alongside and level or ahead: one this car drops back from. One behind drops back itself.
-                if (g > (BesideBrake >= 2f ? 0f : -CarL - 1f) && g < CarL + 1f && Mathf.Abs(o.Lateral - me.Lateral) < 2f * CarW) besideSpeed = Mathf.Min(besideSpeed, o.Speed);
+                // H2, H3: on the inside into a corner it is owed its room and races wheel to wheel, not dropping back from the car on its outside (Ivan).
+                bool onItsInside = InsideRaces && turnSoon != 0 && Mathf.Sign(o.Lateral - me.Lateral) == turnSoon;
+                if (!onItsInside && g > (BesideBrake >= 2f ? 0f : -CarL - 1f) && g < CarL + 1f && Mathf.Abs(o.Lateral - me.Lateral) < 2f * CarW) besideSpeed = Mathf.Min(besideSpeed, o.Speed);
             }
             bool exempt = defending && passing;
             bool zone = TurnAt(c, here) != 0 || BrakingZone(pilot);
