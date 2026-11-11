@@ -394,7 +394,8 @@ static partial class Check
                 if (!met) return (false, "never came up on the stopped car: did not bind");
                 bool slowed = slowest <= SlowFor;
                 bool round = apart == float.MaxValue || apart >= need;
-                return (ghost && slowed && round, $"{(ghost ? "a ghost" : "never a ghost")}, slowed to {100f * slowest:0}% of its racing speed, {(apart == float.MaxValue ? "never level" : $"passed {apart - need + RoomMargin:0.0} m clear")}");
+                int through = run.Race.SpunOverlaps.Count;
+                return (ghost && slowed && round && through == 0, $"{through} through the ghost, {(ghost ? "a ghost" : "never a ghost")}, slowed to {100f * slowest:0}% of its racing speed, {(apart == float.MaxValue ? "never level" : $"passed {apart - need + RoomMargin:0.0} m clear")}");
             }
         }
         return (false, "no judge");
@@ -595,8 +596,10 @@ static partial class Check
                 Frame clear = fs.FirstOrDefault(x => !Enumerable.Range(1, run.N - 1).Any(j => CarComing(run, x, j))) ?? last;
                 float waited = f.T - clear.T;
                 float angle = coming ? Scale(f.Angle[0], 10f, 30f) : Scale(f.Angle[0], Rejoin.ClearEntryAngle, Rejoin.ClearEntryAngle + 15f);
-                return (Clamp100(Math.Min(angle, Scale(waited, GrassAfterClear, GrassAfterClear + 1.5f)) - 50f * all),
-                    $"on the grass {f.T:0.0} s, {waited:0.0} s of it with the track clear, back on at {f.Angle[0]:0} degrees{(coming ? " with a car coming" : "")}, {all} contacts");
+                // A car through the ghost counts as a contact: the ghosting is only the safety net.
+                int through = run.Race.SpunOverlaps.Count;
+                return (Clamp100(Math.Min(angle, Scale(waited, GrassAfterClear, GrassAfterClear + 1.5f)) - 50f * (all + through)),
+                    $"on the grass {f.T:0.0} s, {waited:0.0} s of it with the track clear, back on at {f.Angle[0]:0} degrees{(coming ? " with a car coming" : "")}, {all} contacts, {through} through the ghost");
             }
             case "T18":
             {
