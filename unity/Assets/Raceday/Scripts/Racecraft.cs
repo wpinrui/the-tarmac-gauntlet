@@ -496,6 +496,11 @@ namespace TarmacGauntlet.Raceday
                 float diffAngle = Mathf.DeltaAngle(me.Yaw * Mathf.Rad2Deg, side.Yaw * Mathf.Rad2Deg) * Mathf.Deg2Rad;
                 // Under path choosing it is only the last resort, within 2 m: the chosen path keeps the room.
                 float reach = Experiments.Is(PathChooser.Experiment) ? PathChooser.SideFilterGap : Endurance.SideCollisionMargin * margin;
+                // H2, H3: on the outside of a corner it keeps its committed line, and opens its steering for the car
+                // on its inside only when a contact is about to happen (Ivan).
+                int bend = TurnAt(c, here) != 0 || BrakingZone(pilot) ? PathChooser.NextTurnAt(c, here) : 0;
+                if (Experiments.Is(PathChooser.Experiment) && PathChooser.SideImminent > 0f && bend != 0 && (!PathChooser.SideOweOnly || chooser?.Chosen != null && chooser.Chosen.Owe) && Mathf.Sign(side.Lateral - me.Lateral) == -bend)
+                    reach = PathChooser.SideImminent;
                 if (d < reach && diffAngle * (side.Lateral - me.Lateral) < 0f)
                 {
                     float cc = reach / 2f;
