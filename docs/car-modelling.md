@@ -50,6 +50,7 @@ body.py lofts the outer skin from rows.json, in pure numpy.
 Build space is metres: x forward from mid wheelbase, y left, z up from the ground.
 The skin splits into pieces: body, doors, bonnet, boot or engine cover, glass.
 Every piece is a closed shell with thickness. Shut lines are V grooves.
+A bonnet shut line starts at the windscreen's lower corners. It runs forward along the panels it meets, such as the lamps and the wings, then across the nose. The bonnet reaches back to the windscreen, so its line has no rear edge.
 Wheel arches step round at even angles.
 The bonnet crown narrows with the nose, so no beak forms at the centre.
 
