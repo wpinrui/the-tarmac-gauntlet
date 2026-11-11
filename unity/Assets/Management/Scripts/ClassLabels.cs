@@ -32,12 +32,12 @@ namespace TarmacGauntlet.Management
         internal static Color Colour(CarClass c) => Colours.TryGetValue(c, out Color32 colour) ? colour : Color.white;
 
         /// <summary>A boxed class label. The size comes from the class given, such as "cls-sm".</summary>
-        internal static Label Make(CarClass c, string sizeClass, Font font)
+        internal static Label Make(CarClass c, string sizeClass)
         {
             var label = new Label(Name(c)) { pickingMode = PickingMode.Ignore };
             label.AddToClassList("cls");
             label.AddToClassList(sizeClass);
-            label.style.unityFontDefinition = FontDefinition.FromFont(font);
+            label.style.unityFontDefinition = FontDefinition.FromFont(MenuKit.Bold);
             Paint(label, c);
             return label;
         }

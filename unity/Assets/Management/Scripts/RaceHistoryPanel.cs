@@ -3,9 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using TarmacGauntlet.Career;
 using TarmacGauntlet.Simulation;
-using UnityEngine;
 using UnityEngine.UIElements;
-using static TarmacGauntlet.Management.OfficeKit;
+using static TarmacGauntlet.Management.MenuKit;
 
 namespace TarmacGauntlet.Management
 {
@@ -15,16 +14,15 @@ namespace TarmacGauntlet.Management
     /// the detail window (<see cref="YearAdvance.RaceHistoryWindow"/>), its position chart and the stints, stops and
     /// issues. Older races keep only their results.
     /// </summary>
-    public sealed class RaceHistoryPanel : OfficePanel
+    public sealed class RaceHistoryPanel : MenuPanel
     {
         public const string Slug = "race-history";
 
         // Kept while the game runs; null shows the latest race.
         private int? year;
-        private string resultsView = "all", logView = "stints";
-        private readonly Dictionary<string, Color> colours = new Dictionary<string, Color>();
+        private readonly RaceView.Views views = new RaceView.Views();
 
-        protected override string ScreenSlug => Slug;
+        protected override bool Shows(string slug) => slug == Slug;
 
         protected override void Render()
         {
@@ -37,22 +35,27 @@ namespace TarmacGauntlet.Management
 
             int at = year.HasValue ? Math.Max(0, IndexOf(history, year.Value)) : history.Count - 1;
             RaceHistoryEntry entry = history[at];
-            Body.Add(YearStepper(Menus, entry.Year, at > 0, at < history.Count - 1, d =>
+            Body.Add(YearStepper(entry.Year, at > 0, at < history.Count - 1, d =>
             {
                 year = history[at + d].Year;
                 Render();
             }));
 
-            RaceSummary race = RaceReplay.FromHistory(game, entry);
-            VisualElement tabs = Box("rs-tabs");
-            Body.Add(tabs);
-            VisualElement head = Box("of-head-row");
-            Body.Add(head);
-            ScrollView results = Scroll("rs-scroll");
-            Body.Add(results);
-            RenderResults(race, tabs, head, results);
-
-            if (race.Player != null) RenderPlayer(game, race, entry);
+            var race = new RaceView(RaceReplay.FromHistory(game, entry), false, views);
+            race.Results(Body);
+            if (race.HasPlayer)
+            {
+                VisualElement hero = Box();
+                race.Hero(hero);
+                Menus.SideBody.Add(hero);
+                if (race.HasLaps)
+                {
+                    race.Chart(Menus.SideBody);
+                    VisualElement log = Box("history-log");
+                    race.Log(log);
+                    Menus.SideBody.Add(log);
+                }
+            }
         }
 
         private static int IndexOf(IReadOnlyList<RaceHistoryEntry> history, int y)
@@ -60,256 +63,6 @@ namespace TarmacGauntlet.Management
             for (int i = 0; i < history.Count; i++)
                 if (history[i].Year == y) return i;
             return -1;
-        }
-
-        // ------------------------------------------------------------------ results
-
-        private void RenderResults(RaceSummary race, VisualElement tabs, VisualElement head, ScrollView list)
-        {
-            CarClass[] classes = ClassLabels.Order.Where(c => race.Classification.Any(r => r.CarClass == c)).ToArray();
-            if (resultsView != "all" && resultsView != "podiums" && !classes.Any(c => c.ToString() == resultsView)) resultsView = "all";
-
-            void Show(string view)
-            {
-                resultsView = view;
-                RenderResults(race, tabs, head, list);
-                list.scrollOffset = Vector2.zero;
-            }
-
-            tabs.Clear();
-            tabs.Add(Tab(Menus, "ALL", resultsView == "all", () => Show("all")));
-            foreach (CarClass c in classes)
-            {
-                string key = c.ToString();
-                Label t = Tab(Menus, ClassLabels.Name(c), resultsView == key, () => Show(key));
-                t.AddToClassList("rs-tab-class");
-                t.style.color = ClassLabels.Colour(c);
-                tabs.Add(t);
-            }
-            Label podiums = Tab(Menus, "", resultsView == "podiums", () => Show("podiums"));
-            podiums.AddToClassList("rs-tab-end");
-            podiums.Add(Icon("trophy", "rs-tab-icon"));
-            tabs.Add(podiums);
-
-            head.Clear();
-            head.style.display = resultsView == "podiums" ? DisplayStyle.None : DisplayStyle.Flex;
-            head.Add(Menus.Text(resultsView == "all" ? "POS" : "CLASS POS", "rh-head-pos"));
-            head.Add(Box("of-fill"));
-            head.Add(Menus.Text("LAPS", "rh-head-laps"));
-            head.Add(Menus.Text("PRIZE", "rh-head-prize"));
-
-            list.Clear();
-            if (resultsView == "podiums")
-            {
-                foreach (CarClass c in classes) list.Add(Podium(race, c));
-                return;
-            }
-            bool overall = resultsView == "all";
-            foreach (ClassifiedCar r in overall ? race.Classification : race.Classification.Where(x => x.CarClass.ToString() == resultsView))
-            {
-                VisualElement row = Box("rs-row");
-                row.EnableInClassList("me", r.TeamId == GameActions.PlayerTeamId);
-                row.EnableInClassList("out", r.Retired);
-                row.Add(Menus.Text(Num(overall ? r.Position : r.ClassPosition), "rs-pos", true));
-                row.Add(ClassLabels.Make(r.CarClass, "cls-sm", Menus.Bold));
-                VisualElement team = Box("rs-team");
-                team.Add(Menus.Text(r.TeamName, "rs-team-name", true));
-                row.Add(team);
-                row.Add(Menus.Text(Num(r.Laps), "rs-laps"));
-                row.Add(r.Retired ? Menus.Text("DNF", "rs-dnf", true) : Menus.Text(Menus.Money(r.PrizeMoney), "rs-prize", true));
-                list.Add(row);
-            }
-            if (overall && race.Player != null)
-            {
-                // Open on the player's row.
-                int index = race.Player.Position - 1;
-                list.RegisterCallback<GeometryChangedEvent>(Centre);
-                void Centre(GeometryChangedEvent _)
-                {
-                    list.UnregisterCallback<GeometryChangedEvent>(Centre);
-                    if (index >= list.contentContainer.childCount) return;
-                    VisualElement row = list.contentContainer[index];
-                    list.scrollOffset = new Vector2(0, Mathf.Max(0, row.layout.y - list.contentViewport.layout.height / 2 + row.layout.height / 2));
-                }
-            }
-        }
-
-        private VisualElement Podium(RaceSummary race, CarClass c)
-        {
-            VisualElement block = Box("rs-podium");
-            Label letter = Menus.Text("", "rs-podium-class", true);
-            ClassLabels.Tint(letter, c);
-            block.Add(letter);
-            VisualElement rows = Box("rs-podium-rows");
-            int place = 0;
-            foreach (ClassifiedCar r in race.Classification.Where(x => x.CarClass == c && !x.Retired).Take(3))
-            {
-                place++;
-                VisualElement row = Box("rs-row", "rs-podium-row", "of-two-line");
-                row.EnableInClassList("me", r.TeamId == GameActions.PlayerTeamId);
-                row.Add(Menus.Text(Num(place), "rs-place p" + place, true));
-                row.Add(PodiumTeam(r, Menus.Text));
-                row.Add(Menus.Text("P" + Num(r.Position), "rs-overall"));
-                rows.Add(row);
-            }
-            block.Add(rows);
-            return block;
-        }
-
-        // ------------------------------------------------------------------ the player's race
-
-        private void RenderPlayer(GameState game, RaceSummary race, RaceHistoryEntry entry)
-        {
-            VisualElement side = Menus.SideBody;
-            ClassifiedCar me = race.Player;
-
-            VisualElement hero = Box("rh-hero");
-            hero.Add(Menus.Text("P" + Num(me.Position), "rh-big", true));
-            VisualElement inClass = Box("rs-inclass");
-            inClass.Add(ClassLabels.Make(me.CarClass, "cls-md", Menus.Bold));
-            inClass.Add(Menus.Text("P" + Num(me.ClassPosition), "rs-inclass-pos", true));
-            hero.Add(inClass);
-            VisualElement laps = Box("rs-stat");
-            laps.Add(Menus.Text(Num(me.Laps), "rs-stat-value", true));
-            laps.Add(Menus.Text("LAPS", "rs-stat-label"));
-            hero.Add(laps);
-            hero.Add(me.Retired ? Menus.Text("DNF", "rs-hero-dnf", true) : Menus.Text(Menus.Money(me.PrizeMoney), "rs-hero-prize", true));
-            side.Add(hero);
-
-            if (race.PositionByLap.Count == 0) return;
-
-            colours.Clear();
-            foreach (StintRecord s in race.Stints)
-                if (!colours.ContainsKey(s.DriverId)) colours[s.DriverId] = RaceSummaryScreen.DriverColours[colours.Count % RaceSummaryScreen.DriverColours.Length];
-
-            VisualElement chartBox = Box("rh-chart");
-            var chart = new PositionChart(race, LapScale(race), Colour, Menus.SemiBold);
-            chartBox.Add(chart);
-            Label readout = Menus.Text("", "rs-readout", true);
-            readout.style.display = DisplayStyle.None;
-            chartBox.Add(readout);
-            chart.Hovered += (lap, position) =>
-            {
-                readout.style.display = lap > 0 ? DisplayStyle.Flex : DisplayStyle.None;
-                readout.text = "L" + Num(lap) + "   P" + Num(position);
-            };
-            side.Add(chartBox);
-            side.Add(Legend(race));
-
-            VisualElement log = Box("rh-log");
-            VisualElement tabs = Box("rs-tabs");
-            log.Add(tabs);
-            VisualElement head = Box("of-head-row");
-            log.Add(head);
-            ScrollView list = Scroll("rs-scroll");
-            log.Add(list);
-            side.Add(log);
-            RenderLog(game, race, tabs, head, list);
-        }
-
-        /// <summary>Names each driver's colour, and the issue dots and stop ticks on the chart.</summary>
-        private VisualElement Legend(RaceSummary race)
-        {
-            VisualElement legend = Box("rh-legend");
-            foreach (StintRecord s in race.Stints.GroupBy(x => x.DriverId).Select(g => g.First()))
-            {
-                VisualElement item = Box("rh-legend-item");
-                item.Add(Swatch(Colour(s.DriverId)));
-                item.Add(Menus.Text(s.DriverName, "rh-legend-text"));
-                legend.Add(item);
-            }
-            VisualElement issue = Box("rh-legend-item");
-            issue.Add(Box("rh-legend-dot"));
-            issue.Add(Menus.Text("ISSUE", "rh-legend-text"));
-            legend.Add(issue);
-            VisualElement stop = Box("rh-legend-item");
-            stop.Add(Box("rh-legend-tick"));
-            stop.Add(Menus.Text("PIT STOP", "rh-legend-text"));
-            legend.Add(stop);
-            return legend;
-        }
-
-        private Color Colour(string driverId) => colours.TryGetValue(driverId, out Color c) ? c : Color.white;
-
-        /// <summary>Leader laps per lap of the player's, as the race summary places stints, stops and issues.</summary>
-        private static float LapScale(RaceSummary race)
-        {
-            int leaderLaps = race.PositionByLap.Count;
-            ClassifiedCar me = race.Player;
-            int pace = me.Retired ? race.Classification.FirstOrDefault(c => c.CarClass == me.CarClass && !c.Retired)?.Laps ?? me.Laps : me.Laps;
-            return pace > 0 && leaderLaps > 0 ? leaderLaps / (float)pace : 1f;
-        }
-
-        private void RenderLog(GameState game, RaceSummary race, VisualElement tabs, VisualElement head, ScrollView list)
-        {
-            void Show(string view)
-            {
-                logView = view;
-                RenderLog(game, race, tabs, head, list);
-                list.scrollOffset = Vector2.zero;
-            }
-
-            tabs.Clear();
-            foreach ((string view, string name, int count) in new[] { ("stints", "STINTS", race.Stints.Count), ("stops", "STOPS", race.PitStops.Count), ("issues", "ISSUES", race.Issues.Count) })
-            {
-                Label tab = Tab(Menus, name, logView == view, () => Show(view));
-                tab.Add(Menus.Text(Num(count), "rs-tab-count", true));
-                tabs.Add(tab);
-            }
-
-            head.Clear();
-            void Head(string text, string cls)
-            {
-                Label label = Menus.Text(text, "of-head");
-                label.AddToClassList(cls);
-                head.Add(label);
-            }
-            list.Clear();
-            switch (logView)
-            {
-                case "stints":
-                    head.Add(Box("of-fill"));
-                    Head("LAPS", "rh-log-range");
-                    Head("TOTAL", "rh-log-count");
-                    foreach (StintRecord s in race.Stints)
-                    {
-                        VisualElement row = Box("rs-row", "rs-stint");
-                        row.Add(Swatch(Colour(s.DriverId)));
-                        row.Add(Menus.Text(s.DriverName, "rs-driver", true));
-                        row.Add(Menus.Text(Num(s.StartLap) + " to " + Num(s.EndLap), "rs-range"));
-                        row.Add(Menus.Text(Num(s.EndLap - s.StartLap + 1), "rs-count"));
-                        list.Add(row);
-                    }
-                    break;
-                case "stops":
-                    Head("LAP", "rh-log-at");
-                    Head("NEW DRIVER", "rh-log-fill");
-                    foreach (PitStopRecord s in race.PitStops)
-                    {
-                        VisualElement row = Box("rs-row");
-                        row.Add(Menus.Text(Num(s.Lap), "rs-at"));
-                        if (s.DriverIn != s.DriverOut)
-                        {
-                            row.Add(Swatch(Colour(s.DriverIn)));
-                            row.Add(Menus.Text(RaceReplay.DriverName(game, s.DriverIn), "rs-driver", true));
-                        }
-                        list.Add(row);
-                    }
-                    break;
-                case "issues":
-                    Head("LAP", "rh-log-at");
-                    Head("ISSUE", "rh-log-fill");
-                    foreach (IssueRecord i in race.Issues)
-                    {
-                        VisualElement row = Box("rs-row");
-                        row.Add(Menus.Text(Num(i.Lap), "rs-at"));
-                        row.Add(Menus.Text(i.TemplateId, "rh-issue-name", true));
-                        row.Add(Swatch(Colour(i.DriverId)));
-                        if (i.FixedLap == null) row.Add(Menus.Text("DNF", "rs-dnf", true));
-                        list.Add(row);
-                    }
-                    break;
-            }
         }
     }
 }

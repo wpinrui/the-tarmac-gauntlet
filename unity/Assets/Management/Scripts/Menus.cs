@@ -8,6 +8,7 @@ using TarmacGauntlet.Simulation;
 using TarmacGauntlet.TeamHq;
 using UnityEngine;
 using UnityEngine.UIElements;
+using static TarmacGauntlet.Management.MenuKit;
 
 namespace TarmacGauntlet.Management
 {
@@ -55,14 +56,15 @@ namespace TarmacGauntlet.Management
         private Camera cam;
         private NewspaperView paper;
         private MenuGlass glass;
-        private Font semiBold, bold, mainMedium, mainRegular;
+        private Font mainMedium, mainRegular;
         private readonly HashSet<VisualElement> shown = new HashSet<VisualElement>();
 
-        private VisualElement root, mainColumn, continueItem, gameLayer, top, hubMenu, strip, tag, tagFill, race, panel, panelBody;
+        private VisualElement root, mainColumn, continueItem, gameLayer, top, hubMenu, strip, tag, tagCondition, race, panel, panelBody;
         private VisualElement catcher, lineup, lineupBody;
         private Label tagClass;
         private VisualElement dimmer, pauseLayer, settingsLayer, settingsPanel, dialogLayer, dialog, dialogBody, dialogButtons, badge;
-        private Label continueSub, teamName, year, money, tagName, tagPercent;
+        private Label continueSub, teamName, year, money, tagName;
+        private VisualElement tipLayer;
         private readonly Dictionary<string, VisualElement> hubItems = new Dictionary<string, VisualElement>(), stripIcons = new Dictionary<string, VisualElement>();
 
         private Mode mode = Mode.Main;
@@ -91,8 +93,6 @@ namespace TarmacGauntlet.Management
             cam = hqCamera.GetComponent<Camera>();
             if (cam.GetComponent<GlassBackdrop>() == null) cam.gameObject.AddComponent<GlassBackdrop>();
 
-            semiBold = Resources.Load<Font>("Fonts/TitilliumWeb-SemiBold");
-            bold = Resources.Load<Font>("Fonts/TitilliumWeb-Bold");
             mainMedium = Resources.Load<Font>("Fonts/HostGrotesk-Medium");
             mainRegular = Resources.Load<Font>("Fonts/HostGrotesk-Regular");
 
@@ -108,7 +108,7 @@ namespace TarmacGauntlet.Management
             root = doc.rootVisualElement;
             root.styleSheets.Add(Resources.Load<StyleSheet>("Menus"));
             root.AddToClassList("root");
-            root.style.unityFontDefinition = FontDefinition.FromFont(semiBold);
+            root.style.unityFontDefinition = FontDefinition.FromFont(SemiBold);
             glass = new MenuGlass(root);
             Build();
             gameObject.AddComponent<DriversPanel>();
@@ -152,8 +152,7 @@ namespace TarmacGauntlet.Management
             mainColumn = glass.Make("main-column", "fade");
             mainColumn.Add(BuildWordmark());
             continueItem = MainItem("Continue", () => { if (GameSession.ContinueLatest()) EnterGame(); });
-            continueSub = new Label();
-            continueSub.AddToClassList("sub");
+            continueSub = Text("", "sub");
             continueSub.style.unityFontDefinition = FontDefinition.FromFont(mainRegular);
             continueItem.Add(continueSub);
             mainColumn.Add(continueItem);
@@ -169,23 +168,8 @@ namespace TarmacGauntlet.Management
             catcher.AddToClassList("layer");
             catcher.RegisterCallback<ClickEvent>(_ => { if (mode == Mode.Lineup) Go(Mode.Hub); });
             gameLayer.Add(catcher);
-            top = new VisualElement();
-            top.AddToClassList("top");
+            (top, badge, teamName, year, money) = TopBar(glass);
             top.AddToClassList("fade");
-            var team = new VisualElement();
-            team.AddToClassList("team");
-            badge = new VisualElement();
-            badge.AddToClassList("badge");
-            team.Add(badge);
-            teamName = Text("", "team-name", true);
-            team.Add(teamName);
-            top.Add(team);
-            VisualElement meta = glass.Make("meta");
-            year = Text("", "year");
-            money = Text("", "money", true);
-            meta.Add(year);
-            meta.Add(money);
-            top.Add(meta);
             gameLayer.Add(top);
 
             hubMenu = glass.Make("menu", "fade");
@@ -197,20 +181,13 @@ namespace TarmacGauntlet.Management
                 {
                     VisualElement item = Text(name.ToUpperInvariant(), "item");
                     item.AddToClassList("hub-item");
-                    var itemIcon = new VisualElement { pickingMode = PickingMode.Ignore };
-                    itemIcon.AddToClassList("item-icon");
-                    itemIcon.style.backgroundImage = Resources.Load<Texture2D>("MenuIcons/" + slug);
-                    item.Add(itemIcon);
+                    item.Add(Icon(slug, "item-icon"));
                     item.RegisterCallback<ClickEvent>(_ => OpenScreen(slug));
                     hubItems[slug] = item;
                     items.Add(item);
 
-                    var icon = new VisualElement();
-                    icon.AddToClassList("icon");
-                    var image = new VisualElement { pickingMode = PickingMode.Ignore };
-                    image.AddToClassList("icon-image");
-                    image.style.backgroundImage = Resources.Load<Texture2D>("MenuIcons/" + slug);
-                    icon.Add(image);
+                    VisualElement icon = Box("icon");
+                    icon.Add(Icon(slug, "icon-image"));
                     icon.RegisterCallback<ClickEvent>(_ => OpenScreen(slug));
                     stripIcons[slug] = icon;
                     icons.Add(icon);
@@ -222,27 +199,18 @@ namespace TarmacGauntlet.Management
             gameLayer.Add(strip);
 
             tag = glass.Make("tag", "fade");
-            var tagTop = new VisualElement();
-            tagTop.AddToClassList("tag-top");
-            tagClass = ClassLabels.Make(CarClass.F, "cls-sm", bold);
+            VisualElement tagTop = Box("tag-top");
+            tagClass = ClassLabels.Make(CarClass.F, "cls-sm");
             tagTop.Add(tagClass);
             tagName = Text("", "tag-name", true);
             tagTop.Add(tagName);
             tag.Add(tagTop);
-            var condition = new VisualElement();
-            condition.AddToClassList("condition");
-            var bar = new VisualElement();
-            bar.AddToClassList("bar");
-            tagFill = new VisualElement();
-            tagFill.AddToClassList("bar-fill");
-            bar.Add(tagFill);
-            condition.Add(bar);
-            tagPercent = Text("", "percent", true);
-            condition.Add(tagPercent);
-            tag.Add(condition);
+            tagCondition = Box("tag-condition");
+            tag.Add(tagCondition);
             gameLayer.Add(tag);
 
-            race = RedButton("Race", "race", () => Go(Mode.Lineup));
+            race = RedButton("Race", "big-button", () => Go(Mode.Lineup));
+            race.AddToClassList("corner");
             race.AddToClassList("fade");
             gameLayer.Add(race);
 
@@ -302,12 +270,11 @@ namespace TarmacGauntlet.Management
 
             Popups = Layer();
             tipLayer = Layer();
-            tip = Text("", "tip");
-            tip.pickingMode = PickingMode.Ignore;
-            tip.style.unityFontDefinition = FontDefinition.FromFont(mainRegular);
-            tip.style.display = DisplayStyle.None;
-            tipLayer.Add(tip);
+            Tips = new Tooltips(tipLayer);
         }
+
+        /// <summary>Tooltips over every panel.</summary>
+        internal Tooltips Tips { get; private set; }
 
         /// <summary>A layer over every panel for drop-down lists, emptied each time the menus change screen.</summary>
         internal VisualElement Popups { get; private set; }
@@ -329,18 +296,6 @@ namespace TarmacGauntlet.Management
             ok.AddToClassList("last");
             dialogButtons.Add(ok);
             SetOverlay(Overlay.Dialog);
-        }
-
-        internal VisualElement GhostButton(string text, string cls, Action onClick)
-        {
-            var button = new VisualElement();
-            button.AddToClassList("ghost-button");
-            button.AddToClassList(cls);
-            Label label = Text(text.ToUpperInvariant(), "ghost-label", true);
-            label.pickingMode = PickingMode.Ignore;
-            button.Add(label);
-            button.RegisterCallback<ClickEvent>(_ => onClick());
-            return button;
         }
 
         /// <summary>A new game overwrites the current career, so the career on disk is shown for a yes first.</summary>
@@ -366,43 +321,6 @@ namespace TarmacGauntlet.Management
                 career.Add(words);
                 body.Add(career);
             }, "Cancel", "Overwrite", () => Go(Mode.NewGame));
-        }
-
-        // ------------------------------------------------------------------ tooltips
-
-        private VisualElement tipLayer;
-        private Label tip;
-        private IVisualElementScheduledItem tipTimer;
-
-        /// <summary>
-        /// Shows <paramref name="text"/> under <paramref name="target"/> after a short hover. Only stats and skills
-        /// get tooltips, where a number needs explaining.
-        /// </summary>
-        internal void Tooltip(VisualElement target, string text)
-        {
-            target.RegisterCallback<PointerEnterEvent>(_ =>
-            {
-                tipTimer?.Pause();
-                tipTimer = target.schedule.Execute(() =>
-                {
-                    if (target.panel == null) return;
-                    tip.text = text;
-                    Rect r = target.worldBound;
-                    Vector2 p = tipLayer.WorldToLocal(new Vector2(r.xMin, r.yMax));
-                    tip.style.left = Mathf.Round(p.x);
-                    tip.style.top = Mathf.Round(p.y + 8);
-                    tip.style.display = DisplayStyle.Flex;
-                }).StartingIn(350);
-            });
-            target.RegisterCallback<PointerLeaveEvent>(_ => HideTooltip());
-            target.RegisterCallback<DetachFromPanelEvent>(_ => HideTooltip());
-        }
-
-        internal void HideTooltip()
-        {
-            tipTimer?.Pause();
-            tipTimer = null;
-            if (tip != null) tip.style.display = DisplayStyle.None;
         }
 
         // ------------------------------------------------------------------ wordmark
@@ -492,19 +410,6 @@ namespace TarmacGauntlet.Management
             return group;
         }
 
-        /// <summary>The bold menu font, for class labels and other text built outside <see cref="Text"/>.</summary>
-        internal Font Bold => bold;
-
-        internal Font SemiBold => semiBold;
-
-        internal Label Text(string text, string cls, bool isBold = false)
-        {
-            var label = new Label(text);
-            label.AddToClassList(cls);
-            if (isBold) label.style.unityFontDefinition = FontDefinition.FromFont(bold);
-            return label;
-        }
-
         private VisualElement MenuItem(string text, Action onClick)
         {
             Label item = Text(text.ToUpperInvariant(), "item");
@@ -522,38 +427,6 @@ namespace TarmacGauntlet.Management
             item.Add(label);
             item.RegisterCallback<ClickEvent>(_ => onClick());
             return item;
-        }
-
-        internal VisualElement RedButton(string text, string cls, Action onClick)
-        {
-            var button = new VisualElement();
-            button.AddToClassList("red");
-            button.AddToClassList(cls);
-            var fill = new VisualElement { pickingMode = PickingMode.Ignore };
-            fill.AddToClassList("red-fill");
-            fill.style.backgroundImage = RedGradient;
-            button.Add(fill);
-            Label label = Text(text.ToUpperInvariant(), "red-label", true);
-            label.pickingMode = PickingMode.Ignore;
-            button.Add(label);
-            button.RegisterCallback<ClickEvent>(_ => onClick());
-            return button;
-        }
-
-        private static Texture2D redGradient;
-
-        /// <summary>#ff2b22 at the top to #e10600 at the bottom.</summary>
-        internal static Texture2D RedGradient
-        {
-            get
-            {
-                if (redGradient != null) return redGradient;
-                redGradient = new Texture2D(1, 32, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, hideFlags = HideFlags.HideAndDontSave };
-                Color topColour = new Color32(0xff, 0x2b, 0x22, 0xff), bottomColour = new Color32(0xe1, 0x06, 0x00, 0xff);
-                for (int y = 0; y < 32; y++) redGradient.SetPixel(0, y, Color.Lerp(bottomColour, topColour, y / 31f));
-                redGradient.Apply();
-                return redGradient;
-            }
         }
 
         // ------------------------------------------------------------------ settings
@@ -583,51 +456,36 @@ namespace TarmacGauntlet.Management
             return group;
         }
 
-        private VisualElement Row(string label)
+        private VisualElement Setting(string label)
         {
-            var row = new VisualElement();
-            row.AddToClassList("row");
-            row.Add(Text(label.ToUpperInvariant(), "row-label"));
+            VisualElement row = Box("setting");
+            row.Add(Text(label.ToUpperInvariant(), "setting-label"));
             return row;
         }
 
         private VisualElement Stepper(string label, string[] options, int index, Action<int> set)
         {
-            VisualElement row = Row(label);
-            var stepper = new VisualElement();
-            stepper.AddToClassList("stepper");
+            VisualElement row = Setting(label);
             int current = Mathf.Clamp(index, 0, Mathf.Max(0, options.Length - 1));
-            Label value = Text(options.Length > 0 ? options[current].ToUpperInvariant() : "", "stepper-value", true);
-            void Step(int d)
+            VisualElement stepper = null;
+            void Draw()
             {
-                int next = Mathf.Clamp(current + d, 0, options.Length - 1);
-                if (next == current) return;
-                current = next;
-                value.text = options[current].ToUpperInvariant();
-                set(current);
+                VisualElement next = MenuKit.Stepper(options.Length > 0 ? options[current].ToUpperInvariant() : "", "settings-stepper", current > 0, current < options.Length - 1, d =>
+                {
+                    current += d;
+                    set(current);
+                    Draw();
+                });
+                if (stepper != null) row.Remove(stepper);
+                row.Add(stepper = next);
             }
-            stepper.Add(Chevron("chevron-left", () => Step(-1)));
-            stepper.Add(value);
-            stepper.Add(Chevron("chevron-right", () => Step(1)));
-            row.Add(stepper);
+            Draw();
             return row;
-        }
-
-        internal static VisualElement Chevron(string icon, Action onClick)
-        {
-            var chevron = new VisualElement();
-            chevron.AddToClassList("chevron");
-            var image = new VisualElement { pickingMode = PickingMode.Ignore };
-            image.AddToClassList("chevron-image");
-            image.style.backgroundImage = Resources.Load<Texture2D>("MenuIcons/" + icon);
-            chevron.Add(image);
-            chevron.RegisterCallback<ClickEvent>(_ => onClick());
-            return chevron;
         }
 
         private VisualElement Slider(string label, float value01, Action<float> set)
         {
-            VisualElement row = Row(label);
+            VisualElement row = Setting(label);
             var slider = new VisualElement();
             slider.AddToClassList("slider");
             var track = new VisualElement();
@@ -669,7 +527,7 @@ namespace TarmacGauntlet.Management
 
         private void Go(Mode next, string slug = null)
         {
-            HideTooltip();
+            Tips.Hide();
             Popups.Clear();
             string closing = screen;
             mode = next;
@@ -861,44 +719,27 @@ namespace TarmacGauntlet.Management
 
         // ------------------------------------------------------------------ game data
 
-        private static PlayerTeam Player => GameSession.State?.Teams.OfType<PlayerTeam>().FirstOrDefault();
-
-        private static CarInstance RaceCar()
-        {
-            PlayerTeam p = Player;
-            return p?.EnteredCarId == null ? null : p.Cars.FirstOrDefault(c => c.Id == p.EnteredCarId);
-        }
+        private static CarInstance RaceCar() => MenuKit.RaceCar(Player);
 
         private void OnGameChanged(GameState game)
         {
             PlayerTeam p = Player;
             if (p == null) return;
-            teamName.text = p.Name.ToUpperInvariant();
-            Badges.Paint(badge, p.Logo, p.TeamColour);
-            year.text = "YEAR " + game.CurrentYear.ToString(CultureInfo.InvariantCulture);
-            money.text = Money(p.Budget);
+            FillTopBar(badge, teamName, year, money);
 
             CarInstance car = RaceCar();
             if (car != null)
             {
-                CarModel model = CarModels.All.FirstOrDefault(m => m.Id == car.ModelId);
+                CarModel model = Model(car.ModelId);
                 tagName.text = (model?.Name ?? car.ModelId).ToUpperInvariant();
                 if (model != null) ClassLabels.Paint(tagClass, model.CarClass);
                 tagClass.style.display = model != null ? DisplayStyle.Flex : DisplayStyle.None;
                 double c = Math.Max(0, Math.Min(100, car.Condition));
-                tagFill.style.width = Length.Percent((float)c);
-                tagPercent.text = Math.Round(c).ToString(CultureInfo.InvariantCulture) + "%";
-                tag.EnableInClassList("hi", c >= 60);
-                tag.EnableInClassList("mid", c >= 50 && c < 60);
-                tag.EnableInClassList("lo", c < 50);
+                tagCondition.Clear();
+                tagCondition.Add(Bar(c));
+                tagCondition.Add(Banded(Text(Num((int)Math.Round(c)) + "%", "stat-value", true), c));
             }
             if (root != null) RenderTag();
-        }
-
-        internal static string Money(double amount)
-        {
-            string digits = Math.Round(Math.Abs(amount)).ToString("N0", CultureInfo.InvariantCulture);
-            return (amount < 0 ? "-$" : "$") + digits;
         }
 
         // ------------------------------------------------------------------ per frame

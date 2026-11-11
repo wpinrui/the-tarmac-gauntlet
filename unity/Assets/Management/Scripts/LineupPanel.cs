@@ -1,11 +1,11 @@
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using TarmacGauntlet.Career;
 using TarmacGauntlet.Simulation;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UIElements;
+using static TarmacGauntlet.Management.MenuKit;
 
 namespace TarmacGauntlet.Management
 {
@@ -14,77 +14,48 @@ namespace TarmacGauntlet.Management
     /// driver reorders the lineup in the career (<see cref="GameActions.SetLineup"/>). Go starts the race with
     /// <see cref="RaceWeekend.Begin"/> and loads the circuit.
     /// </summary>
-    public sealed class LineupPanel : MonoBehaviour
+    public sealed class LineupPanel : MenuPanel
     {
         /// <summary>The scene the race runs in.</summary>
         public const string RacedayScene = "Raceday";
 
-        private Menus menus;
-        private VisualElement body, rows, go;
+        private VisualElement rows, go;
 
         // A drag in progress: the row, where it started, where it would drop, and the pointer's start.
         private VisualElement dragged;
         private int from, to;
         private float startY, step;
 
-        private void Awake()
-        {
-            menus = GetComponent<Menus>();
-            menus.ScreenOpened += Opened;
-            GameSession.Changed += OnChanged;
-        }
+        protected override bool Shows(string slug) => slug == Menus.LineupSlug;
 
-        private void OnDestroy()
+        protected override void OnOpened()
         {
-            menus.ScreenOpened -= Opened;
-            GameSession.Changed -= OnChanged;
-        }
-
-        private void Opened(string slug, VisualElement panelBody)
-        {
-            body = slug == Menus.LineupSlug ? panelBody : null;
-            if (body == null) return;
             dragged = null;
-
-            var head = new VisualElement();
-            head.AddToClassList("lu-head");
-            head.Add(menus.Text("DRIVING ORDER", "lu-label"));
-            head.Add(menus.Text("OVR", "lu-label"));
-            body.Add(head);
-            rows = new VisualElement();
-            rows.AddToClassList("lu-rows");
-            body.Add(rows);
-            go = menus.RedButton("Go", "lu-go", Go);
-            body.Add(go);
-            Render();
+            Body.Add(Section("Driving order"));
+            rows = Box("lineup-rows");
+            Body.Add(rows);
+            go = RedButton("Go", "big-button", Go);
+            Body.Add(go);
         }
 
-        private void OnChanged(GameState _)
-        {
-            if (body != null && body.panel != null && dragged == null) Render();
-        }
-
-        private void Render()
+        protected override void Render()
         {
             GameState game = GameSession.State;
+            if (dragged != null) return;
             rows.Clear();
             if (game == null) return;
-            PlayerTeam player = game.Teams.OfType<PlayerTeam>().First();
+            PlayerTeam player = Player;
             foreach (string id in DriverLineup.Of(game))
             {
                 (string name, int ovr) = Describe(game, player, id);
-                var row = new VisualElement { userData = id };
-                row.AddToClassList("lu-row");
-                var grip = new VisualElement { pickingMode = PickingMode.Ignore };
-                grip.AddToClassList("lu-grip");
-                grip.style.backgroundImage = Resources.Load<Texture2D>("MenuIcons/grip");
-                row.Add(grip);
-                Label n = menus.Text(name, "lu-name", true);
+                VisualElement row = Row(null, "drag-row");
+                row.userData = id;
+                row.Add(Icon("grip", "grip"));
+                Label n = Cell(name, "fill", true);
                 n.pickingMode = PickingMode.Ignore;
                 row.Add(n);
-                Label o = menus.Text(ovr.ToString(CultureInfo.InvariantCulture), "lu-ovr", true);
+                Label o = Banded(Cell(Num(ovr), "c-ovr", true), ovr);
                 o.pickingMode = PickingMode.Ignore;
-                o.AddToClassList(ovr >= 60 ? "v-hi" : ovr >= 50 ? "v-mid" : "v-lo");
                 row.Add(o);
                 row.RegisterCallback<PointerDownEvent>(e => StartDrag(row, e));
                 row.RegisterCallback<PointerMoveEvent>(e => MoveDrag(row, e));
@@ -99,8 +70,7 @@ namespace TarmacGauntlet.Management
         {
             if (id == RaceEntry.PlayerCharacterDriverId) return (player.PlayerName, player.Skills.Driver * 5);
             Driver d = game.Drivers.FirstOrDefault(x => x.Id == id);
-            if (d == null) return (id, 0);
-            return (d.Name, (int)JsMath.Round(DriverLifecycle.TotalDriverStats(DriverLifecycle.CalculateDriverStats(d)) / 5));
+            return d == null ? (id, 0) : (d.Name, Ovr(d));
         }
 
         // ------------------------------------------------------------------ dragging
@@ -153,7 +123,7 @@ namespace TarmacGauntlet.Management
         private static void Go()
         {
             GameState game = GameSession.State;
-            if (game == null || game.Teams.OfType<PlayerTeam>().First().EnteredCarId == null) return;
+            if (game == null || Player?.EnteredCarId == null) return;
             RaceWeekend.Begin(game);
             GameSession.Flush();
             SceneManager.LoadScene(RacedayScene);

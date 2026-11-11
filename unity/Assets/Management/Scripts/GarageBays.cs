@@ -66,7 +66,7 @@ namespace TarmacGauntlet.Management
             if (cars == null) return;
             shownState = GameSession.State;
 
-            PlayerTeam p = Garage.Player;
+            PlayerTeam p = MenuKit.Player;
             if (crew == null) crew = FindAnyObjectByType<HqCrew>();
             if (crew != null) crew.Count = p?.CrewSize ?? DemoCrew;
             if (p == null)

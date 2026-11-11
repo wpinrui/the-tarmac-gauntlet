@@ -1,4 +1,3 @@
-using System.Linq;
 using TarmacGauntlet.Career;
 using TarmacGauntlet.Simulation;
 using UnityEngine;
@@ -7,19 +6,26 @@ using UnityEngine.UIElements;
 namespace TarmacGauntlet.Management
 {
     /// <summary>
-    /// An office screen: fills the docked panel, and the side pane if it needs one, when its screen opens, and again
-    /// whenever the game changes while it is open.
+    /// A screen in the menus: fills the docked panel, and the side pane if it needs one, when its screen opens, and
+    /// again whenever the game changes while it is open.
     /// </summary>
-    public abstract class OfficePanel : MonoBehaviour
+    public abstract class MenuPanel : MonoBehaviour
     {
         protected Menus Menus { get; private set; }
 
-        /// <summary>The docked panel's body while this screen is open, otherwise null.</summary>
+        /// <summary>The panel body while this screen is open, otherwise null.</summary>
         protected VisualElement Body { get; private set; }
 
-        protected abstract string ScreenSlug { get; }
+        /// <summary>The slug this screen opened as.</summary>
+        protected string OpenSlug { get; private set; }
 
-        protected static PlayerTeam Player => GameSession.State?.Teams.OfType<PlayerTeam>().FirstOrDefault();
+        private protected Tooltips Tips => Menus.Tips;
+
+        /// <summary>Whether this screen fills the panel for <paramref name="slug"/>.</summary>
+        protected abstract bool Shows(string slug);
+
+        /// <summary>False for a screen that doesn't redraw when the game changes.</summary>
+        protected virtual bool FollowsGame => true;
 
         private void Awake()
         {
@@ -36,21 +42,22 @@ namespace TarmacGauntlet.Management
 
         private void Opened(string slug, VisualElement panelBody)
         {
-            Body = slug == ScreenSlug ? panelBody : null;
+            Body = Shows(slug) ? panelBody : null;
             if (Body == null) return;
+            OpenSlug = slug;
             OnOpened();
             Render();
         }
 
         private void OnChanged(GameState _)
         {
-            if (Body != null && Body.panel != null) Render();
+            if (FollowsGame && Body != null && Body.panel != null) Render();
         }
 
         /// <summary>Called each time the screen opens, before it renders.</summary>
         protected virtual void OnOpened() { }
 
-        /// <summary>Rebuilds the panel and the side pane from the game.</summary>
+        /// <summary>Draws the panel and the side pane from the game.</summary>
         protected abstract void Render();
     }
 }
