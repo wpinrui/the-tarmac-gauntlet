@@ -800,7 +800,13 @@ static partial class Check
                     float g = Gap(o.Distance - x.Distance);
                     if (g > 0f && g < best && Math.Abs(o.Car.Lateral - x.Car.Lateral) < CarW + 0.5f) { best = g; ahead = o; }
                 }
-                if (ahead != null && RoomBeside(r, x, ahead.Id)) Seconds[x] = (Seconds.TryGetValue(x, out float s) ? s : 0f) + Race.Dt;
+                // Backing out of a dive (T20, H8, Ivan) is not braking with room. The car it backs out from is on the
+                // outside of the coming bend, its tail within 2 m of overlap, so it holds the line through the slot.
+                float lap = circuit.Lap, here = ((x.Distance % lap) + lap) % lap;
+                int turn = PathChooser.NextTurnAt(circuit, here);
+                bool blocked = turn != 0 && r.Racers.Any(o => o != x && !o.Ghost && Gap(o.Distance - x.Distance) > 0f
+                    && Gap(o.Distance - x.Distance) < CarL + 2f && (o.Car.Lateral - x.Car.Lateral) * turn > CarW);
+                if (ahead != null && !blocked && RoomBeside(r, x, ahead.Id)) Seconds[x] = (Seconds.TryGetValue(x, out float s) ? s : 0f) + Race.Dt;
             }
         }
     }
