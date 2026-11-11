@@ -131,7 +131,7 @@ def headlamps(ref, cutters, out, sgn):
     shp = wr.outline(R["head"])
     cutters += blend.lay(ref, f"cut_head_{side}", shp, wr, -0.016, 0.006, "housing", 0.01, along_ray=True)
     keep = shp.buffer(-0.01)
-    for i, (x, y, z, r) in enumerate(R["head_lenses"]):
+    for i, (x, y, z, r) in enumerate(q for q in R["head_lenses"] if q[3] > 0.015):     # no slivers
         c = Point(*wr.to_uv((x, y, z)))
         r = min(r, 0.045)
         out += blend.lay(ref, f"lamp_head_{side}{i}", c.buffer(r, 48).intersection(keep), wr,
@@ -170,16 +170,17 @@ def front_parts(ref, cutters, out):
     fr = front_fr()
     g = grille_shape()
     cutters += blend.lay(ref, "cut_grille", g, fr, -0.03, 0.006, "grille", 0.01, along_ray=True)
-    out += blend.lay(ref, "grille_ring", g.difference(g.buffer(-0.012)), fr, -0.003, 0.003, "chrome", 0.005)
+    out += blend.lay(ref, "grille_ring", g.buffer(-0.0015).difference(g.buffer(-0.0135)), fr, -0.003, 0.003, "chrome", 0.005,
+                     along_ray=True)       # inside the opening, clear of its walls
     out += blend.lay(ref, "grille_back", g.buffer(-0.006), fr, -0.0245, -0.021, "grille", 0.012, along_ray=True)
     b = g.bounds
     for i, k in enumerate(GRILLE_BARS):
         z = b[1] + k * (b[3] - b[1])
-        bar = g.buffer(-0.01).intersection(box(-5, z - 0.009, 5, z + 0.009))
+        bar = g.buffer(-0.0145).intersection(box(-5, z - 0.009, 5, z + 0.009))
         out += blend.lay(ref, f"grille_bar_{i}", bar, fr, -0.02, -0.004, "chrome", 0.006, along_ray=True)
     mid = soft(poly(R["intake_mid"]).union(flip(poly(R["intake_mid"]))), 0.02)
     cutters += blend.lay(ref, "cut_intake_mid", mid, fr, -0.03, 0.006, "grille", 0.012, along_ray=True)
-    out += blend.lay(ref, "intake_mid_back", mid.buffer(-0.006), fr, -0.0245, -0.021, "grille", 0.012, along_ray=True)
+    out += blend.lay(ref, "intake_mid_back", mid.buffer(-0.006), fr, -0.029, -0.025, "grille", 0.012, along_ray=True)
     fy, fz, fr_r = R["fog"]
     for sgn, side in ((1, "l"), (-1, "r")):
         s = soft(poly(R["intake_side"]), 0.015)
@@ -195,6 +196,9 @@ def front_parts(ref, cutters, out):
 
 # ---------------------------------------------------------------- glass and trim
 MIRROR_X0, MIRROR_X1 = R["mirror"]["x_back"], R["mirror"]["x_front"]
+MIRROR_D = 0.075     # housing depth front to back
+# where the mirror arm meets the door, seen from the side: the window trim stays clear of it
+MIRROR_FOOT = box(MIRROR_X0 + 0.004, R["belt_z"] - 0.05, MIRROR_X0 + MIRROR_D - 0.002, R["mirror"]["z0"] + 0.09)
 
 
 def dlo_line():
@@ -281,7 +285,7 @@ def glass_parts(ref, cutters, out):
         fr = side_fr(sgn)
         cutters += blend.lay(ref, f"cut_side_{side}", g.buffer(-0.003), fr, -0.08, 0.006, "trim", along_ray=True)
         out += blend.lay(ref, f"side_glass_{side}", g.buffer(-0.006), fr, -0.008, -0.004, "glass", 0.02, along_ray=True)
-        out += blend.lay(ref, f"window_trim_{side}", t, fr, 0.0015, 0.0035, "trim", 0.01)
+        out += blend.lay(ref, f"window_trim_{side}", t.difference(MIRROR_FOOT), fr, 0.0015, 0.0035, "trim", 0.01)
     _o, g, t = screen_shapes()
     cutters += blend.lay(ref, "cut_screen", g.buffer(-0.003), top_fr(), -0.08, 0.006, "trim", along_ray=True)
     out += blend.lay(ref, "screen_glass", g.buffer(-0.006), top_fr(), -0.008, -0.004, "glass", 0.02, along_ray=True)
@@ -424,7 +428,6 @@ def grooves(ref):
 # ---------------------------------------------------------------- mirrors and exhaust
 MIRROR_H = 0.11      # housing height
 MIRROR_W = 0.19      # housing width, out from the arm
-MIRROR_D = 0.075     # housing depth front to back
 MIRROR_R = 0.03      # corner rounding
 MIRROR_SWEEP = 0.22  # radians the housing turns back from square to the car
 
@@ -514,7 +517,7 @@ def exhaust():
             cy = e["y_in"] + w * (i + 0.5)
             outer, inner = _oval(cy, e["z"], a, b), _oval(cy, e["z"], a - 0.005, b - 0.005)
             rings = []
-            for x, rg in ((x_end, inner), (x_end, outer), (x_end + 0.2, outer), (x_end + 0.2, inner)):
+            for x, rg in ((x_end, inner), (x_end, outer), (x_end + 0.077, outer), (x_end + 0.077, inner)):
                 rings.append(np.column_stack([np.full(len(rg), x), rg[:, 0] * sgn, rg[:, 1]]))
             v, f = geom.close_rings(rings, cap=False)
             m = len(rings[0])
@@ -567,20 +570,27 @@ def _rbox(name, x0, x1, y0, y1, z0, z1, r=0.03, lean=0.0):
 
 
 
+def _card_floor(x):
+    """The door card's bottom edge: clear of the rear wheel tub."""
+    dx = abs(x - W["rear_x"])
+    reach = W["arch_r"] + 0.09
+    return max(0.42, W["r"] + np.sqrt(max(reach ** 2 - dx ** 2, 0.0)))
+
+
 def interior(floor):
     x0 = R["screen"]["x_base"] - 0.05
     obs = [_loft("firewall", x0 - 0.010, x0 - 0.004, lambda x: box(-0.5, floor + 0.002, 0.5, 3), n=2),
            _loft("dash", x0 - 0.0125, 0.45, lambda x: box(-0.5, 0.78, 0.5, 0.78 + 0.17 * (1 - (x0 - x) / 0.5) + 0.03), n=10)]
     for sgn, side in ((1, "l"), (-1, "r")):
-        clip = lambda x, s=sgn: (box(0.3, 0.42, 1.2, R["belt_z"] - 0.02) if s > 0 else box(-1.2, 0.42, -0.3, R["belt_z"] - 0.02)).intersection(
+        clip = lambda x, s=sgn: (box(0.3, _card_floor(x), 1.2, R["belt_z"] - 0.02) if s > 0 else box(-1.2, _card_floor(x), -0.3, R["belt_z"] - 0.02)).intersection(
             body.inside(x, 0.035 + 0.003)).difference(body.inside(x, 0.035 + 0.025))
-        obs.append(_loft(f"door_card_{side}", -1.30, 0.80, clip, n=16))
+        obs.append(_loft(f"door_card_{side}", -1.15, 0.44, clip, n=16))
         yc = 0.38 * sgn
         obs.append(_rbox(f"seat_base_{side}", -0.42, 0.10, yc - 0.25, yc + 0.25, floor + 0.002, 0.50))
         obs.append(_rbox(f"seat_back_{side}", -0.56, -0.44, yc - 0.24, yc + 0.24, 0.501, 1.12, lean=0.22))
         obs.append(_rbox(f"headrest_{side}", -0.72, -0.62, yc - 0.13, yc + 0.13, 1.121, 1.25, r=0.035, lean=0.1))
-    obs.append(_rbox("bench_base", -1.20, -0.74, -0.55, 0.55, floor + 0.002, 0.52))
-    obs.append(_rbox("bench_back", -1.36, -1.22, -0.55, 0.55, 0.521, 1.02, lean=0.25))
+    obs.append(_rbox("bench_base", -1.20, -0.74, -0.50, 0.50, floor + 0.004, 0.52))     # between the wheel tubs
+    obs.append(_rbox("bench_back", -1.36, -1.14, -0.50, 0.50, 0.521, 1.02, lean=0.25))
     xm = R["screen"]["x_top"] - 0.03
     roof_in = body.inside(xm, 0.035).bounds[3]
     top = roof_in - 0.07
@@ -692,16 +702,17 @@ def _flat(ref, g, size, fr, a, b, up, name, d0, d1, mat, step=0.004):
     return blend.lay(ref, name, sscale(g, size, size, origin=(0, 0)), pf, d0, d1, mat, step)
 
 
-BADGE_T = 0.020    # badges stand proud of the panel by this much
+FRONT_BADGE_T = 0.016    # the front badge stands proud of the panel by this much
+REAR_BADGE_T = 0.013     # and the rear badge by this much
 NAME_T = 0.004     # the name's letters stand proud by this much
 
 
-def badge(ref, style, size, fr, a, b, up, name, lift=0.0):
+def badge(ref, style, size, fr, a, b, up, name, depth, lift=0.0):
     if style == "chrome":
-        return _flat(ref, badge_chrome(), size, fr, a, b, up, name, 0.0012 + lift, BADGE_T + lift, "chrome", 0.003)
+        return _flat(ref, badge_chrome(), size, fr, a, b, up, name, 0.0012 + lift, depth + lift, "chrome", 0.003)
     obs = []
     for i, (g, m) in enumerate(badge_colour()):
-        obs += _flat(ref, g, size, fr, a, b, up, f"{name}_{i}", 0.0012 + lift, BADGE_T + lift, m, 0.003)
+        obs += _flat(ref, g, size, fr, a, b, up, f"{name}_{i}", 0.0012 + lift, depth + lift, m, 0.003)
     return obs
 
 
@@ -723,11 +734,11 @@ def options(ref):
     gz = sp["grille"][1]
     for k, style in ((0, "chrome"), (1, "colour")):
         # front: in the middle of the grille (the reference), or on the bonnet's front edge
-        add("frontbadge", 1 + k, badge(ref, style, 0.10, front_fr(), 0, gz, up, "fb"))
-        add("frontbadge", 3 + k, badge(ref, style, 0.045, top_fr(), sp["bonnet_x"], 0, fwd, "fb"))
+        add("frontbadge", 1 + k, badge(ref, style, 0.10, front_fr(), 0, gz, up, "fb", FRONT_BADGE_T))
+        add("frontbadge", 3 + k, badge(ref, style, 0.045, top_fr(), sp["bonnet_x"], 0, fwd, "fb", FRONT_BADGE_T))
         # rear: middle of the boot lid (the reference), or high on the lid under the lip
-        add("rearbadge", 1 + k, badge(ref, style, 0.07, rear_fr(), 0, LID_FACE_Z, up, "rb"))
-        add("rearbadge", 3 + k, badge(ref, style, 0.05, rear_fr(), 0, sp["spoiler_z"] - 0.05, up, "rb"))
+        add("rearbadge", 1 + k, badge(ref, style, 0.07, rear_fr(), 0, LID_FACE_Z, up, "rb", REAR_BADGE_T))
+        add("rearbadge", 3 + k, badge(ref, style, 0.05, rear_fr(), 0, sp["spoiler_z"] - 0.05, up, "rb", REAR_BADGE_T))
     cap = 0.026
     lid_y = 0.32
     add("name", 1, _flat(ref, nm, cap, rear_fr(), -lid_y, LID_FACE_Z - 0.01, up, "nm", 0.0012, NAME_T, "chrome"))
