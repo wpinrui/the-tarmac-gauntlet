@@ -24,5 +24,6 @@
     <Compile Include="../../unity/Assets/Simulation/**/*.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/PitStopSpots.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/PitCrewPlan.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/PitDriverPlan.cs" />
   </ItemGroup>
 </Project>

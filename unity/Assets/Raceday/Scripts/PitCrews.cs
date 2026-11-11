@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TarmacGauntlet.Simulation;
 using TarmacGauntlet.TeamHq;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -15,7 +16,7 @@ namespace TarmacGauntlet.Raceday
     /// when the garage is small on screen. The crews nearest the camera swap their still figures for live skinned
     /// rigs that play the clips, at most <see cref="MaxLive"/> people at a time, the crews at work first.
     /// </summary>
-    public sealed class PitCrews : MonoBehaviour
+    public sealed partial class PitCrews : MonoBehaviour
     {
         /// <summary>How the suits take the team's colours.</summary>
         public enum KitLook { TeamTrim, TeamSuit, Same }
@@ -105,6 +106,7 @@ namespace TarmacGauntlet.Raceday
                 kits[i] = KitBlock(colours[i]);
                 Figures(i);
             }
+            BuildDrivers(complex, spots, colours);
         }
 
         // ---------------------------------------------------------------- for the kit and the drivers
@@ -242,8 +244,10 @@ namespace TarmacGauntlet.Raceday
             for (int i = 0; i < crews.Length; i++)
             {
                 GarageCrew crew = crews[i];
-                if (crew == null) continue;
+                if (crew == null && swaps[i] == null) continue;
                 StopClock clock = Clock(i);
+                if (swaps[i] != null) StepDrivers(i, clock, dt);
+                if (crew == null) continue;
                 bool wasResting = crew.AtRest;
                 crew.Step(clock, dt);
                 if (wasResting && crew.AtRest && live[i][0] == null) continue;
@@ -268,12 +272,15 @@ namespace TarmacGauntlet.Raceday
             }
         }
 
-        /// <summary>The stop's clock for car i's crew, from its pit plan or, while the player drives, its own service.</summary>
+        /// <summary>
+        /// The stop's clock for car i's crew and drivers, from its pit plan or, while the player drives, its own service.
+        /// While the car comes in, it says whether the stop will change driver.
+        /// </summary>
         private StopClock Clock(int i)
         {
             RaceCar race = cars[i];
             CarController car = controllers[i];
-            GarageCrew crew = crews[i];
+            GarageCrew crew = crews[i] ?? swaps[i].Frame;
             var c = new StopClock();
             if (bodies[i] != null)
             {
@@ -320,6 +327,11 @@ namespace TarmacGauntlet.Raceday
                 c.NewDriver = service.NewDriver;
                 c.Duration = service.Duration;
             }
+            else if (c.Stage == CrewStage.Ready)
+            {
+                CarRaceLog log = car.Supplies?.Log;
+                c.NewDriver = log != null && log.NextDriverIndex != log.DriverIndex;
+            }
             return c;
         }
 
@@ -354,12 +366,12 @@ namespace TarmacGauntlet.Raceday
                 float tan = Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad) * 2f;
                 for (int i = 0; i < crews.Length; i++)
                 {
-                    GarageCrew crew = crews[i];
+                    GarageCrew crew = crews[i] ?? swaps[i]?.Frame;
                     if (crew == null) continue;
                     Vector3 mid = crew.World(new Vector2(0f, crew.Door * 0.5f));
                     float share = PersonHeight / (Mathf.Max(Vector3.Distance(cam.transform.position, mid), 1f) * tan);
                     if (share < LiveShare || !GeometryUtility.TestPlanesAABB(frustum, new Bounds(mid + Vector3.up * 1.5f, Vector3.one * (crew.Door + 8f)))) continue;
-                    candidates.Add((i, share, !crew.AtRest));
+                    candidates.Add((i, share, crews[i] != null && !crews[i].AtRest || swaps[i] != null && !swaps[i].AtRest));
                 }
                 candidates.Sort((a, b) => a.busy != b.busy ? (a.busy ? -1 : 1) : b.share.CompareTo(a.share));
             }
@@ -367,22 +379,22 @@ namespace TarmacGauntlet.Raceday
             int people = 0;
             foreach (var c in candidates)
             {
-                int n = crews[c.car].People.Length;
+                int n = (crews[c.car]?.People.Length ?? 0) + DriversShown(c.car);
                 if (people + n > MaxLive) continue;
                 people += n;
                 keep[c.car] = true;
             }
             for (int i = 0; i < crews.Length; i++)
             {
-                if (crews[i] == null) continue;
-                bool isLive = live[i][0] != null;
-                if (isLive && !keep[i]) Freeze(i);
+                if (keep[i]) continue;
+                if (crews[i] != null && live[i][0] != null) Freeze(i);
+                FreezeDrivers(i);
             }
             for (int i = 0; i < crews.Length; i++)
             {
-                if (crews[i] == null) continue;
-                bool isLive = live[i][0] != null;
-                if (!isLive && keep[i]) Go(i);
+                if (!keep[i]) continue;
+                if (crews[i] != null && live[i][0] == null) Go(i);
+                GoDrivers(i);
             }
         }
 
