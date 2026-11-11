@@ -1,3 +1,4 @@
+using TarmacGauntlet.Simulation;
 using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
@@ -9,15 +10,16 @@ namespace TarmacGauntlet.Raceday
         private static int spawned;
 
         /// <summary>
-        /// A car of the given model. With no model path, or none found, it is a plain box in the given
-        /// paint. With no keys it can only be driven by the AI.
+        /// A car of the given model, drawn with its class's 3D model. If that cannot be loaded it is a
+        /// plain box in the given paint. With no keys it can only be driven by the AI.
         /// </summary>
-        public static CarController Spawn(string modelId, string modelPath, Circuit circuit, KeyboardState keys, Color? paint = null)
+        public static CarController Spawn(string modelId, Circuit circuit, KeyboardState keys, Color? paint = null)
         {
             CarSpec spec = CarSpec.For(modelId);
             var root = new GameObject(spec.Name);
             root.layer = IgnoreRaycastLayer;
 
+            string modelPath = CarArt.ModelPath(modelId);
             GameObject model = string.IsNullOrEmpty(modelPath) ? null : LoadModel(modelPath);
             Transform[] wheels = model != null ? AttachModel(root, model) : BuildBox(root, spec, paint ?? new Color(0.8f, 0.81f, 0.83f));
 

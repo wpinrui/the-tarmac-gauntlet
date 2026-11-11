@@ -33,14 +33,6 @@ namespace TarmacGauntlet.Management
             { CarClass.F, 150 }, { CarClass.E, 300 }, { CarClass.D, 600 }, { CarClass.C, 1200 }, { CarClass.B, 2500 }, { CarClass.A, 5000 }, { CarClass.F1, 10000 },
         };
 
-        /// <summary>Models with a finished 3D car; the rest show as grey bodies.</summary>
-        private static readonly Dictionary<string, string> Modelled = new Dictionary<string, string>
-        {
-            { "f-05", "Assets/Art/Vehicles/LibertyCollier/LibertyCollier.obj" },
-            { "e-10", "Assets/Art/Vehicles/KaiserOboe/KaiserOboe.obj" },
-            { "a-29", "Assets/Art/Vehicles/CheonmaCX24Si/CheonmaCX24Si.obj" },
-        };
-
         /// <summary>Grey bodies per class: length, width, height and wheel radius in metres, and the side profile.</summary>
         private static readonly Dictionary<CarClass, (float L, float W, float H, float R, HqBodyShape Shape)> Grey =
             new Dictionary<CarClass, (float, float, float, float, HqBodyShape)>
@@ -117,7 +109,7 @@ namespace TarmacGauntlet.Management
             return new HqCarLook
             {
                 Key = key,
-                AssetPath = Modelled.TryGetValue(modelId, out string path) ? path : null,
+                AssetPath = CarArt.ModelPath(modelId ?? ""),
                 Shape = g.Shape,
                 Length = g.L,
                 Width = g.W,

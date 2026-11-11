@@ -119,7 +119,7 @@ namespace TarmacGauntlet.Raceday
                 AiPilot p = pilots[i];
                 c.Spot(s, Circuit, pilots[0].Line, p.Line, p.Profile, out int k, out float lateral, out float speed);
                 bool driven = i == drive;
-                CarController car = CarBuilder.Spawn(c.Model, null, Circuit, driven ? Keys : null, CircuitScene.PaintFor(c.Model));
+                CarController car = CarBuilder.Spawn(c.Model, Circuit, driven ? Keys : null, CircuitScene.PaintFor(c.Model));
                 car.PlaceAt(Circuit.Surface(k, lateral), Quaternion.Euler(0f, c.Turned, 0f) * Circuit.Forward[k]);
                 if (speed > 0f) car.Launch(speed);
                 car.Supplies = Consumables.For(car.Spec, p.Profile, 60f);
