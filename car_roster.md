@@ -21,7 +21,7 @@
 | 8 | Seorak Hwaeum | 2013 Toyota Corolla | $22,500 | 22 | 24 | 86 | 82 | 62 | 94 | 88 | 50 |
 | 9 | Liberty Fortress | 2018 Ford Focus | $25,000 | 26 | 26 | 76 | 74 | 50 | 82 | 86 | 53 |
 | 10 | Kaiser Oboe | 2009 VW Golf | $27,500 | 24 | 28 | 78 | 76 | 56 | 84 | 86 | 55 |
-| 11 | Liberty Mantle | 2011 Ford Mondeo | $30,000 | 22 | 24 | 74 | 78 | 72 | 88 | 88 | 60 |
+| 11 | Liberty Mantle | 2011 Ford Mondeo | $30,000 | 25 | 27 | 74 | 78 | 72 | 88 | 88 | 60 |
 
 ### Class D
 
@@ -47,8 +47,8 @@
 | # | Fictional Name | Real Car | MSRP | Pow | Hnd | FE | TD | Cmf | Rel | PST | FC (L) |
 |---|----------------|----------|------|-----|-----|----|----|-----|-----|-----|--------|
 | 21 | Feretti Vortice | 2015 Ferrari 458 Italia | $750,000 | 76 | 82 | 28 | 36 | 26 | 58 | 36 | 86 |
-| 22 | Archer Tachyon | 2014 McLaren MP4-12C | $800,000 | 78 | 80 | 30 | 34 | 22 | 54 | 32 | 72 |
-| 23 | Archer Jet Black | 2014 Mercedes SLS AMG Black | $850,000 | 80 | 78 | 26 | 32 | 32 | 52 | 38 | 80 |
+| 22 | Archer Tachyon | 2014 McLaren MP4-12C | $800,000 | 79 | 82 | 30 | 34 | 22 | 54 | 32 | 72 |
+| 23 | Archer Jet Black | 2014 Mercedes SLS AMG Black | $850,000 | 82 | 80 | 26 | 32 | 32 | 52 | 38 | 80 |
 | 24 | Kaiser Scream | 2005 Porsche Carrera GT | $900,000 | 82 | 84 | 22 | 28 | 16 | 46 | 30 | 92 |
 | 25 | Liberty Bounty | 2022 Ford GT | $950,000 | 84 | 86 | 26 | 30 | 18 | 50 | 24 | 65 |
 
