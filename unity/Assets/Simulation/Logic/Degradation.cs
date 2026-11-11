@@ -21,12 +21,12 @@ namespace TarmacGauntlet.Simulation
         };
 
         // --- Tyre wear ---
-        // Baseline calibrated for the time-bounded sim (1440 s race budget): a top
-        // class-A car wears ~6 wear/lap, giving ~13-lap tyre stints and ~3 stops on
-        // tyres alone, leaving room for ~48 laps inside the budget. Drop this and
-        // the leader does too few laps; raise it and pit overhead crowds out laps.
+        // Set so a set of tyres lasts about two tanks of fuel on a durable car (Tyre Durability
+        // 80 and up, Smoothness 50: 22 laps or more before the pit limit) but not on a car that
+        // eats its tyres (Durability 30: about 19). Keeping the tyres on at a stop saves the set
+        // and the change, for a lap time cost on old rubber.
         /// <summary>Wear added per lap (0 to 100 scale) with baseline stats and Normal mode.</summary>
-        private const double BaseTyreWearPerLap = 8;
+        private const double BaseTyreWearPerLap = 6;
         /// <summary>
         /// Maximum fractional reduction in wear rate from combined Tyre Durability + Smoothness stats.
         /// At both stats = 100, wear rate is halved.
