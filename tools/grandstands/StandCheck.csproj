@@ -17,6 +17,7 @@
     <Compile Include="../../unity/Assets/Raceday/Scripts/CircuitPart.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/MeshKit.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/Grandstands.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/PitComplex.cs" />
     <None Include="preview.html" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
