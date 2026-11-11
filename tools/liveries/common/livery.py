@@ -46,10 +46,10 @@ class Livery:
         d = " ".join(f"{'M' if i == 0 else 'L'}{u:.4f},{v:.4f}" for i, (u, v) in enumerate(self.uv(view, p) for p in pts))
         self.art[view].append(f'<path d="{d} Z" fill="{fill}"/>')
 
-    def text(self, view, s, p, height, fill, rotate=0, spacing=0.0):
+    def text(self, view, s, p, height, fill, rotate=0, spacing=0.0, font="Titillium"):
         u, v = self.uv(view, p)
         self.art[view].append(
-            f'<text x="{u:.4f}" y="{v:.4f}" font-family="Titillium" font-size="{height / 0.72:.4f}" '
+            f'<text x="{u:.4f}" y="{v:.4f}" font-family="{font}" font-size="{height / 0.72:.4f}" '
             f'letter-spacing="{spacing * height:.4f}" fill="{fill}" text-anchor="middle" dominant-baseline="central" '
             f'transform="rotate({rotate} {u:.4f} {v:.4f})">{s}</text>')
 
@@ -73,8 +73,8 @@ class Livery:
                       f'height="{height * 0.13:.4f}" fill="{c}"/>' for i, c in enumerate(underline or []))
             + "</g>")
 
-    def side_mark(self, svg_path, z, y, height, ink=None):
-        for view in ("left", "right"):
+    def side_mark(self, svg_path, z, y, height, ink=None, views=("left", "right")):
+        for view in views:
             self.mark(view, svg_path, self._side(view, z, y), height, ink)
 
 
@@ -89,9 +89,9 @@ class Livery:
         for view in ("left", "right"):
             self.poly(view, [self._side(view, z, y) for z, y in zy], fill)
 
-    def side_text(self, s, z, y, height, fill, spacing=0.0):
+    def side_text(self, s, z, y, height, fill, spacing=0.0, font="Titillium"):
         for view in ("left", "right"):
-            self.text(view, s, self._side(view, z, y), height, fill, spacing=spacing)
+            self.text(view, s, self._side(view, z, y), height, fill, spacing=spacing, font=font)
 
     def side_number(self, z, y, w, h, ink):
         for view in ("left", "right"):
