@@ -29,6 +29,11 @@ namespace TarmacGauntlet.Raceday
         private const float ReflectionStep = 0.05f;
         /// <summary>Redraw the reflections once the cloud has changed this much.</summary>
         private const float ReflectionCloud = 0.04f;
+        /// <summary>
+        /// How bright the sky's reflection is at night. The floodlights' pools multiply everything under
+        /// them, the reflection too, so a wet track reflecting the glowing night sky would shine white.
+        /// </summary>
+        private const float NightShine = 0.2f;
 
         private Light lamp;
         private Material sky;
@@ -124,6 +129,7 @@ namespace TarmacGauntlet.Raceday
             sky.SetFloat(CoverId, cover);
             sky.SetFloat(NightId, s.Night);
 
+            probe.intensity = Mathf.Lerp(1f, NightShine, s.Night);
             if (float.IsNaN(reflected) || Mathf.Abs(hour - reflected) >= ReflectionStep || Mathf.Abs(cloud - reflectedCloud) >= ReflectionCloud)
             {
                 reflected = hour;
