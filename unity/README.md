@@ -47,6 +47,23 @@ target speed for every 2 m sample (`SpeedProfile.cs`, from the car's grip, downf
 brakes). After a hard crash, or when stuck or spun, it puts the car back on track itself. The console
 shows its predicted lap time and each lap it drives.
 
+The camera starts on the TV view when the race comes from the career, and on the chase camera when the scene runs on
+its own. `C` cycles TV, chase, bonnet, bumper and free. In the TV view the director (`BroadcastDirector.cs`) picks
+the story once a real second: a car stopped off the track, a fight for a class lead, any fight within a class under
+0.5 s, your car, a class leader's stop or yours, a car rejoining, the leader. It cuts between trackside, pan,
+helicopter, onboard and pit lane shots. While you drive, the TV view is your onboard.
+
+`T` opens live timing while the AI drives your car (`LiveTiming.cs`), with the race at 16x behind it: every
+car in race order by class, your car's onboard and the track map, its driver, fuel, tyres and condition with
+the laps each lasts on the engine map in use, the engine map, and the next stop. Pit Now calls the car in at the
+next pit entry, and the stop puts in the litres and tyres asked for and the next driver picked (`PitOrders` in
+`Consumables.cs`). Left alone the car pits and chooses for itself, and each stop puts the orders back to a full
+tank and new tyres. The red button top right, or `T`, returns to the race.
+
+While a teammate drives, `N` or the button beside the red one skips to your next stint: the race runs at 32x until
+the stop that puts you in is over and the car is back on track, then hands you the wheel. `F` or `I` stops the
+skip. When a stop puts a teammate in while you drive, the AI takes the car once you have driven out of the pit lane.
+
 `F` cycles normal speed, 4x and 16x while the AI drives, and `I` drops back to normal speed. Only cars
 near the camera, and near your car while you drive it, run full physics (`PhysicsRange.cs`: the
 nearest 24 within 300 m at normal speed, 8 within 120 m at 4x, none at 16x). The rest glide along

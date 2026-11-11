@@ -38,6 +38,8 @@ namespace TarmacGauntlet.Raceday
         public float Lap;
         /// <summary>True once the race clock runs.</summary>
         public Func<bool> Racing;
+        /// <summary>True to stop drawing the tower, while live timing is up. The clock keeps running.</summary>
+        [NonSerialized] public bool Hidden;
 
         // Layout, in design units.
         private const float Margin = 1.6f, Width = 24f;
@@ -119,7 +121,7 @@ namespace TarmacGauntlet.Raceday
 
         private void OnGUI()
         {
-            if (Event.current.type != EventType.Repaint || rows.Count == 0) return;
+            if (Hidden || Event.current.type != EventType.Repaint || rows.Count == 0) return;
             float u = Unit();
             Style(u);
 
@@ -200,6 +202,9 @@ namespace TarmacGauntlet.Raceday
             return s;
         }
 
+        /// <summary>The race time left, as the tab on top shows it.</summary>
+        public string TimeLeft => Clock();
+
         private string Clock()
         {
             float left = Mathf.Max(0f, RaceLength - clock * TimeCompression);
@@ -262,7 +267,7 @@ namespace TarmacGauntlet.Raceday
         /// A white shape on a clear texture, smoothed at the edges: inside(x, y) in design units, y up
         /// from the bottom. Drawn tinted, at the width and height it was made for.
         /// </summary>
-        private static Texture2D Shape(float width, float height, Func<float, float, bool> inside)
+        internal static Texture2D Shape(float width, float height, Func<float, float, bool> inside)
         {
             const int Rows = 128, Samples = 4;
             int columns = Mathf.CeilToInt(Rows * width / height);
@@ -308,8 +313,8 @@ namespace TarmacGauntlet.Raceday
             _ => Hex(0xdddddd),
         };
 
-        private static string ClassLetter(CarClass c) => c == CarClass.F1 ? "F1" : c.ToString();
+        internal static string ClassLetter(CarClass c) => c == CarClass.F1 ? "F1" : c.ToString();
 
-        private static Color Hex(int rgb) => new Color((rgb >> 16 & 0xff) / 255f, (rgb >> 8 & 0xff) / 255f, (rgb & 0xff) / 255f);
+        internal static Color Hex(int rgb) => new Color((rgb >> 16 & 0xff) / 255f, (rgb >> 8 & 0xff) / 255f, (rgb & 0xff) / 255f);
     }
 }
