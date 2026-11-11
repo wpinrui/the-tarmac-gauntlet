@@ -129,7 +129,12 @@ namespace TarmacGauntlet.Raceday
                 }
                 Transform piece = view.Take(i, item);
                 if (piece == null) continue;
-                if (!taken[i][k]) pieceRenderers[i][k] = piece.GetComponent<Renderer>();
+                if (!taken[i][k])
+                {
+                    pieceRenderers[i][k] = piece.GetComponent<Renderer>();
+                    // A fresh tyre the size of the car's own wheels.
+                    if (item >= KitItem.TyreFrontLeft && item <= KitItem.TyreRearRight) piece.localScale = TyreScale(i, PitBoxKit.Wheel(item));
+                }
                 taken[i][k] = true;
                 KitPlace p = work.Pieces[k];
                 piece.SetPositionAndRotation(p.Position + Vector3.up * Lifted(i, work, item), Quaternion.LookRotation(p.Forward, p.Up));
@@ -148,6 +153,34 @@ namespace TarmacGauntlet.Raceday
                 else Drop(i, w);
             }
             if (models[i] != null) models[i].localPosition = modelRest[i] + Vector3.up * (work.Lift * KitWork.JackLift);
+        }
+
+        /// <summary>
+        /// How much a kit tyre is scaled to match car i's wheel w: its height and its width across the car, from the
+        /// wheel's own meshes, so every car is fitted tyres of its own size.
+        /// </summary>
+        private Vector3 TyreScale(int i, int w)
+        {
+            if (wheels[i][w] == null) return Vector3.one;
+            Transform car = cars[i].transform;
+            Vector3 right = car.right, up = car.up;
+            float r0 = float.MaxValue, r1 = float.MinValue, u0 = float.MaxValue, u1 = float.MinValue;
+            foreach (MeshFilter mf in wheels[i][w].GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (mf.sharedMesh == null) continue;
+                Bounds b = mf.sharedMesh.bounds;
+                for (int c = 0; c < 8; c++)
+                {
+                    Vector3 corner = b.center + Vector3.Scale(b.extents, new Vector3((c & 1) == 0 ? -1 : 1, (c & 2) == 0 ? -1 : 1, (c & 4) == 0 ? -1 : 1));
+                    Vector3 p = mf.transform.TransformPoint(corner);
+                    float x = Vector3.Dot(p, right), y = Vector3.Dot(p, up);
+                    r0 = Mathf.Min(r0, x); r1 = Mathf.Max(r1, x);
+                    u0 = Mathf.Min(u0, y); u1 = Mathf.Max(u1, y);
+                }
+            }
+            if (r0 > r1) return Vector3.one;
+            float size = (u1 - u0) / (2f * (PitBoxKit.TyreRadius + 0.005f)), width = (r1 - r0) / PitBoxKit.TyreWidth;
+            return new Vector3(Mathf.Clamp(size, 0.6f, 1.8f), Mathf.Clamp(size, 0.6f, 1.8f), Mathf.Clamp(width, 0.5f, 2.5f));
         }
 
         /// <summary>A piece on the car rises with it on its jacks.</summary>

@@ -345,8 +345,8 @@ namespace TarmacGauntlet.Raceday
                 case CrewTask.Kind.Screen: return new Vector2(l + 1.8f, 3.8f);
             }
             Vector2 at = Spot(t).at;
-            if (at.y < 0f) return new Vector2(Mathf.Sign(at.x) * (l + (t.Second ? 1.9f : 1.1f)), 2.0f);
-            return new Vector2(at.x, at.y + 1.3f);
+            // Out wide of their own place, the far side too, to step in once the car stops.
+            return new Vector2(at.x, at.y + Mathf.Sign(at.y) * 1.3f);
         }
 
         /// <summary>
