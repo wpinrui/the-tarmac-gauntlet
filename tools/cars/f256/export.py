@@ -36,7 +36,7 @@ def cut(target, cutters):
 def build(game=False):
     blend.reset(MATERIALS)
     shell = parts.shell()
-    cut(shell, [parts.cockpit_cut()] + parts.inlet_cuts())
+    cut(shell, [parts.cockpit_cut()] + parts.inlet_cuts() + parts.gill_cuts())
     blend.tidy(shell)
     print("body cut")
 
@@ -47,6 +47,7 @@ def build(game=False):
     parts.floor()
     parts.rain_light()
     parts.front_wing()
+    parts.bargeboards()
     parts.wheels()
     parts.suspension()
     parts.mirrors()

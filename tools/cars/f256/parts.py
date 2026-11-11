@@ -45,7 +45,7 @@ MATERIALS = {
 }
 LAMPS = {"Rain light": ["lamp_rain"]}
 SHOW = {"Driver": ["driver"]}
-GROUPS = {"frontbadge": "Front badge", "rearbadge": "Rear badge", "name": "Name"}
+GROUPS = {"frontbadge": "Badge"}
 
 
 # ---------------------------------------------------------------- helpers
@@ -117,14 +117,67 @@ def mirrored(fn):
 
 
 # ---------------------------------------------------------------- body
+MOUTH = ((0.475, 0.47), (0.375, 0.10))     # the pod mouth's face leans back from top (x, z) to bottom
+GILLS = (-0.28, -0.56, 5)                   # louvres on each pod's top: first x, last x, count
+
+
+def pod(sgn):
+    """One sidepod: raked mouth with its opening cut, before it joins the body."""
+    v, f = body.pod(sgn)
+    pd = blend.make("pod", v, f, "body")
+    (xt, zt), (xb, zb) = MOUTH
+    k = (xt - xb) / (zt - zb)
+    rake = Polygon([(xb - k * (zb - 0.0), 0.0), (xt + k * 0.2, zt + 0.2), (1.0, zt + 0.2), (1.0, 0.0)])
+    blend.boolean(pd, extrude("cut_rake", rake, "y", -1.0, 1.0, "body", 8), "DIFFERENCE")
+    face = soft(box(0.30, 0.17, 0.585, 0.415), 0.065)
+    if sgn < 0:
+        face = sscale(face, -1, 1, origin=(0, 0))
+    blend.boolean(pd, extrude("cut_mouth", face, "x", 0.22, 0.7, "grille", 96), "DIFFERENCE")
+    return pd
+
+
+def gill_cuts():
+    """Thin louvres across the back of each pod's top."""
+    x0, x1, n = GILLS
+    obs = []
+    for x in np.linspace(x0, x1, n):
+        yi, yo, _z0, z1, r = (float(f(x)) for f in body.P_CV)
+        top = z1 - 0.022
+        for sgn in (1, -1):
+            g = soft(box(x - 0.011, 0.31, x + 0.011, yo - r - 0.01), 0.008)
+            if sgn < 0:
+                g = sscale(g, 1, -1, origin=(0, 0))
+            obs.append(extrude("cut_gill", g, "z", top, z1 + 0.1, "grille", 32))
+    return obs
+
+
 def shell():
     """The centre body with both sidepods joined on."""
     v, f = body.centre()
     sh = blend.make("body", v, f, "body")
     for sgn in (1, -1):
-        v, f = body.pod(sgn)
-        blend.boolean(sh, blend.make("pod", v, f, "body"), "UNION")
+        blend.boolean(sh, pod(sgn), "UNION")
     return sh
+
+
+def bargeboards():
+    """A curved board in front of each sidepod, turning air round the pod."""
+    obs = []
+    for sgn in (1, -1):
+        t = np.linspace(0, 1, 16)
+        x = 0.90 - 0.36 * t
+        y = 0.40 + 0.20 * t ** 1.6
+        line = np.column_stack([x, y])
+        nrm = np.column_stack([np.gradient(y), -np.gradient(x)])
+        nrm /= np.linalg.norm(nrm, axis=1, keepdims=True)
+        g = Polygon(np.vstack([line + nrm * 0.004, (line - nrm * 0.004)[::-1]]))
+        if sgn < 0:
+            g = sscale(g, 1, -1, origin=(0, 0))
+        side = Polygon([(0.54, 0.06), (0.90, 0.06), (0.90, 0.12), (0.70, 0.25), (0.54, 0.25)])
+        b = extrude("bb", g, "z", 0.06, 0.34, "carbon", 64)
+        blend.boolean(b, extrude("bb_trim", soft(side, 0.04), "y", -1, 1, "carbon", 48), "INTERSECT")
+        obs.append(b)
+    return merge(obs, "bargeboards")
 
 
 def cockpit_cut():
@@ -139,13 +192,8 @@ AIRBOX_FACE = (-0.22, 0.745)    # the airbox's upright face starts here (x) abov
 
 
 def inlet_cuts():
-    """Sidepod mouths and the airbox mouth above the driver's head."""
+    """The airbox's upright face and its mouth above the driver's head."""
     obs = []
-    for sgn in (1, -1):
-        face = soft(box(0.30, 0.18, 0.62, 0.41), 0.06)
-        if sgn < 0:
-            face = sscale(face, -1, 1, origin=(0, 0))
-        obs.append(extrude("cut_pod", face, "x", 0.25, 0.60, "grille"))
     obs.append(extrude("cut_hoop", box(-0.3, AIRBOX_FACE[1], 0.3, 1.3), "x", AIRBOX_FACE[0], 0.1, "body", 8))
     a = R["airbox"]
     face = soft(box(-a["w"] * 0.7, AIRBOX_FACE[1] + 0.025, a["w"] * 0.7, a["z1"] - 0.015), 0.04)
@@ -191,13 +239,19 @@ def airfoil(le, te, z, t, lift, n=24):
     return np.vstack([upper, lower])
 
 
-def element(name, e, span, zfn, lift, mat="body"):
+def element(name, e, span, zfn, lift, mat="body", y0=None):
+    """A wing element lofted across the car; with y0 only the outer parts, from |y| = y0."""
     sec = airfoil(e["le"], e["te"], 0.0, e["t"], lift)
-    rings = []
-    for y in np.linspace(-span, span, 41):
-        rings.append(np.column_stack([sec[:, 0], np.full(len(sec), y), sec[:, 1] + zfn(y)]))
-    v, f = geom.close_rings(rings)
-    return blend.make(name, v, f, mat)
+    if y0 is None:
+        ys = [np.linspace(-span, span, 41)]
+    else:
+        ys = [np.linspace(y0, span, 21), np.linspace(-span, -y0, 21)]
+    obs = []
+    for yy in ys:
+        rings = [np.column_stack([sec[:, 0], np.full(len(sec), y), sec[:, 1] + zfn(y)]) for y in yy]
+        v, f = geom.close_rings(rings)
+        obs.append(blend.make(name, v, f, mat))
+    return obs[0] if len(obs) == 1 else merge(obs, name)
 
 
 def plate(name, p, y, mat="body"):
@@ -205,19 +259,41 @@ def plate(name, p, y, mat="body"):
     return extrude(name, g, "y", y - p["t"] / 2, y + p["t"] / 2, mat)
 
 
+FW_LIFTS = (0.035, 0.07, 0.06)    # trailing edge rise of main plane, first flap, second flap
+FW_FLAP_IN = (0.20, 0.36)         # the flaps start this far out from the middle
+
+
 def front_wing():
+    """Main plane across the car with its middle raised under the nose, two stacked flaps on
+    each side, shaped endplates with a foot and a canard, and two pylons up to the nose."""
     fw = R["front_wing"]
     span, mid = fw["span"], fw["mid"]
-    obs = []
-    lifts = (0.035, 0.07)
-    for i, e in enumerate(fw["elements"]):
-        def zfn(y, e=e):
+    els = fw["elements"]
+
+    def zfn(e):
+        def f(y):
             s = np.clip((abs(y) - mid) / 0.15, 0, 1)
             s = s * s * (3 - 2 * s)
             return e["z_mid"] + (e["z_tip"] - e["z_mid"]) * s
-        obs.append(element(f"fw_{i}", e, span + 0.003, zfn, lifts[i]))
+        return f
+    obs = [element("fw_main", els[0], span + 0.003, zfn(els[0]), FW_LIFTS[0])]
+    obs.append(element("fw_flap", els[1], span + 0.003, lambda y: els[1]["z_tip"], FW_LIFTS[1], y0=FW_FLAP_IN[0]))
+    top = {"le": els[1]["te"] + 0.05, "te": els[1]["te"] - 0.10, "t": 0.012}
+    obs.append(element("fw_flap2", top, span + 0.003, lambda y: els[1]["z_tip"] + 0.065, FW_LIFTS[2], y0=FW_FLAP_IN[1]))
+    pl = fw["plate"]
+    x0, x1, z0, z1 = pl["x0"], pl["x1"], pl["z0"], pl["z1"]
+    side = Polygon([(x1, z0), (x1, z0 + 0.10), (x1 - 0.12, z1 - 0.02), (x1 - 0.22, z1), (x0 + 0.06, z1),
+                    (x0, z1 - 0.06), (x0, z0 + 0.10), (x0 + 0.08, z0)])
+    side = soft(side, 0.02)
     for sgn in (1, -1):
-        obs.append(plate("fw_plate", fw["plate"], sgn * (span + fw["plate"]["t"] / 2 - 0.002)))
+        y = sgn * (span + pl["t"] / 2 - 0.002)
+        obs.append(extrude("fw_plate", side, "y", y - pl["t"] / 2, y + pl["t"] / 2, "body", 96))
+        foot = soft(box(x0 + 0.02, -0.035, x1 - 0.02, 0.0), 0.012)
+        foot = sscale(translate(foot, 0, 0), 1, sgn, origin=(0, 0))
+        obs.append(extrude("fw_foot", translate(foot, 0, y), "z", z0 - 0.003, z0 + 0.008, "carbon", 48))
+        can = Polygon([(x1 - 0.02, 0.0), (x1 - 0.20, 0.0), (x1 - 0.17, 0.05), (x1 - 0.05, 0.05)])
+        can = translate(sscale(soft(can, 0.008), 1, sgn, origin=(0, 0)), 0, y)
+        obs.append(extrude("fw_canard", can, "z", 0.205, 0.213, "body", 48))
         g = Polygon([(2.18, 0.18), (2.40, 0.20), (2.36, 0.30), (2.20, 0.30)])
         obs.append(extrude("fw_pylon", soft(g, 0.01), "y", sgn * 0.055 - 0.005, sgn * 0.055 + 0.005, "carbon", 32))
     return merge(obs, "front_wing")
@@ -317,20 +393,72 @@ def steering():
     return merge([wheel, col], "steering")
 
 
+def _helmet_shape(p):
+    """Unit sphere point to helmet: a chin bar that runs forward and down, a flat neck opening and
+    a fuller back."""
+    x, y, z = p
+    if z < 0 and x > 0:
+        x *= 1 + 0.22 * -z
+        y *= 1 - 0.12 * -z
+    if x < 0:
+        x *= 1.05
+    z = max(z, -0.80)
+    return x, y, z
+
+
 def driver():
-    """Helmet with its visor, shoulders and arms, as one object so he can go in one step."""
+    """Helmet with a raised visor, a top stripe and a rear spoiler, shoulders and arms, as one
+    object so he can go in one step."""
     d = R["driver"]
     hx, _hy, hz = d["helmet"]
     r = d["r"]
-    helmet = ellipsoid("helmet", (hx, 0, hz), (r * 1.08, r * 0.92, r), "helmet", 64, 32)
-    vz0, vz1, a = hz - 0.03, hz + 0.035, np.radians(58)
-    blend.split_by_planes(helmet, [((0, 0, vz0), (0, 0, 1)), ((0, 0, vz1), (0, 0, 1)),
-                                   ((hx, 0, 0), (-np.sin(a), np.cos(a), 0)), ((hx, 0, 0), (np.sin(a), np.cos(a), 0))])
-    blend.paint(helmet, "visor", lambda x, y, z: vz0 < z < vz1 and x - hx > abs(y) / np.tan(a))
+    sc = (r * 1.06, r * 0.92, r)
+
+    def place(p, k=1.0):
+        x, y, z = _helmet_shape(p)
+        return (hx + x * sc[0] * k, y * sc[1] * k, hz + z * sc[2] * k)
+    bm = bmesh.new()
+    bmesh.ops.create_uvsphere(bm, u_segments=64, v_segments=32, radius=1.0)
+    for v in bm.verts:
+        v.co = place(v.co)
+    me = bpy.data.meshes.new("helmet"); bm.to_mesh(me); bm.free()
+    helmet = blend.adopt("helmet", me, "helmet")
+    blend.split_by_planes(helmet, [((0, -0.022, 0), (0, 1, 0)), ((0, 0.022, 0), (0, 1, 0))])
+    blend.paint(helmet, "suit", lambda x, y, z: abs(y) < 0.022 and z > hz - 0.02)        # top stripe
+    blend.split_by_planes(helmet, [((0, 0, hz - 0.045), (0, 0, 1))])
+    blend.paint(helmet, "suit", lambda x, y, z: z < hz - 0.045)                          # lower half
+    blend.paint(helmet, "interior", lambda x, y, z: z < hz - 0.105)                      # neck opening
+
+    # the visor: a slim band standing just proud of the face, wrapping round the front
+    a = np.radians(np.linspace(-62, 62, 40))
+    outer, inner = [], []
+    for ai in a:
+        taper = 1 - 0.45 * (abs(ai) / a[-1]) ** 3        # the visor narrows round to its pivots
+        for bi in np.radians(np.linspace(-13, 15, 10)) * taper:
+            p = (np.cos(bi) * np.cos(ai), np.cos(bi) * np.sin(ai), np.sin(bi))
+            outer.append(place(p, 1.02)); inner.append(place(p, 0.99))
+    n, m = len(a), 10
+    verts = np.array(outer + inner)
+    faces = []
+    for i in range(n - 1):
+        for j in range(m - 1):
+            q = (i * m + j, (i + 1) * m + j, (i + 1) * m + j + 1, i * m + j + 1)
+            faces += [q, tuple(k + n * m for k in q[::-1])]
+    for i in range(n - 1):
+        for j in (0, m - 1):
+            q = (i * m + j, (i + 1) * m + j, (i + 1) * m + j + n * m, i * m + j + n * m)
+            faces.append(q if j == 0 else q[::-1])
+    for i in (0, n - 1):
+        for j in range(m - 1):
+            q = (i * m + j, i * m + j + 1, i * m + j + 1 + n * m, i * m + j + n * m)
+            faces.append(q if i == n - 1 else q[::-1])
+    visor = blend.make("visor", verts, faces, "visor")
+    spoiler = extrude("spoiler", soft(box(hx - r * 1.12, hz + 0.075, hx - r * 0.72, hz + 0.087), 0.005),
+                      "y", -0.055, 0.055, "helmet", 24)
     torso = ellipsoid("torso", (hx - 0.12, 0, hz - 0.17), (0.14, 0.2, 0.1), "suit")
     arms = [bar("arm", (hx - 0.08, sgn * 0.17, hz - 0.15), (0.40, sgn * 0.11, 0.55), 0.06, 0.06, "suit")
             for sgn in (1, -1)]
-    return merge([helmet, torso] + arms, "driver")
+    return merge([helmet, visor, spoiler, torso] + arms, "driver")
 
 
 # ---------------------------------------------------------------- badge and name
@@ -497,26 +625,11 @@ def badge(ref, style, size, fr, a, b, up, name):
 
 
 def options(ref):
-    """Badge and name options, named opt_<group>_<n>_<i>. Each lies flat on its panel.
-    Odd numbers are the chrome badge, even the colour badge, at the same spot."""
-    nm = name_shape()
-    up, back = (0, 0, 1), (-1, 0, 0)     # a nose badge reads from ahead: its top faces the driver
-    rw = R["rear_wing"]["plate"]
-    px = (rw["x0"] + rw["x1"]) / 2
-    out = []
-
-    def add(group, n, objs):
-        for i, ob in enumerate(objs):
-            ob.name = f"opt_{group}_{n}_{i}"
-            out.append(ob)
-    for k, style in ((0, "chrome"), (1, "colour")):
-        # front: on top of the nose, or on each side of the tub ahead of the sidepods
-        add("frontbadge", 1 + k, badge(ref, style, 0.07, top_fr(), 1.95, 0, back, "fb"))
-        add("frontbadge", 3 + k, mirrored(lambda s, _l: badge(ref, style, 0.08, side_fr(s), 0.80, 0.42, up, "fb")))
-        # rear: on the outside of each rear wing endplate, or on each side of the engine cover fin
-        add("rearbadge", 1 + k, mirrored(lambda s, _l: badge(ref, style, 0.10, side_fr(s), px, 0.70, up, "rb")))
-        add("rearbadge", 3 + k, mirrored(lambda s, _l: badge(ref, style, 0.07, side_fr(s), -0.70, 0.72, up, "rb")))
-    add("name", 1, mirrored(lambda s, _l: _flat(ref, nm, 0.06, side_fr(s), -0.05, 0.33, up, "nm", 0.0012, NAME_T, "chrome")))
-    add("name", 2, mirrored(lambda s, _l: _flat(ref, nm, 0.04, side_fr(s), px, 0.58, up, "nm", 0.0012, NAME_T, "chrome")))
-    add("name", 3, mirrored(lambda s, _l: _flat(ref, nm, 0.045, side_fr(s), -0.98, 0.60, up, "nm", 0.0012, NAME_T, "chrome")))
-    return out
+    """The colour badge on top of the nose and on each side wall ahead of the sidepod mouths,
+    as the one option opt_frontbadge_1_<i>. Each lies flat on its panel."""
+    back = (-1, 0, 0)     # a nose badge reads from ahead: its top faces the driver
+    obs = badge(ref, "colour", 0.09, top_fr(), 1.95, 0, back, "fb")
+    obs += mirrored(lambda s, _l: badge(ref, "colour", 0.10, side_fr(s), 0.75, 0.42, (0, 0, 1), "fb"))
+    for i, ob in enumerate(obs):
+        ob.name = f"opt_frontbadge_1_{i}"
+    return obs

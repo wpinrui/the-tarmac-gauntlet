@@ -84,13 +84,19 @@ def centre_shape(x):
     return orient(Polygon(centre_ring(x)).buffer(0), 1)
 
 
-def pod_shape(x, sgn=1):
+UNDERCUT = 0.30   # the pod's lower outer corner tucks in by this share of its width
+WAIST_Z = 0.55    # and its side turns upright this share of the way up
+
+
+def pod_ring(x, sgn=1):
     yi, yo, z0, z1, r = (float(f(x)) for f in P_CV)
-    r = min(r, 0.45 * (z1 - z0), 0.45 * (yo - yi))
-    g = box(yi, z0, yo, z1).buffer(-r, join_style=1).buffer(r, join_style=1)
+    u = min(0.13, UNDERCUT * (yo - yi))
+    zw = z0 + (z1 - z0) * WAIST_Z
+    corners = [(yi, z0), (yo - u, z0), (yo, zw), (yo, z1), (yi, z1)]
+    ring = rounded(corners, [0.01, 0.05, r, r, 0.01])
     if sgn < 0:
-        g = Polygon(np.array(g.exterior.coords) * [-1, 1])
-    return orient(g, 1)
+        ring = ring[::-1] * [-1, 1]
+    return ring
 
 
 def _loft(shape, x0, x1, step, ease=0.0, ring=None):
@@ -111,5 +117,5 @@ def centre(step=0.015):
     return _loft(None, C_X0, C_X1, step, ease=0.6, ring=centre_ring)
 
 
-def pod(sgn, step=0.03):
-    return _loft(lambda x: pod_shape(x, sgn), P_X0, P_X1, step)
+def pod(sgn, step=0.02):
+    return _loft(None, P_X0, P_X1, step, ring=lambda x: pod_ring(x, sgn))

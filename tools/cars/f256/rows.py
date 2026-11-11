@@ -51,8 +51,10 @@ CENTRE = [
     (-1.78, 0.050, 0.300, 0.385, 0.040, 0.405),
 ]
 
-# sidepods, left side (mirrored for the right): x, inner y, outer y, bottom, top, corner radius
+# sidepods, left side (mirrored for the right): x, inner y, outer y, bottom, top, corner radius.
+# The first row runs ahead of the mouth, which parts.py rakes back.
 POD = [
+    (0.52, 0.15, 0.645, 0.150, 0.440, 0.055),
     (0.44, 0.15, 0.660, 0.140, 0.450, 0.060),
     (0.38, 0.15, 0.690, 0.110, 0.490, 0.075),
     (0.25, 0.15, 0.710, 0.095, 0.515, 0.090),
@@ -91,7 +93,7 @@ DRIVER = {"helmet": (0.10, 0.0, 0.700), "r": 0.135}
 AIRBOX = {"x": -0.20, "z0": 0.700, "z1": 0.890, "w": 0.075}           # intake above the helmet
 MIRROR = {"x": 0.52, "y": 0.50, "z": 0.640}
 
-PICKS = {}
+PICKS = {"frontbadge": 1}
 
 if __name__ == "__main__":
     out = {"name": "FerettiF256V8T", "centre": CENTRE, "pod": POD, "floor": FLOOR, "diffuser": DIFFUSER,
