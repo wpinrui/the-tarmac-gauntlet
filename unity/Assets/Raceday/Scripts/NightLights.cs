@@ -1,0 +1,200 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace TarmacGauntlet.Raceday
+{
+    /// <summary>
+    /// Switches the night lighting on as the sky darkens: the floodlights' lenses and pools, the stands' glow and every
+    /// car's lamps, all from the night amount of <see cref="SkyClock"/>. The ground is lit by the pools alone. Real
+    /// lights are kept for the cars near the camera, and light nothing but cars: a few spot lights hang at the
+    /// floodlights nearest the camera's view, and two more are the headlamps of the cars nearest the camera. A light
+    /// moving to another floodlight or car fades out first and back in there, so nothing pops.
+    /// </summary>
+    public sealed class NightLights : MonoBehaviour
+    {
+        public TimeOfDay Sky;
+        public Floodlights Layout;
+        public FloodMaterials Materials;
+        public StandMaterials Stands;
+
+        /// <summary>Real lights at floodlights, and at cars' headlamps.</summary>
+        public const int FloodSlots = 4, HeadSlots = 2;
+        /// <summary>Real seconds between looks at the sky and at where the camera is.</summary>
+        private const float Check = 0.25f;
+        /// <summary>A real light fades in or out over this long, real seconds.</summary>
+        private const float Fade = 0.35f;
+        /// <summary>The camera's view is centred this far ahead of it, m.</summary>
+        private const float FocusAhead = 30f;
+        /// <summary>Real lights only go to floodlights and cars nearer the view than this, m.</summary>
+        private const float FloodReach = 160f, HeadReach = 120f;
+        private const float FloodIntensity = 2.5f, HeadIntensity = 3f, HeadRange = 70f, HeadCone = 55f;
+
+        private sealed class Slot
+        {
+            public Light Light;
+            /// <summary>The floodlight or car the light is at, and the one it should move to; -1 for none.</summary>
+            public int At = -1, Want = -1;
+            public float Level;
+        }
+
+        private Slot[] floods, heads;
+        private float nextCheck, night = -1f;
+        private readonly List<int> picks = new List<int>();
+        private readonly List<float> scores = new List<float>();
+
+        private void Start()
+        {
+            floods = new Slot[FloodSlots];
+            heads = new Slot[HeadSlots];
+            for (int i = 0; i < floods.Length; i++) floods[i] = new Slot { Light = Spot("Floodlight " + (i + 1), Materials.Tint) };
+            for (int i = 0; i < heads.Length; i++) heads[i] = new Slot { Light = Spot("Headlamps " + (i + 1), LampMaterials.Shared.HeadTint) };
+        }
+
+        private Light Spot(string name, Color colour)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(transform, false);
+            Light l = go.AddComponent<Light>();
+            l.type = LightType.Spot;
+            l.renderMode = LightRenderMode.ForcePixel;
+            l.shadows = LightShadows.None;
+            l.cullingMask = 1 << CarBuilder.CarLayer;
+            l.color = colour;
+            l.enabled = false;
+            return l;
+        }
+
+        private void Update()
+        {
+            if (Sky == null || Layout == null) return;
+            if (Time.unscaledTime >= nextCheck)
+            {
+                nextCheck = Time.unscaledTime + Check;
+                float now = SkyClock.At(Sky.Hour, SkyClock.Look).Night;
+                if (Mathf.Abs(now - night) >= 0.005f)
+                {
+                    night = now;
+                    Materials.Night(night);
+                    LampMaterials.Shared.Night(night);
+                    Stands?.Night(night, Materials.Tint);
+                    bool beams = LampMaterials.Shared.BeamsOn;
+                    foreach (CarLamps c in CarLamps.All) c.ShowBeam(beams);
+                }
+                Assign();
+            }
+        }
+
+        private void LateUpdate()
+        {
+            if (floods == null) return;
+            float on = NightLook.On(Mathf.Max(night, 0f));
+            float step = Time.unscaledDeltaTime / Fade;
+            foreach (Slot s in floods) Follow(s, step, on * FloodIntensity, PlaceFlood);
+            foreach (Slot s in heads) Follow(s, step, on * HeadIntensity, PlaceHead);
+        }
+
+        /// <summary>Picks the floodlights and the cars the real lights should be at now.</summary>
+        private void Assign()
+        {
+            Camera cam = Camera.main;
+            bool dark = night > 0.01f && cam != null;
+            Vector3 eye = cam != null ? cam.transform.position : Vector3.zero;
+            Vector3 focus = cam != null ? eye + cam.transform.forward * FocusAhead : Vector3.zero;
+
+            picks.Clear();
+            scores.Clear();
+            if (dark)
+                for (int i = 0; i < Layout.Lights.Count; i++)
+                {
+                    float d = (Layout.Lights[i].Target - focus).sqrMagnitude;
+                    if (d < FloodReach * FloodReach) Insert(i, d, FloodSlots);
+                }
+            Share(floods, picks);
+
+            picks.Clear();
+            scores.Clear();
+            if (dark)
+                for (int i = 0; i < CarLamps.All.Count; i++)
+                {
+                    float d = (CarLamps.All[i].transform.position - eye).sqrMagnitude;
+                    if (d < HeadReach * HeadReach) Insert(i, d, HeadSlots);
+                }
+            Share(heads, picks);
+        }
+
+        /// <summary>Keeps the nearest few: inserts index i at score d, dropping the worst past the limit.</summary>
+        private void Insert(int i, float d, int limit)
+        {
+            int at = scores.Count;
+            while (at > 0 && scores[at - 1] > d) at--;
+            if (at >= limit) return;
+            scores.Insert(at, d);
+            picks.Insert(at, i);
+            if (scores.Count > limit)
+            {
+                scores.RemoveAt(limit);
+                picks.RemoveAt(limit);
+            }
+        }
+
+        /// <summary>Lights already at a pick stay there; the others take the picks left over, or go out.</summary>
+        private static void Share(Slot[] slots, List<int> wanted)
+        {
+            var left = new List<int>(wanted);
+            foreach (Slot s in slots)
+                if (s.At >= 0 && left.Remove(s.At)) s.Want = s.At;
+                else s.Want = -2;
+            foreach (Slot s in slots)
+            {
+                if (s.Want != -2) continue;
+                if (left.Count > 0) { s.Want = left[0]; left.RemoveAt(0); }
+                else s.Want = -1;
+            }
+        }
+
+        private delegate bool Place(Slot s);
+
+        /// <summary>Fades a light out from where it is, moves it, and fades it in at its new place.</summary>
+        private static void Follow(Slot s, float step, float full, Place place)
+        {
+            if (s.Want != s.At)
+            {
+                s.Level = Mathf.Max(0f, s.Level - step);
+                if (s.Level <= 0f) s.At = s.Want;
+            }
+            else if (s.At >= 0) s.Level = Mathf.Min(1f, s.Level + step);
+            bool lit = s.At >= 0 && s.Level > 0f && full > 0f && place(s);
+            if (!lit)
+            {
+                if (s.Light.enabled) s.Light.enabled = false;
+                return;
+            }
+            s.Light.intensity = full * s.Level;
+            if (!s.Light.enabled) s.Light.enabled = true;
+        }
+
+        private bool PlaceFlood(Slot s)
+        {
+            if (s.At >= Layout.Lights.Count) return false;
+            Floodlight f = Layout.Lights[s.At];
+            Transform t = s.Light.transform;
+            t.SetPositionAndRotation(f.Position, Quaternion.LookRotation(f.Aim));
+            s.Light.range = f.Reach * 1.6f + 10f;
+            s.Light.spotAngle = f.Cone;
+            s.Light.innerSpotAngle = f.Cone * 0.6f;
+            return true;
+        }
+
+        private bool PlaceHead(Slot s)
+        {
+            if (s.At >= CarLamps.All.Count) return false;
+            CarLamps car = CarLamps.All[s.At];
+            Transform c = car.transform;
+            s.Light.transform.SetPositionAndRotation(c.TransformPoint(car.Nose), c.rotation * Quaternion.Euler(4f, 0f, 0f));
+            s.Light.range = HeadRange;
+            s.Light.spotAngle = HeadCone;
+            s.Light.innerSpotAngle = HeadCone * 0.5f;
+            return true;
+        }
+    }
+}
