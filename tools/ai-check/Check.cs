@@ -198,6 +198,8 @@ static partial class Check
             SuppliesCheck(verbose: true);
             return failed ? 1 : 0;
         }
+        if (args.Length > 1 && args[1] == "pack") { PackRace(); return 0; }
+        if (args.Length > 1 && args[1] == "perf") { PerfStart(); return 0; }
         if (args.Length > 1 && args[1] == "race")
         {
             RacePack(args.Length > 2 ? int.Parse(args[2]) : 4, verbose: true, reversed: Environment.GetEnvironmentVariable("AI_REVERSED") != null);

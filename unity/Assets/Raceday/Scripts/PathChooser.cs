@@ -168,6 +168,10 @@ namespace TarmacGauntlet.Raceday
         /// <summary>One path tried: where it heads, how it uses the pedals, and the limit that threw it out, if any.</summary>
         public sealed class Candidate
         {
+            /// <summary>Where it was made in the plan: the lane index, below 0 for staying, holding or owing.</summary>
+            internal int Wave;
+            /// <summary>For the same move made later, the path it is a later copy of.</summary>
+            internal Candidate Of;
             public float Shift;
             public Pedal Pedal;
             /// <summary>Seconds it stays where it is across the track before it moves: staying in the tow until the last safe moment.</summary>
@@ -249,6 +253,24 @@ namespace TarmacGauntlet.Raceday
         private bool fixedOn;
         private float fixedLat;
         private readonly List<float> fixedLats = new List<float>();
+        private readonly List<Candidate> baseCands = new List<Candidate>(), laterCands = new List<Candidate>();
+        /// <summary>Paths driven on worker threads; 0 drives every path on the calling thread, for comparing.</summary>
+        private static readonly bool ParallelPaths = Knob("PARALLEL", 1f) > 0f;
+
+        /// <summary>
+        /// Drives every path in the list. A path writes only to itself and reads what this plan gathered,
+        /// so the threads change nothing but how long it takes.
+        /// </summary>
+        private void SimulateAll(List<Candidate> cands, AiPilot pilot, TrafficCar me, int ahead, int nextTurn, float margin,
+            float brakes, float riskWeight, float passCost, float freeSpeed)
+        {
+            if (!ParallelPaths || cands.Count < 4)
+            {
+                foreach (Candidate cand in cands) Simulate(pilot, me, cand, ahead, nextTurn, margin, brakes, riskWeight, passCost, freeSpeed);
+                return;
+            }
+            System.Threading.Tasks.Parallel.For(0, cands.Count, i => Simulate(pilot, me, cands[i], ahead, nextTurn, margin, brakes, riskWeight, passCost, freeSpeed));
+        }
 
         /// <summary>Picks a path if it is time to, and returns whether it did.</summary>
         public bool Plan(AiPilot pilot, TrafficCar me, IReadOnlyList<TrafficCar> field, float dt)
@@ -391,6 +413,9 @@ namespace TarmacGauntlet.Raceday
             bool far = DefendLate > 0f ? movePhase == 1 || -attackerGap > tail : -attackerGap < DefendWithin * Mathf.Max(mySpeed, 1f) && -attackerGap > DefendFrom;
             bool cover = Defend > 0f && defending && !exempt && !zone && movePhase != 2 && coverTurn != 0 && late && far;
             float CoverBonus(float shift) => cover ? Defend * Mathf.Clamp01(-coverTurn * shift / DefendCover) : 0f;
+            // The paths are made first, driven together (H-limits and scores need nothing from each other), then
+            // weighed in the order they were made, so the choice is the same however many threads drive them.
+            baseCands.Clear();
             for (int s = owedNear ? -3 : -2; s < shifts.Length; s++)
                 for (int p = 0; p < pedals; p++)
                 {
@@ -406,43 +431,33 @@ namespace TarmacGauntlet.Raceday
                     else if (fastBehind && away && (!CloseLeave || float.IsPositiveInfinity(closeDepth) || Mathf.Sign(cand.Shift - myOffset) == Mathf.Sign(fastLateral - me.Lateral))) cand.Rejected = "H6";
                     else if (defending && !exempt && zone && blocks) cand.Rejected = "H5";
                     else if (defending && !exempt && !zone && away && (movePhase == 2 || movePhase == 1 && Mathf.Sign(cand.Shift - myOffset) != moveDir)) cand.Rejected = "H4";
-                    Simulate(pilot, me, cand, ahead, nextTurn, margin, brakes, riskWeight, passCost, freeSpeed);
-                    // H2, T20: diving with no claim, it backs out all the way: braking is the only path, until it is behind (Ivan).
-                    if (DiveCommit && diving && cand.Pedal != Pedal.Brake && cand.Rejected == null) cand.Rejected = "H8";
-                    // A little against changing its mind, so it doesn't dither between two near-equal paths.
-                    cand.Score -= (zone ? hyst + ZoneHyst : hyst) * LineChange(cand.Shift, lastShift) + (cand.Pedal != lastPedal ? 0.01f : 0f) + offLine * Mathf.Abs(cand.Shift);
-                    // Changing sides of the car ahead mid-move weaves across the cars behind: only for a clearly better path.
-                    if (Mathf.Abs(cand.Shift) > 1f && Mathf.Abs(lastShift) > 1f && Mathf.Sign(cand.Shift) != Mathf.Sign(lastShift)) cand.Score -= SideSwitch;
-                    cand.Score += CoverBonus(cand.Shift) - AltCost(cand.Stay ? myOffset : cand.Owe ? 0f : cand.Shift);
-                    // Once braking for a car in the braking zone, it stays on the brakes rather than flick back on the throttle.
-                    if (zone && lastPedal == Pedal.Brake && cand.Pedal == Pedal.Go) cand.Score -= ZoneSwitch;
-                    Candidates.Add(cand);
-                    // The same move later, flat out: in the tow until then.
-                    if (s < 0 || cand.Pedal != Pedal.Go || pilot.Gliding || Mathf.Abs(cand.Shift - myOffset) < 0.5f) continue;
-                    // Waiting in the tow is only for a car at full throttle: held below it, it pulls out at once (Ivan).
-                    if (NoWait && pilot.HeldBy > 0.5f) continue;
-                    foreach (float wait in Delays)
-                    {
-                        var later = new Candidate { Shift = cand.Shift, Pedal = Pedal.Go, Delay = wait };
-                        if (lapped && !zone && Mathf.Abs(later.Shift) < 1.5f) later.Rejected = "H9";
-                        else later.Rejected = cand.Rejected;
-                        Simulate(pilot, me, later, ahead, nextTurn, margin, brakes, riskWeight, passCost, freeSpeed);
-                        later.Score -= (zone ? hyst + ZoneHyst : hyst) * LineChange(later.Shift, lastShift) + offLine * Mathf.Abs(later.Shift);
-                        later.Score += CoverBonus(later.Shift) - Mathf.Max(AltCost(later.Shift), AltCost(myOffset));   // it holds where it is meanwhile
-                        Candidates.Add(later);
-                    }
-                    // In the tow on a straight, of near-equal moves the later one wins, while a still later one
-                    // is open too: the car moves out at its last safe moment with a step in hand, as it lags its plan.
-                    // Only a move off the line waits: a move back to it is made at once.
-                    // Where it ends up, not the lane it aims for: a lane past the track's edge is the edge (T8).
-                    if (!defending && !zone && (EndWait ? Mathf.Abs(cand.EndOff) > Mathf.Abs(myOffset) + 0.25f : Mathf.Abs(cand.Shift) > Mathf.Abs(myOffset)))
-                        for (int i = Candidates.Count - Delays.Length; i < Candidates.Count - 1; i++)
-                            if (Candidates[i + 1].Rejected == null) Candidates[i].Score += LateBonus * Candidates[i].Delay;
+                    cand.Wave = s;
+                    baseCands.Add(cand);
                 }
+            SimulateAll(baseCands, pilot, me, ahead, nextTurn, margin, brakes, riskWeight, passCost, freeSpeed);
+
+            // The same moves later, flat out, in the tow until then: each starts from its own path's verdict.
+            laterCands.Clear();
+            foreach (Candidate cand in baseCands)
+            {
+                // H2, T20: diving with no claim, it backs out all the way: braking is the only path, until it is behind (Ivan).
+                if (DiveCommit && diving && cand.Pedal != Pedal.Brake && cand.Rejected == null) cand.Rejected = "H8";
+                if (cand.Wave < 0 || cand.Pedal != Pedal.Go || pilot.Gliding || Mathf.Abs(cand.Shift - myOffset) < 0.5f) continue;
+                // Waiting in the tow is only for a car at full throttle: held below it, it pulls out at once (Ivan).
+                if (NoWait && pilot.HeldBy > 0.5f) continue;
+                foreach (float wait in Delays)
+                {
+                    var later = new Candidate { Shift = cand.Shift, Pedal = Pedal.Go, Delay = wait, Of = cand };
+                    if (lapped && !zone && Mathf.Abs(later.Shift) < 1.5f) later.Rejected = "H9";
+                    else later.Rejected = cand.Rejected;
+                    laterCands.Add(later);
+                }
+            }
 
             // H1, T9: paths at fixed places across the track, beside each car ahead and by both edges. Where the
             // racing line runs diagonally across the track, every lane off it crosses the cars ahead too, while
             // the track beside them is open: pick a side and go, all the way to the edge if need be (Ivan).
+            int fixedFrom = laterCands.Count;
             if (FixedLanes && !pilot.Gliding && !defending && !lapped && !recovering && !owedNear && !BrakingZone(pilot))
             {
                 fixedLats.Clear();
@@ -464,11 +479,45 @@ namespace TarmacGauntlet.Raceday
                     if (dup) continue;
                     var fixedCand = new Candidate { Fixed = true, Lat = fl, Shift = fl - lineHere, Pedal = Pedal.Go };
                     if (fastBehind && Mathf.Abs(fixedCand.Shift) > Mathf.Abs(myOffset) + 0.3f && (!CloseLeave || float.IsPositiveInfinity(closeDepth) || Mathf.Sign(fixedCand.Shift - myOffset) == Mathf.Sign(fastLateral - me.Lateral))) fixedCand.Rejected = "H6";
-                    Simulate(pilot, me, fixedCand, ahead, nextTurn, margin, brakes, riskWeight, passCost, freeSpeed);
-                    fixedCand.Score -= (zone ? hyst + ZoneHyst : hyst) * LineChange(fixedCand.Shift, lastShift) + 0.01f + offLine * Mathf.Abs(fixedCand.Shift);
-                    if (Mathf.Abs(fixedCand.Shift) > 1f && Mathf.Abs(lastShift) > 1f && Mathf.Sign(fixedCand.Shift) != Mathf.Sign(lastShift)) fixedCand.Score -= SideSwitch;
-                    Candidates.Add(fixedCand);
+                    laterCands.Add(fixedCand);
                 }
+            }
+            SimulateAll(laterCands, pilot, me, ahead, nextTurn, margin, brakes, riskWeight, passCost, freeSpeed);
+
+            // Weighed in the order made.
+            int li = 0;
+            foreach (Candidate cand in baseCands)
+            {
+                // A little against changing its mind, so it doesn't dither between two near-equal paths.
+                cand.Score -= (zone ? hyst + ZoneHyst : hyst) * LineChange(cand.Shift, lastShift) + (cand.Pedal != lastPedal ? 0.01f : 0f) + offLine * Mathf.Abs(cand.Shift);
+                // Changing sides of the car ahead mid-move weaves across the cars behind: only for a clearly better path.
+                if (Mathf.Abs(cand.Shift) > 1f && Mathf.Abs(lastShift) > 1f && Mathf.Sign(cand.Shift) != Mathf.Sign(lastShift)) cand.Score -= SideSwitch;
+                cand.Score += CoverBonus(cand.Shift) - AltCost(cand.Stay ? myOffset : cand.Owe ? 0f : cand.Shift);
+                // Once braking for a car in the braking zone, it stays on the brakes rather than flick back on the throttle.
+                if (zone && lastPedal == Pedal.Brake && cand.Pedal == Pedal.Go) cand.Score -= ZoneSwitch;
+                Candidates.Add(cand);
+                if (li >= fixedFrom || laterCands[li].Of != cand) continue;
+                for (; li < fixedFrom && laterCands[li].Of == cand; li++)
+                {
+                    Candidate later = laterCands[li];
+                    later.Score -= (zone ? hyst + ZoneHyst : hyst) * LineChange(later.Shift, lastShift) + offLine * Mathf.Abs(later.Shift);
+                    later.Score += CoverBonus(later.Shift) - Mathf.Max(AltCost(later.Shift), AltCost(myOffset));   // it holds where it is meanwhile
+                    Candidates.Add(later);
+                }
+                // In the tow on a straight, of near-equal moves the later one wins, while a still later one
+                // is open too: the car moves out at its last safe moment with a step in hand, as it lags its plan.
+                // Only a move off the line waits: a move back to it is made at once.
+                // Where it ends up, not the lane it aims for: a lane past the track's edge is the edge (T8).
+                if (!defending && !zone && (EndWait ? Mathf.Abs(cand.EndOff) > Mathf.Abs(myOffset) + 0.25f : Mathf.Abs(cand.Shift) > Mathf.Abs(myOffset)))
+                    for (int i = Candidates.Count - Delays.Length; i < Candidates.Count - 1; i++)
+                        if (Candidates[i + 1].Rejected == null) Candidates[i].Score += LateBonus * Candidates[i].Delay;
+            }
+            for (int i = fixedFrom; i < laterCands.Count; i++)
+            {
+                Candidate fixedCand = laterCands[i];
+                fixedCand.Score -= (zone ? hyst + ZoneHyst : hyst) * LineChange(fixedCand.Shift, lastShift) + 0.01f + offLine * Mathf.Abs(fixedCand.Shift);
+                if (Mathf.Abs(fixedCand.Shift) > 1f && Mathf.Abs(lastShift) > 1f && Mathf.Sign(fixedCand.Shift) != Mathf.Sign(lastShift)) fixedCand.Score -= SideSwitch;
+                Candidates.Add(fixedCand);
             }
 
             Candidate best = null;
@@ -643,6 +692,8 @@ namespace TarmacGauntlet.Raceday
             bool onTrack = OnTrack(c, me.Lateral, me.Distance);
             float turnIn = NextCornerStart(c, Mathf.Repeat(d, lap));
             bool turnedIn = false;
+            // Where the checks against each car below stop reaching, behind and ahead (ahead, plus the margin and headway kept).
+            float farBehind = -CarL - Mathf.Max(SwipeGap, 3f) - 0.01f, farAhead = CarL + 15f + 0.01f;
             cand.Path[0] = new Vector2(d, lat);
             // A path ruled out before it is driven breaks its limit at once: last in line when every path breaks one (T9).
             cand.BrokeAt = PreBreak && cand.Rejected != null ? 0 : Steps + 1;
@@ -720,8 +771,17 @@ namespace TarmacGauntlet.Raceday
                     float g = Road(od[j, s] - d, lap);
                     // A stopped ghost with no way round: slowed to a crawl, this car may pass through it (H12's safety net).
                     if (stopped[j] && v < GhostCrawl) continue;
+                    // Too far behind for any limit or risk below to reach it: the same result, sooner.
+                    if (g <= farBehind) continue;
                     float side = ol[j, s] - lat;
                     float apart = Mathf.Abs(side);
+                    // Too far ahead for any limit below: only the risk of closing on it in its lane is left.
+                    if (g >= farAhead + margin + headway * v && !stopped[j])
+                    {
+                        float closingFar = v - ov[j, s];
+                        if (apart < CarW + RoomMargin && closingFar > 0.5f) risk += CloseRisk * Mathf.Exp(-Mathf.Max(g - CarL, 0f) / closingFar) * Tick;
+                        continue;
+                    }
                     // H1: never into a car ahead or alongside, with a margin kept: a passing margin past a
                     // car ahead, a little less beside one. A car already closer than that must not get closer.
                     float need = (g > 0.7f * CarL ? Clear(margin) : CarW + AlongsideGap) + reach[j] - 0.5f * CarW;
