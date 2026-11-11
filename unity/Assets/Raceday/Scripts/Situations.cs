@@ -377,6 +377,22 @@ namespace TarmacGauntlet.Raceday
                     new SituationCar { Model = "b-24", Ahead = 15f, Speed = 285f, Seed = 2 },
                 },
             },
+            // Same model, nose to tail onto the back straight. The paces give the first car a solo lap
+            // 1.5% (a, c) or 0.5% (b, d) quicker: F1's 1.5 s a lap that lets a car pass, scaled to the lap.
+            T20("T20a", "a-29", 70.75f, 350f),
+            T20("T20b", "a-29", 90f, 350f),
+            T20("T20c", "f-01", 50.75f, 610f),
+            T20("T20d", "f-01", 82.5f, 610f),
+        };
+
+        private static Situation T20(string id, string model, float slowPace, float seconds) => new Situation
+        {
+            Id = id, Title = $"same model, {(slowPace < 80f ? "1.5" : "0.5")}% quicker, {model}", At = 2960f, Seconds = seconds,
+            Cars = new[]
+            {
+                new SituationCar { Model = model, Pace = 100f },
+                new SituationCar { Model = model, Ahead = 12f, Pace = slowPace, Seed = 2 },
+            },
         };
 
         /// <summary>The set-up with this id, or null.</summary>

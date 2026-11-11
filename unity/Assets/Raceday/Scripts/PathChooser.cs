@@ -87,6 +87,8 @@ namespace TarmacGauntlet.Raceday
         public static readonly float SideImminent = Knob("SIDEGAP", 0.5f);
         public static readonly bool SideOweOnly = Knob("SIDEOWE", 1f) > 0f;
         public static readonly bool SideInside = Knob("SIDEIN", 1f) > 0f;
+        /// <summary>H2, H3: in a turn the side steering may never steer a car out of the corner, at most hold its heading (Ivan).</summary>
+        public static readonly bool SideNoReverse = Knob("SIDEHOLD", 1f) > 0f;
         private static readonly bool InsideRaces = Knob("INSIDERACES", 0f) > 0f;
         /// <summary>Seconds of score per second spent lifting or braking for a car ahead below its lane's speed.</summary>
         private static readonly float LiftCost = Knob("LIFT", 0.1f);

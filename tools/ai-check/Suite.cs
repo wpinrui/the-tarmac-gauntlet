@@ -630,6 +630,21 @@ static partial class Check
                 float score = hits > 0 || off ? 0f : Math.Min(Scale(-closest, -NoseMargin, 0f), Scale(gapIn, 15f, 40f));
                 return (score, $"closest nose to tail {closest:0.0} m, {gapIn:0.0} m behind at turn-in, {(off ? "off the track, " : "")}{hits} contacts");
             }
+            case "T20a":
+            case "T20b":
+            case "T20c":
+            case "T20d":
+            {
+                // Same model, the first car quicker: passes cleanly within 3 laps when 1.5% quicker (a, c),
+                // and may stay behind when only 0.5% quicker (b, d). A pass counts once it stays ahead.
+                float lap = run.Race.Racers[0].Pilot.Profile.LapTime;
+                Frame pass = null;
+                foreach (Frame f in fs)
+                    if (run.Gap(f, 0, 1) < -CarL) pass ??= f; else pass = null;
+                bool must = run.S.Id == "T20a" || run.S.Id == "T20c";
+                float score = pass == null ? (must ? 0f : 100f) : must ? 60f + 0.4f * Scale(pass.T, lap, 3f * lap) : 100f;
+                return (score, pass == null ? "stayed behind" : $"passed at {pass.T:0} s, lap {pass.T / lap + 1f:0.0}, at {run.At(pass, 0):0} m");
+            }
         }
         return (0f, "no score");
     }
@@ -821,7 +836,9 @@ static partial class Check
         };
         if (Environment.GetEnvironmentVariable("PILE_LOG") == "1") foreach (string p in piles.PileUps) Console.WriteLine("PILE " + p);
         if (lapped) m.Add(loss.LappedLost / carHours);
-        return new RaceResult { Measures = m.ToArray(), Line = $"A place {race.Racers.Count(x => x.Distance > a.Distance) + 1}, A laps {a.Laps}, {race.PassCount} passes" };
+        // Same-class passes with no contact for either car from 5 s before to 2 s after: reported, not scored.
+        int cleanClass = race.ClassPasses.Count(p => !race.Contacts.Any(c => c.Time > p.Time - 5f && c.Time < p.Time + 2f && (c.A == p.By || c.B == p.By || c.A == p.Of || c.B == p.Of)));
+        return new RaceResult { Measures = m.ToArray(), Line = $"A place {race.Racers.Count(x => x.Distance > a.Distance) + 1}, A laps {a.Laps}, {race.PassCount} passes, {cleanClass / carHours:0.00} clean same-class passes /car-hour ({cleanClass} of {race.ClassPasses.Count})" };
     }
 
     /// <summary>The game's full field: the season's roster by class, quickest class first, the A car at the back.</summary>
