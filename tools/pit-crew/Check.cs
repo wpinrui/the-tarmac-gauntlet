@@ -16,6 +16,8 @@
 //   home after              25 s after the car is released everyone is back at their spot in the garage, idle,
 //                           and the crew rests
 //   out of the fast lane    no one steps into the fast lane, where cars pass the boxes at the limiter
+//   clear of passing cars   a car driving to or from any other box, or along the fast lane, keeps at least 0.5 m
+//                           from every place a crew works a job round a car standing in its box (0.25 m round them)
 //
 // TRACE="<a stop as a failure names it>" WHO=<person, from 1> prints that person through that stop.
 using System;
@@ -40,6 +42,12 @@ static class Check
     static readonly List<(float bad, string where)> notHome = new List<(float, string)>();
     static readonly List<(float bad, string where)> inFastLane = new List<(float, string)>();
     static int stops, people, jobs;
+    const float PassGap = 0.5f;
+    const float PassLength = 5.2f, PassWidth = 2.0f;   // the biggest car the stops are run with
+    // Per garage, every place its crew work a job at a stop, world x and z on a 5 cm grid.
+    static readonly Dictionary<int, HashSet<(int, int)>> workedAt = new Dictionary<int, HashSet<(int, int)>>();
+    static readonly List<(float bad, string where)> passing = new List<(float, string)>();
+    static float closestPass = float.MaxValue;
 
     /// <summary>One stop to run: its work and the car's way in and out.</summary>
     struct Stop
@@ -90,10 +98,13 @@ static class Check
                 }
             }
 
+        Passing(circuit, lane);
+
         Report("never through the car", throughCar, $"{stops} stops, {people} people", "m into the car");
         Report("at each job in its time", late, $"{jobs} jobs", "");
         Report("home after", notHome, $"{people} people home", "");
         Report("out of the fast lane", inFastLane, $"its edge {-fast:0.00} m out from the box's middle", "m into it");
+        Report("clear of passing cars", passing, $"closest {closestPass:0.00} m", "m short");
         return failed ? 1 : 0;
     }
 
@@ -191,6 +202,14 @@ static class Check
             }
         }
         clock.Elapsed = duration;
+        // Where each job is worked, for the check on passing cars.
+        if (!workedAt.TryGetValue(g, out HashSet<(int, int)> at)) workedAt[g] = at = new HashSet<(int, int)>();
+        foreach (CrewMember m in crew.People)
+            foreach (CrewTask task in m.Tasks)
+            {
+                Vector3 w = crew.World(crew.PlaceOf(task).at);
+                at.Add((Mathf.RoundToInt(w.x * 20f), Mathf.RoundToInt(w.z * 20f)));
+            }
 
         // Each job: there on time and working most of it; each of several wheels worked inside the tyre time.
         for (int p = 0; p < crew.People.Length; p++)
@@ -243,6 +262,62 @@ static class Check
         if (worstDepth > 0f) throughCar.Add((worstDepth, tag + ": " + worstWho));
         if (worstLane > 0f) inFastLane.Add((worstLane, tag + ": " + laneWho));
     }
+
+    /// <summary>
+    /// Drives the biggest car along the routes to and from the nearby boxes and along the fast lane, past each garage's
+    /// box, and finds how close its outline comes to any place its crew work a job round the car standing there.
+    /// </summary>
+    static void Passing(Circuit circuit, PitLane lane)
+    {
+        var from = new RacingLine(circuit);
+        var routes = new Dictionary<int, RacingLine>();
+        RacingLine RouteOf(int h) => routes.TryGetValue(h, out RacingLine r) ? r : routes[h] = lane.Route(from, h);
+        float hl = PassLength * 0.5f, hw = PassWidth * 0.5f;
+        foreach (KeyValuePair<int, HashSet<(int, int)>> kv in workedAt)
+        {
+            int g = kv.Key;
+            Vector2[] places = kv.Value.Select(q => new Vector2(q.Item1 / 20f, q.Item2 / 20f)).ToArray();
+            Vector3 box = lane.BoxPoint(g), left = lane.LaneLeft(lane.BoxLane[g]);
+            // A point in the box's frame: metres along the lane and across it, towards the garages.
+            Vector2 Local(float x, float z) => new Vector2((x - box.x) * left.z - (z - box.z) * left.x, (x - box.x) * left.x + (z - box.z) * left.z);
+            float worst = float.MaxValue;
+            string who = "";
+            var others = new List<int> { -1 };
+            for (int h = Mathf.Max(g - 4, 0); h <= Mathf.Min(g + 4, lane.Garages - 1); h++) if (h != g) others.Add(h);
+            foreach (int h in others)
+            {
+                RacingLine r = RouteOf(h);
+                int n = r.Count;
+                for (int k = 0; k < n; k++)
+                {
+                    Vector3 a = r.Point[k], b = r.Point[(k + 1) % n];
+                    if (Flat(a - box).magnitude > 45f) continue;
+                    // The car points the way the route runs here.
+                    Vector3 f3 = Flat(b - a).normalized;
+                    var fwd = new Vector2(f3.x, f3.z);
+                    var side = new Vector2(-fwd.y, fwd.x);
+                    for (int q = 0; q < 8; q++)
+                    {
+                        Vector3 c = Vector3.Lerp(a, b, q / 8f);
+                        foreach (Vector2 p in places)
+                        {
+                            Vector2 d = p - new Vector2(c.x, c.z);
+                            float da = Mathf.Abs(Vector2.Dot(d, fwd)) - hl, db = Mathf.Abs(Vector2.Dot(d, side)) - hw;
+                            float gap = (da > 0f && db > 0f ? Mathf.Sqrt(da * da + db * db) : Mathf.Max(da, db)) - Reach;
+                            if (gap >= worst) continue;
+                            worst = gap;
+                            Vector2 u = Local(p.x, p.y), v = Local(c.x, c.z);
+                            who = $"{(h < 0 ? "the fast lane" : $"garage {h + 1}'s route")}, crew at ({u.x:0.0}, {u.y:0.0}), car at ({v.x:0.0}, {v.y:0.0}) along and across the lane";
+                        }
+                    }
+                }
+            }
+            closestPass = Mathf.Min(closestPass, worst);
+            if (worst < PassGap) passing.Add((PassGap - worst, $"garage {g + 1}'s crew, {who}, {worst:0.00} m away"));
+        }
+    }
+
+    static Vector3 Flat(Vector3 v) => new Vector3(v.x, 0f, v.z);
 
     /// <summary>The car on its route at lane sample i, in the box's frame, into the clock.</summary>
     static void Car(GarageCrew crew, PitLane lane, MethodInfo across, int g, float i, float speed, ref StopClock clock)
