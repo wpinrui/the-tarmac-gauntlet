@@ -134,7 +134,8 @@ turning with the distance travelled. In the game, the hub menu (Garage then Offi
 condition beside its bay, and the Race button. A screen opens as one panel docked right, with the menu collapsed to
 an icon strip; Q and E cycle screens and clicking the open screen's icon goes back to the hub. Escape closes a
 screen, and on the hub opens Resume, Settings, Quit to main menu and Quit game. Every change of screen calls
-`HqCamera.Show`. Screens are empty: fill one from `Menus.ScreenOpened(slug, body)`.
+`HqCamera.Show`. Screens are empty: fill one from `Menus.ScreenOpened(slug, body)`. Every menu icon in `Resources/MenuIcons` except the team badge is a Tabler outline icon (MIT, https://tabler.io/icons),
+rendered white at 96px so USS can tint it.
 
 The frosted glass is `MenuGlass.cs`: `GlassBackdrop` on the camera keeps a quarter size copy of the scene blurred
 and saturated (`Resources/MenuGlassBlur.shader`), and every glass panel shows its own slice of it under a white sheen.

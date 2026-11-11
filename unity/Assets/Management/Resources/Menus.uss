@@ -31,6 +31,9 @@
 .item { width: 272px; height: 40px; padding-left: 16px; padding-right: 16px; border-radius: 12px; font-size: 15px; letter-spacing: 0.9px; -unity-text-align: middle-left; }
 .item:hover { background-color: rgba(255, 255, 255, 0.1); }
 .item.on { background-color: rgba(255, 255, 255, 0.2); }
+.hub-item { padding-left: 50px; }
+.item-icon { position: absolute; left: 16px; top: 10px; width: 20px; height: 20px; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.75); }
+.item:hover .item-icon, .item.on .item-icon { -unity-background-image-tint-color: rgb(255, 255, 255); }
 
 /* Icon strip */
 .strip { position: absolute; left: 32px; top: 112px; padding: 8px; }
