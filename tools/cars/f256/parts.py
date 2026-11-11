@@ -628,8 +628,8 @@ def options(ref):
     """The colour badge on top of the nose and on each side wall ahead of the sidepod mouths,
     as the one option opt_frontbadge_1_<i>. Each lies flat on its panel."""
     back = (-1, 0, 0)     # a nose badge reads from ahead: its top faces the driver
-    obs = badge(ref, "colour", 0.09, top_fr(), 1.95, 0, back, "fb")
-    obs += mirrored(lambda s, _l: badge(ref, "colour", 0.10, side_fr(s), 0.75, 0.42, (0, 0, 1), "fb"))
+    obs = badge(ref, "colour", 0.09, top_fr(), 2.28, 0, back, "fb")
+    obs += mirrored(lambda s, _l: badge(ref, "colour", 0.18, side_fr(s), 0.74, 0.36, (0, 0, 1), "fb"))
     for i, ob in enumerate(obs):
         ob.name = f"opt_frontbadge_1_{i}"
     return obs
