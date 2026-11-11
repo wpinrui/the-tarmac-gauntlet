@@ -23,7 +23,7 @@ namespace TarmacGauntlet.Management
         public const string HubScene = "TeamHq";
 
         /// <summary>Skill points a new career starts with, and what each race adds.</summary>
-        private const int StartingPoints = 15, PointsPerRace = 3, MaxSkill = 20;
+        internal const int PointsPerRace = 3, MaxSkill = 20;
 
         private static readonly Color[] DriverColours =
         {
@@ -31,7 +31,7 @@ namespace TarmacGauntlet.Management
             new Color32(0xc5, 0x8c, 0xff, 0xff), new Color32(0x3d, 0xdc, 0x84, 0xff),
         };
 
-        private static readonly (PlayerSkillType Type, string Name, string Tip)[] Skills =
+        internal static readonly (PlayerSkillType Type, string Name, string Tip)[] Skills =
         {
             (PlayerSkillType.Driver, "Driver", "Your own driving. All five of your driver stats are this level times 5."),
             (PlayerSkillType.Engineer, "Engineer", "Shorter pit stops, and the car loses condition more slowly in a race."),
@@ -110,7 +110,7 @@ namespace TarmacGauntlet.Management
             GameState game = GameSession.State;
             PlayerTeam p = Player;
             if (game == null || p == null) return 0;
-            int earned = StartingPoints + PointsPerRace * game.RaceHistory.Count;
+            int earned = GameInit.StartingSkillPoints - p.ForfeitedSkillPoints + PointsPerRace * game.RaceHistory.Count;
             int spent = p.Skills.Driver + p.Skills.Engineer + p.Skills.Business;
             int room = 3 * MaxSkill - spent;
             return Math.Max(0, Math.Min(earned - spent, room));

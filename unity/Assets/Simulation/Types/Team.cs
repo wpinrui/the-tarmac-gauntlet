@@ -38,8 +38,11 @@ namespace TarmacGauntlet.Simulation
     {
         public string PlayerName { get; init; } = "";
         public string Nationality { get; init; } = ""; // ISO 3166-1 alpha-2 country code
-        public string? Logo { get; init; }             // Data URL or asset path
+        public string? Logo { get; init; }             // Data URL or asset path; a badge shape id from new game
+        public string TeamColour { get; init; } = "";  // #rrggbb, picked at new game
         public PlayerSkills Skills { get; init; } = new PlayerSkills();
+        /// <summary>Starting skill points left unspent at new game. They are gone for good.</summary>
+        public int ForfeitedSkillPoints { get; init; }
         public int SpareParts { get; init; }           // Consumable units carried over
         public int TyreSets { get; init; }             // Tyre sets carried over
         public IReadOnlyList<TransactionRecord> Transactions { get; init; } = Array.Empty<TransactionRecord>();

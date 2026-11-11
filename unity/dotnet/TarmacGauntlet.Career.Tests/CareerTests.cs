@@ -24,6 +24,15 @@ namespace TarmacGauntlet.Career.Tests
             return r.NextDouble;
         }
 
+        [Test]
+        public void InfoCarriesTheBadge()
+        {
+            GameSession.NewCareer(Options with { Logo = "bolt", TeamColour = "#3aa0ff" }, Seeded(8));
+            CareerInfo info = GameSession.Store.Latest()!;
+            Assert.That(info.Logo, Is.EqualTo("bolt"));
+            Assert.That(info.TeamColour, Is.EqualTo("#3aa0ff"));
+        }
+
         [SetUp]
         public void SetUp()
         {
