@@ -5,7 +5,7 @@ using UnityEngine;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// Builds the circuit, the country round it (<see cref="Landscape"/>), the sky and its sun (<see cref="TimeOfDay"/>), the career's field and the cameras when the scene starts. The
+    /// Builds the circuit, the country round it (<see cref="Landscape"/>), the trackside furniture (<see cref="Trackside"/>), the sky and its sun (<see cref="TimeOfDay"/>), the career's field and the cameras when the scene starts. The
     /// field is every team with a car, from <see cref="RaceWeekend.Setup"/>, gridded by prestige: each
     /// car on a full tank and new tyres, its starting driver at the wheel. Run on its own, the scene
     /// makes a new career in which the player owns the Cheonma. The <see cref="RaceDirector"/> keeps
@@ -73,7 +73,8 @@ namespace TarmacGauntlet.Raceday
             var materials = new CircuitMaterials();
             var builder = new CircuitBuilder(circuit, materials);
             List<CircuitPart> parts = builder.Build();
-            parts.AddRange(new Grandstands(circuit, builder, new StandMaterials(StandLook.Colours), StandLook.Main, StandLook.Corners).Build());
+            var stands = new Grandstands(circuit, builder, new StandMaterials(StandLook.Colours), StandLook.Main, StandLook.Corners);
+            parts.AddRange(stands.Build());
             foreach (CircuitPart part in parts) AddPart(track.transform, part);
             Landscape.Build(circuit, builder, materials, LandscapeLooks.Current);
             Complex = new PitComplex(circuit, builder.GarageFloors);
@@ -85,6 +86,7 @@ namespace TarmacGauntlet.Raceday
             PitComplexView view = buildings.AddComponent<PitComplexView>();
             view.Sky = sky;
             view.Materials = pitMaterials;
+            Trackside trackside = Trackside.Build(circuit, builder, stands.Footprints);
 
             keys = new GameObject("Keyboard").AddComponent<KeyboardState>();
             var line = new RacingLine(circuit);
@@ -171,6 +173,9 @@ namespace TarmacGauntlet.Raceday
             view.Fit(Complex, tower.Colours, pits.Garages);
             tv.Classes = tower.Classes;
             sky.RaceSeconds = () => tower.RaceTime;
+            trackside.Cars = racing;
+            trackside.Racing = tower.Racing;
+            if (starter is RaceStart formation) trackside.PaceCarOut = () => !formation.Racing;
             director = new GameObject("Race director").AddComponent<RaceDirector>();
             director.Day = day;
             director.Cars = racing;
