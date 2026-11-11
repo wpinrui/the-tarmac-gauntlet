@@ -12,7 +12,8 @@ namespace TarmacGauntlet.Raceday
     /// Driver stats, 0 to 100:
     /// Pace sets how much of the car's grip and braking the target speeds use.
     /// Consistency sets how much the corner speeds wander from lap to lap.
-    /// Safety sets how often a corner is overcooked: braking too late and running wide.
+    /// Safety sets how often a corner is overcooked: braking too late and running wide. A wet track
+    /// (<see cref="RaceWeather"/>) makes it happen more often.
     ///
     /// Besides the racing line it has lanes either side of it, each with its own target speeds.
     /// <see cref="Offset"/> picks a point between them, so the car can run beside the line to
@@ -646,7 +647,9 @@ namespace TarmacGauntlet.Raceday
                     rolled[i] = true;
                     float spread = 0.035f * (1f - Consistency / 100f);
                     float scale = 1f + spread * Mathf.Clamp(Gaussian(), -2f, 1f);
-                    float risk = 0.12f * (1f - Safety / 100f) * (1f - Safety / 100f);
+                    float careless = 1f - Safety / 100f;
+                    // A wet track catches out every driver now and then, the careless ones most.
+                    float risk = 0.12f * careless * careless + 0.025f * RaceWeather.Now.Wet * (0.4f + 0.6f * careless);
                     overcooked[i] = random.NextDouble() < risk;
                     if (overcooked[i])
                     {

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Rolls many races' weather outside Unity and checks it behaves like a European summer. Run through run.sh. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)../../out/weather-check/obj/</BaseIntermediateOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Check.cs;Stubs.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/SkyClock.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Weather.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/RaceWeather.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/WeatherSky.cs" />
+  </ItemGroup>
+</Project>

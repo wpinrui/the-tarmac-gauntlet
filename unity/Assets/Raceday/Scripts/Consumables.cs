@@ -110,7 +110,9 @@ namespace TarmacGauntlet.Raceday
 
         public float PowerScale => (Map == EngineMap.Push ? 1.05f : Map == EngineMap.Conserve ? 0.92f : 1f) * (float)Effects.Power * PowerTrim;
         private float FuelScale => (Map == EngineMap.Push ? 1.15f : Map == EngineMap.Conserve ? 0.85f : 1f) / Mathf.Max((float)Effects.FuelEfficiency, 0.1f);
-        private float WearScale => (Map == EngineMap.Push ? 1.3f : Map == EngineMap.Conserve ? 0.7f : 1f) / Mathf.Max((float)Effects.TyreDurability, 0.1f);
+        /// <summary>Wear by engine map and the car's durability; a wet track runs the tyres cool and wears them less.</summary>
+        private float WearScale => (Map == EngineMap.Push ? 1.3f : Map == EngineMap.Conserve ? 0.7f : 1f) / Mathf.Max((float)Effects.TyreDurability, 0.1f)
+            * (1f - 0.35f * RaceWeather.Now.Wet);
 
         /// <summary>Laps the fuel lasts at the limit on the engine map in use.</summary>
         public float FuelLaps => Fuel / Mathf.Max(FuelPerLap * FuelScale, 0.01f);
@@ -121,13 +123,16 @@ namespace TarmacGauntlet.Raceday
         /// <summary>The race maths' mode for the engine map.</summary>
         public InstructionMode Mode => Map == EngineMap.Push ? InstructionMode.Push : Map == EngineMap.Conserve ? InstructionMode.Conserve : InstructionMode.Normal;
 
-        /// <summary>Share of new tyres' grip: falls slowly, then quickly once the tyres are past three quarters worn.</summary>
+        /// <summary>
+        /// Share of new tyres' grip on a dry track: falls slowly, then quickly once the tyres are past
+        /// three quarters worn, and falls again on a wet track (<see cref="RaceWeather"/>).
+        /// </summary>
         public float GripScale
         {
             get
             {
                 float past = Mathf.Max(Wear - 0.75f, 0f);
-                return (1f - 0.08f * Wear - 2.4f * past * past) * (float)Effects.Handling * GripTrim;
+                return (1f - 0.08f * Wear - 2.4f * past * past) * (float)Effects.Handling * GripTrim * RaceWeather.Now.Grip;
             }
         }
 
