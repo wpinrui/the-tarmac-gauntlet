@@ -95,7 +95,7 @@ def simplify(m, keep):
 
 def place(parts):
     """Turns the helmet to face +z (it faces -x in its scene) and scales it so the shell is LENGTH long."""
-    turn = np.array([[0, 0, -1], [0, 1, 0], [1, 0, 0]], float)   # a quarter turn about y: -x goes to +z
+    turn = np.array([[0, 0, 1], [0, 1, 0], [-1, 0, 0]], float)   # a quarter turn about y: -x goes to +z
     pts = parts['lip'].vertices @ turn.T
     shell = parts['shell'].vertices @ turn.T
     scale = LENGTH / (shell[:, 2].max() - shell[:, 2].min())
