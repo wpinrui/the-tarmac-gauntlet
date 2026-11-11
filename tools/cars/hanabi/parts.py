@@ -840,11 +840,11 @@ def _rbox(name, x0, x1, y0, y1, z0, z1, r=0.03, lean=0.0, mat="seat"):
     return blend.make(name, v, f, mat)
 
 
-def _wall(name, x0, x1, clip, n=12, mat="interior"):
-    """A panel following the inside of the body between x0 and x1, cut to clip(x)."""
+def _wall(name, x0, x1, clip, n=12, mat="interior", off=0.006):
+    """A panel following the inside of the body between x0 and x1, off clear of it, cut to clip(x)."""
     rings = []
     for x in np.linspace(x0, x1, n):
-        g = body.inside(x, 0.035 + 0.006).intersection(clip(x))
+        g = body.inside(x, 0.035 + off).intersection(clip(x))
         if g.geom_type != "Polygon":
             g = max(getattr(g, "geoms", [g]), key=lambda q: q.area)
         ring = body.even(np.array(g.exterior.coords)[:-1], 64)
@@ -876,8 +876,8 @@ def interior():
            _wall("dash", 0.12, x_front - 0.0085, lambda x: box(-1, 0.62 + 0.12 * (x - 0.12) / 0.33, 1, top), n=10)]
     for sgn, side in ((1, "l"), (-1, "r")):
         clip = lambda x, s=sgn: (box(0.3, 0.42, 1.2, top - 0.015) if s > 0 else box(-1.2, 0.42, -0.3, top - 0.015)).intersection(
-            body.inside(x, 0.035 + 0.009)).difference(body.inside(x, 0.035 + 0.036))
-        obs.append(_wall(f"door_card_{side}", -0.72, 0.28, clip, n=12))
+            body.inside(x, 0.035 + 0.003)).difference(body.inside(x, 0.035 + 0.03))   # just off the door's wall
+        obs.append(_wall(f"door_card_{side}", -0.72, 0.10, clip, n=12, off=0.003))   # ends clear of the dash
     # steering wheel behind the dash ahead of the left seat, the driver's, on a column into the dash
     yc = 0.33
     ang = np.linspace(0, 2 * np.pi, 41)

@@ -338,7 +338,7 @@ DOOR_ROUND = 0.04                 # its back corners are rounded
 # door's front edge, as the reference's door; or out to the side on an upright axis. The right
 # door is their mirror image.
 DOOR_STYLES = {
-    "Up and forward": ((0.52, 0.31, 0.62), (0.36, 0.22, 1.0), -75.0),
+    "Up and forward": ((0.55, 0.34, 0.62), (0.39, 0.25, 1.0), -75.0),
     "Out to the side": ((0.52, 0.31, 0.62), (0.52, 0.31, 1.0), -65.0),
 }
 DOOR_PICK = "Up and forward"

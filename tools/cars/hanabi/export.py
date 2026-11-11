@@ -141,6 +141,7 @@ def build(game=False):
         bpy.data.objects.remove(ob)
     for ob in [cabin] + [o for o in seats if o.name.startswith(("hoop", "door_card"))]:
         parts.stand_off(ob, *tubs)
+        blend.outward(ob)
     for ob in tubs:
         bpy.data.objects.remove(ob)
     out += [cabin] + seats + wheels

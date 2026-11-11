@@ -504,9 +504,11 @@ def door_card(sgn):
     xs, cv = body.curves(ROWS["stations"])
     rings = []
     for x in np.linspace(-0.05, 0.78, 10):
-        sec = Polygon(body.section({k: float(cv[k](x)) for k in body.KEYS})).buffer(0)
-        side = sbox(0.3, 0.32, 1.2, 0.78) if sgn > 0 else sbox(-1.2, 0.32, -0.3, 0.78)
-        band = sec.buffer(-0.033).difference(sec.buffer(-0.058)).intersection(side)
+        sec = body.section({k: float(cv[k](x)) for k in body.KEYS})
+        # the cabin's wall as cabin() cuts it, so the card lies just off it all the way round
+        wall = Polygon(resample(Polygon(sec).buffer(-0.03).intersection(sbox(-3, 0.30, 3, 5)), 64)).buffer(0)
+        side = sbox(0.3, 0.36, 1.2, 0.78) if sgn > 0 else sbox(-1.2, 0.36, -0.3, 0.78)
+        band = wall.buffer(-0.002).difference(wall.buffer(-0.027)).intersection(side)
         if band.geom_type != "Polygon":
             band = max(band.geoms, key=lambda g: g.area)
         r = resample(band, 48)
@@ -691,25 +693,7 @@ def options(bvh):
 
 
 def tidy(ob):
-    """Weld the hairline seams the booleans leave and close any pinhole they open."""
-    bm = bmesh.new(); bm.from_mesh(ob.data)
-    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=2e-5)
-    for _ in range(5):   # needle triangles with no area: collapse their shortest edge
-        bm.faces.ensure_lookup_table()
-        flat = [f for f in bm.faces if f.is_valid and f.calc_area() < 1e-10]
-        if not flat:
-            break
-        edges = {min(f.edges, key=lambda e: e.calc_length()) for f in flat}
-        bmesh.ops.collapse(bm, edges=[e for e in edges if e.is_valid])
-    bmesh.ops.holes_fill(bm, edges=[e for e in bm.edges if e.is_boundary], sides=0)
-    bmesh.ops.triangulate(bm, faces=bm.faces)
-    # a slit too thin to fill closes by collapsing its short side
-    bmesh.ops.collapse(bm, edges=[e for e in bm.edges if e.is_boundary and e.calc_length() < 5e-4])
-    bmesh.ops.holes_fill(bm, edges=[e for e in bm.edges if e.is_boundary], sides=0)
-    bmesh.ops.triangulate(bm, faces=bm.faces)
-    bmesh.ops.delete(bm, geom=[e for e in bm.edges if not e.link_faces], context="EDGES")
-    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
-    bm.to_mesh(ob.data); bm.free()
+    common.tidy(ob)
 
 
 def smooth(ob, angle=35):
@@ -742,6 +726,7 @@ def main():
     if "--fast" not in sys.argv:
         for sgn in (1, -1):
             pieces = door(bvh, shell, trim, sgn)
+            tidy(trim)      # weld the left cut's seams before the right door cuts the trim again
             print("door cut free:", [o.name for o in pieces])
             obs += [p for p in pieces if p not in obs]
     for ob in obs:

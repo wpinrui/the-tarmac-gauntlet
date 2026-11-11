@@ -321,6 +321,13 @@ def paint(ob, mat, where):
             p.material_index = k
 
 
+def outward(ob):
+    """Point every face of a closed part outward again after booleans."""
+    bm = bmesh.new(); bm.from_mesh(ob.data)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(ob.data); bm.free()
+
+
 def tidy(ob):
     """Weld hairline seams the booleans leave, drop sliver triangles and close pinholes."""
     bm = bmesh.new(); bm.from_mesh(ob.data)
@@ -401,10 +408,11 @@ def cutter(bvh, name, regions, fr, out=0.35, grow=0.0):
     """A solid for cutting a panel free of the body, laid along fr's rays. regions: [(shape,
     depth)], each running from depth inside the skin (negative: outside it) to out beyond it.
     grow widens each shape and deepens it, so a cutter grown a little more than its pair leaves
-    a gap between the two pieces."""
+    a gap between the two pieces. Each region reaches a little further out than the last, so
+    no two share a face and the union stays clean."""
     obs = []
     for i, (g, depth) in enumerate(regions):
-        obs += lay(bvh, f"{name}_{i}", g.buffer(grow, join_style=2), fr, -(depth + grow), out + grow,
+        obs += lay(bvh, f"{name}_{i}", g.buffer(grow, join_style=2), fr, -(depth + grow), out + grow + 0.004 * i,
                    "interior", 0.01, along_ray=True)
     return union_all(obs, name)
 
