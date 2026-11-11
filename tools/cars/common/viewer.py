@@ -1,5 +1,6 @@
 """Shared primitive: an orbitable viewer page for an exported OBJ, with a wireframe toggle,
-one toggle per lamp group, one per part that can be hidden, and one row per placement option group. The model is inlined."""
+one toggle per lamp group, one per part that can be hidden, one row per placement option group,
+and a toggle that swings the doors open on their hinges. The model is inlined."""
 import base64
 import gzip
 import json
@@ -38,7 +39,7 @@ button:focus-visible { outline: 2px solid var(--on); outline-offset: 2px; }
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
 <script type="text/plain" id="model">__OBJ__</script>
 <script>
-const MATS = __MATS__, PICKS = __PICKS__, LAMPS = __LAMPS__, GROUPS = __GROUPS__, SHOW = __SHOW__;
+const MATS = __MATS__, PICKS = __PICKS__, LAMPS = __LAMPS__, GROUPS = __GROUPS__, SHOW = __SHOW__, DOORS = __DOORS__;
 const parts = {};
 const stage = document.getElementById('stage');
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
@@ -81,7 +82,19 @@ new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzi
     const g = /^opt_([a-z]+)_(\d+)_/.exec(o.name);
     if (g) ((opts[g[1]] ||= {})[g[2]] ||= []).push(o);
     for (const [label, names] of Object.entries(SHOW)) if (names.some(n => o.name.startsWith(n))) (parts[label] ||= []).push(o);
+    for (const d of DOORS) if (o.name.replace(/^opt_[a-z]+_\d+_/, '').startsWith(d.parts)) { (d.obs ||= []).push(o); o.matrixAutoUpdate = false; }
   });
+  for (const label of [...new Set(DOORS.map(d => d.label))]) {
+    const ds = DOORS.filter(d => d.label === label), keys = Object.keys(ds[0].styles);
+    ds.forEach(d => d.pick = d.pick || keys[0]);
+    if (keys.length < 2) continue;
+    const set = document.createElement('div'); set.className = 'set';
+    const b = document.createElement('b'); b.textContent = label; set.appendChild(b);
+    const pick = k => { ds.forEach(d => d.pick = k); set.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.k === k)); };
+    keys.forEach(k => { const x = document.createElement('button'); x.textContent = k; x.dataset.k = k;
+      x.addEventListener('click', () => pick(k)); set.appendChild(x); });
+    document.getElementById('options').appendChild(set); pick(ds[0].pick);
+  }
   scene.add(obj);
   const bar = document.getElementById('options');
   for (const [g, label] of Object.entries(GROUPS)) {
@@ -105,12 +118,28 @@ toggle('Wireframe', on => Object.values(mats).forEach(m => m.wireframe = on));
 for (const [label, list] of Object.entries(LAMPS)) toggle(label, on => list.forEach(n => { const m = mats[n]; if (!m) return;
   m.emissive = on ? new THREE.Color(...m.userData.emit) : new THREE.Color(0, 0, 0); m.emissiveIntensity = on ? 2 : 0; m.needsUpdate = true; }));
 for (const label of Object.keys(SHOW)) toggle(label, on => (parts[label] || []).forEach(o => o.visible = on), true);
+for (const d of DOORS) { d.t = 0; d.goal = 0; }
+for (const label of new Set(DOORS.map(d => d.label))) toggle(label, on => DOORS.forEach(d => { if (d.label === label) d.goal = on ? 1 : 0; }));
+const toThree = p => new THREE.Vector3(p[0], p[2], -p[1]);
+function doors(dt) {
+  for (const d of DOORS) {
+    if (!d.obs) continue;
+    d.t += Math.sign(d.goal - d.t) * Math.min(Math.abs(d.goal - d.t), dt / 1.2);
+    const s = d.styles[d.pick], a = toThree(s.axis[0]), ax = toThree(s.axis[1]).sub(a).normalize();
+    const e = d.t * d.t * (3 - 2 * d.t);
+    const m = new THREE.Matrix4().makeTranslation(a.x, a.y, a.z)
+      .multiply(new THREE.Matrix4().makeRotationAxis(ax, e * s.open * Math.PI / 180))
+      .multiply(new THREE.Matrix4().makeTranslation(-a.x, -a.y, -a.z));
+    d.obs.forEach(o => o.matrix.copy(m));
+  }
+}
 let fov0 = 30;
 function resize() { const w = stage.clientWidth, h = stage.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h;
   camera.fov = Math.min(70, fov0 * Math.max(1, 1.05 / camera.aspect)); camera.updateProjectionMatrix(); }
 new ResizeObserver(resize).observe(stage); resize();
 window.view = (p, t, fov) => { camera.position.set(...p); if (t) controls.target.set(...t); if (fov) { fov0 = fov; resize(); } controls.update(); };
-(function loop() { controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); })();
+let last = performance.now();
+(function loop(now = last) { doors(Math.min(0.1, (now - last) / 1000)); last = now; controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); })();
 </script>
 </body>
 </html>
@@ -129,14 +158,16 @@ def _short(txt):
     return "\n".join(out)
 
 
-def write(obj_path, html_path, title, materials, picks, lamps, groups, show=None):
+def write(obj_path, html_path, title, materials, picks, lamps, groups, show=None, doors=None):
     """materials {name: (rgb, spec, alpha, emit)}; lamps {label: [material names]};
     groups {option group: label}; show {label: [object name prefixes]}, parts with a show and
-    hide toggle."""
+    hide toggle; doors [{"label", "parts": object name prefix, "styles": {label: {"axis": [p0,
+    p1], "open": degrees}}, "pick"}], hinges in build space, turning by the right hand rule."""
     obj = base64.b64encode(gzip.compress(_short(Path(obj_path).read_text()).encode(), 9)).decode()
     mats = {k: {"c": v[0], "s": v[1], "a": v[2], "e": v[3] or (0, 0, 0)} for k, v in materials.items()}
     html = (PAGE.replace("__TITLE__", title).replace("__OBJ__", obj).replace("__MATS__", json.dumps(mats))
             .replace("__PICKS__", json.dumps(picks)).replace("__LAMPS__", json.dumps(lamps))
-            .replace("__GROUPS__", json.dumps(groups)).replace("__SHOW__", json.dumps(show or {})))
+            .replace("__GROUPS__", json.dumps(groups)).replace("__SHOW__", json.dumps(show or {}))
+            .replace("__DOORS__", json.dumps(doors or [], default=float)))
     Path(html_path).write_text(html)
     print("wrote", html_path, Path(html_path).stat().st_size // 1024, "KB")

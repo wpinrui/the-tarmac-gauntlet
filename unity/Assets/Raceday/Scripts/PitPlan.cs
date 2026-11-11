@@ -44,7 +44,8 @@ namespace TarmacGauntlet.Raceday
             startFuel = supplies.Fuel;
             PitOrders orders = supplies.Orders;
             litres = Mathf.Clamp(orders.Litres ?? float.PositiveInfinity, 0f, Mathf.Max(supplies.Capacity - supplies.Fuel, 0f));
-            scale = 0.85f + 0.3f * (float)spec.Stats.PitStopTime / 100f;
+            // The car's Pit Stop stat scales the work: 0.7 times at 0, 1.3 times at 100.
+            scale = 0.7f + 0.6f * (float)spec.Stats.PitStopTime / 100f;
             PitWork work = supplies.Log?.Pit(orders.Tyres);
             tyres = work == null ? orders.Tyres : work.ChangeTyres;
             NewTyres = tyres;
@@ -95,6 +96,7 @@ namespace TarmacGauntlet.Raceday
         public const float DecideBefore = 450f;
         private const float StopBraking = 3.5f;     // m/s² into the box
         private const float CarLength = 4.8f;
+        private const float Reaction = 0.4f;        // s a car leaving keeps in hand behind the car ahead
         /// <summary>The car comes in before its tyres are this worn.</summary>
         public const float WearLimit = 0.9f;
 
@@ -207,7 +209,7 @@ namespace TarmacGauntlet.Raceday
                     if (Service.Done && FastLaneClear(id, cars)) State = Stage.Leaving;
                     return State == Stage.Stopped;
                 case Stage.Leaving:
-                    p.SpeedCap = Follow(p, position, id, cars, spec);
+                    p.SpeedCap = Follow(p, position, id, cars, spec, Reaction);
                     int past = c.Wrap(p.Index - boxSample);
                     if (past < c.Count / 2 && past >= c.Wrap(rejoinSample - boxSample)) State = Stage.Racing;
                     return false;
@@ -229,9 +231,10 @@ namespace TarmacGauntlet.Raceday
         /// <summary>
         /// Fastest a car driving a route may go to keep a safe gap to the nearest car ahead on it, m/s:
         /// it could stop in its own braking distance if that car stopped as hard as it can. A car
-        /// standing still beside the route, as in a box, is passed.
+        /// standing still beside the route, as in a box, is passed. With a <c>reaction</c> time it also keeps
+        /// that long in hand at its speed, so it can follow a car braking hard for the exit road's bends.
         /// </summary>
-        public static float Follow(AiPilot route, Vector3 position, int id, IReadOnlyList<CarState> cars, CarSpec spec)
+        public static float Follow(AiPilot route, Vector3 position, int id, IReadOnlyList<CarState> cars, CarSpec spec, float reaction = 0f)
         {
             RacingLine line = route.Line;
             int k = route.Index;
@@ -255,7 +258,8 @@ namespace TarmacGauntlet.Raceday
                 float gap = line.Circuit.Wrap(j - k) * line.Circuit.Step - CarLength - 2f;
                 Vector3 tj = line.Tangent[j];
                 float theirs = Mathf.Max(o.Velocity.x * tj.x + o.Velocity.z * tj.z, 0f);
-                float c = gap > 0f ? Mathf.Sqrt(theirs * theirs + 2f * brake * gap) : 0f;
+                float lag = brake * reaction;
+                float c = gap > 0f ? Mathf.Max(Mathf.Sqrt(lag * lag + theirs * theirs + 2f * brake * gap) - lag, 0f) : 0f;
                 cap = Mathf.Min(cap, c);
             }
             return cap;
@@ -274,7 +278,8 @@ namespace TarmacGauntlet.Raceday
                 float a = d.x * along.x + d.z * along.z;
                 float across = d.x * left.x + d.z * left.z;
                 bool moving = o.Velocity.x * o.Velocity.x + o.Velocity.z * o.Velocity.z > 9f;
-                if (moving && a > -110f && a < 8f && across < -Lane.BoxLateral + Lane.FastLane + 2.5f && across > -12f) return false;
+                // Out past the line cars take by the boxes: a car swinging into a nearby box isn't fast lane traffic.
+                if (moving && a > -110f && a < 8f && across < Lane.PassLateral - Lane.BoxLateral - 0.3f && across > -12f) return false;
             }
             return true;
         }

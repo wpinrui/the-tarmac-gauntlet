@@ -189,7 +189,10 @@ namespace TarmacGauntlet.Raceday
             // Each team's hired crew wait in its garage and work its stops.
             var crewSizes = new int[grid.Count];
             for (int i = 0; i < grid.Count; i++) crewSizes[i] = grid[i].CrewSize;
-            new GameObject("Pit crews").AddComponent<PitCrews>().Build(Complex, pits, racing, drivers, tower.Colours, crewSizes);
+            PitCrews crews = new GameObject("Pit crews").AddComponent<PitCrews>();
+            crews.Build(Complex, pits, racing, drivers, tower.Colours, crewSizes);
+            // The crews handle the kit at their stops: the fuel hose, the guns, the tyres, the jacks and the lollipop.
+            crews.gameObject.AddComponent<PitKitWork>().Build(Complex, crews, view.Kit, racing);
             tv.Classes = tower.Classes;
             sky.RaceSeconds = () => tower.RaceTime;
             // Every race rolls its own weather (WeatherPlan), played on the race clock.

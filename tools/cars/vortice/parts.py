@@ -357,6 +357,51 @@ def door_path():
     return [_into_glass(path[0])] + path.tolist() + [_into_glass(path[-1])]
 
 
+# ---------------------------------------------------------------- driver's door
+DOOR_DEPTH = 0.05     # below the cabin floor the door takes the sill this deep
+DOOR_WALL = 0.09      # above it, the whole wall: the cabin is hollow behind it
+DOOR_GAP = 0.0015     # half the gap round the door, inside the shut line's groove
+DOOR_OPEN = 62.0      # degrees the door swings out
+
+
+def door_outline():
+    """The left door seen from the side: inside its shut line, closed across the window, and
+    the frameless window it carries."""
+    d = door_path()
+    dlo, _g, _t = dlo_shapes()
+    x0 = min(p[0] for p in d)
+    return unary_union([Polygon(d).buffer(0), dlo.intersection(box(x0, -1, 5, 5))])
+
+
+def mirror_footprint():
+    """The mirror on the door seen from the side, with room: taken only outside the skin."""
+    m = R["mirror"]
+    return box(m["x_back"] - 0.05, m["z0"] - 0.06, m["x_front"] + 0.06, m["z1"] + 0.05)
+
+
+def door_hinge(sgn=1):
+    """The hinge axis up the door's front edge, outside the skin, and the open angle. Turning
+    about an axis pointing up, a negative angle swings the left door's back edge out and a
+    positive one the right's. sgn picks the side: 1 left, -1 right."""
+    d = np.array(R["door"])
+    xf = float(d[:, 0].max()) + 0.004
+    z0, z1 = float(d[:, 1].min()), float(d[:, 1].max())
+    y = max(body.y_at(xf - 0.01, z) for z in np.linspace(z0 + 0.02, z1, 20)) + 0.003
+    return (xf, y * sgn, z0), (xf, y * sgn, z1), -DOOR_OPEN * sgn
+
+
+def door(ref, shell, obs, floor, sgn=1):
+    """Cut the left (sgn 1) or right (sgn -1) door free of the body and its window trim; its glass, card and mirror
+    glass go with it. Returns the door's pieces."""
+    side = "l" if sgn > 0 else "r"
+    o = door_outline()
+    regions = [(o.intersection(box(-5, -1, 5, floor + 0.02)), DOOR_DEPTH),
+               (o.intersection(box(-5, floor + 0.02, 5, 5)), DOOR_WALL), (mirror_footprint(), -0.004)]
+    trim = [ob for ob in obs if ob.name == f"window_trim_{side}"]
+    roles = {f"side_glass_{side}": "glass", f"mirror_glass_{side}": "mirror", f"door_card_{side}": "card"}
+    return blend.free_door(ref, side_fr(sgn), regions, DOOR_GAP, shell, trim, roles, o, name=f"door_{side}")
+
+
 def bonnet_path():
     """The bonnet shut line in plan: out of the windscreen trim at its lower corner, straight
     forward to the head lamp, along the lamp's inner edge as one straight fit, and across the
