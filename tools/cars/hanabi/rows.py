@@ -481,7 +481,7 @@ def measure(path):
         "exhaust": exhaust,
         "spots": spots,
         # Ivan's picks from the viewer.
-        "picks": {"roof": 1, "frontbadge": 1, "rearbadge": 1, "name": 1},
+        "picks": {"roof": 1, "frontbadge": 1, "rearbadge": 1, "name": 2},
     }
 
 
