@@ -1,5 +1,5 @@
 """Shared primitive: an orbitable viewer page for an exported OBJ, with a wireframe toggle,
-one toggle per lamp group and one row per placement option group. The model is inlined."""
+one toggle per lamp group, one per part that can be hidden, and one row per placement option group. The model is inlined."""
 import base64
 import gzip
 import json
@@ -38,7 +38,8 @@ button:focus-visible { outline: 2px solid var(--on); outline-offset: 2px; }
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
 <script type="text/plain" id="model">__OBJ__</script>
 <script>
-const MATS = __MATS__, PICKS = __PICKS__, LAMPS = __LAMPS__, GROUPS = __GROUPS__;
+const MATS = __MATS__, PICKS = __PICKS__, LAMPS = __LAMPS__, GROUPS = __GROUPS__, SHOW = __SHOW__;
+const parts = {};
 const stage = document.getElementById('stage');
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -79,6 +80,7 @@ new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzi
     o.material = mm.length === 1 ? mm[0] : mm;
     const g = /^opt_([a-z]+)_(\d+)_/.exec(o.name);
     if (g) ((opts[g[1]] ||= {})[g[2]] ||= []).push(o);
+    for (const [label, names] of Object.entries(SHOW)) if (names.some(n => o.name.startsWith(n))) (parts[label] ||= []).push(o);
   });
   scene.add(obj);
   const bar = document.getElementById('options');
@@ -95,13 +97,14 @@ new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzi
   }
 });
 const toggles = document.getElementById('toggles');
-const toggle = (label, fn) => { const x = document.createElement('button'); x.textContent = label;
-  x.setAttribute('aria-pressed', 'false');
+const toggle = (label, fn, on0 = false) => { const x = document.createElement('button'); x.textContent = label;
+  x.setAttribute('aria-pressed', String(on0));
   x.addEventListener('click', () => { const on = x.getAttribute('aria-pressed') !== 'true'; x.setAttribute('aria-pressed', on); fn(on); });
   toggles.appendChild(x); };
 toggle('Wireframe', on => Object.values(mats).forEach(m => m.wireframe = on));
 for (const [label, list] of Object.entries(LAMPS)) toggle(label, on => list.forEach(n => { const m = mats[n]; if (!m) return;
   m.emissive = on ? new THREE.Color(...m.userData.emit) : new THREE.Color(0, 0, 0); m.emissiveIntensity = on ? 2 : 0; m.needsUpdate = true; }));
+for (const label of Object.keys(SHOW)) toggle(label, on => (parts[label] || []).forEach(o => o.visible = on), true);
 let fov0 = 30;
 function resize() { const w = stage.clientWidth, h = stage.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h;
   camera.fov = Math.min(70, fov0 * Math.max(1, 1.05 / camera.aspect)); camera.updateProjectionMatrix(); }
@@ -126,13 +129,14 @@ def _short(txt):
     return "\n".join(out)
 
 
-def write(obj_path, html_path, title, materials, picks, lamps, groups):
+def write(obj_path, html_path, title, materials, picks, lamps, groups, show=None):
     """materials {name: (rgb, spec, alpha, emit)}; lamps {label: [material names]};
-    groups {option group: label}."""
+    groups {option group: label}; show {label: [object name prefixes]}, parts with a show and
+    hide toggle."""
     obj = base64.b64encode(gzip.compress(_short(Path(obj_path).read_text()).encode(), 9)).decode()
     mats = {k: {"c": v[0], "s": v[1], "a": v[2], "e": v[3] or (0, 0, 0)} for k, v in materials.items()}
     html = (PAGE.replace("__TITLE__", title).replace("__OBJ__", obj).replace("__MATS__", json.dumps(mats))
             .replace("__PICKS__", json.dumps(picks)).replace("__LAMPS__", json.dumps(lamps))
-            .replace("__GROUPS__", json.dumps(groups)))
+            .replace("__GROUPS__", json.dumps(groups)).replace("__SHOW__", json.dumps(show or {})))
     Path(html_path).write_text(html)
     print("wrote", html_path, Path(html_path).stat().st_size // 1024, "KB")
