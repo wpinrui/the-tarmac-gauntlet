@@ -348,8 +348,8 @@ def screen_parts(rcv):
     for i, (x, y, z) in enumerate(rings[jo]):
         zb = _top_z(x, y)
         if zb is not None:
-            w[i] = np.clip((0.10 - (z - zb)) / 0.05, 0.0, 1.0)
-    w = gaussian_filter1d(w, 3.0, mode="wrap")
+            w[i] = np.clip((0.20 - (z - zb)) / 0.08, 0.0, 1.0)
+    w = gaussian_filter1d(w, 6.0, mode="wrap")
     for j, flare in ((jo, 0.045), (ji, 0.0)):
         pts = rings[j].copy()
         for i in range(len(p)):
@@ -362,6 +362,11 @@ def screen_parts(rcv):
                 x2, y2 = x, y; zb = _top_z(x, y)
             if zb is not None:
                 pts[i] = (x2, y2, (1 - w[i]) * z + w[i] * min(z, zb - 0.015))
+        # smooth the dropped underside along the loop, so its edge runs clean
+        # (the inner side by height only: smoothing it in plan would pull its corners into the glass)
+        k = np.clip(w * 4, 0, 1)[:, None]
+        cols = slice(0, 3) if flare else slice(2, 3)
+        pts[:, cols] = pts[:, cols] * (1 - k) + gaussian_filter1d(pts[:, cols], 3.0, axis=0, mode="wrap") * k
         rings[j] = pts
     # the fillet: points from the outer edge down to the flared foot, dropping first, then out
     a, b = rings[jo - 1], rings[jo]
