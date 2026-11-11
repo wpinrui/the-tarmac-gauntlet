@@ -16,7 +16,8 @@ namespace TarmacGauntlet.Raceday
     /// back. V moves the cameras to the next car, and P to the next car making a pit stop. F steps
     /// the race through normal speed, 4x and 16x while the AI drives your car, and ends the pit lane
     /// start's fast forward. Cars away from the camera glide without physics (<see cref="PhysicsRange"/>).
-    /// The field is shown on the timing tower (<see cref="RaceTower"/>).
+    /// The field is shown on the timing tower (<see cref="RaceTower"/>). T opens live timing while the AI drives
+    /// your car, with the controls for its next stop (<see cref="LiveTiming"/>).
     /// </summary>
     public sealed class CircuitScene : MonoBehaviour
     {
@@ -39,6 +40,7 @@ namespace TarmacGauntlet.Raceday
         private SituationMenu lab;
         private RaceDay day;
         private RaceDirector director;
+        private LiveTiming timing;
 
         private const string PlayerCar = "a-29";
         private const string PlayerModel = "Assets/Art/Vehicles/CheonmaCX24Si/CheonmaCX24Si.obj";
@@ -153,6 +155,24 @@ namespace TarmacGauntlet.Raceday
             director.Drivers = drivers;
             director.Tower = tower;
             var hidden = new List<GameObject> { tower.gameObject, director.gameObject };
+            if (player >= 0)
+            {
+                timing = new GameObject("Live timing").AddComponent<LiveTiming>();
+                timing.Cars = racing;
+                timing.Drivers = drivers;
+                timing.Teams = teams;
+                timing.Classes = tower.Classes;
+                timing.Colours = tower.Colours;
+                timing.Player = player;
+                timing.Lap = circuit.Lap;
+                timing.Circuit = circuit;
+                timing.Driver = ai;
+                timing.Tower = tower;
+                timing.Hud = views.Hud;
+                timing.Keys = keys;
+                timing.Game = setup.Game;
+                hidden.Add(timing.gameObject);
+            }
             foreach (CarController c in cars) hidden.Add(c.gameObject);
             if (starter != null) hidden.Add(starter.gameObject);
             lab = new GameObject("AI debug menu").AddComponent<SituationMenu>();
@@ -232,7 +252,8 @@ namespace TarmacGauntlet.Raceday
                 skipping = false;
             }
             if (skipping && pitLaneStart.Time >= pitLaneStart.FastForwardTo) skipping = false;
-            float scale = skipping ? SkipSpeed : Speeds[speed];
+            // Live timing runs the race at the top speed behind it.
+            float scale = skipping ? SkipSpeed : timing != null && timing.Open ? Speeds[Speeds.Length - 1] : Speeds[speed];
             if (Time.timeScale != scale)
             {
                 Time.timeScale = scale;
