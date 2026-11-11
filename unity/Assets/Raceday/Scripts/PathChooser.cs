@@ -108,6 +108,8 @@ namespace TarmacGauntlet.Raceday
         /// <summary>How far ahead of where the car is the line leaving a car its width may aim, m (H2).</summary>
         private static readonly float OweLead = Knob("OWELEAD", 2f), CommitLead = Knob("CLEAD", 1f);
         /// <summary>Room owed only to a car alongside and only on the track (Ivan, H2).</summary>
+        /// <summary>T18b: seconds of the racing line ahead that the committed room to a car on the inside is kept from.</summary>
+        private static readonly float OweAhead = Knob("OWEAHEAD", 0.75f);
         private static readonly bool OweTrack = Knob("OWETRACK", 0f) > 0f, OweH1 = Knob("OWEH1", 1f) > 0f, OweCommit = Knob("OWECOMMIT", 1f) > 0f, OweEdge = Knob("OWEEDGE", 1f) > 0f;
         /// <summary>Score per second a pull-out waits: of two near-equal moves, the later one, so the car stays in the tow until it must move.</summary>
         private static readonly float LateBonus = Knob("LATE", 0.1f);
@@ -406,6 +408,12 @@ namespace TarmacGauntlet.Raceday
                 // racing line where that is wider: steered and taken at that lane's speed, not re-planned wider.
                 int kh = pilot.Index;
                 float bnd = c.HalfWidth(kh) - 1.5f * CarW - RoomMargin - 0.15f, lineK = line.Lateral[kh];
+                // T18b: the line just ahead counts too, as the car lags its pilot: steered out before the line dives, not after.
+                for (float ta = Tick; ta <= OweAhead; ta += Tick)
+                {
+                    float la = line.Lateral[c.IndexOf(Mathf.Repeat(me.Distance + mySpeed * ta, lap))];
+                    if (-nextTurn * la > -nextTurn * lineK) lineK = la;
+                }
                 owe = -nextTurn * lineK > bnd ? -nextTurn * bnd - lineK : 0f;
                 if (CommitLead > 0f) owe = Mathf.Clamp(owe, myOffset - CommitLead, myOffset + CommitLead);   // no further from where the car is than it can follow
             }
