@@ -502,7 +502,8 @@ def roof_options(env_bvh, xs, rcv, plain):
             blend.boolean(top, c, "DIFFERENCE")
         objs = [top]
         for sgn, side in ((1, "l"), (-1, "r")):
-            objs += blend.lay(env_bvh, f"roof_side_glass_{side}", sg.buffer(-0.002), side_fr(sgn), -0.012, -0.008, "glass", 0.02, along_ray=True)
+            # each side glass sits in its door, as the reference's does, and swings with it
+            objs += blend.lay(env_bvh, f"door_{side}_glass", sg.buffer(-0.002), side_fr(sgn), -0.012, -0.008, "glass", 0.02, along_ray=True)
             if n == 3:
                 band = sg.buffer(0.012).difference(sg.buffer(-0.002)).intersection(box(-5, BELT + 0.02, 5, 5))
                 objs += blend.lay(env_bvh, f"roof_side_band_{side}", band, side_fr(sgn), 0.0015, 0.0035, "trim", 0.008)
@@ -643,6 +644,52 @@ def grooves(ref):
         obs.append(blend.groove(ref, f"g_{name}_b", np.vstack([ring[b - 2:], ring[:3]]), top_fr(),
                                 width=0.0056, depth=0.0055))
     return obs
+
+
+# ---------------------------------------------------------------- driver's door
+DOOR_WALL = 0.09      # the door takes the cockpit wall this deep
+DOOR_TOP = BELT - 0.08     # above this the door top is a solid ledge to the cockpit's edge
+DOOR_IN = 0.69        # the ledge is taken in to here, past the cockpit's edge at 0.705
+DOOR_GAP = 0.0015     # half the gap round the door, inside the shut line's groove
+DOOR_OPEN = 65.0      # degrees the door swings out
+
+
+def door_outline():
+    """The left door seen from the side: inside its shut line, up over its top and the mirror
+    on its front top corner."""
+    d = np.array(R["door"])
+    top = max(m[4] for m in R["mirror"]) + 0.03
+    return unary_union([poly(d), box(d[-1][0], DOOR_TOP, d[0][0], top)])
+
+
+def _door_top(grow, sgn=1):
+    """The door top and mirror, straight through from the cockpit's edge outwards."""
+    g = door_outline().intersection(box(-5, DOOR_TOP, 5, 5)).buffer(grow, join_style=2)
+    ring = np.array(g.exterior.coords)[:-1]
+    rings = [np.column_stack([ring[:, 0], np.full(len(ring), y * sgn), ring[:, 1]]) for y in (DOOR_IN - grow, 1.4)]
+    v, f = geom.close_rings(rings)
+    return [blend.make("door_top", v, f, "interior")]
+
+
+def door_hinge(sgn=1):
+    """The hinge axis up the door's front edge, outside the skin, and the open angle. Turning
+    about an axis pointing up, a negative angle swings the left door's back edge out and a
+    positive one the right's. sgn picks the side: 1 left, -1 right."""
+    d = np.array(R["door"])
+    xf = float(d[:, 0].max()) + 0.004
+    z0, z1 = float(d[:, 1].min()), float(d[:, 1].max())
+    y = max(body.y_at(xf - 0.01, z) for z in np.linspace(z0 + 0.02, BELT - 0.02, 20)) + 0.003
+    return (xf, y * sgn, z0), (xf, y * sgn, z1), -DOOR_OPEN * sgn
+
+
+def door(ref, shell, sgn=1):
+    """Cut the left (sgn 1) or right (sgn -1) door free of the body; its card and mirror
+    glass go with it. Returns the door's pieces."""
+    side = "l" if sgn > 0 else "r"
+    o = door_outline()
+    regions = [(o.intersection(box(-5, -1, 5, DOOR_TOP + 0.01)), DOOR_WALL)]
+    roles = {f"mirror_glass_{side}": "mirror", f"door_card_{side}": "card"}
+    return blend.free_door(ref, side_fr(sgn), regions, DOOR_GAP, shell, [], roles, o, solids=lambda g: _door_top(g, sgn), name=f"door_{side}")
 
 
 # ---------------------------------------------------------------- mirrors and exhaust
@@ -831,8 +878,8 @@ def interior():
         clip = lambda x, s=sgn: (box(0.3, 0.42, 1.2, top - 0.015) if s > 0 else box(-1.2, 0.42, -0.3, top - 0.015)).intersection(
             body.inside(x, 0.035 + 0.009)).difference(body.inside(x, 0.035 + 0.036))
         obs.append(_wall(f"door_card_{side}", -0.72, 0.28, clip, n=12))
-    # steering wheel behind the dash ahead of the right seat, on a column into the dash
-    yc = -0.33
+    # steering wheel behind the dash ahead of the left seat, the driver's, on a column into the dash
+    yc = 0.33
     ang = np.linspace(0, 2 * np.pi, 41)
     ring = [(0.02 + 0.05 * np.sin(a), yc + 0.17 * np.cos(a), 0.74 + 0.16 * np.sin(a)) for a in ang]
     wheel = _tube("steering_wheel", np.array(ring), 0.016, "trim")
@@ -841,7 +888,8 @@ def interior():
     for ob in (wheel, hub):
         blend.boolean(col, ob, "UNION")
     obs.append(col)
-    cabin = blend.union_all(obs, "cabin")
+    cards = [o for o in obs if o.name.startswith("door_card")]      # the driver's swings with its door
+    cabin = blend.union_all([o for o in obs if o not in cards], "cabin")
     seats = []
     for sgn, side in ((1, "l"), (-1, "r")):
         yc = 0.33 * sgn
@@ -855,7 +903,7 @@ def interior():
         path = [(hx, yc - 0.17, fl + 0.001), (hx, yc - 0.17, 0.80), (hx, yc - 0.155, 1.06), (hx, yc - 0.11, 1.12),
                 (hx, yc, 1.135), (hx, yc + 0.11, 1.12), (hx, yc + 0.155, 1.06), (hx, yc + 0.17, 0.80), (hx, yc + 0.17, fl + 0.001)]
         seats.append(_tube(f"hoop_{side}", geom.catmull_open(path, 6), 0.021, "trim"))   # trimmed to the floor in export
-    return cabin, seats
+    return cabin, seats + cards
 
 
 def rear_view_mirror(env_bvh):
