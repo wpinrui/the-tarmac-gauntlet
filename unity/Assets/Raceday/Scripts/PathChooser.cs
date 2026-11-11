@@ -110,8 +110,8 @@ namespace TarmacGauntlet.Raceday
         /// <summary>How far ahead of where the car is the line leaving a car its width may aim, m (H2).</summary>
         private static readonly float OweLead = Knob("OWELEAD", 2f), CommitLead = Knob("CLEAD", 1f);
         /// <summary>Room owed only to a car alongside and only on the track (Ivan, H2).</summary>
-        /// <summary>T18b: seconds of the racing line ahead that the committed room to a car on the inside is kept from.</summary>
-        private static readonly float OweAhead = Knob("OWEAHEAD", 0.75f);
+        /// <summary>H2, H3, T18b: the committed lane leaving a car on the inside its width is held at its place across the track.</summary>
+        private static readonly bool OweHold = Knob("OWEHOLD", 1f) > 0f;
         /// <summary>H8, T6b: a path braking for a corner may tuck in behind a car ahead at no less than the gap it has now, and this many seconds clear, s.</summary>
         private static readonly float Tuck = Knob("TUCK", 0.03f);
         /// <summary>H1: a path moving across, away from a car ahead it is already close behind, is not broken by the following gap.</summary>
@@ -167,6 +167,13 @@ namespace TarmacGauntlet.Raceday
         public Candidate Chosen { get; private set; }
         /// <summary>The offset from the racing line the car is heading for, m, positive left.</summary>
         public float Target { get; private set; }
+        /// <summary>H2, H3: where across the track the committed lane leaving a car on the inside its width is.</summary>
+        public float OweLane { get; private set; }
+        /// <summary>The inside of the corner for <see cref="OweLane"/>, -1 or 1, or 0 when no such lane is held.</summary>
+        public int OweInside { get; private set; }
+
+        /// <summary>The pilot's offset, kept no deeper than <see cref="OweLane"/> with the racing line where it is now.</summary>
+        public float HoldOwe(float offset, float lineHere) => OweInside != 0 && OweInside * (lineHere + offset) > OweInside * OweLane ? OweLane - lineHere : offset;
         /// <summary>The speed the chosen path holds the car to, m/s, or infinity.</summary>
         public float Cap { get; private set; } = float.PositiveInfinity;
         /// <summary>Why the car is doing what it does, for the debug menu, or null when it is free on its line.</summary>
@@ -418,6 +425,7 @@ namespace TarmacGauntlet.Raceday
             // the car is: a car wide at the limit lags its pilot, which would otherwise step on and on until it
             // aims across the car it owes (H2).
             float owe = pilot.Offset + best.SoonOff;
+            OweInside = 0;
             if (best.Owe && OweLead > 0f) owe = Mathf.Clamp(owe, myOffset + best.SoonOff - OweLead, myOffset + best.SoonOff + OweLead);
             if (best.Owe && OweCommit && nextTurn != 0)
             {
@@ -425,13 +433,10 @@ namespace TarmacGauntlet.Raceday
                 // racing line where that is wider: steered and taken at that lane's speed, not re-planned wider.
                 int kh = pilot.Index;
                 float bnd = c.HalfWidth(kh) - 1.5f * CarW - RoomMargin - 0.15f, lineK = line.Lateral[kh];
-                // T18b: the line just ahead counts too, as the car lags its pilot: steered out before the line dives, not after.
-                for (float ta = Tick; ta <= OweAhead; ta += Tick)
-                {
-                    float la = line.Lateral[c.IndexOf(Mathf.Repeat(me.Distance + mySpeed * ta, lap))];
-                    if (-nextTurn * la > -nextTurn * lineK) lineK = la;
-                }
                 owe = -nextTurn * lineK > bnd ? -nextTurn * bnd - lineK : 0f;
+                // H2, H3, T18b: that lane is a fixed place across the track, held as the line dives past it, so
+                // the car neither lags onto the inside car nor opens its steering (Ivan).
+                if (OweHold) { OweLane = -nextTurn * bnd; OweInside = -nextTurn; }
                 if (CommitLead > 0f) owe = Mathf.Clamp(owe, myOffset - CommitLead, myOffset + CommitLead);   // no further from where the car is than it can follow
             }
             Target = best.Owe ? owe : best.Delay > 0f ? pilot.Offset : best.Shift;

@@ -356,6 +356,7 @@ namespace TarmacGauntlet.Raceday
                     if (PathChooser.PullOutFree) step = Endurance.OvertakeOffsetRate * dt;
                 }
                 pilot.Offset = Mathf.Clamp(Mathf.MoveTowards(pilot.Offset, chooser.Target, step), AiPilot.LaneShifts[0], AiPilot.LaneShifts[AiPilot.LaneShifts.Length - 1]);
+                pilot.Offset = chooser.HoldOwe(pilot.Offset, line.Lateral[pilot.Index]);
                 Target = chooser.Target;
                 pilot.SpeedCap = chooser.Cap;
                 State = Mathf.Abs(pilot.Offset) > 0.5f ? Mode.Overtaking : Mode.Racing;
