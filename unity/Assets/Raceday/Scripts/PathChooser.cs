@@ -60,6 +60,8 @@ namespace TarmacGauntlet.Raceday
         private static readonly float GhostCrawl = Knob("CRAWL", 6f);
         /// <summary>A moving ghost this close to the track, m, is planned round like any car (T17).</summary>
         private static readonly float GhostNear = Knob("GHOSTNEAR", 3f);
+        /// <summary>T17: how far off the track a ghost heading back towards it is already planned round, m.</summary>
+        private static readonly float GhostSee = Knob("GHOSTSEE", 15f);
         private static readonly bool Commit = Knob("COMMIT", 1f) > 0f;
         /// <summary>T9: H6 and defending judged on real pace (lap time), not only the closing speed of the moment.</summary>
         private static readonly bool RealPace = Knob("REALPACE", 1f) > 0f;
@@ -736,7 +738,10 @@ namespace TarmacGauntlet.Raceday
                     && Mathf.Abs(o.Lateral) < c.HalfWidth(c.IndexOf(Mathf.Repeat(o.Distance, lap)));
                 // A ghost getting back into the race is a car to plan round too, once near the track: the
                 // ghosting is only the safety net (Ivan, T17).
-                bool rejoining = AvoidGhosts && o.Ghost && !me.Ghost && Mathf.Abs(o.Lateral) < c.HalfWidth(c.IndexOf(Mathf.Repeat(o.Distance, lap))) + GhostNear;
+                // T17: seen from when it heads back towards the track, not only once it is near it (Ivan).
+                float outBy = Mathf.Abs(o.Lateral) - c.HalfWidth(c.IndexOf(Mathf.Repeat(o.Distance, lap)));
+                bool heading = o.Across * Mathf.Sign(o.Lateral) < -0.1f && outBy < GhostSee;
+                bool rejoining = AvoidGhosts && o.Ghost && !me.Ghost && (outBy < GhostNear || heading);
                 if (o.Ghost && !me.Ghost && !still && !rejoining) continue;
                 float g = Road(o.Distance - me.Distance, lap);
                 if (g <= -50f || g >= 200f) continue;
