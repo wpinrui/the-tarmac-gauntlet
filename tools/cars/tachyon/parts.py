@@ -230,16 +230,22 @@ def pane(pts):
     return soft(biggest(full), 0.012), k
 
 
+QUARTER_GAP = 0.04     # black pillar between the door glass and the quarter glass
+
+
 def side_shapes():
-    """In side view (x, z): the black opening round both side windows, the two panes, and the
-    door glass's bottom line."""
+    """In side view (x, z): the black opening round both side windows, the door glass and the
+    quarter glass filling the opening behind it, and the door glass's bottom line."""
     door, k = pane(R["door_glass"])
     quarter, _k = pane(R["quarter_glass"])
-    panes = [door.buffer(-0.012, join_style=1), quarter.buffer(-0.012, join_style=1)]
     opening = soft(door.union(quarter).buffer(0.05, join_style=1).buffer(-0.05, join_style=1), 0.02)
     opening = opening.union(soft(unary_union([door, quarter]).convex_hull.intersection(
         box(-0.65, 0.88, -0.15, 1.2)), 0.02)).buffer(0.002)
-    return opening, panes, k
+    inner = opening.buffer(-0.014, join_style=1)
+    x0 = door.bounds[0]
+    front = soft(inner.intersection(door.buffer(-0.012, join_style=1)), 0.01)
+    back = soft(biggest(inner.intersection(box(-5, 0, x0 - QUARTER_GAP, 5))), 0.015)
+    return opening, [front, back], k
 
 
 def belt(x):
@@ -346,44 +352,56 @@ def side_intake_cut(ref):
 
 # ---------------------------------------------------------------- shut lines
 def door_path():
-    """The door's outline, open where it runs under the window, its two ends carried into the
-    window's black band."""
+    """The door's outline, open where it runs under the window. Its front end runs into the
+    window's black band at the nearest point; its rear end carries straight on up its rear
+    edge into the band."""
     opening, _p, _k = side_shapes()
     d = np.array(soft(poly(R["door"]), 0.03).exterior.coords)[:-1]
     d = geom.resample(np.vstack([d, d[:1]]), 0.01)[:-1]
-    near = opening.buffer(0.03)
+    near = opening.buffer(0.03).union(box(-5, 0.70, 0.2, 5))      # the notched top rear corner goes
     keep = np.array([not near.contains(Point(p)) for p in d])
     k = int(np.argmax(~keep & np.roll(keep, 1)))
     rolled, kr = np.roll(d, -k, axis=0), np.roll(keep, -k)
     path = rolled[kr]
+    band = opening.buffer(-0.007)
 
     def into(p):
         q = np.array(opening.exterior.interpolate(opening.exterior.project(Point(p))).coords[0])
         return (q + np.array([0, 0.015])).tolist()
-    return [into(path[0])] + path.tolist() + [into(path[-1])]
+
+    def carry(end, prev):
+        t = (end - prev) / np.linalg.norm(end - prev)
+        for s in np.arange(0.01, 0.4, 0.005):
+            q = end + t * s
+            if band.contains(Point(q)):
+                return [(end + t * x).tolist() for x in np.arange(0.02, s, 0.02)] + [q.tolist()]
+        return [into(end)]
+    a, b = path[0], path[-1]
+    head = carry(a, path[min(8, len(path) - 1)]) if a[0] < b[0] else [into(a)]
+    tail = carry(b, path[max(-9, -len(path))]) if b[0] < a[0] else [into(b)]
+    return head[::-1] + path.tolist() + tail
+
+
+BONNET_GAP = 0.035     # the bonnet line keeps this far inside the head lamps
 
 
 def bonnet_path():
-    """The bonnet shut line in plan: out of the windscreen's lower corner, forward along the
-    wing tops past the lamps and across the nose, as one smooth curve. The lid runs under the
-    windscreen, so the line has no rear edge."""
+    """The bonnet shut line in plan as one plain U: out of the windscreen's lower corner,
+    straight forward along the wing, round the lamps' inner edge and across the nose. The lid
+    runs under the windscreen, so the line has no rear edge."""
     from scipy.interpolate import splev, splprep
     o, _g, _t = screen_shapes()
     c = np.array(o.exterior.coords)
-    corner = c[np.argmax(c[:, 1] + 0.6 * c[:, 0])]          # the screen's lower side corner
-    lid = soft(poly(R["bonnet"]).union(poly(R["cowl"])).buffer(0.02).buffer(-0.02), 0.05)
-    from shapely.geometry.polygon import orient
-    e = np.array(orient(lid, 1).exterior.coords)[:-1]
-    e = geom.resample(np.vstack([e, e[:1]]), 0.01)[:-1]
-    i0 = int(np.argmin(np.linalg.norm(e - corner, axis=1) + 10 * (e[:, 1] < 0)))
-    i1 = int(np.argmax(e[:, 0] - 3 * np.abs(e[:, 1])))       # the nose, on the middle line
-    e = np.roll(e, -i0, axis=0)
-    i1 = (i1 - i0) % len(e)
-    arc = e[: i1 + 1] if e[min(i1 // 2, len(e) - 1), 1] > 0 else e[i1:][::-1]
-    arc = arc[(arc[:, 0] > corner[0] + 0.08) & (arc[:, 1] > 0.02)]
-    half = np.vstack([[corner + [0.01, -0.012]], arc[::3], [[arc[-1, 0] + 0.004, 0.0]]])
+    corner = c[np.argmax(c[:, 1] + 0.6 * c[:, 0])]
+    h = np.array(R["head"]).reshape(-1, 3)
+    lamp = Polygon(h[:, :2]).convex_hull.buffer(BONNET_GAP)
+    inner = lambda x: lamp.intersection(LineString([(x, 0), (x, 2)])).bounds[1]
+    xn = poly(R["bonnet"]).bounds[2] - 0.01
+    y0 = corner[1] - 0.015
+    half = np.array([(corner[0] + 0.01, y0), (1.55, y0 - 0.01), (1.85, min(y0 - 0.03, inner(1.85))),
+                     (2.05, inner(2.05)), (xn - 0.05, 0.30), (xn, 0.0)])
     pts = np.vstack([half, half[-2::-1] * [1, -1]])
-    tck, _u = splprep([pts[:, 0], pts[:, 1]], s=0.006, k=3)
+    tck, _u = splprep([pts[:, 0], pts[:, 1]], s=0.004, k=3)
     x, y = splev(np.linspace(0, 1, 480), tck)
     q = np.column_stack([x, y])
     q = q[: int(np.argmax(q[:, 1] <= 0))]
@@ -507,7 +525,7 @@ def tip_shape():
     return soft(smooth_loop(R["exhaust"][0], 0.0003), 0.015)
 
 
-TIP_PROUD = 0.015    # each tip stands this far behind the rearmost skin round it
+TIP_PROUD = 0.0      # each tip ends level with the rearmost skin round it
 TIP_LEN = 0.30       # and runs this far into the body
 
 

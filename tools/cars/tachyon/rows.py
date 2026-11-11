@@ -334,6 +334,43 @@ def plain_ends(stations, xf, xr, arches, blend=0.12):
     return stations
 
 
+NOSE_FROM = 1.90     # ahead of here the nose is rebuilt plain
+NOSE_LIFT = 0.05     # its bottom rises this much by the tip
+
+
+def plain_nose(stations, xf=NOSE_FROM):
+    """The model's nose is open where its intake is, so its sections hang a small knob over a
+    hollow. Ahead of xf each section is the section at xf stretched to a smooth top line, a
+    near level bottom and the measured plan width, so the nose runs down to one blunt face."""
+    from scipy.ndimage import gaussian_filter1d
+    th = np.linspace(-np.pi / 2, np.pi / 2, ANGLES)
+    st = sorted(stations, key=lambda t: t["x"])
+    X = np.array([t["x"] for t in st])
+    halves = [np.column_stack([np.asarray(t["r"]) * np.cos(th), t["zc"] + np.asarray(t["r"]) * np.sin(th)]) for t in st]
+    i0 = int(np.argmin(np.abs(X - xf)))
+    ref = halves[i0]
+    t0, b0, w0 = ref[:, 1].max(), ref[:, 1].min(), ref[:, 0].max()
+    xn = X.max()
+    tops = np.array([h[:, 1].max() for h in halves])
+    near = X > xn - 0.03
+    t1 = float(tops[near].mean())
+    wid = gaussian_filter1d(np.array([h[:, 0].max() for h in halves]), 2, mode="nearest")
+    lw = w0
+    for i in range(i0, len(X)):
+        t = max(0.0, (X[i] - X[i0]) / (xn - X[i0]))
+        lt = t0 + (t1 - t0) * t ** 1.6                  # one even curve down to the tip
+        lb = b0 + NOSE_LIFT * t ** 3
+        lw = min(lw, wid[i])
+        h = np.column_stack([ref[:, 0] * lw / w0, lb + (ref[:, 1] - b0) * (lt - lb) / (t0 - b0)])
+        zc = (lt + lb) / 2
+        full = np.vstack([h, (h * [-1, 1])[::-1]])
+        segs = np.stack([full[:-1], full[1:]], 1)
+        r = polar(segs, zc, np.clip(th, -np.pi / 2 + 0.01, np.pi / 2 - 0.01))
+        r = np.where(np.isnan(r), np.nanmax(r), r)
+        st[i]["zc"], st[i]["r"] = round(float(zc), 4), r4(r)
+    return stations
+
+
 def arches(sp, m, wheels):
     """Arch radius round each wheel centre (x, z), from the body paint at the sides."""
     v = sp(np.vstack([m[k] for k in PAINT])).reshape(-1, 3)
@@ -404,7 +441,7 @@ def measure(path):
     left = lambda t: t[t[:, :, 1].mean(1) > 0]
     wheels = [(WHEELBASE / 2, TYRE_F), (-WHEELBASE / 2, TYRE_R)]
     arch = arches(sp, m, wheels)
-    stations = sections(sp, m, arch)
+    stations = plain_nose(sections(sp, m, arch))
 
     # panel borders of the painted skin, seen from the side (left), above, ahead and behind
     E = np.vstack([open_edges(P("Paint_Metal", 0, 2, 5)), open_edges(P("Paint_Plastic", 0, 1))])
