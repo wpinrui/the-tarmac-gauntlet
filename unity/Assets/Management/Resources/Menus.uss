@@ -212,7 +212,7 @@
 .tile-label { font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.62); white-space: nowrap; }
 .tile-value { margin-top: 2px; font-size: 22px; }
 .tile-count { font-size: 20px; }
-.tile-price { font-size: 15px; color: rgb(61, 220, 132); }
+.tile-price { font-size: 15px; color: rgba(255, 255, 255, 0.74); }
 .tile-line { flex-direction: row; align-items: center; justify-content: space-between; margin-top: 6px; }
 .tile-line > .small-button { flex-grow: 1; margin-left: 10px; }
 .tile > .small-button { margin-top: 8px; }
