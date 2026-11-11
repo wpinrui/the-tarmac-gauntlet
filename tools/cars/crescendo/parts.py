@@ -705,6 +705,9 @@ def badge(ref, style, size, fr, a, b, up, name, lift=0.0):
     return obs
 
 
+LID_FACE_Z = 0.86    # the boot lid's upright face, where the rear badge and name sit
+
+
 def options(ref):
     """Badge and name options, named opt_<group>_<n>_<i>. Each lies flat on its panel.
     Odd numbers are the chrome badge, even the colour badge, at the same spot."""
@@ -723,12 +726,12 @@ def options(ref):
         add("frontbadge", 1 + k, badge(ref, style, 0.10, front_fr(), 0, gz, up, "fb"))
         add("frontbadge", 3 + k, badge(ref, style, 0.045, top_fr(), sp["bonnet_x"], 0, fwd, "fb"))
         # rear: middle of the boot lid (the reference), or high on the lid under the lip
-        add("rearbadge", 1 + k, badge(ref, style, 0.07, rear_fr(), 0, sp["lid_z"], up, "rb"))
+        add("rearbadge", 1 + k, badge(ref, style, 0.07, rear_fr(), 0, LID_FACE_Z, up, "rb"))
         add("rearbadge", 3 + k, badge(ref, style, 0.05, rear_fr(), 0, sp["spoiler_z"] - 0.05, up, "rb"))
     cap = 0.026
     lid_y = 0.32
-    add("name", 1, _flat(ref, nm, cap, rear_fr(), -lid_y, sp["lid_z"] - 0.01, up, "nm", 0.0012, NAME_T, "chrome"))
-    add("name", 2, _flat(ref, nm, cap, rear_fr(), lid_y, sp["lid_z"] - 0.01, up, "nm", 0.0012, NAME_T, "chrome"))
+    add("name", 1, _flat(ref, nm, cap, rear_fr(), -lid_y, LID_FACE_Z - 0.01, up, "nm", 0.0012, NAME_T, "chrome"))
+    add("name", 2, _flat(ref, nm, cap, rear_fr(), lid_y, LID_FACE_Z - 0.01, up, "nm", 0.0012, NAME_T, "chrome"))
     q = []
     for sgn in (1, -1):
         q += _flat(ref, nm, cap, side_fr(sgn), WING_NAME_X, 0.64, up, "nm", 0.0012, NAME_T, "chrome")

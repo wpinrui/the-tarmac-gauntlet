@@ -270,8 +270,8 @@ def sections(sp, m, arches):
     return [dict(x=round(float(x), 4), zc=round(float(zc), 4), r=r4(r)) for x, zc, r in zip(X, ZC, Rm)]
 
 
-TAIL_FACE = 0.62     # top of the small flat rear face; above it the tail leans in one plain curve
-TAIL_SHOULDER = 0.20  # the lid's back edge rolls down to the face over this length, with no bumper step
+TAIL_FACE = 0.80     # top of the upright rear face: bumper and lid are one face, with no step between
+TAIL_SHOULDER = 0.12  # the lid's back edge rolls down to the face over this length
 TAIL_CORNER = 0.30    # the plan corners round in over this length
 TAIL_FACE_W = 0.42    # half width of the flat rear face
 
