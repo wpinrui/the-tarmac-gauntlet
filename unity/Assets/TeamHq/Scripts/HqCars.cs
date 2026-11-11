@@ -54,6 +54,9 @@ namespace TarmacGauntlet.TeamHq
 
         public int Count => bays.Count;
 
+        /// <summary>Whether a car stands still in a bay, so the crew can check its wheels.</summary>
+        public bool Parked(int index) => index >= 0 && index < bays.Count && bays[index].Car != null && bays[index].Phase == Phase.Idle;
+
         /// <summary>Sets up the bays, with the cars that stand in them while no game is loaded.</summary>
         public void Init(IReadOnlyList<HqBay> places, HqCarLook?[] demoCars)
         {

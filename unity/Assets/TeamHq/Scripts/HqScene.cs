@@ -27,7 +27,11 @@ namespace TarmacGauntlet.TeamHq
             var props = new GameObject("Props").transform;
             props.SetParent(transform, false);
             foreach (HqProp prop in geometry.Props) HqProps.Place(props, prop);
-            gameObject.AddComponent<HqCars>().Init(geometry.Bays, DemoCars);
+            HqCars cars = gameObject.AddComponent<HqCars>();
+            cars.Init(geometry.Bays, DemoCars);
+            var crew = new GameObject("Crew");
+            crew.transform.SetParent(transform, false);
+            crew.AddComponent<HqCrew>().HasCar = cars.Parked;
             AddLights(geometry);
 
             var camObject = new GameObject("Menu Camera") { tag = "MainCamera" };
