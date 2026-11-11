@@ -60,6 +60,7 @@ namespace TarmacGauntlet.Raceday
         private static readonly float GhostCrawl = Knob("CRAWL", 6f);
         /// <summary>A moving ghost this close to the track, m, is planned round like any car (T17).</summary>
         private static readonly float GhostNear = Knob("GHOSTNEAR", 3f);
+        private static readonly bool Commit = Knob("COMMIT", 1f) > 0f;
         private static readonly bool AvoidGhosts = Knob("AVOIDGHOSTS", 1f) > 0f;
         /// <summary>Gap to a car alongside, side to side, inside which TORCS's parallel steering still takes over, m (spec: 2 m).</summary>
         public const float SideFilterGap = 2f;
@@ -141,6 +142,8 @@ namespace TarmacGauntlet.Raceday
         private float moveDir;
         private float lastShift;
         private Pedal lastPedal;
+        // Braking for a corner at the last choice, and whether that choice left a car its width (H13).
+        private bool lastBraking, lastOwe;
 
         // The cars near this one, and where they are predicted to be at each step.
         private readonly List<TrafficCar> others = new List<TrafficCar>();
@@ -273,8 +276,21 @@ namespace TarmacGauntlet.Raceday
                 }
 
             Candidate best = null;
-            foreach (Candidate k in Candidates)
-                if (k.Rejected == null && (best == null || k.Score > best.Score)) best = k;
+            // H13: from the braking point to the apex the car keeps the path it chose, and changes it only
+            // when that path breaks a limit (Ivan).
+            bool braking = BrakingZone(pilot);
+            bool sideBySide = false;
+            foreach (TrafficCar o in others)
+                if (Mathf.Abs(Road(o.Distance - me.Distance, lap)) < CarL && Mathf.Abs(o.Lateral - me.Lateral) < 3f * CarW) sideBySide = true;
+            if (Commit && braking && lastBraking && sideBySide)
+                foreach (Candidate k in Candidates)
+                {
+                    bool same = k.Delay == 0f && !k.Stay && (lastOwe ? k.Owe : !k.Owe && Mathf.Abs(k.Shift - lastShift) < 0.3f);
+                    if (same && k.Rejected == null && (best == null || k.Score > best.Score)) best = k;
+                }
+            if (best == null)
+                foreach (Candidate k in Candidates)
+                    if (k.Rejected == null && (best == null || k.Score > best.Score)) best = k;
             if (best == null)
                 // Every path breaks a limit: brake, on the path that keeps the limit longest, moving across as little as it can.
                 foreach (Candidate k in Candidates)
@@ -306,6 +322,8 @@ namespace TarmacGauntlet.Raceday
             Cap = CapAt(best.Pedal, ahead, 0, mySpeed, me.Distance, margin);
             lastShift = best.Shift;
             lastPedal = best.Pedal;
+            lastBraking = braking;
+            lastOwe = best.Owe;
 
             // The one move: noted on the path taken.
             bool movedAway = Mathf.Abs(best.Shift) > Mathf.Abs(myOffset) + 0.3f;
