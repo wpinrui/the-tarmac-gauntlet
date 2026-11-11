@@ -44,7 +44,8 @@ namespace TarmacGauntlet.Raceday
             startFuel = supplies.Fuel;
             PitOrders orders = supplies.Orders;
             litres = Mathf.Clamp(orders.Litres ?? float.PositiveInfinity, 0f, Mathf.Max(supplies.Capacity - supplies.Fuel, 0f));
-            scale = 0.85f + 0.3f * (float)spec.Stats.PitStopTime / 100f;
+            // The car's Pit Stop stat scales the work: 0.7 times at 0, 1.3 times at 100.
+            scale = 0.7f + 0.6f * (float)spec.Stats.PitStopTime / 100f;
             PitWork work = supplies.Log?.Pit(orders.Tyres);
             tyres = work == null ? orders.Tyres : work.ChangeTyres;
             NewTyres = tyres;
