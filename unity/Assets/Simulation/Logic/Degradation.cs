@@ -44,10 +44,14 @@ namespace TarmacGauntlet.Simulation
         private const double MaxFuelStatReduction = 0.5;
 
         // --- Driver fatigue ---
-        /// <summary>Fatigue built up per lap (0 to 100 scale) with baseline stats and Normal mode.</summary>
-        private const double BaseFatiguePerLap = 3;
-        /// <summary>Maximum fractional reduction in fatigue rate from combined Comfort + Stamina stats.</summary>
-        private const double MaxFatigueStatReduction = 0.5;
+        // Comfort is the car's only lever on fatigue, so it gets the bigger share. The base is set so
+        // a Comfort 50, Stamina 50 car tires at about the same rate as before Comfort got its own cut.
+        /// <summary>Fatigue built up per lap (0 to 100 scale) at Comfort 0, Stamina 0 and Normal mode.</summary>
+        private const double BaseFatiguePerLap = 3.7;
+        /// <summary>Fractional reduction in fatigue rate at Comfort 100.</summary>
+        private const double MaxComfortFatigueReduction = 0.6;
+        /// <summary>Fractional reduction in fatigue rate at Stamina 100.</summary>
+        private const double MaxStaminaFatigueReduction = 0.25;
 
         // --- Car condition ---
         // Condition multiplies power/handling directly via effectiveStats: at 1.0 %/lap
@@ -109,7 +113,8 @@ namespace TarmacGauntlet.Simulation
         /// <returns>New fatigue level, clamped to a maximum of 100.</returns>
         public static double UpdateDriverFatigue(double current, double comfort, double stamina, InstructionMode mode)
         {
-            double statFactor = 1 - ((comfort + stamina) / 200) * MaxFatigueStatReduction;
+            double statFactor = (1 - (comfort / 100) * MaxComfortFatigueReduction)
+                * (1 - (stamina / 100) * MaxStaminaFatigueReduction);
             double fatiguePerLap = BaseFatiguePerLap * statFactor * ModeDegradationScale(mode);
             return Math.Min(100, current + fatiguePerLap);
         }
