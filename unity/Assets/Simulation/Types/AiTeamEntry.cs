@@ -7,6 +7,8 @@ namespace TarmacGauntlet.Simulation
     {
         public string Name { get; init; } = "";
         public string Descriptor { get; init; } = "";
+        /// <summary>The one car model this team ever runs.</summary>
+        public string ModelId { get; init; } = "";
         public CarClass CarClass { get; init; }
     }
 }
