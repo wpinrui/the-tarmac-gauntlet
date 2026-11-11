@@ -42,3 +42,4 @@ One row per run, win or lose. Full-suite runs only, plus dev runs marked as such
 | 2026-11-11 | dev, unfinished | RJ BRAKE 9, SECS 0.5 (v1 and E1); RJ LANE 4.5 (E1) | Rejoin assumes the car coming brakes at 9 m/s² with 0.5 s to spare; stopped when Ivan paused the work | | | | | |
 | 2026-11-11 | dev, unfinished | E1.8 + back to the line | Stopped for Ivan's method change: shipped as E1.9 without a race run | | | | | |
 | 2026-11-11 | set-ups | E1.9 | Back on the racing line once clear: a metre off the line costs 0.05 s (was 0.01), a move back to the line costs no hysteresis, a car behind adds no side risk. Ivan tests in Unity; no metric run. T1 100, T8 85, H8 pass, H10 pass | | | | | |
+| 2026-11-11 | set-ups | E1.10, E2.1 | T17: rejoins at its safe angle whenever ready, no wait for a gap (E2 is E0 with only this). T17 100 on all: 2.4 s on the grass against E0's 5.4 s, no contacts. Ivan tests in Unity | | | | | |
