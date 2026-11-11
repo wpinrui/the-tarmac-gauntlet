@@ -15,7 +15,7 @@ namespace TarmacGauntlet.Management
     /// The management menus over the Team HQ building: the main menu, the hub with its top bar, car tag and Race
     /// button, screens as one panel docked to the right with the menu collapsed to an icon strip, the Escape menu
     /// and settings. Every screen change moves the camera to that screen's shot.
-    /// Screens are empty panels for now: other code fills them through <see cref="ScreenOpened"/>.
+    /// Screen panels fill their docked panel through <see cref="ScreenOpened"/>, such as <see cref="DriversPanel"/>.
     /// </summary>
     public sealed class Menus : MonoBehaviour
     {
@@ -34,6 +34,14 @@ namespace TarmacGauntlet.Management
         /// <summary>A panel opened: its slug and the element to fill. The body is emptied each time.</summary>
         public event Action<string, VisualElement> ScreenOpened;
 
+        /// <summary>
+        /// The side pane left of the docked panel, emptied with the panel each time a screen opens. It shows while a
+        /// screen is open and the pane has something in it.
+        /// </summary>
+        internal VisualElement SideBody { get; private set; }
+
+        private VisualElement side;
+
         private enum Mode { Main, NewGame, Hub, Screen, Lineup }
         private enum Overlay { None, Pause, Settings }
 
@@ -47,6 +55,8 @@ namespace TarmacGauntlet.Management
         private readonly HashSet<VisualElement> shown = new HashSet<VisualElement>();
 
         private VisualElement root, mainColumn, continueItem, gameLayer, top, hubMenu, strip, tag, tagFill, race, panel, panelBody, panelButton;
+        private VisualElement catcher, lineup, lineupBody;
+        private Label tagClass;
         private VisualElement dimmer, pauseLayer, settingsLayer, settingsPanel;
         private Label continueSub, teamName, year, money, tagName, tagPercent;
         private readonly Dictionary<string, VisualElement> hubItems = new Dictionary<string, VisualElement>(), stripIcons = new Dictionary<string, VisualElement>();
@@ -79,8 +89,8 @@ namespace TarmacGauntlet.Management
 
             semiBold = Resources.Load<Font>("Fonts/TitilliumWeb-SemiBold");
             bold = Resources.Load<Font>("Fonts/TitilliumWeb-Bold");
-            mainMedium = Resources.Load<Font>("Fonts/HankenGrotesk-Medium");
-            mainRegular = Resources.Load<Font>("Fonts/HankenGrotesk-Regular");
+            mainMedium = Resources.Load<Font>("Fonts/HostGrotesk-Medium");
+            mainRegular = Resources.Load<Font>("Fonts/HostGrotesk-Regular");
 
             var settings = ScriptableObject.CreateInstance<PanelSettings>();
             settings.scaleMode = PanelScaleMode.ScaleWithScreenSize;
@@ -97,6 +107,9 @@ namespace TarmacGauntlet.Management
             root.style.unityFontDefinition = FontDefinition.FromFont(semiBold);
             glass = new MenuGlass(root);
             Build();
+            gameObject.AddComponent<DriversPanel>();
+            gameObject.AddComponent<CrewPanel>();
+            gameObject.AddComponent<LineupPanel>();
 
             GameSession.Changed += OnGameChanged;
             if (GameSession.State != null) OnGameChanged(GameSession.State);
@@ -116,9 +129,7 @@ namespace TarmacGauntlet.Management
             // Main menu: a tall glass column on the left edge, the wordmark above four items.
             var mainLayer = Layer();
             mainColumn = glass.Make("main-column", "fade");
-            var wordmark = new VisualElement { name = "wordmark" };
-            wordmark.AddToClassList("wordmark");
-            mainColumn.Add(wordmark);
+            mainColumn.Add(BuildWordmark());
             continueItem = MainItem("Continue", () => { if (GameSession.ContinueLatest()) Go(Mode.Hub); });
             continueSub = new Label();
             continueSub.AddToClassList("sub");
@@ -132,6 +143,11 @@ namespace TarmacGauntlet.Management
 
             // The game: top bar, hub menu, icon strip, car tag, Race and the docked panel.
             gameLayer = Layer();
+            // Under everything in the game layer: a click on the scene closes the lineup.
+            catcher = new VisualElement();
+            catcher.AddToClassList("layer");
+            catcher.RegisterCallback<ClickEvent>(_ => { if (mode == Mode.Lineup) Go(Mode.Hub); });
+            gameLayer.Add(catcher);
             top = new VisualElement();
             top.AddToClassList("top");
             top.AddToClassList("fade");
@@ -181,8 +197,13 @@ namespace TarmacGauntlet.Management
             gameLayer.Add(strip);
 
             tag = glass.Make("tag", "fade");
+            var tagTop = new VisualElement();
+            tagTop.AddToClassList("tag-top");
+            tagClass = ClassLabels.Make(CarClass.F, "cls-sm", bold);
+            tagTop.Add(tagClass);
             tagName = Text("", "tag-name", true);
-            tag.Add(tagName);
+            tagTop.Add(tagName);
+            tag.Add(tagTop);
             var condition = new VisualElement();
             condition.AddToClassList("condition");
             var bar = new VisualElement();
@@ -208,6 +229,19 @@ namespace TarmacGauntlet.Management
             panel.Add(panelButton);
             gameLayer.Add(panel);
 
+            // The lineup: a small panel where the Race button was.
+            lineup = glass.Make("lineup", "fade");
+            lineupBody = new VisualElement();
+            lineup.Add(lineupBody);
+            gameLayer.Add(lineup);
+
+            // A second pane left of the docked panel, for screens that show a selected item beside a long list.
+            side = glass.Make("side", "fade");
+            SideBody = new VisualElement();
+            SideBody.AddToClassList("side-body");
+            side.Add(SideBody);
+            gameLayer.Add(side);
+
             // Escape menu and settings, over a dimmed scene.
             dimmer = Layer("dimmer", "fade");
             pauseLayer = Layer("centre", "fade");
@@ -224,8 +258,122 @@ namespace TarmacGauntlet.Management
             settingsPanel = glass.Make("settings");
             settingsLayer.Add(settingsPanel);
 
-            foreach (VisualElement e in new[] { mainColumn, top, hubMenu, strip, tag, race, panel, dimmer, pauseLayer, settingsLayer })
+            foreach (VisualElement e in new[] { mainColumn, top, hubMenu, strip, tag, race, panel, side, catcher, lineup, dimmer, pauseLayer, settingsLayer })
                 e.style.display = DisplayStyle.None;
+
+            tipLayer = Layer();
+            tip = Text("", "tip");
+            tip.pickingMode = PickingMode.Ignore;
+            tip.style.unityFontDefinition = FontDefinition.FromFont(mainRegular);
+            tip.style.display = DisplayStyle.None;
+            tipLayer.Add(tip);
+        }
+
+        // ------------------------------------------------------------------ tooltips
+
+        private VisualElement tipLayer;
+        private Label tip;
+        private IVisualElementScheduledItem tipTimer;
+
+        /// <summary>
+        /// Shows <paramref name="text"/> under <paramref name="target"/> after a short hover. Only stats and skills
+        /// get tooltips, where a number needs explaining.
+        /// </summary>
+        internal void Tooltip(VisualElement target, string text)
+        {
+            target.RegisterCallback<PointerEnterEvent>(_ =>
+            {
+                tipTimer?.Pause();
+                tipTimer = target.schedule.Execute(() =>
+                {
+                    if (target.panel == null) return;
+                    tip.text = text;
+                    Rect r = target.worldBound;
+                    Vector2 p = tipLayer.WorldToLocal(new Vector2(r.xMin, r.yMax));
+                    tip.style.left = Mathf.Round(p.x);
+                    tip.style.top = Mathf.Round(p.y + 8);
+                    tip.style.display = DisplayStyle.Flex;
+                }).StartingIn(350);
+            });
+            target.RegisterCallback<PointerLeaveEvent>(_ => HideTooltip());
+            target.RegisterCallback<DetachFromPanelEvent>(_ => HideTooltip());
+        }
+
+        private void HideTooltip()
+        {
+            tipTimer?.Pause();
+            tipTimer = null;
+            if (tip != null) tip.style.display = DisplayStyle.None;
+        }
+
+        // ------------------------------------------------------------------ wordmark
+
+        // In wordmark pixels on its 358 x 209.32 canvas, one to one with the reference screen (wordmark/README.md).
+        private const float CarStartLeft = 364, CarFinalLeft = 195, CarTop = 19.7f, CarWidth = 169.61f, CarHeight = 43;
+        private const float RimSize = 14.14f, RimY = 50.07f, TyreRadius = 12.627f;
+        private static readonly float[] RimX = { 233.05f, 333.38f };
+        private const float RollDelay = 0.35f, RollSeconds = 1.7f;
+
+        private static bool rolledIn;
+        private VisualElement car;
+        private readonly List<VisualElement> rims = new List<VisualElement>();
+        private float rollStart = -1;
+
+        private VisualElement BuildWordmark()
+        {
+            var wordmark = new VisualElement { name = "wordmark", pickingMode = PickingMode.Ignore };
+            wordmark.AddToClassList("wordmark");
+            wordmark.Add(Picture("wordmark-text", 0, 0, 358, 209.32f));
+            car = new VisualElement { pickingMode = PickingMode.Ignore };
+            car.AddToClassList("wordmark-car");
+            car.style.width = CarWidth;
+            car.style.height = CarHeight;
+            car.Add(Picture("car-body", 0, 0, CarWidth, CarHeight));
+            foreach (float x in RimX)
+            {
+                VisualElement rim = Picture("car-rim", x - CarFinalLeft - RimSize / 2, RimY - CarTop - RimSize / 2, RimSize, RimSize);
+                rims.Add(rim);
+                car.Add(rim);
+            }
+            wordmark.Add(car);
+            PlaceCar(CarFinalLeft);
+            return wordmark;
+        }
+
+        private static VisualElement Picture(string file, float left, float top, float width, float height)
+        {
+            var e = new VisualElement { pickingMode = PickingMode.Ignore };
+            e.AddToClassList("wordmark-layer");
+            e.style.backgroundImage = Resources.Load<Texture2D>("Wordmark/" + file);
+            e.style.left = left;
+            e.style.top = top;
+            e.style.width = width;
+            e.style.height = height;
+            return e;
+        }
+
+        /// <summary>Puts the car's left edge at x and turns the rims by the distance rolled from the start.</summary>
+        private void PlaceCar(float x)
+        {
+            car.style.left = x;
+            car.style.top = CarTop;
+            // Rolling left turns the wheels anticlockwise; UI Toolkit's positive angles turn clockwise.
+            float degrees = -(CarStartLeft - x) / TyreRadius * Mathf.Rad2Deg;
+            foreach (VisualElement rim in rims) rim.style.rotate = new Rotate(new Angle(degrees, AngleUnit.Degree));
+        }
+
+        /// <summary>On game launch the car rolls in from the right and brakes to a stop at its spot.</summary>
+        private void RollWordmark()
+        {
+            if (rolledIn) return;
+            if (rollStart < 0)
+            {
+                if (!shown.Contains(mainColumn)) return;
+                rollStart = Time.unscaledTime + RollDelay;
+            }
+            float t = Mathf.Clamp01((Time.unscaledTime - rollStart) / RollSeconds);
+            PlaceCar(CarStartLeft - (CarStartLeft - CarFinalLeft) * (1 - (1 - t) * (1 - t)));
+            if (t >= 1) rolledIn = true;
         }
 
         private VisualElement Layer(params string[] classes)
@@ -245,7 +393,7 @@ namespace TarmacGauntlet.Management
             return group;
         }
 
-        private Label Text(string text, string cls, bool isBold = false)
+        internal Label Text(string text, string cls, bool isBold = false)
         {
             var label = new Label(text);
             label.AddToClassList(cls);
@@ -272,7 +420,7 @@ namespace TarmacGauntlet.Management
             return item;
         }
 
-        private VisualElement RedButton(string text, string cls, Action onClick)
+        internal VisualElement RedButton(string text, string cls, Action onClick)
         {
             var button = new VisualElement();
             button.AddToClassList("red");
@@ -291,7 +439,7 @@ namespace TarmacGauntlet.Management
         private static Texture2D redGradient;
 
         /// <summary>#ff2b22 at the top to #e10600 at the bottom.</summary>
-        private static Texture2D RedGradient
+        internal static Texture2D RedGradient
         {
             get
             {
@@ -361,7 +509,7 @@ namespace TarmacGauntlet.Management
             return row;
         }
 
-        private static VisualElement Chevron(string icon, Action onClick)
+        internal static VisualElement Chevron(string icon, Action onClick)
         {
             var chevron = new VisualElement();
             chevron.AddToClassList("chevron");
@@ -417,13 +565,20 @@ namespace TarmacGauntlet.Management
 
         private void Go(Mode next, string slug = null)
         {
+            HideTooltip();
             mode = next;
             screen = next == Mode.Screen ? slug : null;
-            if (next == Mode.Screen || next == Mode.Lineup || next == Mode.NewGame)
+            if (next == Mode.Screen || next == Mode.NewGame)
             {
                 panelBody.Clear();
-                panel.name = next == Mode.Screen ? slug : next == Mode.Lineup ? LineupSlug : NewGameSlug;
+                SideBody.Clear();
+                panel.name = next == Mode.Screen ? slug : NewGameSlug;
                 ScreenOpened?.Invoke(panel.name, panelBody);
+            }
+            else if (next == Mode.Lineup)
+            {
+                lineupBody.Clear();
+                ScreenOpened?.Invoke(LineupSlug, lineupBody);
             }
             hqCamera.Show(next == Mode.Main || next == Mode.NewGame ? MainShot : next == Mode.Screen ? slug : HubShot);
             Render();
@@ -495,7 +650,10 @@ namespace TarmacGauntlet.Management
             Show(hubMenu, mode == Mode.Hub && !covered);
             Show(strip, (mode == Mode.Screen || mode == Mode.Lineup) && !covered);
             Show(race, mode == Mode.Hub && !covered);
-            Show(panel, (mode == Mode.Screen || mode == Mode.Lineup || mode == Mode.NewGame) && !covered);
+            Show(panel, (mode == Mode.Screen || mode == Mode.NewGame) && !covered);
+            Show(lineup, mode == Mode.Lineup && !covered);
+            Show(catcher, mode == Mode.Lineup && !covered);
+            Show(side, mode == Mode.Screen && SideBody.childCount > 0 && !covered);
             panelButton.style.display = mode == Mode.NewGame ? DisplayStyle.Flex : DisplayStyle.None;
             Show(dimmer, covered);
             Show(pauseLayer, overlay == Overlay.Pause);
@@ -558,6 +716,8 @@ namespace TarmacGauntlet.Management
             {
                 CarModel model = CarModels.All.FirstOrDefault(m => m.Id == car.ModelId);
                 tagName.text = (model?.Name ?? car.ModelId).ToUpperInvariant();
+                if (model != null) ClassLabels.Paint(tagClass, model.CarClass);
+                tagClass.style.display = model != null ? DisplayStyle.Flex : DisplayStyle.None;
                 double c = Math.Max(0, Math.Min(100, car.Condition));
                 tagFill.style.width = Length.Percent((float)c);
                 tagPercent.text = Math.Round(c).ToString(CultureInfo.InvariantCulture) + "%";
@@ -568,7 +728,7 @@ namespace TarmacGauntlet.Management
             if (root != null) RenderTag();
         }
 
-        private static string Money(double amount)
+        internal static string Money(double amount)
         {
             string digits = Math.Round(Math.Abs(amount)).ToString("N0", CultureInfo.InvariantCulture);
             return (amount < 0 ? "-$" : "$") + digits;
@@ -579,6 +739,7 @@ namespace TarmacGauntlet.Management
         private void LateUpdate()
         {
             if (root == null) return;
+            RollWordmark();
             if (TagWanted() != tagWasShown) RenderTag();
             if (tagWasShown) PlaceTag();
             glass.Refresh();
@@ -601,6 +762,16 @@ namespace TarmacGauntlet.Management
         {
             Event ev = Event.current;
             if (ev.type != EventType.KeyDown || root == null) return;
+            // Typing in a text field is not a shortcut; Escape just leaves the field.
+            if (root.panel?.focusController?.focusedElement is VisualElement focused && (focused is TextField || focused.GetFirstAncestorOfType<TextField>() != null))
+            {
+                if (ev.keyCode == KeyCode.Escape)
+                {
+                    focused.Blur();
+                    ev.Use();
+                }
+                return;
+            }
             switch (ev.keyCode)
             {
                 case KeyCode.Escape:

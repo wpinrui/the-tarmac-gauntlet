@@ -72,11 +72,11 @@ namespace TarmacGauntlet.TeamHq
                 car.name = "Car " + prefab.name;
                 if (repaint)
                 {
-                    Material paint = HqMaterials.For(bay.Paint);
+                    Material bodyPaint = HqMaterials.For(bay.Paint);
                     foreach (Renderer r in car.GetComponentsInChildren<Renderer>())
                     {
                         Material[] mats = r.sharedMaterials;
-                        for (int k = 0; k < mats.Length; k++) if (mats[k] != null && mats[k].name.StartsWith("body")) mats[k] = paint;
+                        for (int k = 0; k < mats.Length; k++) if (mats[k] != null && mats[k].name.StartsWith("body")) mats[k] = bodyPaint;
                         r.sharedMaterials = mats;
                     }
                 }

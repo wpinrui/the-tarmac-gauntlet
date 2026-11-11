@@ -79,6 +79,16 @@ namespace TarmacGauntlet.Simulation.Tests
         }
 
         [Test]
+        public void WithNoLineupGiven_TheCareersStoredOrderIsUsed()
+        {
+            GameState game = Career();
+            string hired = Hired(game);
+            game = GameActions.SetLineup(game, new[] { hired, RaceEntry.PlayerCharacterDriverId });
+            GridCar player = RaceWeekend.BuildSetup(game).Grid.First(g => g.Player);
+            Assert.That(player.Lineup.Select(d => d.Id), Is.EqualTo(new[] { hired, RaceEntry.PlayerCharacterDriverId }));
+        }
+
+        [Test]
         public void DriversLeftOutOfTheLineupFollowTheNamedOnes()
         {
             GameState game = Career();

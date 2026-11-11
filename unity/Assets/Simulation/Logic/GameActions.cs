@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 
@@ -163,6 +164,13 @@ namespace TarmacGauntlet.Simulation
                 Transactions = p.Transactions.Append(Tx(year, TransactionCategory.DriverBuyout, -buyoutCost, $"Bought out {driverName}")).ToArray(),
             });
             return result with { Contracts = updatedContracts };
+        }
+
+        /// <summary>Stores the order the player's drivers race in, starter first.</summary>
+        public static GameState SetLineup(GameState game, IEnumerable<string> driverIds)
+        {
+            string[] ids = driverIds.ToArray();
+            return UpdatePlayer(game, p => p with { Lineup = ids });
         }
 
         // ---------------------------------------------------------------------------

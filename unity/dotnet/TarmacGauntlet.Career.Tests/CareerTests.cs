@@ -44,6 +44,8 @@ namespace TarmacGauntlet.Career.Tests
             GameState game = GameInit.InitializeGame(Options, Seeded(1));
             game = GameActions.BuyCar(game, new CarInstance { Id = "car-p1", ModelId = "f-01", Condition = 82 }, 4_500, "Nusa Carrier");
             game = GameActions.EnterCar(game, "car-p1");
+            game = GameActions.HireDriver(game, "driver-300", "Driver 300", 2, 1_500);
+            game = GameActions.SetLineup(game, new[] { "driver-300", RaceEntry.PlayerCharacterDriverId });
             return GameActions.PushRaceHistory(game, new RaceHistoryEntry
             {
                 Year = 1,
@@ -75,6 +77,7 @@ namespace TarmacGauntlet.Career.Tests
             Assert.That(((PlayerTeam)back.Teams[0]).Skills, Is.EqualTo(Options.Skills));
             Assert.That(back.RaceHistory[0].FastestLap!.Time, Is.EqualTo(101.234567));
             Assert.That(back.RaceHistory[0].Stints!["car-p1"][0].EndLap, Is.EqualTo(60));
+            Assert.That(DriverLineup.Of(back), Is.EqualTo(new[] { "driver-300", RaceEntry.PlayerCharacterDriverId }));
         }
 
         [Test]

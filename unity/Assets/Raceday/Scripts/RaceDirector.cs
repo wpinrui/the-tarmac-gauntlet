@@ -11,7 +11,7 @@ namespace TarmacGauntlet.Raceday
     /// its box, or stops beside the track after a fatal crash (<see cref="Retire"/>). After a stop's driver change, the new driver drives at their own pace. When the
     /// race clock runs out each car takes the flag the next time it crosses the line, and once all
     /// have, or <see cref="FlagWait"/> after the time ran out, the race is settled into the career
-    /// (<see cref="RaceWeekend.Finish"/>).
+    /// (<see cref="RaceWeekend.Finish"/>) and the player's car is parked in its box for the race summary.
     /// </summary>
     public sealed class RaceDirector : MonoBehaviour
     {
@@ -23,6 +23,8 @@ namespace TarmacGauntlet.Raceday
         public const float LimpSpeed = 0.45f;
         /// <summary>How far beyond the track edge a car that crashed out comes to rest, m.</summary>
         public const float OffTrack = 4f;
+        /// <summary>How far across the pit lane the summary's camera stands from the player's box, m.</summary>
+        public const float SummaryDistance = 11f;
 
         /// <summary>The cars and their drivers, in the same order as the race day's.</summary>
         public RaceDay Day;
@@ -139,8 +141,47 @@ namespace TarmacGauntlet.Raceday
                 Debug.LogException(e);
                 return;
             }
-            RaceSummary s = RaceWeekend.Summary;
-            if (s?.Player != null) Debug.Log($"Race over: P{s.Player.Position} after {s.Player.Laps} laps, {s.PitStops.Count} stops, {s.Issues.Count} issues");
+            ParkForSummary();
+        }
+
+        /// <summary>
+        /// Sets the scene for the race summary: the player's car parked in its box, seen from across the pit lane, at
+        /// normal speed, with the race views, timing tower and driving HUD gone.
+        /// </summary>
+        private void ParkForSummary()
+        {
+            Time.timeScale = 1f;
+            if (Tower != null) Tower.gameObject.SetActive(false);
+            Camera cam = Camera.main;
+            if (cam != null)
+            {
+                foreach (Behaviour b in new Behaviour[] { cam.GetComponent<RaceCameras>(), cam.GetComponent<FreeCamera>(), cam.GetComponent<DriveHud>(), cam.GetComponent<FpsCounter>() })
+                    if (b != null) b.enabled = false;
+            }
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+
+            int me = -1;
+            for (int i = 0; i < Day.Cars.Count; i++) if (Day.Cars[i].Car.Player) me = i;
+            if (me < 0 || Cars[me] == null || Cars[me].Pits == null || Cars[me].Garage < 0) return;
+
+            PitLane pits = Cars[me].Pits;
+            int garage = Cars[me].Garage;
+            Vector3 box = pits.BoxPoint(garage);
+            Vector3 toGarage = pits.LaneLeft(pits.BoxLane[garage]);
+            var along = new Vector3(toGarage.z, 0f, -toGarage.x);   // down the lane, the way cars drive it
+
+            Drivers[me].enabled = false;
+            Cars[me].enabled = false;   // out of every other car's traffic
+            CarController car = controllers[me];
+            car.PlaceAt(box, along);
+            car.Hold = true;
+            car.InputEnabled = false;
+
+            if (cam == null) return;
+            cam.fieldOfView = 34f;
+            Vector3 eye = box - toGarage * SummaryDistance + Vector3.up * 2.4f + along * 2f;
+            cam.transform.SetPositionAndRotation(eye, Quaternion.LookRotation(box + Vector3.up * 0.7f - along * 0.4f - eye, Vector3.up));
         }
     }
 }
