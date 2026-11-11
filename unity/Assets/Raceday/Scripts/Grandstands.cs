@@ -13,7 +13,7 @@ namespace TarmacGauntlet.Raceday
     {
         public const MainStandShape Main = MainStandShape.Cantilever;
         public const CornerStandShape Corners = CornerStandShape.Covered;
-        public const StandColours Colours = StandColours.Green;
+        public const StandColours Colours = StandColours.Blue;
     }
 
     /// <summary>Where a stand goes, how many rows it has and how full it is.</summary>
