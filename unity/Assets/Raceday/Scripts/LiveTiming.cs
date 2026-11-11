@@ -69,11 +69,10 @@ namespace TarmacGauntlet.Raceday
 
         private Font bold, semiBold;
         private GUIStyle big, text, small, right;
-        private Texture2D slash, disc, arrow, map;
+        private Texture2D slash, disc, arrow;
+        private TrackMap map;
         private RenderTexture pip;
         private Camera onboard;
-        private Vector2 mapMin, mapMax;
-        private float mapScale;
 
         private CarController Car => Driver.Car;
         private Consumables Supplies => Car.Supplies;
@@ -91,7 +90,7 @@ namespace TarmacGauntlet.Raceday
             slash = RaceTower.Shape(0.42f + 1.25f * lean, 1.25f, (x, y) => x >= y * lean && x <= y * lean + 0.42f);
             arrow = RaceTower.Shape(0.72f, 1f, (x, y) => x <= 0.72f * (1f - 2f * Mathf.Abs(y - 0.5f)));
             disc = RaceTower.Shape(1f, 1f, (x, y) => (x - 0.5f) * (x - 0.5f) + (y - 0.5f) * (y - 0.5f) < 0.25f);
-            map = TrackMap();
+            map = new TrackMap(Circuit, MapWidth, MapHeight);
             pip = new RenderTexture(PipWidth, PipHeight, 24) { hideFlags = HideFlags.DontSave };
             onboard = new GameObject("Onboard camera").AddComponent<Camera>();
             onboard.transform.SetParent(transform, false);
@@ -287,42 +286,25 @@ namespace TarmacGauntlet.Raceday
         private void Map(Rect r)
         {
             Fill(r, Panel, 9f);
-            Rect inner = Fit(r);
-            GUI.DrawTexture(inner, map, ScaleMode.StretchToFill, true, 0f, Track, 0f, 0f);
+            Rect inner = map.Fit(r);
+            GUI.DrawTexture(inner, map.Texture, ScaleMode.StretchToFill, true, 0f, Track, 0f, 0f);
             for (int i = 0; i < Cars.Length; i++)
             {
                 if (Cars[i] == null || i == Player) continue;
-                Dot(inner, OnTrack(Cars[i]), 9f, RaceTower.ClassColour(Classes[i]));
+                Dot(inner, TrackMap.OnTrack(Circuit, Cars[i]), 9f, RaceTower.ClassColour(Classes[i]));
             }
             if (Cars[Player] != null)
             {
-                Dot(inner, OnTrack(Cars[Player]), 18f, Ground);
-                Dot(inner, OnTrack(Cars[Player]), 13f, Color.white);
+                Dot(inner, TrackMap.OnTrack(Circuit, Cars[Player]), 18f, Ground);
+                Dot(inner, TrackMap.OnTrack(Circuit, Cars[Player]), 13f, Color.white);
             }
-        }
-
-        /// <summary>Where a car is, from its distance and place across the track, so gliding cars show too.</summary>
-        private Vector3 OnTrack(RaceCar car)
-        {
-            TrafficCar t = car.Traffic;
-            int i = Circuit.IndexOf(Mathf.Repeat(t.Distance, Lap));
-            return Circuit.Centre[i] + Circuit.Left[i] * t.Lateral;
         }
 
         private void Dot(Rect inner, Vector3 p, float size, Color colour)
         {
-            float u = (p.x - mapMin.x) * mapScale / MapWidth, v = 1f - (p.z - mapMin.y) * mapScale / MapHeight;
-            var at = new Vector2(inner.x + u * inner.width, inner.y + v * inner.height);
+            Vector2 at = map.At(inner, p);
             float s = size * k;
             GUI.DrawTexture(new Rect(at.x - s / 2f, at.y - s / 2f, s, s), disc, ScaleMode.StretchToFill, true, 0f, colour, 0f, 0f);
-        }
-
-        /// <summary>The map texture's place in its panel, keeping its shape.</summary>
-        private static Rect Fit(Rect r)
-        {
-            float scale = Mathf.Min(r.width / MapWidth, r.height / MapHeight);
-            float w = MapWidth * scale, h = MapHeight * scale;
-            return new Rect(r.x + (r.width - w) / 2f, r.y + (r.height - h) / 2f, w, h);
         }
 
         /// <summary>The driver at the wheel, fuel, tyres and condition, and the engine map.</summary>
@@ -450,56 +432,6 @@ namespace TarmacGauntlet.Raceday
             return (space >= 0 ? name.Substring(space + 1) : name).ToUpperInvariant();
         }
 
-        /// <summary>The circuit's outline, drawn once, with the scale that places cars on it.</summary>
-        private Texture2D TrackMap()
-        {
-            Vector3[] c = Circuit.Centre;
-            mapMin = new Vector2(float.MaxValue, float.MaxValue);
-            mapMax = new Vector2(float.MinValue, float.MinValue);
-            foreach (Vector3 p in c)
-            {
-                mapMin = Vector2.Min(mapMin, new Vector2(p.x, p.z));
-                mapMax = Vector2.Max(mapMax, new Vector2(p.x, p.z));
-            }
-            const float Pad = 28f;
-            Vector2 size = mapMax - mapMin;
-            mapScale = Mathf.Min((MapWidth - 2f * Pad) / Mathf.Max(size.x, 1f), (MapHeight - 2f * Pad) / Mathf.Max(size.y, 1f));
-            // Centre the circuit in the texture.
-            mapMin -= new Vector2((MapWidth / mapScale - size.x) / 2f, (MapHeight / mapScale - size.y) / 2f);
-
-            var alpha = new byte[MapWidth * MapHeight];
-            const float Half = 6f;
-            for (int i = 0; i < c.Length; i++)
-            {
-                Vector3 a = c[i], b = c[(i + 1) % c.Length];
-                int steps = Mathf.Max(1, Mathf.CeilToInt(Vector3.Distance(a, b) * mapScale));
-                for (int s = 0; s <= steps; s++)
-                {
-                    Vector3 p = Vector3.Lerp(a, b, s / (float)steps);
-                    float px = (p.x - mapMin.x) * mapScale, py = (p.z - mapMin.y) * mapScale;
-                    for (int y = Mathf.FloorToInt(py - Half); y <= Mathf.CeilToInt(py + Half); y++)
-                    for (int x = Mathf.FloorToInt(px - Half); x <= Mathf.CeilToInt(px + Half); x++)
-                    {
-                        if (x < 0 || y < 0 || x >= MapWidth || y >= MapHeight) continue;
-                        float d = Mathf.Sqrt((x + 0.5f - px) * (x + 0.5f - px) + (y + 0.5f - py) * (y + 0.5f - py));
-                        byte v = (byte)(255f * Mathf.Clamp01(Half - d));
-                        if (v > alpha[y * MapWidth + x]) alpha[y * MapWidth + x] = v;
-                    }
-                }
-            }
-            var pixels = new Color32[alpha.Length];
-            for (int i = 0; i < alpha.Length; i++) pixels[i] = new Color32(255, 255, 255, alpha[i]);
-            var tex = new Texture2D(MapWidth, MapHeight, TextureFormat.RGBA32, false)
-            {
-                wrapMode = TextureWrapMode.Clamp,
-                filterMode = FilterMode.Bilinear,
-                hideFlags = HideFlags.DontSave,
-            };
-            tex.SetPixels32(pixels);
-            tex.Apply();
-            return tex;
-        }
-
         private void Style()
         {
             if (big != null && Mathf.Approximately(big.fontSize, Mathf.Max(1, Mathf.RoundToInt(28f * k)))) return;
@@ -543,7 +475,7 @@ namespace TarmacGauntlet.Raceday
             if (slash != null) Destroy(slash);
             if (disc != null) Destroy(disc);
             if (arrow != null) Destroy(arrow);
-            if (map != null) Destroy(map);
+            if (map != null) Destroy(map.Texture);
             if (pip != null) pip.Release();
         }
     }

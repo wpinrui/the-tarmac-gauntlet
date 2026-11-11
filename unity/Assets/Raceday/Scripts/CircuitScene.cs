@@ -195,6 +195,22 @@ namespace TarmacGauntlet.Raceday
                 timing.Skip = () => stintSkip = true;
                 hidden.Add(timing.gameObject);
             }
+            BroadcastGraphics graphics = new GameObject("Broadcast graphics").AddComponent<BroadcastGraphics>();
+            graphics.Director = tv;
+            graphics.Cars = racing;
+            graphics.Drivers = drivers;
+            graphics.Teams = teams;
+            graphics.Classes = tower.Classes;
+            graphics.Colours = tower.Colours;
+            graphics.Models = new string[grid.Count];
+            for (int i = 0; i < grid.Count; i++) graphics.Models[i] = grid[i].Model.Name;
+            graphics.Day = day;
+            graphics.Game = setup.Game;
+            graphics.Circuit = circuit;
+            graphics.Player = player;
+            graphics.Tower = tower;
+            graphics.Keys = keys;
+            hidden.Add(graphics.gameObject);
             foreach (CarController c in cars) hidden.Add(c.gameObject);
             if (starter != null) hidden.Add(starter.gameObject);
             lab = new GameObject("AI debug menu").AddComponent<SituationMenu>();
