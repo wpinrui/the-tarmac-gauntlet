@@ -2,6 +2,7 @@
 intersecting pairs and z-fighting. Returns the list of hits."""
 import bmesh
 import bpy
+import re
 from mathutils.bvhtree import BVHTree
 
 TOUCH = 0.004     # parts closer than this are attached
@@ -29,6 +30,12 @@ def _volume(bm):
     return sum((f.verts[0].co - c).dot((f.verts[1].co - c).cross(f.verts[2].co - c)) for f in bm.faces) / 6
 
 
+def _apart(a, b):
+    """True for parts of two different options of one group, which never appear together."""
+    ma, mb = re.match(r"opt_(.+)_(\d+)_\d+", a), re.match(r"opt_(.+)_(\d+)_\d+", b)
+    return bool(ma and mb and ma[1] == mb[1] and ma[2] != mb[2])
+
+
 def run(obj_path, free=("wheel_",)):
     """free: name prefixes allowed to stand apart (wheels sit in the arches)."""
     data = _load(obj_path)
@@ -46,15 +53,17 @@ def run(obj_path, free=("wheel_",)):
             continue
         va = [v.co for v in data[a].verts]
         near = any(any((trees[b].find_nearest(v)[3] or 1) < TOUCH for v in va[:: max(1, len(va) // 400)])
-                   for b in names if b != a)
+                   for b in names if b != a and not _apart(a, b))
         if not near:
             hits.append(f"floating: {a}")
     for i, a in enumerate(names):
         for b in names[i + 1:]:
-            if trees[a].overlap(trees[b]):
+            if not _apart(a, b) and trees[a].overlap(trees[b]):
                 hits.append(f"intersecting: {a} x {b}")
     for i, a in enumerate(names):
         for b in names[i + 1:]:
+            if _apart(a, b):
+                continue
             n = 0
             for f in data[a].faces:
                 _loc, nrm, _i, d = trees[b].find_nearest(f.calc_center_median())
