@@ -53,6 +53,15 @@ namespace TarmacGauntlet.Raceday
         /// <summary>How far out from the road edge the runoff reaches on a side (0 = left), or 0 where the side is open.</summary>
         public float RunoffReach(int side, int k) => open[side][k] ? 0f : barrier[side][k];
 
+        /// <summary>True where armco or a pit wall stands on a side (0 = left) at <see cref="RunoffReach"/>.</summary>
+        public bool Fenced(int side, int k) => !open[side][k] && (fenced[side][k] || pitWall[side][k]);
+
+        /// <summary>True where the barrier on a side (0 = left) is the pit wall.</summary>
+        public bool PitWallAt(int side, int k) => !open[side][k] && pitWall[side][k];
+
+        /// <summary>A point on the verge or runoff as laid, at a lateral offset past the road edge.</summary>
+        public Vector3 RunoffPoint(int k, float lateral) => Point(k, lateral, 0f, true);
+
         /// <param name="materials">May be null outside Unity (tests and previews).</param>
         public CircuitBuilder(Circuit circuit, CircuitMaterials materials)
         {
