@@ -88,6 +88,9 @@ namespace TarmacGauntlet.Raceday
         public static readonly bool SideOweOnly = Knob("SIDEOWE", 1f) > 0f;
         public static readonly bool SideInside = Knob("SIDEIN", 1f) > 0f;
         /// <summary>H2, H3: in a turn the side steering may never steer a car out of the corner, at most hold its heading (Ivan).</summary>
+        /// <summary>T20: a car ahead on the outside into a corner is predicted to close in down to the lane it owes.</summary>
+        private static readonly bool DiveSee = Knob("DIVESEE", 1f) > 0f;
+        private static readonly bool DivePredict = Knob("DIVEPRED", 1f) > 0f;
         public static readonly bool SideNoReverse = Knob("SIDEHOLD", 1f) > 0f;
         private static readonly bool InsideRaces = Knob("INSIDERACES", 0f) > 0f;
         /// <summary>Seconds of score per second spent lifting or braking for a car ahead below its lane's speed.</summary>
@@ -98,6 +101,10 @@ namespace TarmacGauntlet.Raceday
         private static readonly float BrakeOpen = Knob("BOPEN", 12f), BesideBrake = Knob("BESIDE", 2f), BesideDrop = Knob("BDROP", 6f);
         /// <summary>The slowest car alongside this plan, m/s.</summary>
         private float besideSpeed = float.PositiveInfinity;
+        private bool diving;
+        private float diveSpeed;
+        /// <summary>T20: how far under the outside car's speed a car diving at it brakes to, m/s.</summary>
+        private static readonly float DiveDrop = Knob("DIVEDROP", 10f);
         /// <summary>The nearest car ahead not quite in this car's lane, which braking slows for when none is.</summary>
         private int aheadWide = -1;
         private static readonly float FallBehind = Knob("FALLBEHIND", 0f), WideAhead = Knob("WIDE", 3f), ZoneSwitch = Knob("ZSWITCH", 0f), SideSwitch = Knob("SSWITCH", 0.3f), ZoneHyst = Knob("ZHYST", 0f);
@@ -238,7 +245,7 @@ namespace TarmacGauntlet.Raceday
             float here = Mathf.Repeat(me.Distance, lap);
             lapLength = lap;
             Gather(c, me, field);
-            Predict(c, me);
+            Predict(c, me, NextTurn(c, here));
 
             // What the cars around ask of this one, from where they are now.
             float mySpeed = me.Speed;
@@ -249,6 +256,8 @@ namespace TarmacGauntlet.Raceday
             int ahead = -1;
             float aheadGap = 60f;
             besideSpeed = float.PositiveInfinity;
+            diving = false;
+            diveSpeed = float.PositiveInfinity;
             aheadWide = -1;
             float wideGap = 60f;
             float freeSpeed = Mathf.Max(mySpeed, pilot.FreeSpeed);
@@ -273,6 +282,10 @@ namespace TarmacGauntlet.Raceday
                 // A car alongside and level or ahead: one this car drops back from. One behind drops back itself.
                 // H2, H3: on the inside into a corner it is owed its room and races wheel to wheel, not dropping back from the car on its outside (Ivan).
                 bool onItsInside = InsideRaces && turnSoon != 0 && Mathf.Sign(o.Lateral - me.Lateral) == turnSoon;
+                // T20: a car ahead on the outside into the corner, with this one short of the slot it leaves on the inside.
+                int ki = c.IndexOf(here);
+                if (DiveSee && turnSoon != 0 && g > 0f && g < CarL + 2f && (o.Lateral - me.Lateral) * turnSoon > CarW
+                    && -turnSoon * me.Lateral < c.HalfWidth(ki) - 0.5f * CarW - RoomMargin - 0.15f) { diving = true; diveSpeed = Mathf.Min(diveSpeed, o.Speed); }
                 if (!onItsInside && g > (BesideBrake >= 2f ? 0f : -CarL - 1f) && g < CarL + 1f && Mathf.Abs(o.Lateral - me.Lateral) < 2f * CarW) besideSpeed = Mathf.Min(besideSpeed, o.Speed);
             }
             bool exempt = defending && passing;
@@ -492,6 +505,8 @@ namespace TarmacGauntlet.Raceday
         private float CapAt(Pedal pedal, int ahead, int s, float mySpeed, float d, float margin)
         {
             if (pedal == Pedal.Go) return float.PositiveInfinity;
+            // T20: diving at a car on the outside, braking backs out, as hard as the brakes allow for a second (Ivan).
+            if (pedal == Pedal.Brake && diving && s * Tick <= 1f) return Mathf.Clamp(diveSpeed - DiveDrop, Mathf.Max(mySpeed - 8f, 0f), mySpeed);
             // Braking with no car in its lane slows for one a little across, which a corner may bring into it.
             if (pedal == Pedal.Brake && ahead < 0 && WideAhead > 0f) ahead = aheadWide;
             // With no car ahead, braking drops back from a car alongside: to a little under its speed, as
@@ -759,7 +774,7 @@ namespace TarmacGauntlet.Raceday
         /// Where each car near will be at each step: at the speeds its own line gives, slowing for a
         /// car ahead of it in its lane, and drifting across as it is now for a second.
         /// </summary>
-        private void Predict(Circuit c, TrafficCar me)
+        private void Predict(Circuit c, TrafficCar me, int nextTurn)
         {
             int n = others.Count;
             if (od.GetLength(0) < n) { od = new float[n, Steps + 1]; ol = new float[n, Steps + 1]; ov = new float[n, Steps + 1]; }
@@ -803,7 +818,12 @@ namespace TarmacGauntlet.Raceday
                         lat = Mathf.Clamp(o.Profile.Line.Lateral[k] + Mathf.MoveTowards(was, o.Aim, Endurance.OvertakeOffsetRate * Tick), -edge, edge);
                         // A car alongside doesn't close in on this one: its own limits keep it off, as this car's keep it off that one.
                         float g0 = Road(od[j, 0] - me.Distance, lap);
-                        if (Mathf.Abs(g0) < CarL + 2f && Mathf.Abs(lat - me.Lateral) < Mathf.Abs(ol[j, s - 1] - me.Lateral)) lat = ol[j, s - 1];
+                        // T20, H7: into a corner, a car ahead on this one's outside keeps off only as far as the lane leaving a
+                        // car its width from the inside edge. Short of that slot, this car is diving at it, and must back out (Ivan).
+                        bool outside = DivePredict && nextTurn != 0 && g0 > 0f && (ol[j, 0] - me.Lateral) * nextTurn > CarW;
+                        float owedLane = c.HalfWidth(k) - 1.5f * CarW - RoomMargin - 0.15f;
+                        if (outside && g0 < CarL + 2f) lat = -nextTurn * Mathf.Min(-nextTurn * lat, Mathf.Max(owedLane, -nextTurn * ol[j, s - 1]));
+                        else if (Mathf.Abs(g0) < CarL + 2f && Mathf.Abs(lat - me.Lateral) < Mathf.Abs(ol[j, s - 1] - me.Lateral)) lat = ol[j, s - 1];
                     }
                     else lat = o.Lateral + o.Across * Mathf.Min(t, 1f);
                     float d = od[j, s - 1] + v * Tick;
