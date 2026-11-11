@@ -77,6 +77,8 @@ namespace TarmacGauntlet.Raceday
         private static readonly float OweTight = Knob("OWETIGHT", 0.7f);
         /// <summary>Score for covering the inside of the next corner with a car close behind (H4), s; how far across counts as covering it, m; and how close behind, s, but no closer than a car it has just passed, m.</summary>
         private static readonly float Defend = Knob("DEFEND", 0.3f), DefendCover = Knob("DCOVER", 3f), DefendWithin = Knob("DWITHIN", 0.45f), DefendFrom = Knob("DFROM", 10f);
+        /// <summary>Gap kept nose to tail when moving across in front of a car behind, m: never across its nose (T8).</summary>
+        private static readonly float SwipeGap = Knob("SWIPE", 1f);
         /// <summary>Score per second a pull-out waits: of two near-equal moves, the later one, so the car stays in the tow until it must move.</summary>
         private static readonly float LateBonus = Knob("LATE", 0.1f);
         /// <summary>Side-to-side gap H1 keeps to a car alongside, m.</summary>
@@ -429,7 +431,7 @@ namespace TarmacGauntlet.Raceday
                     // A car coming from behind is its own to miss: this car only must not move across into it.
                     bool behind = from < -0.3f * CarL;
                     bool into = !behind || apart < Mathf.Abs(ol[j, s] - me.Lateral) - 0.05f;
-                    if (g > -0.3f * CarL && g < CarL + (g > 0f ? buffer : 0f) && apart < need && into && (!touching || apart < Mathf.Min(start - 0.1f, need) || apart < CarW + 0.05f && (TouchClose <= 0f || g < from - TouchClose))) { broke = "H1"; by = others[j].Id; brokeBehind = behind; }
+                    if (g > (behind ? -CarL - SwipeGap : -0.3f * CarL) && g < CarL + (g > 0f ? buffer : 0f) && apart < need && into && (!touching || apart < Mathf.Min(start - 0.1f, need) || apart < CarW + 0.05f && (TouchClose <= 0f || g < from - TouchClose))) { broke = "H1"; by = others[j].Id; brokeBehind = behind; }
                     else if (!stopped[j] && Mathf.Abs(g) < CarL && OnTrack(c, ol[j, s], od[j, s]))
                     {
                         // H2 and H3: room for a car alongside, on the inside always, on the outside once its front is level or ahead.
