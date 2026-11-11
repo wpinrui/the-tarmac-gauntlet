@@ -104,6 +104,9 @@ namespace TarmacGauntlet.Raceday
         private bool diving;
         private float diveSpeed;
         /// <summary>T20: how far under the outside car's speed a car diving at it brakes to, m/s.</summary>
+        /// <summary>How far ahead the outside car must be, as a share of a car length, before the inside car has no claim: its nose short of the other's middle.</summary>
+        private static readonly float DiveFrom = Knob("DIVEFROM", 0.4f);
+        private static readonly bool DiveCommit = Knob("DIVECOMMIT", 1f) > 0f;
         private static readonly float DiveDrop = Knob("DIVEDROP", 10f);
         /// <summary>The nearest car ahead not quite in this car's lane, which braking slows for when none is.</summary>
         private int aheadWide = -1;
@@ -284,7 +287,7 @@ namespace TarmacGauntlet.Raceday
                 bool onItsInside = InsideRaces && turnSoon != 0 && Mathf.Sign(o.Lateral - me.Lateral) == turnSoon;
                 // T20: a car ahead on the outside into the corner, with this one short of the slot it leaves on the inside.
                 int ki = c.IndexOf(here);
-                if (DiveSee && turnSoon != 0 && g > 0f && g < CarL + 2f && (o.Lateral - me.Lateral) * turnSoon > CarW
+                if (DiveSee && turnSoon != 0 && g > DiveFrom * CarL && g < CarL + 2f && (o.Lateral - me.Lateral) * turnSoon > CarW
                     && -turnSoon * me.Lateral < c.HalfWidth(ki) - 0.5f * CarW - RoomMargin - 0.15f) { diving = true; diveSpeed = Mathf.Min(diveSpeed, o.Speed); }
                 if (!onItsInside && g > (BesideBrake >= 2f ? 0f : -CarL - 1f) && g < CarL + 1f && Mathf.Abs(o.Lateral - me.Lateral) < 2f * CarW) besideSpeed = Mathf.Min(besideSpeed, o.Speed);
             }
@@ -346,6 +349,8 @@ namespace TarmacGauntlet.Raceday
                     else if (defending && !exempt && zone && blocks) cand.Rejected = "H5";
                     else if (defending && !exempt && !zone && away && (movePhase == 2 || movePhase == 1 && Mathf.Sign(cand.Shift - myOffset) != moveDir)) cand.Rejected = "H4";
                     Simulate(pilot, me, cand, ahead, nextTurn, margin, brakes, riskWeight, passCost, freeSpeed);
+                    // H2, T20: diving with no claim, it backs out all the way: braking is the only path, until it is behind (Ivan).
+                    if (DiveCommit && diving && cand.Pedal != Pedal.Brake && cand.Rejected == null) cand.Rejected = "H8";
                     // A little against changing its mind, so it doesn't dither between two near-equal paths.
                     cand.Score -= (zone ? Hysteresis + ZoneHyst : Hysteresis) * LineChange(cand.Shift, lastShift) + (cand.Pedal != lastPedal ? 0.01f : 0f) + OffLine * Mathf.Abs(cand.Shift);
                     // Changing sides of the car ahead mid-move weaves across the cars behind: only for a clearly better path.
@@ -820,7 +825,7 @@ namespace TarmacGauntlet.Raceday
                         float g0 = Road(od[j, 0] - me.Distance, lap);
                         // T20, H7: into a corner, a car ahead on this one's outside keeps off only as far as the lane leaving a
                         // car its width from the inside edge. Short of that slot, this car is diving at it, and must back out (Ivan).
-                        bool outside = DivePredict && nextTurn != 0 && g0 > 0f && (ol[j, 0] - me.Lateral) * nextTurn > CarW;
+                        bool outside = DivePredict && nextTurn != 0 && g0 > DiveFrom * CarL && (ol[j, 0] - me.Lateral) * nextTurn > CarW;
                         float owedLane = c.HalfWidth(k) - 1.5f * CarW - RoomMargin - 0.15f;
                         if (outside && g0 < CarL + 2f) lat = -nextTurn * Mathf.Min(-nextTurn * lat, Mathf.Max(owedLane, -nextTurn * ol[j, s - 1]));
                         else if (Mathf.Abs(g0) < CarL + 2f && Mathf.Abs(lat - me.Lateral) < Mathf.Abs(ol[j, s - 1] - me.Lateral)) lat = ol[j, s - 1];

@@ -267,8 +267,14 @@ static partial class Check
                     }
                 if (alongside * Race.Dt < 0.5f) return (false, "the inside car was never alongside: did not bind");
                 given /= alongside;
-                bool pass = least >= CarW + RoomMargin && given <= GiveSlack && lifted <= LiftSlack;
-                return (pass, $"least room inside {least:0.0} m, {given:0.0} m more than owed, lifted {lifted:0.0} s, over {alongside * Race.Dt:0.0} s alongside");
+                // Through the corner the inside car is half alongside or more, or backed out behind: its nose
+                // beside the rear wheels, a door's width off, has no claim and is turned in on (Ivan, E1.33).
+                Frame nose = fs.FirstOrDefault(x => run.At(x, 0) >= T7Start - 10f && run.At(x, 0) < T7End && -run.Gap(x, 0, 1) > 0.5f * CarL
+                    && -run.Gap(x, 0, 1) < CarL + 0.5f && Math.Abs(x.L[1] - x.L[0]) < CarW + RoomMargin);
+                bool noseIn = nose != null;
+                float back = nose == null ? 0f : -run.Gap(nose, 0, 1);
+                bool pass = least >= CarW + RoomMargin && given <= GiveSlack && lifted <= LiftSlack && !noseIn;
+                return (pass, $"{(noseIn ? $"nose in {back:0.0} m back at {run.At(nose, 0):0} m, " : "")}least room inside {least:0.0} m, {given:0.0} m more than owed, lifted {lifted:0.0} s, over {alongside * Race.Dt:0.0} s alongside");
             }
             case "H3":
             case "H3b":
