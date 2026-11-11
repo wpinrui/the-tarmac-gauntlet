@@ -161,7 +161,7 @@ namespace TarmacGauntlet.Simulation
             var result = UpdatePlayer(game, p => p with
             {
                 Budget = p.Budget - buyoutCost,
-                Transactions = p.Transactions.Append(Tx(year, TransactionCategory.DriverBuyout, -buyoutCost, $"Bought out {driverName}")).ToArray(),
+                Transactions = p.Transactions.Append(Tx(year, TransactionCategory.DriverBuyout, -buyoutCost, $"Bought out {driverName}") with { DriverId = driverId }).ToArray(),
             });
             return result with { Contracts = updatedContracts };
         }

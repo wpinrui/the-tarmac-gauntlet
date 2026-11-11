@@ -178,7 +178,7 @@ namespace TarmacGauntlet.Simulation.Tests
             Assert.That(p.Contracts, Is.Empty);
             Assert.That(p.Transactions.Single(), Is.EqualTo(new TransactionRecord
             {
-                Year = 4, Category = TransactionCategory.DriverBuyout, Amount = -7_500, Description = "Bought out Driver d1",
+                Year = 4, Category = TransactionCategory.DriverBuyout, Amount = -7_500, Description = "Bought out Driver d1", DriverId = "d1",
             }));
         }
 

@@ -10,13 +10,13 @@ namespace TarmacGauntlet.Management
 {
     /// <summary>
     /// The player's overall position on each of the leader's laps, P1 at the top. Each driver's stints are shaded in
-    /// their colour, stops are ticks along the bottom and issues are dots on the line: amber if fixed, red if not.
+    /// their colour, stops are lines across the chart and issues are dots on the line: amber if fixed, red if not.
     /// Hovering reports the lap and position under the pointer through <see cref="Hovered"/>.
     /// </summary>
     internal sealed class PositionChart : VisualElement
     {
         private const float Left = 34, Top = 8, Bottom = 22, Right = 6;
-        private static readonly Color Grid = new Color(1, 1, 1, 0.1f), Line = Color.white, Tick = new Color(1, 1, 1, 0.45f), Cursor = new Color(1, 1, 1, 0.35f);
+        private static readonly Color Grid = new Color(1, 1, 1, 0.1f), Line = Color.white, Tick = new Color(1, 1, 1, 0.55f), Cursor = new Color(1, 1, 1, 0.35f);
         private static readonly Color Fixed = new Color32(0xff, 0xb0, 0x20, 0xff), Unfixed = new Color32(0xff, 0x5a, 0x4f, 0xff), Outline = new Color(0.07f, 0.07f, 0.07f);
 
         /// <summary>The lap and position under the pointer, or 0 and 0 when it leaves.</summary>
@@ -114,12 +114,12 @@ namespace TarmacGauntlet.Management
             int mid = Math.Max(2, (int)Math.Round(maxPosition / 2.0));
             foreach (int pos in new[] { 1, mid, maxPosition }) Segment(p, X(1), Y(pos), X(Laps), Y(pos));
 
-            p.lineWidth = 1.5f;
+            p.lineWidth = 2;
             p.strokeColor = Tick;
             foreach (PitStopRecord s in summary.PitStops)
             {
                 float x = X(PlayerLap(s.Lap));
-                Segment(p, x, bottom - 6, x, bottom);
+                Segment(p, x, top, x, bottom);
             }
 
             p.lineWidth = 2;
@@ -140,6 +140,7 @@ namespace TarmacGauntlet.Management
                 Dot(p, new Vector2(X(lap), Y(PositionAt(lap))), 4.5f, issue.FixedLap != null ? Fixed : Unfixed);
             }
             Dot(p, new Vector2(X(positions.Count), Y(positions[positions.Count - 1])), 5f, Line);
+            foreach (PitStopRecord s in summary.PitStops) Dot(p, new Vector2(X(PlayerLap(s.Lap)), bottom), 4f, Line);
 
             if (hoverLap > 0)
             {
