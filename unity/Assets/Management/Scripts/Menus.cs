@@ -79,8 +79,8 @@ namespace TarmacGauntlet.Management
 
             semiBold = Resources.Load<Font>("Fonts/TitilliumWeb-SemiBold");
             bold = Resources.Load<Font>("Fonts/TitilliumWeb-Bold");
-            mainMedium = Resources.Load<Font>("Fonts/HankenGrotesk-Medium");
-            mainRegular = Resources.Load<Font>("Fonts/HankenGrotesk-Regular");
+            mainMedium = Resources.Load<Font>("Fonts/HostGrotesk-Medium");
+            mainRegular = Resources.Load<Font>("Fonts/HostGrotesk-Regular");
 
             var settings = ScriptableObject.CreateInstance<PanelSettings>();
             settings.scaleMode = PanelScaleMode.ScaleWithScreenSize;
@@ -116,9 +116,7 @@ namespace TarmacGauntlet.Management
             // Main menu: a tall glass column on the left edge, the wordmark above four items.
             var mainLayer = Layer();
             mainColumn = glass.Make("main-column", "fade");
-            var wordmark = new VisualElement { name = "wordmark" };
-            wordmark.AddToClassList("wordmark");
-            mainColumn.Add(wordmark);
+            mainColumn.Add(BuildWordmark());
             continueItem = MainItem("Continue", () => { if (GameSession.ContinueLatest()) Go(Mode.Hub); });
             continueSub = new Label();
             continueSub.AddToClassList("sub");
@@ -226,6 +224,76 @@ namespace TarmacGauntlet.Management
 
             foreach (VisualElement e in new[] { mainColumn, top, hubMenu, strip, tag, race, panel, dimmer, pauseLayer, settingsLayer })
                 e.style.display = DisplayStyle.None;
+        }
+
+        // ------------------------------------------------------------------ wordmark
+
+        // In wordmark pixels on its 358 x 209.32 canvas, one to one with the reference screen (wordmark/README.md).
+        private const float CarStartLeft = 364, CarFinalLeft = 195, CarTop = 19.7f, CarWidth = 169.61f, CarHeight = 43;
+        private const float RimSize = 14.14f, RimY = 50.07f, TyreRadius = 12.627f;
+        private static readonly float[] RimX = { 233.05f, 333.38f };
+        private const float RollDelay = 0.35f, RollSeconds = 1.7f;
+
+        private static bool rolledIn;
+        private VisualElement car;
+        private readonly List<VisualElement> rims = new List<VisualElement>();
+        private float rollStart = -1;
+
+        private VisualElement BuildWordmark()
+        {
+            var wordmark = new VisualElement { name = "wordmark", pickingMode = PickingMode.Ignore };
+            wordmark.AddToClassList("wordmark");
+            wordmark.Add(Picture("wordmark-text", 0, 0, 358, 209.32f));
+            car = new VisualElement { pickingMode = PickingMode.Ignore };
+            car.AddToClassList("wordmark-car");
+            car.style.width = CarWidth;
+            car.style.height = CarHeight;
+            car.Add(Picture("car-body", 0, 0, CarWidth, CarHeight));
+            foreach (float x in RimX)
+            {
+                VisualElement rim = Picture("car-rim", x - CarFinalLeft - RimSize / 2, RimY - CarTop - RimSize / 2, RimSize, RimSize);
+                rims.Add(rim);
+                car.Add(rim);
+            }
+            wordmark.Add(car);
+            PlaceCar(CarFinalLeft);
+            return wordmark;
+        }
+
+        private static VisualElement Picture(string file, float left, float top, float width, float height)
+        {
+            var e = new VisualElement { pickingMode = PickingMode.Ignore };
+            e.AddToClassList("wordmark-layer");
+            e.style.backgroundImage = Resources.Load<Texture2D>("Wordmark/" + file);
+            e.style.left = left;
+            e.style.top = top;
+            e.style.width = width;
+            e.style.height = height;
+            return e;
+        }
+
+        /// <summary>Puts the car's left edge at x and turns the rims by the distance rolled from the start.</summary>
+        private void PlaceCar(float x)
+        {
+            car.style.left = x;
+            car.style.top = CarTop;
+            // Rolling left turns the wheels anticlockwise; UI Toolkit's positive angles turn clockwise.
+            float degrees = -(CarStartLeft - x) / TyreRadius * Mathf.Rad2Deg;
+            foreach (VisualElement rim in rims) rim.style.rotate = new Rotate(new Angle(degrees, AngleUnit.Degree));
+        }
+
+        /// <summary>On game launch the car rolls in from the right and brakes to a stop at its spot.</summary>
+        private void RollWordmark()
+        {
+            if (rolledIn) return;
+            if (rollStart < 0)
+            {
+                if (!shown.Contains(mainColumn)) return;
+                rollStart = Time.unscaledTime + RollDelay;
+            }
+            float t = Mathf.Clamp01((Time.unscaledTime - rollStart) / RollSeconds);
+            PlaceCar(CarStartLeft - (CarStartLeft - CarFinalLeft) * (1 - (1 - t) * (1 - t)));
+            if (t >= 1) rolledIn = true;
         }
 
         private VisualElement Layer(params string[] classes)
@@ -579,6 +647,7 @@ namespace TarmacGauntlet.Management
         private void LateUpdate()
         {
             if (root == null) return;
+            RollWordmark();
             if (TagWanted() != tagWasShown) RenderTag();
             if (tagWasShown) PlaceTag();
             glass.Refresh();

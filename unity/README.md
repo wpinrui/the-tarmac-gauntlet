@@ -127,9 +127,10 @@ into `Resources/Props` as `<id>.json`, `<id>_mesh.bytes` and its textures; `HqGe
 
 The management menus sit over the Team HQ scene (`Assets/Management`, approved in the viewer
 https://claude.ai/artifact/9oLpt153QSeZj1edjd7mHt). `Menus.cs` builds them with UI Toolkit from code, styled by
-`Resources/Menus.uss` on a 1600 x 900 reference screen. The main menu is a tall glass column with the wordmark slot
-(`#wordmark`, empty until the wordmark is designed) over Continue, New game, Settings and Quit game in Hanken
-Grotesk. In the game, the hub menu (Garage then Office, told apart by spacing), the top bar, the race car's name and
+`Resources/Menus.uss` on a 1600 x 900 reference screen. The main menu is a tall glass column with the wordmark
+(`Resources/Wordmark`, https://claude.ai/artifact/DokfsDDo2SPFbaFdKVURdy) over Continue, New game, Settings and Quit
+game in Host Grotesk Medium. On game launch the wordmark's car rolls in from the right and brakes to a stop, its rims
+turning with the distance travelled. In the game, the hub menu (Garage then Office, told apart by spacing), the top bar, the race car's name and
 condition beside its bay, and the Race button. A screen opens as one panel docked right, with the menu collapsed to
 an icon strip; Q and E cycle screens and clicking the open screen's icon goes back to the hub. Escape closes a
 screen, and on the hub opens Resume, Settings, Quit to main menu and Quit game. Every change of screen calls
