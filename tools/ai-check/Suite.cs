@@ -271,6 +271,7 @@ static partial class Check
                 return (pass, $"least room inside {least:0.0} m, {given:0.0} m more than owed, lifted {lifted:0.0} s, over {alongside * Race.Dt:0.0} s alongside");
             }
             case "H3":
+            case "H3b":
             {
                 // The outside car, its front level or ahead, keeps a car's width beside the first car.
                 float least = float.MaxValue;

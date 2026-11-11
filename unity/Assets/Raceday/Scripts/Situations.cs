@@ -112,6 +112,15 @@ namespace TarmacGauntlet.Raceday
             },
             new Situation
             {
+                Id = "H3b", Title = "inside car slightly ahead", At = T7 - 180f, Seconds = 8f,
+                Cars = new[]
+                {
+                    new SituationCar { Model = "b-25", Off = -4f },
+                    new SituationCar { Model = "b-24", Ahead = -1.8f, Seed = 2 },
+                },
+            },
+            new Situation
+            {
                 Id = "H4", Title = "one defensive move on the straight", At = 2960f, Seconds = 15f,
                 Cars = new[]
                 {
