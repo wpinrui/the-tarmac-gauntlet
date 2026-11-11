@@ -323,6 +323,10 @@ namespace TarmacGauntlet.Raceday
             }
             bool exempt = defending && passing;
             bool zone = TurnAt(c, here) != 0 || BrakingZone(pilot);
+            // From the corner's exit to the next braking zone the racing line is only the default (Ivan):
+            // nothing holds the car to a path it chose, so it takes the open side the moment that is better.
+            bool free = FreeStretch(pilot);
+            float offLine = free ? FreeOff * OffLine : OffLine, hyst = free ? 0f : Hysteresis;
             headway = HeadZone >= 0f && (lapOne || zone || Road(NextCornerStart(c, here) - here, lap) < HeadNear * mySpeed) ? HeadZone : Headway;
             int nextTurn = NextTurn(c, here);
             float myOffset = me.Lateral - line.Lateral[pilot.Index];
@@ -402,7 +406,7 @@ namespace TarmacGauntlet.Raceday
                     // H2, T20: diving with no claim, it backs out all the way: braking is the only path, until it is behind (Ivan).
                     if (DiveCommit && diving && cand.Pedal != Pedal.Brake && cand.Rejected == null) cand.Rejected = "H8";
                     // A little against changing its mind, so it doesn't dither between two near-equal paths.
-                    cand.Score -= (zone ? Hysteresis + ZoneHyst : Hysteresis) * LineChange(cand.Shift, lastShift) + (cand.Pedal != lastPedal ? 0.01f : 0f) + OffLine * Mathf.Abs(cand.Shift);
+                    cand.Score -= (zone ? hyst + ZoneHyst : hyst) * LineChange(cand.Shift, lastShift) + (cand.Pedal != lastPedal ? 0.01f : 0f) + offLine * Mathf.Abs(cand.Shift);
                     // Changing sides of the car ahead mid-move weaves across the cars behind: only for a clearly better path.
                     if (Mathf.Abs(cand.Shift) > 1f && Mathf.Abs(lastShift) > 1f && Mathf.Sign(cand.Shift) != Mathf.Sign(lastShift)) cand.Score -= SideSwitch;
                     cand.Score += CoverBonus(cand.Shift) - AltCost(cand.Stay ? myOffset : cand.Owe ? 0f : cand.Shift);
@@ -411,13 +415,15 @@ namespace TarmacGauntlet.Raceday
                     Candidates.Add(cand);
                     // The same move later, flat out: in the tow until then.
                     if (s < 0 || cand.Pedal != Pedal.Go || pilot.Gliding || Mathf.Abs(cand.Shift - myOffset) < 0.5f) continue;
+                    // Waiting in the tow is only for a car at full throttle: held below it, it pulls out at once (Ivan).
+                    if (NoWait && pilot.HeldBy > 0.5f) continue;
                     foreach (float wait in Delays)
                     {
                         var later = new Candidate { Shift = cand.Shift, Pedal = Pedal.Go, Delay = wait };
                         if (lapped && !zone && Mathf.Abs(later.Shift) < 1.5f) later.Rejected = "H9";
                         else later.Rejected = cand.Rejected;
                         Simulate(pilot, me, later, ahead, nextTurn, margin, brakes, riskWeight, passCost, freeSpeed);
-                        later.Score -= (zone ? Hysteresis + ZoneHyst : Hysteresis) * LineChange(later.Shift, lastShift) + OffLine * Mathf.Abs(later.Shift);
+                        later.Score -= (zone ? hyst + ZoneHyst : hyst) * LineChange(later.Shift, lastShift) + offLine * Mathf.Abs(later.Shift);
                         later.Score += CoverBonus(later.Shift) - Mathf.Max(AltCost(later.Shift), AltCost(myOffset));   // it holds where it is meanwhile
                         Candidates.Add(later);
                     }
@@ -454,7 +460,7 @@ namespace TarmacGauntlet.Raceday
                     var fixedCand = new Candidate { Fixed = true, Lat = fl, Shift = fl - lineHere, Pedal = Pedal.Go };
                     if (fastBehind && Mathf.Abs(fixedCand.Shift) > Mathf.Abs(myOffset) + 0.3f && (!CloseLeave || float.IsPositiveInfinity(closeDepth) || Mathf.Sign(fixedCand.Shift - myOffset) == Mathf.Sign(fastLateral - me.Lateral))) fixedCand.Rejected = "H6";
                     Simulate(pilot, me, fixedCand, ahead, nextTurn, margin, brakes, riskWeight, passCost, freeSpeed);
-                    fixedCand.Score -= (zone ? Hysteresis + ZoneHyst : Hysteresis) * LineChange(fixedCand.Shift, lastShift) + 0.01f + OffLine * Mathf.Abs(fixedCand.Shift);
+                    fixedCand.Score -= (zone ? hyst + ZoneHyst : hyst) * LineChange(fixedCand.Shift, lastShift) + 0.01f + offLine * Mathf.Abs(fixedCand.Shift);
                     if (Mathf.Abs(fixedCand.Shift) > 1f && Mathf.Abs(lastShift) > 1f && Mathf.Sign(fixedCand.Shift) != Mathf.Sign(lastShift)) fixedCand.Score -= SideSwitch;
                     Candidates.Add(fixedCand);
                 }
@@ -632,8 +638,13 @@ namespace TarmacGauntlet.Raceday
                 float edge = Mathf.Max(c.HalfWidth(k) - RacingLine.EdgeMargin, 0f);
                 // The pilot steers the line plus an offset, and the offset is what moves at the overtake rate.
                 float wantOff = cand.Stay ? me.Lateral - line.Lateral[k] : s * Tick <= cand.Delay ? holdOffset : cand.Fixed ? cand.Lat - line.Lateral[k] : cand.Shift;
-                off = Mathf.MoveTowards(off, wantOff, Endurance.OvertakeOffsetRate * Tick);
-                lat = Mathf.Clamp(line.Lateral[k] + off, -edge, edge);
+                // H1: a fixed place moves across the track at the overtake rate, whatever the line does under it (Ivan).
+                if (cand.Fixed && FixedAbs) { lat = Mathf.Clamp(Mathf.MoveTowards(lat, cand.Lat, Endurance.OvertakeOffsetRate * Tick), -edge, edge); off = lat - line.Lateral[k]; }
+                else
+                {
+                    off = Mathf.MoveTowards(off, wantOff, Endurance.OvertakeOffsetRate * Tick);
+                    lat = Mathf.Clamp(line.Lateral[k] + off, -edge, edge);
+                }
                 if (cand.Owe && nextTurn != 0)
                 {
                     // A car's width from the inside edge, measured from the edge and nothing else: once that is
@@ -992,6 +1003,27 @@ namespace TarmacGauntlet.Raceday
             }
             return c.Lap;
         }
+
+        /// <summary>
+        /// From the corner's exit to the next braking zone: the racing line is only the default there, with
+        /// nothing against changing its mind (Ivan). Past the slowest point of the corner, speeds rising, not braking.
+        /// </summary>
+        private static bool FreeStretch(AiPilot pilot)
+        {
+            if (!Free || BrakingZone(pilot)) return false;
+            SpeedProfile p = pilot.Profile;
+            Circuit c = pilot.Line.Circuit;
+            int k = pilot.Index;
+            return TurnAt(c, k * c.Step) == 0 || p.Speed[c.Wrap(k + Mathf.RoundToInt(10f / c.Step))] > p.Speed[k];
+        }
+        private static readonly bool Free = Knob("FREE", 1f) > 0f;
+        private static readonly float FreeOff = Knob("FREEOFF", 1f);
+        private static readonly bool NoWait = Knob("NOWAIT", 1f) > 0f;
+        /// <summary>H1: a fixed place is reached across the track at the overtake rate, not the line's offset.</summary>
+        public static readonly bool FixedAbs = Knob("FIXEDABS", 1f) > 0f;
+        /// <summary>The fixed place across the track the chosen path holds, when it holds one.</summary>
+        public bool FixedOn => fixedOn;
+        public float FixedLat => fixedLat;
 
         /// <summary>True in the braking zone: the car's speed profile falls over the next 20 m.</summary>
         private static bool BrakingZone(AiPilot pilot)
