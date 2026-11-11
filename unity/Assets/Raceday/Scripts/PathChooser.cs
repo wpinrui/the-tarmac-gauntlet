@@ -92,6 +92,15 @@ namespace TarmacGauntlet.Raceday
         private static readonly bool DiveSee = Knob("DIVESEE", 1f) > 0f;
         private static readonly bool DivePredict = Knob("DIVEPRED", 1f) > 0f;
         public static readonly bool SideNoReverse = Knob("SIDEHOLD", 1f) > 0f;
+        /// <summary>T1: off the braking zone, the full brakes are for a gap closing faster than they can shed,
+        /// not for slowing to the car ahead's speed within the gap. Seconds of closing kept spare (Ivan).</summary>
+        public static readonly float RelBrake = Knob("RELBRAKE", 1f);
+        /// <summary>The closing speed, m/s, up to which <see cref="RelBrake"/> applies.</summary>
+        public static readonly float RelClose = Knob("RELCLOSE", 8f);
+        /// <summary>The speed, m/s, the car ahead must be past for <see cref="RelBrake"/>: not in the start's pack.</summary>
+        public static readonly float RelFrom = Knob("RELFROM", 55f);
+        /// <summary>T1: an escaping path flat out may beat a clean one that lifts.</summary>
+        private static readonly bool EscapeGo = Knob("ESCGO", 1f) > 0f;
         private static readonly bool InsideRaces = Knob("INSIDERACES", 0f) > 0f;
         /// <summary>Seconds of score per second spent lifting or braking for a car ahead below its lane's speed.</summary>
         private static readonly float LiftCost = Knob("LIFT", 0.1f);
@@ -456,6 +465,10 @@ namespace TarmacGauntlet.Raceday
             if (best == null)
                 foreach (Candidate k in Candidates)
                     if (k.Rejected == null && !k.Escaped && (best == null || k.Score > best.Score)) best = k;
+            // T1: off the braking zone, flat out moving away from a car that cuts across beats lifting behind it (Ivan).
+            if (EscapeGo && best != null && best.Pedal != Pedal.Go && !braking)
+                foreach (Candidate k in Candidates)
+                    if (k.Rejected == null && k.Escaped && k.Pedal == Pedal.Go && k.Score > best.Score) best = k;
             // H1: boxed in behind a car with every path breaking a limit, the way out is across, away from it (Ivan).
             if (best == null)
                 foreach (Candidate k in Candidates)
