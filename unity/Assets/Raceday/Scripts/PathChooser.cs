@@ -114,6 +114,8 @@ namespace TarmacGauntlet.Raceday
         private static readonly float OweAhead = Knob("OWEAHEAD", 0.75f);
         /// <summary>H8, T6b: a path braking for a corner may tuck in behind a car ahead at no less than the gap it has now, and this many seconds clear, s.</summary>
         private static readonly float Tuck = Knob("TUCK", 0.03f);
+        /// <summary>H1: a path moving across, away from a car ahead it is already close behind, is not broken by the following gap.</summary>
+        private static readonly float Escape = Knob("ESCAPE", 0.85f);
         private static readonly bool OweTrack = Knob("OWETRACK", 0f) > 0f, OweH1 = Knob("OWEH1", 1f) > 0f, OweCommit = Knob("OWECOMMIT", 1f) > 0f, OweEdge = Knob("OWEEDGE", 1f) > 0f;
         /// <summary>Score per second a pull-out waits: of two near-equal moves, the later one, so the car stays in the tow until it must move.</summary>
         private static readonly float LateBonus = Knob("LATE", 0.1f);
@@ -141,6 +143,8 @@ namespace TarmacGauntlet.Raceday
             public bool Owe;
             /// <summary>H1, T9: heads for a fixed place across the track, <see cref="Lat"/>, whatever the racing line does.</summary>
             public bool Fixed;
+            /// <summary>H1: kept only by moving away from a car ahead it is already inside the following gap of.</summary>
+            public bool Escaped;
             /// <summary>Where a fixed path runs, m left of the track centre.</summary>
             public float Lat;
             /// <summary>How far its offset from the racing line moves in the first step: where an owing path steers now.</summary>
@@ -392,6 +396,10 @@ namespace TarmacGauntlet.Raceday
                 }
             if (best == null)
                 foreach (Candidate k in Candidates)
+                    if (k.Rejected == null && !k.Escaped && (best == null || k.Score > best.Score)) best = k;
+            // H1: boxed in behind a car with every path breaking a limit, the way out is across, away from it (Ivan).
+            if (best == null)
+                foreach (Candidate k in Candidates)
                     if (k.Rejected == null && (best == null || k.Score > best.Score)) best = k;
             if (best == null)
                 // Every path breaks a limit: brake, on the path that keeps the limit longest, moving across as little as it can.
@@ -511,12 +519,14 @@ namespace TarmacGauntlet.Raceday
             float holdOffset = me.Lateral - line.Lateral[c.IndexOf(Mathf.Repeat(d, lap))], off = holdOffset;
             float over = 0f, risk = 0f, yellow = 0f, lifted = 0f;
             bool tuckZone = BrakingZone(pilot);   // H8, T6b: only braking for the corner
+            bool escapeZone = !tuckZone && TurnAt(c, me.Distance) == 0;   // H1: out of the corner
             bool onTrack = OnTrack(c, me.Lateral, me.Distance);
             float turnIn = NextCornerStart(c, Mathf.Repeat(d, lap));
             bool turnedIn = false;
             cand.Path[0] = new Vector2(d, lat);
             // A path ruled out before it is driven breaks its limit at once: last in line when every path breaks one (T9).
             cand.BrokeAt = PreBreak && cand.Rejected != null ? 0 : Steps + 1;
+            cand.Escaped = false;
             for (int s = 1; s <= Steps; s++)
             {
                 int k = c.IndexOf(Mathf.Repeat(d, lap));
@@ -606,7 +616,12 @@ namespace TarmacGauntlet.Raceday
                     // H8, T6b: tucking in behind a car ahead is no closer to it than now, which is all a car already
                     // inside the following gap can keep: it rejoins the line behind rather than holding a lane beside (Ivan).
                     bool tuck = Tuck > 0f && tuckZone && g > CarL + margin + Tuck * v && g >= from - 0.1f;
-                    if (!leftRoom && !tuck && g > (behind ? -CarL - SwipeGap : -0.3f * CarL) && g < CarL + (g > 0f ? buffer : 0f) && apart < need && into && (!touching || apart < Mathf.Min(start - 0.1f, need) || apart < CarW + 0.05f && (TouchClose <= 0f || g < from - TouchClose))) { broke = "H1"; by = others[j].Id; brokeBehind = behind; }
+                    // H1: a car ahead already within the following gap is left by moving across, away from its lane:
+                    // that path is no worse for being inside the gap, so long as it never closes to the car's tail.
+                    bool escape = Escape > 0f && escapeZone && from > 0.7f * CarL && apart > start + 0.05f && g > CarL + margin + Escape * headway * v;
+                    bool h1 = !leftRoom && !tuck && g > (behind ? -CarL - SwipeGap : -0.3f * CarL) && g < CarL + (g > 0f ? buffer : 0f) && apart < need && into && (!touching || apart < Mathf.Min(start - 0.1f, need) || apart < CarW + 0.05f && (TouchClose <= 0f || g < from - TouchClose));
+                    if (h1 && escape) cand.Escaped = true;
+                    if (h1 && !escape) { broke = "H1"; by = others[j].Id; brokeBehind = behind; }
                     else if (!stopped[j] && Mathf.Abs(g) < CarL && OnTrack(c, ol[j, s], od[j, s]))
                     {
                         // H2 and H3: room for a car alongside, on the inside always, on the outside once its front is level or ahead.
