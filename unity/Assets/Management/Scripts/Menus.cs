@@ -196,6 +196,11 @@ namespace TarmacGauntlet.Management
                 foreach ((string slug, string name) in Groups[g])
                 {
                     VisualElement item = Text(name.ToUpperInvariant(), "item");
+                    item.AddToClassList("hub-item");
+                    var itemIcon = new VisualElement { pickingMode = PickingMode.Ignore };
+                    itemIcon.AddToClassList("item-icon");
+                    itemIcon.style.backgroundImage = Resources.Load<Texture2D>("MenuIcons/" + slug);
+                    item.Add(itemIcon);
                     item.RegisterCallback<ClickEvent>(_ => OpenScreen(slug));
                     hubItems[slug] = item;
                     items.Add(item);
