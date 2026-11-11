@@ -53,9 +53,10 @@ class Livery:
             f'letter-spacing="{spacing * height:.4f}" fill="{fill}" text-anchor="middle" dominant-baseline="central" '
             f'transform="rotate({rotate} {u:.4f} {v:.4f})">{s}</text>')
 
-    def mark(self, view, svg_path, p, height, ink=None, rotate=0):
+    def mark(self, view, svg_path, p, height, ink=None, rotate=0, underline=None):
         """An existing brand mark (SVG file), height metres tall, centred on p. ink recolours
-        every fill, for a mark that would vanish on the paint."""
+        every fill, for a mark that would vanish on the paint. underline: colours of equal
+        bars laid side by side under the mark, turning with it."""
         src = Path(svg_path).read_text()
         vb = [float(x) for x in re.search(r'viewBox="([^"]+)"', src).group(1).split()]
         inner = re.search(r"<svg[^>]*>(.*)</svg>", src, re.S).group(1)
@@ -65,11 +66,15 @@ class Livery:
         u, v = self.uv(view, p)
         self.art[view].append(
             f'<g transform="translate({u:.4f} {v:.4f}) rotate({rotate})"><svg x="{-w / 2:.4f}" y="{-height / 2:.4f}" '
-            f'width="{w:.4f}" height="{height:.4f}" viewBox="{" ".join(map(str, vb))}">{inner}</svg></g>')
+            f'width="{w:.4f}" height="{height:.4f}" viewBox="{" ".join(map(str, vb))}">{inner}</svg>'
+            + "".join(f'<rect x="{-w / 2 + i * w / len(underline):.4f}" y="{height * 0.52:.4f}" width="{w / len(underline):.4f}" '
+                      f'height="{height * 0.13:.4f}" fill="{c}"/>' for i, c in enumerate(underline or []))
+            + "</g>")
 
     def side_mark(self, svg_path, z, y, height, ink=None):
         for view in ("left", "right"):
             self.mark(view, svg_path, self._side(view, z, y), height, ink)
+
 
     def number(self, view, centre, w, h, ink, rotate=0):
         """Where the game draws the race number: a box w by h metres, upright in the drawing
