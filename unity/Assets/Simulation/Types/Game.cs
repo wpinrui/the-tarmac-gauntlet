@@ -118,5 +118,8 @@ namespace TarmacGauntlet.Simulation
 
         // History
         public IReadOnlyList<RaceHistoryEntry> RaceHistory { get; init; } = Array.Empty<RaceHistoryEntry>();
+
+        /// <summary>The paper printed after the latest race, or null before the first.</summary>
+        public Newspaper? Newspaper { get; init; }
     }
 }
