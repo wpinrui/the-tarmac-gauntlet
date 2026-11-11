@@ -70,7 +70,7 @@ def _run(data, free):
             hits.append(f"inward shell: {k}")
     names = list(data)
     for a in names:
-        if a.startswith(free):
+        if re.sub(r"^opt_[a-z]+_\d+_", "", a).startswith(free):
             continue
         va = [v.co for v in data[a].verts]
         near = any(any((trees[b].find_nearest(v)[3] or 1) < TOUCH for v in va[:: max(1, len(va) // 400)])
