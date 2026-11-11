@@ -15,7 +15,7 @@ namespace TarmacGauntlet.Raceday
         public static readonly LandscapeLook Highland = new LandscapeLook { Forest = 0.58f, Conifer = 0.85f, Hedges = 0.2f, Copses = 0.3f, Hills = 320f };
 
         /// <summary>The look the race uses.</summary>
-        public static LandscapeLook Current = Farmland;
+        public static LandscapeLook Current = Woodland;
 
         /// <summary>Ground colour by land use, multiplied over the grass grain.</summary>
         public static Color Ground(LandUse use)

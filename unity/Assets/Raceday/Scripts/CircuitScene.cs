@@ -70,9 +70,16 @@ namespace TarmacGauntlet.Raceday
             Time.fixedDeltaTime = 0.01f;
             var circuit = new Circuit(CircuitData.Load());
             var track = new GameObject("Circuit");
+<<<<<<< HEAD
             var materials = new CircuitMaterials();
             var builder = new CircuitBuilder(circuit, materials);
             foreach (CircuitPart part in builder.Build())
+=======
+            var builder = new CircuitBuilder(circuit, new CircuitMaterials());
+            List<CircuitPart> parts = builder.Build();
+            parts.AddRange(new Grandstands(circuit, builder, new StandMaterials(StandLook.Colours), StandLook.Main, StandLook.Corners).Build());
+            foreach (CircuitPart part in parts)
+>>>>>>> origin/main
             {
                 var go = new GameObject(part.Name) { isStatic = true };
                 go.transform.SetParent(track.transform, false);
