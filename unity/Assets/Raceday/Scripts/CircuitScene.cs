@@ -17,7 +17,9 @@ namespace TarmacGauntlet.Raceday
     /// the race through normal speed, 4x and 16x while the AI drives your car, and ends the pit lane
     /// start's fast forward. Cars away from the camera glide without physics (<see cref="PhysicsRange"/>).
     /// The field is shown on the timing tower (<see cref="RaceTower"/>). T opens live timing while the AI drives
-    /// your car, with the controls for its next stop (<see cref="LiveTiming"/>).
+    /// your car, with the controls for its next stop (<see cref="LiveTiming"/>). While a teammate drives, N
+    /// (or the button beside live timing's way back) fast forwards at 32x to your next stint and hands you the
+    /// wheel once you are back on track. A stop that puts a teammate in hands the car back to the AI.
     /// </summary>
     public sealed class CircuitScene : MonoBehaviour
     {
@@ -41,6 +43,12 @@ namespace TarmacGauntlet.Raceday
         private RaceDay day;
         private RaceDirector director;
         private LiveTiming timing;
+        /// <summary>The player's car in the race, or -1 for none.</summary>
+        private int playerIndex = -1;
+        private RaceCar[] racingCars;
+        /// <summary>True while the race fast forwards to your next stint.</summary>
+        private bool stintSkip;
+        private string lastDriver;
 
         private const string PlayerCar = "a-29";
         private const string PlayerModel = "Assets/Art/Vehicles/CheonmaCX24Si/CheonmaCX24Si.obj";
@@ -143,6 +151,8 @@ namespace TarmacGauntlet.Raceday
                 racing[i] = race;
                 drivers[i] = driver;
             }
+            playerIndex = player;
+            racingCars = racing;
             PhysicsRange range = new GameObject("Physics range").AddComponent<PhysicsRange>();
             range.Drivers = drivers;
             range.Player = ai.Car;
@@ -171,6 +181,8 @@ namespace TarmacGauntlet.Raceday
                 timing.Hud = views.Hud;
                 timing.Keys = keys;
                 timing.Game = setup.Game;
+                timing.CanSkip = CanSkip;
+                timing.Skip = () => stintSkip = true;
                 hidden.Add(timing.gameObject);
             }
             foreach (CarController c in cars) hidden.Add(c.gameObject);
@@ -243,23 +255,63 @@ namespace TarmacGauntlet.Raceday
             if (keys.Pressed(KeyCode.F))
             {
                 if (skipping) skipping = false;
+                else if (stintSkip) stintSkip = false;
                 else speed = (speed + 1) % Speeds.Length;
             }
+            if (keys.Pressed(KeyCode.N) && CanSkip()) stintSkip = true;
+            Stints();
             // Fast forward is for watching: taking the wheel drops back to normal speed.
             if (!ai.enabled)
             {
                 speed = 0;
                 skipping = false;
+                stintSkip = false;
             }
             if (skipping && pitLaneStart.Time >= pitLaneStart.FastForwardTo) skipping = false;
             // Live timing runs the race at the top speed behind it.
-            float scale = skipping ? SkipSpeed : timing != null && timing.Open ? Speeds[Speeds.Length - 1] : Speeds[speed];
+            float scale = skipping || stintSkip ? SkipSpeed : timing != null && timing.Open ? Speeds[Speeds.Length - 1] : Speeds[speed];
             if (Time.timeScale != scale)
             {
                 Time.timeScale = scale;
                 // Let a slow frame catch up with all its physics steps rather than fall behind the clock.
                 Time.maximumDeltaTime = Mathf.Max(1f / 3f, scale / 30f);
             }
+        }
+
+        /// <summary>
+        /// True while a teammate drives your car and you have a stint to come: the race can skip to it.
+        /// </summary>
+        private bool CanSkip()
+        {
+            if (playerIndex < 0 || !ai.enabled || director.Finished) return false;
+            CarRaceLog mine = day.Cars[playerIndex];
+            if (mine.Retired || mine.Driver.Id == RaceEntry.PlayerCharacterDriverId) return false;
+            foreach (RaceDriver d in mine.Car.Lineup) if (d.Id == RaceEntry.PlayerCharacterDriverId) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// Hands your car over as the drivers change. Skipping to your stint ends once the stop that puts
+        /// you in is over and the car is back on track: you take the wheel. A stop that puts a teammate in
+        /// while you drive gives the car to the AI once you have driven out of the pit lane.
+        /// </summary>
+        private void Stints()
+        {
+            if (playerIndex < 0) return;
+            CarRaceLog mine = day.Cars[playerIndex];
+            bool you = mine.Driver.Id == RaceEntry.PlayerCharacterDriverId;
+            if (stintSkip && you && !ai.Pitting && !racingCars[playerIndex].InPitLane)
+            {
+                stintSkip = false;
+                speed = 0;
+                ai.enabled = false;
+            }
+            if (lastDriver == RaceEntry.PlayerCharacterDriverId && !you && !ai.enabled)
+            {
+                if (racingCars[playerIndex].InPitLane) return;   // drive out first: lastDriver stays yours until then
+                ai.enabled = true;
+            }
+            lastDriver = mine.Driver.Id;
         }
 
         /// <summary>The timing tower, its clock running from the green, or from the first car out of the pit lane.</summary>
