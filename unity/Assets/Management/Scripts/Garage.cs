@@ -4,6 +4,7 @@ using System.Linq;
 using TarmacGauntlet.Career;
 using TarmacGauntlet.Simulation;
 using TarmacGauntlet.TeamHq;
+using static TarmacGauntlet.Management.MenuKit;
 
 namespace TarmacGauntlet.Management
 {
@@ -52,13 +53,6 @@ namespace TarmacGauntlet.Management
                 { CarClass.A, (4.75f, 2.00f, 1.05f, 0.35f, HqBodyShape.Proto) },
                 { CarClass.F1, (5.20f, 1.80f, 0.95f, 0.33f, HqBodyShape.Proto) },
             };
-
-        internal static PlayerTeam Player => GameSession.State?.Teams.OfType<PlayerTeam>().FirstOrDefault();
-
-        internal static CarModel Model(string id) =>
-            GameSession.State?.CarModels.FirstOrDefault(m => m.Id == id) ?? CarModels.All.FirstOrDefault(m => m.Id == id);
-
-        internal static CarInstance RaceCar(PlayerTeam p) => p?.EnteredCarId == null ? null : p.Cars.FirstOrDefault(c => c.Id == p.EnteredCarId);
 
         /// <summary>The race car's class, or F with no race car.</summary>
         internal static CarClass RaceClass(PlayerTeam p) => Model(RaceCar(p)?.ModelId ?? "")?.CarClass ?? CarClass.F;
@@ -178,10 +172,5 @@ namespace TarmacGauntlet.Management
             }
             return pot;
         }
-
-        internal static string Years(int age) => age + (age == 1 ? " YR" : " YRS");
-
-        /// <summary>Text colour class for a 0 to 100 value: green at 60 or more, amber from 50, red below.</summary>
-        internal static string Band(double v) => v >= 60 ? "hi" : v >= 50 ? "mid" : "lo";
     }
 }

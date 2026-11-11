@@ -38,7 +38,7 @@ namespace TarmacGauntlet.Management
             this.lapScale = lapScale;
             this.driverColour = driverColour;
             maxPosition = Math.Max(10, positions.Count > 0 ? positions.Max() : 10);
-            AddToClassList("rs-plot");
+            AddToClassList("chart-plot");
 
             int mid = Math.Max(2, (int)Math.Round(maxPosition / 2.0));
             foreach (int p in new[] { 1, mid, maxPosition }) AddLabel("P" + p.ToString(CultureInfo.InvariantCulture), 0, p, font);
@@ -59,7 +59,7 @@ namespace TarmacGauntlet.Management
         private void AddLabel(string text, float lap, int position, Font font)
         {
             var label = new Label(text) { pickingMode = PickingMode.Ignore };
-            label.AddToClassList("rs-axis");
+            label.AddToClassList("chart-axis");
             label.style.unityFontDefinition = FontDefinition.FromFont(font);
             Add(label);
             labels.Add((label, lap, position));

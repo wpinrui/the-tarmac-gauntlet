@@ -3,7 +3,7 @@ using System.Linq;
 using TarmacGauntlet.Career;
 using TarmacGauntlet.Simulation;
 using UnityEngine.UIElements;
-using static TarmacGauntlet.Management.OfficeKit;
+using static TarmacGauntlet.Management.MenuKit;
 
 namespace TarmacGauntlet.Management
 {
@@ -12,14 +12,14 @@ namespace TarmacGauntlet.Management
     /// transaction, newest first. The side pane holds the full prize money table, the only place it appears, with the
     /// player's last finish marked.
     /// </summary>
-    public sealed class FinancesPanel : OfficePanel
+    public sealed class FinancesPanel : MenuPanel
     {
         public const string Slug = "finances";
         private const int PrizeColumns = 4;
 
         private int? year; // kept while the game runs; null shows the current year
 
-        protected override string ScreenSlug => Slug;
+        protected override bool Shows(string slug) => slug == Slug;
 
         protected override void Render()
         {
@@ -32,7 +32,7 @@ namespace TarmacGauntlet.Management
             List<int> years = p.Transactions.Select(t => t.Year).Append(game.CurrentYear).Distinct().OrderBy(y => y).ToList();
             int shown = year.HasValue && years.Contains(year.Value) ? year.Value : game.CurrentYear;
             int at = years.IndexOf(shown);
-            Body.Add(YearStepper(Menus, shown, at > 0, at < years.Count - 1, d =>
+            Body.Add(YearStepper(shown, at > 0, at < years.Count - 1, d =>
             {
                 year = years[at + d];
                 Render();
@@ -43,20 +43,21 @@ namespace TarmacGauntlet.Management
             double expenses = list.Where(t => t.Amount < 0).Sum(t => t.Amount);
             double net = income + expenses;
 
-            VisualElement hero = Box("fin-hero");
-            hero.Add(Figure(Signed(income), "INCOME", "of-green"));
-            hero.Add(Figure(Menus.Money(expenses), "SPENDING", "of-red"));
-            hero.Add(Figure(Signed(net), "NET", net >= 0 ? "of-green" : "of-red"));
-            Body.Add(hero);
+            Body.Add(Tiles(new[]
+            {
+                Figure(Signed(income), "Income", "v-hi"),
+                Figure(Money(expenses), "Spending", "v-lo"),
+                Figure(Signed(net), "Net", net >= 0 ? "v-hi" : "v-lo"),
+            }));
 
-            ScrollView rows = Scroll("rs-scroll");
+            ScrollView rows = Scroll();
             foreach (TransactionRecord t in list)
             {
-                VisualElement row = Box("of-row");
-                row.Add(Icon(IconFor(t.Category), "fin-icon"));
+                VisualElement row = Row();
+                row.Add(Icon(IconFor(t.Category), "row-icon"));
                 row.Add(Description(game, t));
-                Label amount = Menus.Text(Signed(t.Amount), "fin-amount", true);
-                amount.AddToClassList(t.Amount >= 0 ? "of-green" : "of-red");
+                Label amount = Cell(Signed(t.Amount), "c-amount", true);
+                amount.AddToClassList(t.Amount >= 0 ? "v-hi" : "v-lo");
                 row.Add(amount);
                 rows.Add(row);
             }
@@ -65,11 +66,10 @@ namespace TarmacGauntlet.Management
             RenderPrizes(game);
         }
 
-        private VisualElement Figure(string value, string label, string colour)
+        private static VisualElement Figure(string value, string label, string colour)
         {
-            VisualElement figure = Box("fin-figure");
-            figure.Add(Menus.Text(label, "fin-label", true));
-            Label v = Menus.Text(value, "fin-value", true);
+            VisualElement figure = Tile(label);
+            Label v = Text(value, "tile-value", true);
             v.AddToClassList(colour);
             figure.Add(v);
             return figure;
@@ -80,11 +80,11 @@ namespace TarmacGauntlet.Management
         {
             string name = t.DriverId == null ? null : game.Drivers.FirstOrDefault(d => d.Id == t.DriverId)?.Name;
             int at = name == null ? -1 : t.Description.IndexOf(name, System.StringComparison.Ordinal);
-            if (at < 0) return Menus.Text(t.Description, "of-fill");
-            VisualElement line = Box("of-fill", "fin-desc");
-            if (at > 0) line.Add(Menus.Text(t.Description.Substring(0, at).Trim(), "fin-desc-text"));
-            line.Add(DriverLink(Menus, name, t.DriverId, "fin-desc-text"));
-            if (at + name.Length < t.Description.Length) line.Add(Menus.Text(t.Description.Substring(at + name.Length).Trim(), "fin-desc-text"));
+            if (at < 0) return Cell(t.Description, "fill");
+            VisualElement line = Box("fill", "words");
+            if (at > 0) line.Add(Text(t.Description.Substring(0, at).Trim(), "word"));
+            line.Add(DriverLink(Menus, name, t.DriverId, "word"));
+            if (at + name.Length < t.Description.Length) line.Add(Text(t.Description.Substring(at + name.Length).Trim(), "word"));
             return line;
         }
 
@@ -94,7 +94,7 @@ namespace TarmacGauntlet.Management
             int last = game.RaceHistory.LastOrDefault()?.Results.FirstOrDefault(r => r.TeamId == GameActions.PlayerTeamId)?.Position ?? 0;
             IReadOnlyList<double> table = PostRace.PrizeTable;
             int perColumn = (table.Count + PrizeColumns - 1) / PrizeColumns;
-            Menus.SideBody.Add(Menus.Text("PRIZE MONEY TABLE", "of-title", true));
+            Menus.SideBody.Add(Section("Prize money"));
             VisualElement grid = Box("prizes");
             for (int c = 0; c < PrizeColumns; c++)
             {
@@ -105,10 +105,8 @@ namespace TarmacGauntlet.Management
                     int place = i + 1;
                     VisualElement cell = Box("prize-cell");
                     cell.EnableInClassList("me", place == last);
-                    Label pos = Menus.Text(Num(place), "prize-pos");
-                    if (place <= 3) pos.AddToClassList("p" + place);
-                    cell.Add(pos);
-                    cell.Add(Menus.Text(Menus.Money(table[i]), "prize-amount", true));
+                    cell.Add(Place(Num(place), place, "prize-pos"));
+                    cell.Add(Text(Money(table[i]), "prize-amount", true));
                     column.Add(cell);
                 }
                 grid.Add(column);
