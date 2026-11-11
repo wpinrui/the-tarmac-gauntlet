@@ -17,6 +17,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 MARKS = HERE / "out" / "marks"
+MODEL = HERE.parents[2] / "unity" / "Assets" / "Art" / "Vehicles" / "LibertyCollier" / "LibertyCollier.obj"
 sys.path.insert(0, str(HERE.parent / "common"))
 from livery import Livery  # noqa: E402
 
@@ -27,6 +28,38 @@ CREAM = "#f3ead2"
 
 DOOR_Z, DOOR_W, DOOR_H = 0.22, 0.5, 0.28
 ROOF_Z = -0.55
+
+
+def tail_z(x, y, _tris=[]):
+    """Where the tailgate's surface is at (x, y): a ray from behind the car, along +z, to the
+    first body triangle it meets."""
+    if not _tris:
+        verts, mat = [], None
+        for ln in MODEL.read_text().splitlines():
+            t = ln.split()
+            if not t:
+                continue
+            if t[0] == "v":
+                verts.append(tuple(map(float, t[1:4])))
+            elif t[0] == "usemtl":
+                mat = t[1]
+            elif t[0] == "f" and mat == "body":
+                ids = [verts[int(k.split("/")[0]) - 1] for k in t[1:]]
+                for i in range(1, len(ids) - 1):
+                    tri = (ids[0], ids[i], ids[i + 1])
+                    if max(p[2] for p in tri) < -1.3:
+                        _tris.append(tri)
+    best = None
+    for a, b, c in _tris:
+        d = (b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1])
+        if abs(d) < 1e-12:
+            continue
+        u = ((x - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (y - a[1])) / d
+        v = ((b[0] - a[0]) * (y - a[1]) - (x - a[0]) * (b[1] - a[1])) / d
+        if u >= 0 and v >= 0 and u + v <= 1:
+            z = a[2] + u * (b[2] - a[2]) + v * (c[2] - a[2])
+            best = z if best is None else min(best, z)
+    return best
 
 
 def bezier(pts, n=40):
@@ -109,6 +142,10 @@ def split_y(z):
     return (1.4 - z) / 1.54
 
 
+# The Southern Cross as the flag places it: (x across the fly, y down it, radius on the roof, points).
+CROSS = ((0.75, 0.167, 0.11, 7), (0.625, 0.45, 0.11, 7), (0.873, 0.4, 0.11, 7), (0.75, 0.833, 0.11, 7), (0.81, 0.56, 0.06, 5))
+
+
 def southern_cross(slant):
     """slant: degrees the big side logo tilts, positive running down toward the tail."""
     def make(views):
@@ -119,11 +156,21 @@ def southern_cross(slant):
         lv.band_x(-2, 2, GOLD, views=("rear",))
         lv.side_poly(star(1.17, 0.83, 0.075, 7), GOLD)  # the Commonwealth star on the front wing
         # The Southern Cross over the roof, Alpha toward the windscreen, in the flag's arrangement.
-        for fx, fy, r, n in ((0.75, 0.167, 0.11, 7), (0.625, 0.45, 0.11, 7), (0.873, 0.4, 0.11, 7),
-                             (0.75, 0.833, 0.11, 7), (0.81, 0.56, 0.06, 5)):
+        for fx, fy, r, n in CROSS:
             x, z = (fx - 0.75) * 3.33, -0.575 + (fy - 0.5) * 1.667
             lv.poly("top", [(x + dx, 0, z - dz) for dx, dz in star(0, 0, r, n)], GOLD)  # points to the tail
         lv.mark("top", MARKS / "logo-light.svg", (0, 0, 1.5), 0.34, rotate=-90)
+        # Behind the roof the top view is gold too, so the tailgate's top edge blends gold into gold.
+        lv.poly("top", [(-2, 0, -1.3), (2, 0, -1.3), (2, 0, -3), (-2, 0, -3)], GOLD)
+        # The tailgate answers the roof: the Southern Cross in green on the gold, upright as on the
+        # flag, beside the maker's badge and clear of the script.
+        for fx, fy, r, n in CROSS:
+            x, y = 0.25 - (fx - 0.75) * 0.9, 0.76 - (fy - 0.5) * 0.45
+            pts = [(x - dx, y + dy) for dx, dy in star(0, 0, r * 0.4, n)]
+            lv.poly("rear", [(px, py, 0) for px, py in pts], GREEN)
+            # The tailgate leans back, so the top view sees these stars too: draw them there as well,
+            # where they land on the surface, or its gold bleeds into them.
+            lv.poly("top", [(px, 0, tail_z(px, py)) for px, py in pts], GREEN)
         lv.mark("rear", MARKS / "url-green.svg", (0.0, 0.36, 0), 0.075)  # in the plate recess
         # Gold number on the green at the front of the door, the flag at the door's foot and the
         # logo big from the door's back half over the rear quarter.
