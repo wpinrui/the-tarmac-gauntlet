@@ -253,8 +253,12 @@ def headlamps(ref, cutters, out, sgn):
     out += blend.lay(ref, f"head_reflector_{side}", ring.intersection(inner), fr, -0.0155, -0.0125, "reflector", 0.004, along_ray=True)
     keep = pc.buffer(rad + 0.02, 64).union(amber.buffer(0.01))
     band = inner.difference(shp.buffer(-0.022)).difference(keep)
-    upper = box(-5, amber.bounds[3] + 0.01, 5, 5)
-    bar = band.intersection(upper)
+    c3 = v.mean(0)
+    up = (to2([c3 + [0, 0, 0.1]]) - to2([c3]))[0]
+    up /= np.linalg.norm(up)
+    a0 = np.array(amber.centroid.coords[0]) @ up if not amber.is_empty else -5
+    pieces = [q for q in getattr(band, "geoms", [band]) if np.array(q.centroid.coords[0]) @ up > a0 + 0.01]
+    bar = unary_union(pieces) if pieces else band
     if not bar.is_empty:
         out += blend.lay(ref, f"lamp_head_{side}1", biggest(bar), fr, -0.016, -0.011, "lamp_head", 0.004, along_ray=True)
     if not amber.is_empty:
