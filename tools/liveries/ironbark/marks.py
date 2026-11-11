@@ -1,5 +1,5 @@
 """Ironbark Racing's marks as SVG files with every letter drawn as a path, so they bake the
-same anywhere: the tree-ring logo (light for green paint, dark for gold), the tagline and the
+same anywhere: the tree-ring logo (light for green paint, dark for gold), the team's web address and the
 Australian flag. Writes them to out/marks/.
 
 Run: python3 marks.py   (needs fonttools)
@@ -82,8 +82,8 @@ def logo(word_fill, racing_fill):
     return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {x0 + w + 4:.1f} 140">{"".join(body)}</svg>'
 
 
-def tagline(fill):
-    a, w = words(ZILLA, "Australian hardwood, won’t snap", 40, 0, 32, fill, anchor="start")
+def url(fill):
+    a, w = words(BARLOW, "ironbark-supplies.au", 40, 0, 32, fill, spacing=0.04, anchor="start")
     return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w:.1f} 44">{a}</svg>'
 
 
@@ -109,8 +109,7 @@ def flag(mirror=False):
 MARKS = {
     "logo-light": lambda: logo(CREAM, GOLD),
     "logo-dark": lambda: logo(GREEN, INK),
-    "tagline-gold": lambda: tagline(GOLD),
-    "tagline-green": lambda: tagline(GREEN),
+    "url-green": lambda: url(GREEN),
     "flag": lambda: flag(),
     "flag-mirror": lambda: flag(True),
 }

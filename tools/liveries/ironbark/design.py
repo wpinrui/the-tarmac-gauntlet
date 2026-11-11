@@ -98,7 +98,6 @@ def green_and_gold(views):
         lv.mark(view, MARKS / "logo-light.svg", lv._side(view, DOOR_Z, 0.32), 0.17)
     lv.mark("top", MARKS / "logo-light.svg", (0, 0, 1.55), 0.2, rotate=-90)
     lv.mark("rear", MARKS / "logo-light.svg", (0.0, 0.66, 0), 0.13)
-    lv.side_mark(MARKS / "tagline-gold.svg", -0.15, 0.11, 0.045)
     flags(lv, 1.22, 0.83, 0.11)
     numbers(lv, CREAM, 0.79)
     return lv
@@ -110,29 +109,35 @@ def split_y(z):
     return (1.4 - z) / 1.54
 
 
-def southern_cross(views):
-    lv = Livery(views, GREEN)
-    z0, z1 = 1.4, 1.4 - 1.54 * 2.0
-    lv.side_poly([(z0, 0.0), (z1, 2.0), (-2.4, 2.0), (-2.4, -0.1), (z0 + 0.15, -0.1)], GOLD)
-    lv.side_poly([(z0 - 0.09, 0.0), (z1 - 0.09, 2.0), (z1 - 0.12, 2.0), (z0 - 0.12, 0.0)], GREEN)
-    lv.band_x(-2, 2, GOLD, views=("rear",))
-    lv.side_poly(star(0.62, 0.78, 0.1, 7), GOLD)  # the Commonwealth star on the door's green
-    # The Southern Cross over the roof, Alpha toward the windscreen, in the flag's arrangement.
-    for fx, fy, r, n in ((0.75, 0.167, 0.11, 7), (0.625, 0.45, 0.11, 7), (0.873, 0.4, 0.11, 7),
-                         (0.75, 0.833, 0.11, 7), (0.81, 0.56, 0.06, 5)):
-        x, z = (fx - 0.75) * 3.33, -0.575 + (fy - 0.5) * 1.667
-        lv.poly("top", [(x + dx, 0, z - dz) for dx, dz in star(0, 0, r, n)], GOLD)  # points to the tail
-    for view in ("left", "right"):
-        lv.mark(view, MARKS / "logo-dark.svg", lv._side(view, 0.0, 0.29), 0.16)
-    lv.mark("top", MARKS / "logo-light.svg", (0, 0, 1.55), 0.2, rotate=-90)
-    lv.mark("rear", MARKS / "logo-dark.svg", (0.0, 0.66, 0), 0.13)
-    lv.side_mark(MARKS / "tagline-green.svg", -1.0, 0.11, 0.045)
-    flags(lv, -0.7, 0.86, 0.11)
-    lv.side_number(0.02, 0.5, DOOR_W, DOOR_H, GREEN)
-    return lv
+def southern_cross(slant):
+    """slant: degrees the big side logo tilts, positive running down toward the tail."""
+    def make(views):
+        lv = Livery(views, GREEN)
+        z0, z1 = 1.4, 1.4 - 1.54 * 2.0
+        lv.side_poly([(z0, 0.0), (z1, 2.0), (-2.4, 2.0), (-2.4, -0.1), (z0 + 0.15, -0.1)], GOLD)
+        lv.side_poly([(z0 - 0.09, 0.0), (z1 - 0.09, 2.0), (z1 - 0.12, 2.0), (z0 - 0.12, 0.0)], GREEN)
+        lv.band_x(-2, 2, GOLD, views=("rear",))
+        lv.side_poly(star(1.17, 0.83, 0.075, 7), GOLD)  # the Commonwealth star on the front wing
+        # The Southern Cross over the roof, Alpha toward the windscreen, in the flag's arrangement.
+        for fx, fy, r, n in ((0.75, 0.167, 0.11, 7), (0.625, 0.45, 0.11, 7), (0.873, 0.4, 0.11, 7),
+                             (0.75, 0.833, 0.11, 7), (0.81, 0.56, 0.06, 5)):
+            x, z = (fx - 0.75) * 3.33, -0.575 + (fy - 0.5) * 1.667
+            lv.poly("top", [(x + dx, 0, z - dz) for dx, dz in star(0, 0, r, n)], GOLD)  # points to the tail
+        lv.mark("top", MARKS / "logo-light.svg", (0, 0, 1.5), 0.34, rotate=-90)
+        lv.mark("rear", MARKS / "logo-dark.svg", (0.04, 0.63, 0), 0.19)
+        lv.mark("rear", MARKS / "url-green.svg", (0.0, 0.36, 0), 0.075)  # in the plate recess
+        # Gold number on the green at the front of the door, the flag at the door's foot and the
+        # logo big from the door's back half over the rear quarter.
+        lv.side_number(0.6, 0.8, 0.4, 0.24, GOLD)
+        flags(lv, 0.45, 0.3, 0.11)
+        z, y, h = {12: (-0.36, 0.46, 0.36), -18: (-0.28, 0.56, 0.41)}[slant]
+        for view, sign in (("left", 1), ("right", -1)):
+            lv.mark(view, MARKS / "logo-dark.svg", lv._side(view, z, y), h, rotate=sign * slant)
+        return lv
+    return make
 
 
-OPTIONS = {"green-and-gold": green_and_gold, "southern-cross": southern_cross}
+OPTIONS = {"down-to-tail": southern_cross(12), "down-to-nose": southern_cross(-18)}
 
 if __name__ == "__main__":
     views = HERE / "out" / "views" / "views.json"
