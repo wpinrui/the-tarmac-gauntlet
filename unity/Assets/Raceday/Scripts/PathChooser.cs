@@ -75,6 +75,12 @@ namespace TarmacGauntlet.Raceday
         private static readonly bool YellowCap = Knob("YELLOWCAP", 1f) > 0f;
         /// <summary>Gap to a car alongside, side to side, inside which TORCS's parallel steering still takes over, m (spec: 2 m).</summary>
         public const float SideFilterGap = 2f;
+        /// <summary>
+        /// H2, H3: under E1.23 side steering is only for a contact about to happen, within this gap, m. Further off,
+        /// a car that has left the room it owes keeps its committed line and doesn't open its steering (Ivan).
+        /// </summary>
+        public static readonly float SideImminent = Knob("SIDEGAP", 0.5f);
+        public static readonly bool SideOweOnly = Knob("SIDEOWE", 1f) > 0f;
         /// <summary>Seconds of score per second spent lifting or braking for a car ahead below its lane's speed.</summary>
         private static readonly float LiftCost = Knob("LIFT", 0.1f);
         /// <summary>Deceleration, m/s², braking plans to open a short gap with.</summary>
@@ -741,6 +747,9 @@ namespace TarmacGauntlet.Raceday
                     if (c.Ahead(arc.s, here) <= arc.e - arc.s) return arc.dir;
             return 0;
         }
+
+        /// <summary>The way the next bend within 300 m turns, +1 right, the one the car is in included, or 0 for none.</summary>
+        public static int NextTurnAt(Circuit c, float here) => NextTurn(c, here);
 
         /// <summary>The way the next bend within 300 m turns, the one the car is in included, or 0 for none.</summary>
         private static int NextTurn(Circuit c, float here, float within = 300f)
