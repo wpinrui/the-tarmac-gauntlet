@@ -354,6 +354,52 @@ def door_paths():
     return rear, front
 
 
+# ---------------------------------------------------------------- driver's door
+DOOR_DEPTH = 0.05     # below the cabin floor the door takes the sill this deep
+DOOR_WALL = 0.09      # above it, the whole wall: the cabin is hollow behind it
+DOOR_GAP = 0.0015     # half the gap round the door, inside the shut line's groove
+DOOR_OPEN = 65.0      # degrees the door swings out
+
+
+def door_outline():
+    """The left front door seen from the side: inside its front shut line and the rear door's
+    front edge, closed across the window, and the window frame round its glass back to the
+    B-pillar's middle."""
+    rear, front = door_paths()
+    bc = float(np.mean(R["b_pillar"]))
+    edge = [p for p in rear if p[0] > bc - 0.1]
+    dlo, _g, _t = dlo_shapes()
+    return unary_union([Polygon(front + edge).buffer(0), dlo.intersection(box(bc, -1, 5, 5))])
+
+
+def mirror_footprint():
+    """The mirror on the door seen from the side, with room: taken only outside the skin."""
+    m = R["mirror"]
+    return box(m["x_back"] - 0.05, R["belt_z"] - 0.06, m["x_front"] + 0.06, m["z1"] + 0.05)
+
+
+def door_hinge():
+    """The hinge axis up the door's front edge, outside the skin, and the open angle. Turning
+    about an axis pointing up, a negative angle swings the door's back edge out."""
+    o = door_outline()
+    _x0, z0, x1, z1 = o.bounds
+    xf = x1 + 0.004
+    y = max(body.y_at(xf - 0.01, z) for z in np.linspace(z0 + 0.02, R["belt_z"], 20)) + 0.003
+    return (xf, y, z0), (xf, y, R["belt_z"]), -DOOR_OPEN
+
+
+def door(ref, shell, obs, floor):
+    """Cut the left front door free of the body and its window trim; its glass, card and
+    mirror glass go with it. Returns the door's pieces."""
+    o = door_outline()
+    regions = [(o.intersection(box(-5, -1, 5, floor + 0.02)), DOOR_DEPTH),
+               (o.intersection(box(-5, floor + 0.02, 5, 5)), DOOR_WALL), (mirror_footprint(), -0.004)]
+    trim = [ob for ob in obs if ob.name == "window_trim_l"]
+    roles = {"side_glass_l": "glass", "side_glass_l_1": "glass", "side_glass_l_2": "glass",
+             "mirror_glass_l": "mirror", "door_card_l": "card"}
+    return blend.free_door(ref, side_fr(1), regions, DOOR_GAP, shell, trim, roles, o)
+
+
 def bonnet_loop():
     """The bonnet in plan: a plain arc at the cowl, straight sides along the wing tops, then
     back over the headlamps' top edges and straight across above the grille."""
@@ -584,7 +630,9 @@ def interior(floor):
     for sgn, side in ((1, "l"), (-1, "r")):
         clip = lambda x, s=sgn: (box(0.3, _card_floor(x), 1.2, R["belt_z"] - 0.02) if s > 0 else box(-1.2, _card_floor(x), -0.3, R["belt_z"] - 0.02)).intersection(
             body.inside(x, 0.035 + 0.003)).difference(body.inside(x, 0.035 + 0.025))
-        obs.append(_loft(f"door_card_{side}", -1.15, 0.44, clip, n=16))
+        bc = float(np.mean(R["b_pillar"]))           # front and rear door cards part at the B-pillar
+        obs.append(_loft(f"door_card_{side}", bc + 0.006, 0.44, clip, n=10))
+        obs.append(_loft(f"door_card_{side}_rear", -1.15, bc - 0.006, clip, n=8))
         yc = 0.38 * sgn
         obs.append(_rbox(f"seat_base_{side}", -0.42, 0.10, yc - 0.25, yc + 0.25, floor + 0.002, 0.50))
         obs.append(_rbox(f"seat_back_{side}", -0.56, -0.44, yc - 0.24, yc + 0.24, 0.501, 1.12, lean=0.22))

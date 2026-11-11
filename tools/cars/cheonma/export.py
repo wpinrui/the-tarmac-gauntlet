@@ -121,6 +121,10 @@ def paint_glass(ob):
 
 from rows import X as ROWS_X, Z as ROWS_Z  # noqa: E402
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "common"))
+import blend as common  # noqa: E402  (door cutting and hinges)
+import geom as cgeom  # noqa: E402
+
 
 def place_wheels():
     w = ROWS["wheel"]
@@ -311,11 +315,11 @@ def cockpit(shell):
         boolean(shell, prism("side_cut", a, b, "interior"), "DIFFERENCE")
     # Interior: seat, dash, wheel on its column, door cards, mirror. All fused to the tub.
     bits = [
-        parts.box(-0.10, 0.30, -0.25, 0.05, 0.22, 0.36),          # seat base
-        parts.box(-0.16, -0.03, -0.25, 0.05, 0.22, 0.74),         # seat back on the bulkhead
+        parts.box(-0.10, 0.30, -0.05, 0.25, 0.22, 0.36),          # seat base, left of centre by the door
+        parts.box(-0.16, -0.03, -0.05, 0.25, 0.22, 0.74),         # seat back on the bulkhead
         parts.box(0.80, 1.00, -0.24, 0.24, 0.50, 0.60),           # dash
-        parts.box(0.60, 0.82, -0.12, -0.04, 0.52, 0.58),          # steering column
-        parts.disc(np.array([0.60, -0.08, 0.57]), (-1, 0, 0.25), 0.12, 0.03),  # steering wheel
+        parts.box(0.60, 0.82, 0.04, 0.12, 0.52, 0.58),            # steering column
+        parts.disc(np.array([0.60, 0.08, 0.57]), (-1, 0, 0.25), 0.12, 0.03),  # steering wheel
         parts.box(0.00, 0.75, 0.24, 0.32, 0.36, 0.52),            # door card left
         parts.box(0.00, 0.75, -0.32, -0.24, 0.36, 0.52),          # door card right
         parts.box(0.36, 0.39, -0.05, 0.05, 0.90, 0.93),           # interior mirror
@@ -323,6 +327,42 @@ def cockpit(shell):
     ]
     for i, (v, f) in enumerate(bits):
         boolean(shell, make(f"interior_{i}", v, f, "interior"), "UNION")
+
+
+# ---------------------------------------------------------------- driver's door
+DOOR_SIDE = [(-0.12, 0.62), (0.514, 0.62), (0.354, 1.0), (-0.12, 1.0)]   # seen from the side
+DOOR_IN, DOOR_OUT = 0.26, 0.45    # the canopy wall lies between these, clear of the seat and mirror
+DOOR_GAP = 0.0015                 # half the gap round the door
+DOOR_ROUND = 0.04                 # its back corners are rounded
+# hinges, each (p0, p1, degrees): up and forward on a raked axis along the door's front edge,
+# as the reference's door; or out to the side on an upright axis
+DOOR_STYLES = {
+    "Up and forward": ((0.52, 0.31, 0.62), (0.36, 0.22, 1.0), -75.0),
+    "Out to the side": ((0.52, 0.31, 0.62), (0.52, 0.31, 1.0), -65.0),
+}
+DOOR_PICK = "Up and forward"
+
+
+def door_outline():
+    """The door seen from the side, its back corners rounded and its hinge edge kept straight."""
+    from shapely.geometry import Polygon as P, box
+    g = P(DOOR_SIDE)
+    return g.buffer(-DOOR_ROUND, join_style=1).buffer(DOOR_ROUND, join_style=1).union(g.intersection(box(0.2, 0, 2, 2)))
+
+
+def _door_solid(grow):
+    g = door_outline().buffer(grow, join_style=2)
+    ring = cgeom.resample(np.vstack([np.array(g.exterior.coords)]), 0.01)[:-1]
+    rings = [np.column_stack([ring[:, 0], np.full(len(ring), y), ring[:, 1]]) for y in (DOOR_IN - grow, DOOR_OUT + grow)]
+    v, f = cgeom.close_rings(rings)
+    return [make("door_solid", v, f, "interior")]
+
+
+def door(shell):
+    """Cut the left door free of the canopy; its window goes with it."""
+    fr = common.frame((0, 0.7, 0), (1, 0, 0), (0, 0, 1), (0, -1, 0))
+    roles = {"side_window_l": "glass"}
+    return common.free_door(None, fr, [], DOOR_GAP, shell, [], roles, door_outline(), solids=_door_solid)
 
 
 def mirror_recesses(shell):
@@ -414,6 +454,9 @@ def main():
     obs += windows(bvh)
     obs += options(bvh)
     cockpit(shell)
+    pieces = door(shell)
+    print("door cut free:", [o.name for o in pieces])
+    obs += [p for p in pieces if p not in obs]
     for name, (v, f, mat) in loose.items():
         obs.append(make(name, v, f, mat))
     obs += wheels()
@@ -436,6 +479,8 @@ def main():
                           export_triangulated_mesh=True,
                           path_mode="RELATIVE", **axes)
     write_mtl(OUT / f"{NAME}.mtl")
+    if GAME:
+        common.write_doors(OUT / f"{NAME}.doors.json", {"door_l": DOOR_STYLES[DOOR_PICK]})
 
 
 def write_mtl(path):

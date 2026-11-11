@@ -1,0 +1,12 @@
+laid 39 parts, 18 cutters
+cabin cut
+openings cut, hollows dropped: 0
+grooves cut
+door cut free: ['door_l', 'door_l_trim', 'door_l_glass', 'door_l_mirror', 'door_l_card']
+triangles 567083
+Writing to out/ArcherCrescendo.obj
+OBJ export of 'ArcherCrescendo.obj' took 2906.26 ms
+Info: File exported successfully
+wrote out/ArcherCrescendo.obj
+wrote /home/user/the-tarmac-gauntlet/tools/cars/crescendo/viewer.html 10811 KB
+exit 0

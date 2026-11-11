@@ -139,11 +139,13 @@ def build(game=False):
     arch, tubs = parts.arches()
     for ob in arch:
         bpy.data.objects.remove(ob)
-    for ob in [cabin] + [o for o in seats if o.name.startswith("hoop")]:
+    for ob in [cabin] + [o for o in seats if o.name.startswith(("hoop", "door_card"))]:
         parts.stand_off(ob, *tubs)
     for ob in tubs:
         bpy.data.objects.remove(ob)
     out += [cabin] + seats + wheels
+    door = parts.door(ref, shell)
+    print("door cut free:", [o.name for o in door])
     opts = parts.options(ref)
     for n, objs in roofs.items():
         for i, ob in enumerate(objs):
@@ -177,4 +179,6 @@ if __name__ == "__main__":
     out_dir = Path(args[0]) if args else HERE / "out"
     obs = build(game)
     blend.export(obs, out_dir, R["name"], MATERIALS, game=game)
+    if game:
+        blend.write_doors(out_dir / f"{R['name']}.doors.json", {"door_l": parts.door_hinge()})
     print("wrote", out_dir / f"{R['name']}.obj")

@@ -21,7 +21,7 @@ namespace TarmacGauntlet.Raceday
 
             string modelPath = CarArt.ModelPath(modelId);
             GameObject model = string.IsNullOrEmpty(modelPath) ? null : LoadModel(modelPath);
-            Transform[] wheels = model != null ? AttachModel(root, model, paint) : BuildBox(root, spec, paint ?? new Color(0.8f, 0.81f, 0.83f));
+            Transform[] wheels = model != null ? AttachModel(root, model, modelPath, paint) : BuildBox(root, spec, paint ?? new Color(0.8f, 0.81f, 0.83f));
 
             BoxCollider box = root.AddComponent<BoxCollider>();
             box.center = new Vector3(0f, 0.62f, 0.06f);
@@ -54,16 +54,18 @@ namespace TarmacGauntlet.Raceday
 
         /// <summary>
         /// Puts the model under the car and gives each wheel a pivot at its centre, so it can
-        /// steer, spin and move with the suspension. With a paint, the body is resprayed in it.
+        /// steer, spin and move with the suspension, and each opening door its hinge (CarDoors on
+        /// the model). With a paint, the body is resprayed in it.
         /// Returns pivots front left, front right, rear left, rear right.
         /// </summary>
-        private static Transform[] AttachModel(GameObject root, GameObject prefab, Color? paint)
+        private static Transform[] AttachModel(GameObject root, GameObject prefab, string modelPath, Color? paint)
         {
             GameObject model = Object.Instantiate(prefab, root.transform, false);
             model.name = "Model";
             if (paint.HasValue) CarPaint.Respray(model, paint.Value);
             foreach (Collider c in model.GetComponentsInChildren<Collider>()) Object.Destroy(c);
             foreach (Transform t in model.GetComponentsInChildren<Transform>()) t.gameObject.layer = IgnoreRaycastLayer;
+            CarDoors.Attach(model, modelPath);
 
             string[] corners = { "fl", "fr", "rl", "rr" };
             var pivots = new Transform[4];

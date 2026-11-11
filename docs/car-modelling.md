@@ -49,6 +49,7 @@ When there is no model, use orthographic drawings only, never perspective photos
 body.py lofts the outer skin from rows.json, in pure numpy.
 Build space is metres: x forward from mid wheelbase, y left, z up from the ground.
 The skin splits into pieces: body, doors, bonnet, boot or engine cover, glass.
+Every door that opens is its own closed shell, cut from the body along its shut line, named `door_l` or `door_r`. The opening it leaves gets jamb faces in the interior material.
 Every piece is a closed shell with thickness. Shut lines are V grooves.
 A bonnet shut line starts at the windscreen's lower corners. It runs forward along the panels it meets, such as the lamps and the wings, then across the nose. The bonnet reaches back to the windscreen, so its line has no rear edge.
 Wheel arches step round at even angles.
@@ -59,6 +60,7 @@ Lamps, grille slats and badges are raised parts lying on the panel.
 Trace every headlight and tail light outline closely from the reference. Never approximate a lamp shape.
 Lamp interiors are our own, not copied from the real car.
 Lamp parts and materials are named so the game can light them: `lamp_head`, `lamp_tail`, `lamp_brake`, `lamp_rain`.
+Parts that swing with a door start with its name: `door_l_glass`, `door_l_card`, `door_l_mirror`.
 The interior gets a firewall, a dash meeting it, seats, door cards and a mirror.
 Door mirrors get a separate recessed glass part.
 Lay each window's glass, black band and cutter along that window's own normal, never along the car's axes. A shallow window projected from straight behind or above stretches its band.
@@ -82,6 +84,7 @@ Run no checks until Ivan confirms the direction.
 
 ## 8. Check, then fix
 After Ivan confirms the direction, check.py must find no open or inward shells, no floating parts, no intersecting pairs and no z-fighting.
+check.py also runs with every door open.
 Close-ups come before posting: the nose, the shut lines, the lamps.
 A pillar shut line runs down the pillar's middle, so each door shows the same width of black.
 Black window trim is one even band, with no jump at a shut line.
@@ -90,6 +93,7 @@ Fix every hit, then show Ivan the fixed version. He must say ok before it goes i
 ## 9. Put it in the game
 Record Ivan's viewer picks in rows.py, then `export.py <dir> --game` writes only the picked options with Unity axes (forward +Z, up +Y, metres).
 Export into `unity/Assets/Art/Vehicles/<Name>/` with the OBJ, MTL and textures.
+export.py writes each door's hinge axis and open angle, in Unity axes, to `<Name>.doors.json` beside the OBJ.
 Every file and folder gets a committed `.meta` with its own random guid.
 The build scripts live in `tools/cars/<name>/`: rows.py, rows.json, body.py, parts.py, glyphs.py, glyphs.json, export.py, publish.py, check.py.
 Shared primitives live in `tools/cars/common/`: lofting, laying shapes on the body, grooves, booleans, lathing, export, the viewer, checks and glyph outlines. They hold no shapes, sizes, colours or part designs. Every visual decision is written fresh in the car's own scripts. Nothing visual carries over from another car.

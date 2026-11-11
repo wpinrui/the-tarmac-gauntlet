@@ -384,3 +384,76 @@ def export(obs, out_dir, name, materials, game=False):
                   "Ks {0:.2f} {0:.2f} {0:.2f}".format(spec * 0.5), "Ns 200", f"d {alpha:.2f}",
                   "Ke {:.2f} {:.2f} {:.2f}".format(*(emit or (0, 0, 0))), ""]
     (out / f"{name}.mtl").write_text("\n".join(lines))
+
+
+# ---------------------------------------------------------------- doors
+def cutter(bvh, name, regions, fr, out=0.35, grow=0.0):
+    """A solid for cutting a panel free of the body, laid along fr's rays. regions: [(shape,
+    depth)], each running from depth inside the skin (negative: outside it) to out beyond it.
+    grow widens each shape and deepens it, so a cutter grown a little more than its pair leaves
+    a gap between the two pieces."""
+    obs = []
+    for i, (g, depth) in enumerate(regions):
+        obs += lay(bvh, f"{name}_{i}", g.buffer(grow, join_style=2), fr, -(depth + grow), out + grow,
+                   "interior", 0.01, along_ray=True)
+    return union_all(obs, name)
+
+
+def split_off(ob, inner, outer, name):
+    """Cut a piece free of ob: the piece is ob inside inner, ob keeps what lies outside outer.
+    The cut faces take the cutters' material."""
+    piece = ob.copy(); piece.data = ob.data.copy(); piece.name = name
+    bpy.context.scene.collection.objects.link(piece)
+    boolean(piece, inner, "INTERSECT")
+    boolean(ob, outer, "DIFFERENCE")
+    return piece
+
+
+def swing(obs, p0, p1, deg):
+    """Turn objects about the axis p0 to p1 by deg (right hand rule), as an open door."""
+    p0 = Vector(p0); ax = (Vector(p1) - p0).normalized()
+    m = Matrix.Translation(p0) @ Matrix.Rotation(math.radians(deg), 4, ax) @ Matrix.Translation(-p0)
+    for ob in obs:
+        ob.data.transform(m)
+
+
+def write_doors(path, doors):
+    """<Name>.doors.json for the game: each door's hinge axis and open angle, in the model's
+    local space as Unity shows it (x right, y up, z forward, metres). The open angle is the one
+    to pass to Unity's Quaternion.AngleAxis about hinge1 - hinge0. doors: {name: (p0, p1,
+    deg)} in build space, deg turning about p0 to p1 by the right hand rule there. Unity mirrors
+    x, so the angle changes sign."""
+    import json
+    u = lambda p: [round(-float(p[1]), 5), round(float(p[2]), 5), round(float(p[0]), 5)]
+    out = {"doors": [{"name": k, "hinge0": u(p0), "hinge1": u(p1), "open": round(-float(deg), 2)}
+                     for k, (p0, p1, deg) in doors.items()]}
+    Path(path).write_text(json.dumps(out, indent=2) + "\n")
+
+
+def free_door(ref, fr, regions, gap, shell, trims, roles, outline, name="door_l", solids=None):
+    """Cut a door free: its panel out of shell and out of each trim object in trims (each
+    split piece named <name>_trim, _trim_1, ...), with a gap of 2 * gap all round. solids, if
+    given, is a function of grow returning more cutter solids to add to the regions'. Then each
+    object of the scene named in roles {old name: role}, whose centre lies on the door's side
+    (y the same sign as fr's rays point from) and inside outline seen from the side, is renamed
+    <name>_<role>. regions and fr as for cutter. Returns the door's objects, its panel first."""
+    from shapely.geometry import Point
+    sgn = -float(np.sign(fr[3][1]))
+    def one(tag, grow):
+        obs = [cutter(ref, name + tag, regions, fr, grow=grow)] if regions else []
+        return union_all(obs + (solids(grow) if solids else []), name + tag)
+    pair = lambda: (one("_in", -gap), one("_out", gap))
+    pieces = [split_off(shell, *pair(), name)]
+    for i, t in enumerate(trims):
+        pieces.append(split_off(t, *pair(), f"{name}_trim" + (f"_{i}" if i else "")))
+    seen = {}
+    for ob in [o for o in bpy.context.scene.objects if o.type == "MESH"]:
+        if ob.name not in roles or not ob.data.vertices:
+            continue
+        c = np.mean([v.co for v in ob.data.vertices], axis=0)
+        if c[1] * sgn > 0 and outline.buffer(0.02).contains(Point(c[0], c[2])):
+            role = roles[ob.name]
+            k = seen.get(role, 0); seen[role] = k + 1
+            ob.name = f"{name}_{role}" + (f"_{k}" if k else "")
+            pieces.append(ob)
+    return pieces
