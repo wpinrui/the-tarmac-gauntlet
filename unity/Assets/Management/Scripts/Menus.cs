@@ -34,6 +34,9 @@ namespace TarmacGauntlet.Management
         /// <summary>A panel opened: its slug and the element to fill. The body is emptied each time.</summary>
         public event Action<string, VisualElement> ScreenOpened;
 
+        /// <summary>A hub screen closed: its slug. Another screen may open straight after.</summary>
+        public event Action<string> ScreenClosed;
+
         /// <summary>
         /// The side pane left of the docked panel, emptied with the panel each time a screen opens. It shows while a
         /// screen is open and the pane has something in it.
@@ -110,6 +113,9 @@ namespace TarmacGauntlet.Management
             gameObject.AddComponent<DriversPanel>();
             gameObject.AddComponent<CrewPanel>();
             gameObject.AddComponent<LineupPanel>();
+            gameObject.AddComponent<GarageBays>();
+            gameObject.AddComponent<WorkshopPanel>();
+            gameObject.AddComponent<DealerPanel>();
 
             GameSession.Changed += OnGameChanged;
             if (GameSession.State != null) OnGameChanged(GameSession.State);
@@ -566,8 +572,10 @@ namespace TarmacGauntlet.Management
         private void Go(Mode next, string slug = null)
         {
             HideTooltip();
+            string closing = screen;
             mode = next;
             screen = next == Mode.Screen ? slug : null;
+            if (closing != null) ScreenClosed?.Invoke(closing);
             if (next == Mode.Screen || next == Mode.NewGame)
             {
                 panelBody.Clear();
@@ -582,6 +590,12 @@ namespace TarmacGauntlet.Management
             }
             hqCamera.Show(next == Mode.Main || next == Mode.NewGame ? MainShot : next == Mode.Screen ? slug : HubShot);
             Render();
+        }
+
+        /// <summary>Closes the open screen and goes back to the hub.</summary>
+        internal void CloseScreen()
+        {
+            if (mode == Mode.Screen) Go(Mode.Hub);
         }
 
         private void OpenScreen(string slug)
