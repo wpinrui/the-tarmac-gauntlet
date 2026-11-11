@@ -19,5 +19,6 @@
     <Compile Include="../../../unity/Assets/Raceday/Scripts/LandscapePlan.cs" />
     <Compile Include="../../../unity/Assets/Raceday/Scripts/LandscapeLooks.cs" />
     <Compile Include="../../../unity/Assets/Raceday/Scripts/Horizon.cs" />
+    <Compile Include="../../../unity/Assets/Raceday/Scripts/Grandstands.cs" />
   </ItemGroup>
 </Project>

@@ -78,3 +78,10 @@ namespace TarmacGauntlet.Raceday
         public UnityEngine.Material Asphalt, PitAsphalt, White, Yellow, Kerb, Verge, Grass, Gravel, Armco, Tyres, Concrete, Hatch, Terrain, GarageInside, Bollard;
     }
 }
+namespace TarmacGauntlet.Raceday
+{
+    public sealed class StandMaterials
+    {
+        public UnityEngine.Material Concrete, Steel, Cladding, Seats, Roof, Bank, Crowd, FenceMesh, FencePosts;
+    }
+}

@@ -37,6 +37,7 @@ public static class Check
             foreach (TreeSpot t in plan.Trees) counts[(int)t.Kind]++;
             Console.WriteLine($"{name}: {plan.Trees.Count} trees and bushes in {ms} ms (" + string.Join(", ", Enum.GetNames(typeof(TreeKind)).Select((k, i) => $"{k} {counts[i]}")) + ")");
             Rules(name, circuit, builder, plan);
+            Stands(name, circuit, builder, plan);
             Cost(name, plan);
             if (outDir != null) Write(Path.Combine(outDir, name), plan, horizon);
         }
@@ -69,6 +70,32 @@ public static class Check
         Expect($"{name}: nothing within {LandscapePlan.KeepClear} m behind the armco", worst >= LandscapePlan.KeepClear - 0.01f, $"nearest {worst:0.0} m at {at.x:0} {at.z:0}");
         Expect($"{name}: nothing in the paddock", paddock == 0, $"{paddock} trees");
         Expect($"{name}: same look gives the same trees", new LandscapePlan(c, b.RunoffReach, LandscapeLooks.Current).Trees.Count == new LandscapePlan(c, b.RunoffReach, LandscapeLooks.Current).Trees.Count, "");
+    }
+
+    /// <summary>No tree's crown reaches over a grandstand's footprint (Grandstands.Footprints).</summary>
+    private static void Stands(string name, Circuit c, CircuitBuilder b, LandscapePlan plan)
+    {
+        var stands = new Grandstands(c, b, null, StandLook.Main, StandLook.Corners);
+        stands.Build();
+        int bad = 0;
+        string where = "";
+        foreach (TreeSpot t in plan.Trees)
+        {
+            int best = 0;
+            float bd = float.MaxValue;
+            for (int k = 0; k < c.Count; k += 1)
+            {
+                float dx = t.Base.x - c.Centre[k].x, dz = t.Base.z - c.Centre[k].z, d = dx * dx + dz * dz;
+                if (d < bd) { bd = d; best = k; }
+            }
+            float lx = t.Base.x - c.Centre[best].x, lz = t.Base.z - c.Centre[best].z;
+            float lateral = lx * c.Left[best].x + lz * c.Left[best].z;
+            float crown = LandscapePlan.ModelRadius[(int)t.Kind] * t.Scale * 0.5f;
+            float inward = lateral - Math.Sign(lateral) * crown;   // the crown's edge nearest the track
+            foreach (StandFootprint f in stands.Footprints)
+                if (f.Covers(c.Lap, best * c.Step, inward)) { bad++; where = $"{t.Base.x:0} {t.Base.z:0}"; break; }
+        }
+        Expect($"{name}: no tree over a grandstand ({stands.Footprints.Count} stands)", bad == 0, $"{bad} trees, last at {where}");
     }
 
     /// <summary>Quads drawn and chunks (one draw call each, plus shadow cascades for the near ones).</summary>
