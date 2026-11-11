@@ -51,7 +51,6 @@ namespace TarmacGauntlet.Raceday
         private string lastDriver;
 
         private const string PlayerCar = "a-29";
-        private const string PlayerModel = "Assets/Art/Vehicles/CheonmaCX24Si/CheonmaCX24Si.obj";
         private const string PaceCarModel = "c-19";
         /// <summary>The player's team name when the scene runs on its own.</summary>
         private const string PlayerTeam = "Your Team";
@@ -118,7 +117,7 @@ namespace TarmacGauntlet.Raceday
                 bool mine = i == player;
                 string id = field[i];
                 Color paint = PaintFor(id);
-                CarController car = CarBuilder.Spawn(id, mine && id == PlayerCar ? PlayerModel : null, circuit, mine ? keys : null, paint);
+                CarController car = CarBuilder.Spawn(id, circuit, mine ? keys : null, paint);
                 if (pitLaneStart != null) car.PlaceAt(pitLaneStart.Place(i, out Vector3 forward), forward);
                 else
                 {
@@ -236,7 +235,7 @@ namespace TarmacGauntlet.Raceday
             if (start != StartMode.Rolling) return;
 
             // The pace car waits ahead of pole, in pole's column.
-            CarController paceCar = CarBuilder.Spawn(PaceCarModel, null, circuit, null, new Color(0.95f, 0.95f, 0.95f));
+            CarController paceCar = CarBuilder.Spawn(PaceCarModel, circuit, null, new Color(0.95f, 0.95f, 0.95f));
             paceCar.name = "Pace car";
             paceCar.PlaceAt(circuit.IndexOf(circuit.Data.grid.slots[0].d + 40f), RollingStart.ColumnOf(0));
             var rolling = (RaceStart)starter;
