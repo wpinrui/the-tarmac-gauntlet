@@ -144,6 +144,10 @@ namespace TarmacGauntlet.Raceday
         private static readonly bool OweHold = Knob("OWEHOLD", 1f) > 0f;
         /// <summary>H8, T6b: a path braking for a corner may tuck in behind a car ahead at no less than the gap it has now, and this many seconds clear, s.</summary>
         private static readonly float Tuck = Knob("TUCK", 0.03f);
+        /// <summary>T20: in the tow on a straight, a path may close to this many seconds behind a car ahead, no faster than stops short of it if it brakes at its hardest, s.</summary>
+        private static readonly float Tow = Knob("TOW", 0.05f);
+        /// <summary>Seconds short of the next corner the tow ends.</summary>
+        private static readonly float TowNear = Knob("TOWNEAR", 3f);
         /// <summary>H1: a path moving across, away from a car ahead it is already close behind, is not broken by the following gap.</summary>
         private static readonly float Escape = Knob("ESCAPE", 0.85f);
         private static readonly bool OweTrack = Knob("OWETRACK", 0f) > 0f, OweH1 = Knob("OWEH1", 1f) > 0f, OweCommit = Knob("OWECOMMIT", 1f) > 0f, OweEdge = Knob("OWEEDGE", 1f) > 0f;
@@ -605,6 +609,8 @@ namespace TarmacGauntlet.Raceday
             float over = 0f, risk = 0f, yellow = 0f, lifted = 0f;
             bool tuckZone = BrakingZone(pilot);   // H8, T6b: only braking for the corner
             bool escapeZone = !tuckZone && TurnAt(c, me.Distance) == 0;   // H1: out of the corner
+            // T20: the tow is for the straight, seconds clear of the next corner's braking.
+            bool towZone = escapeZone && Road(NextCornerStart(c, Mathf.Repeat(me.Distance, lap)) - Mathf.Repeat(me.Distance, lap), lap) > TowNear * me.Speed;
             bool onTrack = OnTrack(c, me.Lateral, me.Distance);
             float turnIn = NextCornerStart(c, Mathf.Repeat(d, lap));
             bool turnedIn = false;
@@ -704,6 +710,9 @@ namespace TarmacGauntlet.Raceday
                         && (HardAhead <= 0f || v <= SafeSpeed(ov[j, s], others[j].Braking, g - CarL - margin));
                     // H1: a car ahead already within the following gap is left by moving across, away from its lane:
                     // that path is no worse for being inside the gap, so long as it never closes to the car's tail.
+                    // T20: in the tow on a straight it closes right up, as close as the car ahead's hardest braking allows (Ivan: slipstream, then pull out).
+                    if (!tuck && Tow > 0f && towZone && from > 0.7f * CarL && g > CarL + margin + Tow * v
+                        && v <= SafeSpeed(ov[j, s], others[j].Braking, g - CarL - margin)) tuck = true;
                     bool escape = Escape > 0f && escapeZone && from > 0.7f * CarL && apart > start + 0.05f && g > CarL + margin + Escape * headway * v;
                     bool h1 = !leftRoom && !tuck && g > (behind ? -CarL - SwipeGap : -0.3f * CarL) && g < CarL + (g > 0f ? buffer : 0f) && apart < need && into && (!touching || apart < Mathf.Min(start - 0.1f, need) || apart < CarW + 0.05f && (TouchClose <= 0f || g < from - TouchClose));
                     if (h1 && escape) cand.Escaped = true;
