@@ -92,6 +92,22 @@ namespace TarmacGauntlet.Simulation.Tests
         }
 
         [Test]
+        public void InitializeGame_PlayerTeamKeepsItsBadge()
+        {
+            var game = InitializeGame(Options with { Logo = "bolt", TeamColour = "#3aa0ff" }, Stable);
+            Assert.That(Player(game).Logo, Is.EqualTo("bolt"));
+            Assert.That(Player(game).TeamColour, Is.EqualTo("#3aa0ff"));
+        }
+
+        [Test]
+        public void InitializeGame_UnspentStartingPointsAreForfeited()
+        {
+            Assert.That(Player(InitializeGame(Options, Stable)).ForfeitedSkillPoints, Is.EqualTo(0));
+            var game = InitializeGame(Options with { Skills = new PlayerSkills { Driver = 6 } }, Stable);
+            Assert.That(Player(game).ForfeitedSkillPoints, Is.EqualTo(9));
+        }
+
+        [Test]
         public void InitializeGame_PlayerTeamHasTheCorrectNameAndPlayerName()
         {
             var game = InitializeGame(Options, Stable);

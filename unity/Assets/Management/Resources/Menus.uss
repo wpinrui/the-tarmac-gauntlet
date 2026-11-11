@@ -323,3 +323,57 @@
 .rs-step-icon { width: 14px; height: 14px; -unity-background-scale-mode: scale-to-fit; }
 .rs-continue { position: absolute; right: 40px; bottom: 40px; height: 62px; padding-left: 44px; padding-right: 44px; }
 .rs-continue .red-label { font-size: 22px; letter-spacing: 3.5px; }
+
+/* Dialogs: over whatever is showing, Cancel and a red confirm */
+.dialog { width: 420px; border-radius: 24px; padding: 16px; }
+.dialog-body { padding: 8px 6px 16px 6px; }
+.dialog-title { font-size: 20px; letter-spacing: 1px; }
+.dialog-sub { font-size: 14px; letter-spacing: 0.8px; color: rgba(255, 255, 255, 0.62); }
+.dialog-text { margin-top: 8px; font-size: 15px; white-space: normal; color: rgba(255, 255, 255, 0.75); }
+.dialog-career { flex-direction: row; align-items: center; }
+.dialog-badge { width: 44px; height: 44px; margin-right: 14px; -unity-background-scale-mode: scale-to-fit; }
+.dialog-buttons { flex-direction: row; }
+.dialog-button { flex-grow: 1; flex-basis: 0; height: 52px; margin-right: 8px; }
+.dialog-button.last { margin-right: 0; }
+.dialog-button .red-label, .dialog-button .ghost-label { font-size: 18px; }
+
+/* New game: one panel that fits its content */
+.panel#new-game { bottom: auto; }
+.ng-box { flex-shrink: 0; margin-bottom: 12px; padding: 16px; border-radius: 20px; background-color: rgba(0, 0, 0, 0.18); }
+.ng-team { flex-direction: row; }
+.ng-big { width: 120px; height: 120px; flex-shrink: 0; margin-right: 16px; border-radius: 16px; align-items: center; justify-content: center; background-color: rgba(255, 255, 255, 0.06); }
+.ng-big-badge { width: 84px; height: 84px; -unity-background-scale-mode: scale-to-fit; }
+.ng-team-column { flex-grow: 1; flex-shrink: 1; min-width: 0; }
+.ng-field { margin: 0; padding: 0; height: 44px; }
+.ng-field .unity-base-text-field__input { flex-grow: 1; margin: 0; padding-left: 14px; padding-right: 14px; border-radius: 12px; border-width: 1px; border-color: rgba(255, 255, 255, 0); background-color: rgba(255, 255, 255, 0.08); font-size: 16px; color: rgb(255, 255, 255); -unity-text-align: middle-left; --unity-cursor-color: rgb(255, 255, 255); --unity-selection-color: rgba(255, 255, 255, 0.3); }
+.ng-field:focus .unity-base-text-field__input { border-color: rgba(255, 255, 255, 0.4); }
+.ng-field .unity-base-text-field__input--placeholder { font-size: 14px; letter-spacing: 1.4px; color: rgba(255, 255, 255, 0.42); }
+.ng-team-name { height: 48px; margin-bottom: 10px; }
+.ng-team-name .unity-base-text-field__input { font-size: 20px; }
+.ng-shapes { flex-direction: row; justify-content: space-between; margin-bottom: 10px; }
+.ng-shape { width: 44px; height: 44px; border-radius: 10px; align-items: center; justify-content: center; }
+.ng-shape:hover { background-color: rgba(255, 255, 255, 0.1); }
+.ng-shape.on { background-color: rgba(255, 255, 255, 0.2); }
+.ng-shape-image { width: 24px; height: 24px; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.7); }
+.ng-shape.on .ng-shape-image, .ng-shape:hover .ng-shape-image { -unity-background-image-tint-color: rgb(255, 255, 255); }
+.ng-colours { flex-direction: row; justify-content: space-between; padding-left: 2px; padding-right: 2px; }
+.ng-swatch { width: 36px; height: 36px; border-radius: 18px; border-width: 2px; border-color: rgba(255, 255, 255, 0); align-items: center; justify-content: center; }
+.ng-swatch.on { border-color: rgb(255, 255, 255); }
+.ng-swatch-fill { width: 26px; height: 26px; border-radius: 13px; border-width: 1px; border-color: rgba(255, 255, 255, 0.25); }
+.ng-player { flex-direction: row; padding: 12px; }
+.ng-half { flex-grow: 1; flex-basis: 0; margin-right: 8px; }
+.ng-half.last { margin-right: 0; }
+.ng-skills { align-items: stretch; }
+.ng-pips { flex-direction: row; justify-content: center; margin-bottom: 14px; }
+.ng-pip { margin: 0 3.5px; }
+.ng-skill-row { flex-direction: row; }
+.ng-skill-head { flex-direction: row; align-items: center; margin-bottom: 4px; }
+.ng-skill-head .rs-skill-name { margin-bottom: 0; margin-right: 6px; }
+.ng-info { width: 18px; height: 18px; align-items: center; justify-content: center; }
+.ng-info-image { width: 16px; height: 16px; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.5); }
+.ng-info:hover .ng-info-image { -unity-background-image-tint-color: rgb(255, 255, 255); }
+.ng-countries { position: absolute; max-height: 280px; padding: 6px; border-radius: 12px; background-color: rgba(24, 24, 26, 0.94); border-width: 1px; border-color: rgba(255, 255, 255, 0.14); }
+.ng-country-list { flex-shrink: 1; }
+.ng-country { height: 34px; padding-left: 12px; padding-right: 12px; border-radius: 8px; font-size: 15px; color: rgba(255, 255, 255, 0.8); -unity-text-align: middle-left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ng-country:hover { background-color: rgba(255, 255, 255, 0.1); color: rgb(255, 255, 255); }
+.ng-country.on { background-color: rgba(255, 255, 255, 0.2); color: rgb(255, 255, 255); }

@@ -12,6 +12,7 @@ namespace TarmacGauntlet.Simulation
         public string Nationality { get; init; } = ""; // ISO 3166-1 alpha-2 country code
         public string TeamName { get; init; } = "";
         public string? Logo { get; init; }
+        public string TeamColour { get; init; } = ""; // #rrggbb
         public PlayerSkills Skills { get; init; } = new PlayerSkills();
     }
 
@@ -26,6 +27,8 @@ namespace TarmacGauntlet.Simulation
         private const int DriverPoolSize = 310;
         /// <summary>Drivers per AI team.</summary>
         private const int DriversPerAiTeam = 3;
+        /// <summary>Skill points the player spends at new game.</summary>
+        public const int StartingSkillPoints = 15;
         /// <summary>Player's starting budget.</summary>
         private const double PlayerStartingBudget = 1_000;
         /// <summary>Youngest driver in the seeded pool.</summary>
@@ -243,6 +246,7 @@ namespace TarmacGauntlet.Simulation
             string nationality,
             string teamName,
             string? logo,
+            string teamColour,
             PlayerSkills skills)
         {
             // Player starts with no car. Their first action is visiting the dealers.
@@ -262,7 +266,9 @@ namespace TarmacGauntlet.Simulation
                 PlayerName = playerName,
                 Nationality = nationality,
                 Logo = logo,
+                TeamColour = teamColour,
                 Skills = skills,
+                ForfeitedSkillPoints = Math.Max(0, StartingSkillPoints - skills.Driver - skills.Engineer - skills.Business),
                 SpareParts = 0,
                 TyreSets = 0,
                 Transactions = Array.Empty<TransactionRecord>(),
@@ -340,6 +346,7 @@ namespace TarmacGauntlet.Simulation
                 options.Nationality,
                 options.TeamName,
                 options.Logo,
+                options.TeamColour,
                 options.Skills);
 
             // 4. All teams
