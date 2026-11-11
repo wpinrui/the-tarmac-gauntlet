@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Threading;
 using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
@@ -10,7 +12,8 @@ namespace TarmacGauntlet.Raceday
     /// Driver stats, 0 to 100:
     /// Pace sets how much of the car's grip and braking the target speeds use.
     /// Consistency sets how much the corner speeds wander from lap to lap.
-    /// Safety sets how often a corner is overcooked: braking too late and running wide.
+    /// Safety sets how often a corner is overcooked: braking too late and running wide. A wet track
+    /// (<see cref="RaceWeather"/>) makes it happen more often.
     ///
     /// Besides the racing line it has lanes either side of it, each with its own target speeds.
     /// <see cref="Offset"/> picks a point between them, so the car can run beside the line to
@@ -200,9 +203,39 @@ namespace TarmacGauntlet.Raceday
         /// </summary>
         private SpeedProfile Place(int i)
         {
-            places ??= new SpeedProfile[Mathf.RoundToInt(2f * PlaceReach / PlaceStep) + 1];
+            if (places == null) Interlocked.CompareExchange(ref places, new SpeedProfile[PlaceCount], null);
             i = Mathf.Clamp(i, 0, places.Length - 1);
-            return places[i] ??= new SpeedProfile(new RacingLine(Line.Circuit, i * PlaceStep - PlaceReach), Spec, placeLimit, placeMax);
+            SpeedProfile have = Volatile.Read(ref places[i]);
+            if (have != null) return have;
+            // Paths driven on other threads may ask for the same place at once: the first one built is kept.
+            var built = new SpeedProfile(PlaceLine(Line.Circuit, i), Spec, placeLimit, placeMax);
+            return Interlocked.CompareExchange(ref places[i], built, null) ?? built;
+        }
+
+        /// <summary>
+        /// Builds every fixed place's speeds now, off the main thread where the car's line is tuned, rather than
+        /// on the race's first steps, when the whole grid asks for them at once. Only under path choosing.
+        /// </summary>
+        public AiPilot BuildPlaces()
+        {
+            if (Experiments.Is(PathChooser.Experiment) && LaneProfiles[0] != LaneProfiles[MiddleLane])
+                for (int i = 0; i < PlaceCount; i++) Place(i);
+            return this;
+        }
+
+        private static readonly int PlaceCount = Mathf.RoundToInt(2f * PlaceReach / PlaceStep) + 1;
+        private static readonly Dictionary<Circuit, RacingLine[]> placeLines = new Dictionary<Circuit, RacingLine[]>();
+
+        /// <summary>The path at fixed place i across the track: the same for every car on a circuit, so built once.</summary>
+        private static RacingLine PlaceLine(Circuit c, int i)
+        {
+            RacingLine[] lines;
+            lock (placeLines)
+                if (!placeLines.TryGetValue(c, out lines)) placeLines[c] = lines = new RacingLine[PlaceCount];
+            RacingLine l = Volatile.Read(ref lines[i]);
+            if (l != null) return l;
+            l = new RacingLine(c, i * PlaceStep - PlaceReach);
+            return Interlocked.CompareExchange(ref lines[i], l, null) ?? l;
         }
 
         private void PlaceBlend(float lateral, out SpeedProfile a, out SpeedProfile b, out float t)
@@ -614,7 +647,9 @@ namespace TarmacGauntlet.Raceday
                     rolled[i] = true;
                     float spread = 0.035f * (1f - Consistency / 100f);
                     float scale = 1f + spread * Mathf.Clamp(Gaussian(), -2f, 1f);
-                    float risk = 0.12f * (1f - Safety / 100f) * (1f - Safety / 100f);
+                    float careless = 1f - Safety / 100f;
+                    // A wet track catches out every driver now and then, the careless ones most.
+                    float risk = 0.12f * careless * careless + 0.025f * RaceWeather.Now.Wet * (0.4f + 0.6f * careless);
                     overcooked[i] = random.NextDouble() < risk;
                     if (overcooked[i])
                     {
