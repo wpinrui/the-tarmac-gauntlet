@@ -54,14 +54,14 @@ namespace TarmacGauntlet.Raceday
         private const string PaceCarModel = "c-19";
         /// <summary>The player's team name when the scene runs on its own.</summary>
         private const string PlayerTeam = "Your Team";
-        /// <summary>Paint for the stand-in boxes, by class, so the classes can be told apart on track.</summary>
+        /// <summary>Paint by class, so the classes can be told apart on track.</summary>
         private static readonly Color[] ClassPaint =
         {
             new Color(0.85f, 0.15f, 0.12f), new Color(0.95f, 0.55f, 0.1f), new Color(0.95f, 0.85f, 0.2f),
             new Color(0.25f, 0.7f, 0.3f), new Color(0.2f, 0.45f, 0.9f), new Color(0.6f, 0.3f, 0.8f),
         };
 
-        /// <summary>The stand-in boxes' paint for a model, by its class.</summary>
+        /// <summary>A model's paint, by its class.</summary>
         internal static Color PaintFor(string id) => ClassPaint[Mathf.Clamp(id[0] - 'a', 0, ClassPaint.Length - 1)];
 
         private void Awake()
