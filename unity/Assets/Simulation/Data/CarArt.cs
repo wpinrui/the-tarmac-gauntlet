@@ -6,7 +6,7 @@ namespace TarmacGauntlet.Simulation
 {
     /// <summary>
     /// The 3D model a car is drawn with. For now every car of a class borrows that class's one
-    /// finished model. F1 has none yet, so it borrows class A's.
+    /// finished model.
     /// </summary>
     public static class CarArt
     {
@@ -18,7 +18,7 @@ namespace TarmacGauntlet.Simulation
             { CarClass.C, "Assets/Art/Vehicles/ArcherCrescendo/ArcherCrescendo.obj" },
             { CarClass.B, "Assets/Art/Vehicles/FerettiVortice/FerettiVortice.obj" },
             { CarClass.A, "Assets/Art/Vehicles/CheonmaCX24Si/CheonmaCX24Si.obj" },
-            { CarClass.F1, "Assets/Art/Vehicles/CheonmaCX24Si/CheonmaCX24Si.obj" },
+            { CarClass.F1, "Assets/Art/Vehicles/FerettiF256V8T/FerettiF256V8T.obj" },
         };
 
         /// <summary>The model's asset path, or null for an unknown model id.</summary>
