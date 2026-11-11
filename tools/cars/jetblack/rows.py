@@ -457,11 +457,10 @@ def measure(path):
     vent = project(P("black", 0), 0, 2)
     hood_vent = project(P("grill", 5), 0, 1)
 
-    # rear: the tail lamps in 3D, the exhaust tips (left pair), the star, the spoiler in plan
+    # rear: the tail lamps in 3D, the exhaust tips (left pair), the star
     tail = P("tail_gls", 1)
     tips = project(P("chrome", 2), 1, 2)
     badge_r = disc(P("chrome", 0))
-    spoiler = project(P("paint", 9), 0, 1)
     third = sp(m["break"]).reshape(-1, 3)
 
     mv = left(P("paint", 7)).reshape(-1, 3)
@@ -485,10 +484,10 @@ def measure(path):
         "head": r4(head), "badge_front": badge_f, "nose_star": nose_star,
         "vent": ring(vent), "vent_fin": ring(project(P("chrome", 12), 0, 2)),
         "hood_vent": ring(hood_vent),
-        "tail": r4(tail), "exhaust": ring(tips), "badge_rear": badge_r, "spoiler": ring(spoiler),
+        "tail": r4(tail), "exhaust": ring(tips), "badge_rear": badge_r,
         "third_brake": r4([third[:, 0].mean(), third[:, 1].min(), third[:, 1].max(), third[:, 2].min(), third[:, 2].max()]),
         "mirror": mirror,
-        "picks": {"frontbadge": 1, "rearbadge": 1, "name": 1},
+        "picks": {"frontbadge": 1, "rearbadge": 1, "name": 3},     # Ivan, 2026-11-11
     }
 
 if __name__ == "__main__":

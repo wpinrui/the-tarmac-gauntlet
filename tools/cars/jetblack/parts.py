@@ -250,21 +250,30 @@ def plain_glass(pts, lo, hi, r=0.05):
 
 
 def side_window():
-    """The side window seen from the side (x, z): a straight belt line along its bottom, an even
-    curve over its top, a straight front edge down the windscreen pillar, corners rounded."""
+    """The side window seen from the side (x, z), rebuilt from plain fits: a straight level
+    bottom edge, a straight steep rear edge, and one even curve over the top down the
+    windscreen pillar to the front tip. Corners rounded."""
     p = np.asarray(R["door_glass"], float)
-    x0, x1 = p[:, 0].min(), p[:, 0].max()
-    i_rear = p[:, 0].argmin()
-    i_front = p[:, 0].argmax()
-    kb = np.polyfit([p[i_rear, 0], p[i_front, 0]], [p[i_rear, 1], p[i_front, 1]], 1)
-    top = p[(p[:, 1] > np.polyval(kb, p[:, 0]) + 0.03)]
-    top = top[(top[:, 0] > x0 + 0.06) & (top[:, 0] < x1 - 0.02)]
-    kt = np.polyfit(top[:, 0], top[:, 1], 3)
-    xs = np.linspace(x0, x1, 80)
-    zt = np.maximum(np.polyval(kt, xs), np.polyval(kb, xs))
+    low = p[p[:, 1] < p[:, 1].min() + 0.03]
+    kb = np.polyfit(low[:, 0], low[:, 1], 1)
+    rb = low[low[:, 0].argmin()]                   # where the rear edge leaves the bottom
+    rt = p[p[:, 0].argmin()]                       # the rear edge's top
+    xf = p[:, 0].max()
+    top = p[(p[:, 1] > np.polyval(kb, p[:, 0]) + 0.03) & (p[:, 0] > rt[0] + 0.02)]
+    pts = sorted([tuple(q) for q in top] + [tuple(rt), (xf, float(np.polyval(kb, xf)))])
+    keep = [pts[0]]
+    for q in pts[1:]:
+        if q[0] - keep[-1][0] > 0.07 or q == pts[-1]:
+            keep.append(q)
+    kt = geom.monotone(keep)                       # one even curve, no overshoot
+    xs = np.linspace(rt[0] - 0.05, xf, 120)
+    zt = np.maximum(kt(np.clip(xs, rt[0], xf)), np.polyval(kb, xs))
     g = Polygon(np.vstack([np.column_stack([xs, np.polyval(kb, xs)]), np.column_stack([xs, zt])[::-1]])).buffer(0)
-    g = biggest(g).intersection(Polygon(np.vstack([p, p[:1]])).buffer(0.01).convex_hull)
-    return soft(biggest(g), 0.02), kb
+    d = rt - rb
+    n = np.array([d[1], -d[0]]); n = n / np.linalg.norm(n) * (1 if n[0] > 0 else -1)    # points forward
+    far = 3.0
+    ahead = Polygon([rb - d * far, rt + d * far, rt + d * far + n * far, rb - d * far + n * far])
+    return soft(biggest(g.intersection(ahead)), 0.02), kb
 
 
 def side_shapes():
@@ -457,23 +466,15 @@ def boot_path():
     return np.vstack([q, (q[-2::-1] * [1, -1])])
 
 
-def spoiler_loop():
-    """The flush spoiler set into the boot lid, in plan."""
-    p = poly(R["spoiler"])
-    half = p.intersection(box(-5, 0, 5, 5))
-    g = soft(half.union(sscale(half, 1, -1, origin=(0, 0))).buffer(1e-4), 0.03)
-    return np.array(g.simplify(0.002).exterior.coords)[:-1]
-
-
 def grooves(ref):
-    """Shut lines as V grooves to cut: doors, bonnet, boot lid, spoiler."""
+    """Shut lines as V grooves to cut: doors, bonnet, boot lid. The reference's flush spoiler in
+    the boot lid is left out: the lid is one plain panel (Ivan, 2026-11-11)."""
     obs = []
     path = door_path()
     for sgn, side in ((1, "l"), (-1, "r")):
         obs.append(blend.groove(ref, f"g_door_{side}", path, side_fr(sgn)))
     obs.append(blend.groove(ref, "g_bonnet", bonnet_path(), top_fr()))
     obs.append(blend.groove(ref, "g_boot", boot_path(), top_fr()))
-    obs.append(blend.groove(ref, "g_spoiler", spoiler_loop(), top_fr(), closed=True))
     return obs
 
 
