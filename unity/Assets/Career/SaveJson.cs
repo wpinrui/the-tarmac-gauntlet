@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.IO;
+using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;
@@ -35,9 +36,16 @@ namespace TarmacGauntlet.Career
             if (version > Version)
                 throw new InvalidOperationException($"The save is format {version}, newer than this game's format {Version}.");
             Migrate(root, version);
-            return root.ToObject<GameState>(JsonSerializer.Create(Settings))
+            GameState game = root.ToObject<GameState>(JsonSerializer.Create(Settings))
                 ?? throw new InvalidOperationException("The save is empty.");
+            return WithRaceNumbers(game);
         }
+
+        /// <summary>Saves made before race numbers existed get this season's numbers on load.</summary>
+        private static GameState WithRaceNumbers(GameState game) =>
+            game.Teams.All(t => t.RaceNumber > 0)
+                ? game
+                : game with { Teams = RaceNumbers.Assign(game.Teams, RaceNumbers.WinnerOf(game.RaceHistory, game.CurrentYear - 1)) };
 
         /// <summary>Brings an older save up to <see cref="Version"/> in place. Version 1 is the first, so nothing to do yet.</summary>
         private static void Migrate(JObject root, int version)
