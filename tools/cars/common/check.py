@@ -17,7 +17,7 @@ def _swing(data, doors):
         p0 = Vector(p0); ax = (Vector(p1) - p0).normalized()
         m = Matrix.Translation(p0) @ Matrix.Rotation(math.radians(deg), 4, ax) @ Matrix.Translation(-p0)
         for k, bm in data.items():
-            if k.startswith(prefix):
+            if re.sub(r"^opt_[a-z]+_\d+_", "", k).startswith(prefix):
                 bm.transform(m)
 
 
@@ -44,7 +44,7 @@ def _volume(bm):
 
 def _apart(a, b):
     """True for parts of two different options of one group, which never appear together."""
-    ma, mb = re.match(r"opt_(.+)_(\d+)_\d+", a), re.match(r"opt_(.+)_(\d+)_\d+", b)
+    ma, mb = re.match(r"opt_([a-z]+)_(\d+)_", a), re.match(r"opt_([a-z]+)_(\d+)_", b)
     return bool(ma and mb and ma[1] == mb[1] and ma[2] != mb[2])
 
 

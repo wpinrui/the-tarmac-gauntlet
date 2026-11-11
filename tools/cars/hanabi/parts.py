@@ -502,7 +502,9 @@ def roof_options(env_bvh, xs, rcv, plain):
             blend.boolean(top, c, "DIFFERENCE")
         objs = [top]
         for sgn, side in ((1, "l"), (-1, "r")):
-            objs += blend.lay(env_bvh, f"roof_side_glass_{side}", sg.buffer(-0.002), side_fr(sgn), -0.012, -0.008, "glass", 0.02, along_ray=True)
+            # the left glass sits in the driver's door, as the reference's does, and swings with it
+            name = "door_l_glass" if sgn > 0 else f"roof_side_glass_{side}"
+            objs += blend.lay(env_bvh, name, sg.buffer(-0.002), side_fr(sgn), -0.012, -0.008, "glass", 0.02, along_ray=True)
             if n == 3:
                 band = sg.buffer(0.012).difference(sg.buffer(-0.002)).intersection(box(-5, BELT + 0.02, 5, 5))
                 objs += blend.lay(env_bvh, f"roof_side_band_{side}", band, side_fr(sgn), 0.0015, 0.0035, "trim", 0.008)

@@ -6,8 +6,7 @@ roof options built
 door cut free: ['door_l', 'door_l_mirror', 'door_l_card']
 triangles 535676
 Writing to out/ToraHanabi.obj
-OBJ export of 'ToraHanabi.obj' took 564.55 ms
+OBJ export of 'ToraHanabi.obj' took 312.54 ms
 Info: File exported successfully
 wrote out/ToraHanabi.obj
-wrote /home/user/the-tarmac-gauntlet/tools/cars/hanabi/viewer.html 9982 KB
-exit 0
+wrote /home/user/the-tarmac-gauntlet/tools/cars/hanabi/viewer.html 9983 KB

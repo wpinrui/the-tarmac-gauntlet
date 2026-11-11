@@ -543,7 +543,8 @@ def door(bvh, shell, trim):
     o = door_outline()
     regions = [(o.intersection(sbox(-5, -1, 5, CABIN_FLOOR + 0.02)), DOOR_DEPTH),
                (o.intersection(sbox(-5, CABIN_FLOOR + 0.02, 5, 5)), DOOR_WALL), (mirror_footprint(), -0.004)]
-    roles = {"side_glass_l0": "glass", "mirror_glass_l": "mirror", "door_card_l": "card"}
+    roles = {"side_glass_l0": "glass", "side_strip_l": "strip", "side_strip_l_1": "strip",
+             "mirror_glass_l": "mirror", "door_card_l": "card"}
     fr = common.frame((0, 0.7, 0), (1, 0, 0), (0, 0, 1), (0, -1, 0))
     return common.free_door(bvh, fr, regions, DOOR_GAP, shell, [trim], roles, o)
 

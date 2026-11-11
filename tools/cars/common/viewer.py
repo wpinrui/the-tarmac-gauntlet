@@ -82,7 +82,7 @@ new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzi
     const g = /^opt_([a-z]+)_(\d+)_/.exec(o.name);
     if (g) ((opts[g[1]] ||= {})[g[2]] ||= []).push(o);
     for (const [label, names] of Object.entries(SHOW)) if (names.some(n => o.name.startsWith(n))) (parts[label] ||= []).push(o);
-    for (const d of DOORS) if (o.name.startsWith(d.parts)) { (d.obs ||= []).push(o); o.matrixAutoUpdate = false; }
+    for (const d of DOORS) if (o.name.replace(/^opt_[a-z]+_\d+_/, '').startsWith(d.parts)) { (d.obs ||= []).push(o); o.matrixAutoUpdate = false; }
   });
   for (const d of DOORS) {
     const keys = Object.keys(d.styles);

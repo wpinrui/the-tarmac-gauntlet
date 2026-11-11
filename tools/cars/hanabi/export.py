@@ -149,16 +149,16 @@ def build(game=False):
     opts = parts.options(ref)
     for n, objs in roofs.items():
         for i, ob in enumerate(objs):
-            ob.name = f"opt_roof_{n}_{i}"
+            ob.name = f"opt_roof_{n}_" + ("door_l_glass" if ob.name.startswith("door_l") else str(i))
             opts.append(ob)
     if game:
         picks = R["picks"]
         for ob in opts:
-            _o, g, n, i = ob.name.split("_")
+            _o, g, n, i = ob.name.split("_", 3)
             if int(n) != picks[g]:
                 bpy.data.objects.remove(ob)
             else:
-                ob.name = f"{g}_{i}"
+                ob.name = i if i.startswith("door_l") else f"{g}_{i}"
     bpy.data.objects.remove(plain)
     obs = [o for o in bpy.context.scene.objects if o.type == "MESH"]
     for ob in obs:
