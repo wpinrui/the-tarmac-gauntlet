@@ -202,6 +202,7 @@ namespace TarmacGauntlet.Raceday
             pilot.SpeedCap = float.PositiveInfinity;
             pilot.SpeedScale = 1f;
             pilot.SideFilter = false;
+            pilot.SideHold = false;
             pilot.SideWeight = 1f;
             pilot.SideSteer = 0f;
             float margin = Endurance.MarginScale(pilot.Safety);
@@ -311,6 +312,10 @@ namespace TarmacGauntlet.Raceday
                         brakeDist = Mathf.Max(brakeDist, brakesOnly);
                         // Not in the tutorial: only while closing. Inside the margin and already no faster
                         // than the car ahead, the tutorial still brakes, to a stop, until the gap opens.
+                        // T1: the car ahead moves on while I brake, so the gap shrinks by only (v-u)/(v+u) of
+                        // my braking distance. Off the braking zone the car ahead isn't braking for a corner.
+                        if (Experiments.Is(PathChooser.Experiment) && PathChooser.RelBrake > 0f && !BrakingZone(pilot) && currentSpeedSqr > allowedSpeedSqr && mySpeed - o.Speed < PathChooser.RelClose && o.Speed > PathChooser.RelFrom)
+                            brakeDist = brakeDist * (mySpeed - o.Speed) / (mySpeed + o.Speed) + PathChooser.RelBrake * (mySpeed - o.Speed);
                         if (brakeDist > distance && currentSpeedSqr > allowedSpeedSqr) { Braking = true; BrakeFor = o.Id; BrakeGap = distance; BrakeSide = carDist; brakeLateral = o.Lateral; }
                     }
                 }
@@ -356,7 +361,7 @@ namespace TarmacGauntlet.Raceday
                     if (PathChooser.PullOutFree) step = Endurance.OvertakeOffsetRate * dt;
                 }
                 pilot.Offset = Mathf.Clamp(Mathf.MoveTowards(pilot.Offset, chooser.Target, step), AiPilot.LaneShifts[0], AiPilot.LaneShifts[AiPilot.LaneShifts.Length - 1]);
-                pilot.Offset = chooser.HoldOwe(pilot.Offset, line.Lateral[pilot.Index]);
+                pilot.Offset = chooser.HoldOwe(pilot.Offset, line.Lateral[pilot.Index], me.Across);
                 Target = chooser.Target;
                 pilot.SpeedCap = chooser.Cap;
                 State = Mathf.Abs(pilot.Offset) > 0.5f ? Mode.Overtaking : Mode.Racing;
@@ -532,6 +537,9 @@ namespace TarmacGauntlet.Raceday
                         pilot.SideFactor = outside * sign > 0f ? 1.5f : 2f;
                     }
                     pilot.SideFilter = true;
+                    // Only the outside car level with the inside one: everywhere else the filter is the last resort against a contact.
+                    pilot.SideHold = Experiments.Is(PathChooser.Experiment) && PathChooser.SideNoReverse && outsideCar
+                        && Mathf.Abs(Mathf.Repeat(side.Distance - me.Distance + 0.5f * lap, lap) - 0.5f * lap) < CarLength;
                     SideSteering = true;
                     // The filter's new offset is where the car is: it counts towards the one move.
                     if (Defending && !Exempt) OneMove(was, pilot.Offset, false);

@@ -104,6 +104,8 @@ sealed class Race
     /// <summary>One line per change of order between two cars running within 100 m of each other.</summary>
     public readonly List<string> Passes = new List<string>();
     public int PassCount;
+    /// <summary>Passes on the road between two cars of the same class, not lappings: when, and by and of whom.</summary>
+    public readonly List<(float Time, string By, string Of)> ClassPasses = new List<(float, string, string)>();
     /// <summary>Passes of a car queued behind another by a car 1% or more slower, and the first of them.</summary>
     public int QueuePassed;
     public string QueuePassedLine = "";
@@ -562,6 +564,7 @@ sealed class Race
                     if (QueuePassed++ == 0)
                         QueuePassedLine = $"{Name(by)} is {100f * (by.Pilot.Profile.LapTime / of.Pilot.Profile.LapTime - 1f):0.0}% slower and passed {Name(of)} while it queued behind a car, at {Clock(Time)} at {Math.Max(by.Car.TrackIndex, 0) * circuit.Step:0} m";
                 }
+                if (Class(by) == Class(of) && by.Distance - of.Distance < circuit.Lap * 0.5f) ClassPasses.Add((Time, Name(by), Name(of)));
                 if (Passes.Count < 400)
                     Passes.Add($"{Clock(Time)} {Name(by)} passes {Name(of)} at {Math.Max(by.Car.TrackIndex, 0) * circuit.Step:0} m{(by.Distance - of.Distance > circuit.Lap * 0.5f ? " (lapping)" : "")}");
             }

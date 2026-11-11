@@ -62,6 +62,8 @@ namespace TarmacGauntlet.Raceday
         /// car alongside (psteer, radians, positive to the right), and its factor, 1.5 or 2.
         /// </summary>
         public bool SideFilter;
+        /// <summary>The side steering may not take the wheel below <see cref="SideFilter"/>'s hold of the corner: see Racecraft.</summary>
+        public bool SideHold;
         public float SideWeight = 1f, SideSteer, SideFactor = 2f;
         /// <summary>
         /// True while the car is in another's slipstream: with less drag it outruns the target speeds
@@ -251,7 +253,16 @@ namespace TarmacGauntlet.Raceday
             {
                 float p = steer * SideWeight + SideFactor * SideSteer * (1f - SideWeight);
                 // Keep the car's own steering when it already turns harder the same way.
+                float own = steer;
                 steer = p * steer > 0f && Mathf.Abs(steer) > Mathf.Abs(p) ? steer : p;
+                // In a turn, never out of the corner: at most the wheel that holds the line's bend.
+                if (SideHold)
+                {
+                    float bend = Mathf.Atan(wheelbase * kappa);
+                    float hold = bend * own > 0f ? (Mathf.Abs(own) < Mathf.Abs(bend) ? own : bend) : 0f;
+                    if (hold > 0f) steer = Mathf.Max(steer, hold);
+                    else if (hold < 0f) steer = Mathf.Min(steer, hold);
+                }
             }
             steer = Mathf.Clamp(steer, -Spec.SteerLock, Spec.SteerLock);
 

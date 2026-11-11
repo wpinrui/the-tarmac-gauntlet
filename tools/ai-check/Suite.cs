@@ -184,6 +184,7 @@ static partial class Check
     /// </summary>
     static string LeftTrack(SetupRun run)
     {
+        var offs = new List<string>();
         for (int i = 0; i < run.N; i++)
         {
             float racing = float.NegativeInfinity, off = 0f;
@@ -193,9 +194,9 @@ static partial class Check
                 if (on && !f.Busy[i]) racing = f.T;
                 else if (!on && f.T - racing < 0.5f) off += Race.Dt;
             }
-            if (off > 0f) return $"{run.Name(i)} left the track";
+            if (off > 0f) offs.Add(run.Name(i));
         }
-        return null;
+        return offs.Count == 0 ? null : string.Join(" and ", offs) + " left the track";
     }
 
     /// <summary>Hard limit set-ups: a bad start, any contact or a car leaving the track fails, whatever the limit's own check says.</summary>
@@ -267,10 +268,20 @@ static partial class Check
                     }
                 if (alongside * Race.Dt < 0.5f) return (false, "the inside car was never alongside: did not bind");
                 given /= alongside;
-                bool pass = least >= CarW + RoomMargin && given <= GiveSlack && lifted <= LiftSlack;
-                return (pass, $"least room inside {least:0.0} m, {given:0.0} m more than owed, lifted {lifted:0.0} s, over {alongside * Race.Dt:0.0} s alongside");
+                // Through the corner the inside car is half alongside or more, or backed out behind: its nose
+                // beside the rear wheels, a door's width off, has no claim and is turned in on (Ivan, E1.33).
+                Frame nose = fs.FirstOrDefault(x => run.At(x, 0) >= T7Start - 10f && run.At(x, 0) < T7End && -run.Gap(x, 0, 1) > 0.5f * CarL
+                    && -run.Gap(x, 0, 1) < CarL + 0.5f && Math.Abs(x.L[1] - x.L[0]) < CarW + RoomMargin);
+                bool noseIn = nose != null;
+                float back = nose == null ? 0f : -run.Gap(nose, 0, 1);
+                bool pass = least >= CarW + RoomMargin && given <= GiveSlack && lifted <= LiftSlack && !noseIn;
+                return (pass, $"{(noseIn ? $"nose in {back:0.0} m back at {run.At(nose, 0):0} m, " : "")}least room inside {least:0.0} m, {given:0.0} m more than owed, lifted {lifted:0.0} s, over {alongside * Race.Dt:0.0} s alongside");
             }
             case "H3":
+            case "H3b":
+            case "H3c":
+            case "H3d":
+            case "H3e":
             {
                 // The outside car, its front level or ahead, keeps a car's width beside the first car.
                 float least = float.MaxValue;
@@ -441,6 +452,15 @@ static partial class Check
                 float share = follow > 0 ? (float)onLine / follow : 0f;
                 // Flat in the tow, not lifting to sit at the speed of the car ahead (Ivan).
                 float lifted = run.LiftedBehind(0, 1);
+                // Nor lifting as it closes with seconds to spare, when the car ahead cuts across (Ivan).
+                AiPilot p0 = run.Race.Racers[0].Pilot;
+                foreach (Frame f in fs)
+                {
+                    float g = run.Gap(f, 0, 1) - CarL, closing = f.V[0] - f.V[1];
+                    if (g <= 0f || closing <= 0.5f || g / closing < 2f || f.Throttle[0] > 0.9f) continue;
+                    int k = f.K[0];
+                    if (f.V[0] < 0.98f * p0.LaneSpeed(k, f.L[0] - p0.Line.Lateral[k])) lifted += Race.Dt;
+                }
                 // Once past, back on the line.
                 Frame past = fs.FirstOrDefault(f => run.Gap(f, 0, 1) < 0f);
                 float offClear = past == null ? 0f : run.OffLineClear(0, past.T);
@@ -629,6 +649,21 @@ static partial class Check
                 float gapIn = turnIn == null ? 99f : Enumerable.Range(1, run.N - 1).Where(j => run.Gap(turnIn, 0, j) > 0f).Select(j => run.Gap(turnIn, 0, j) - CarL).DefaultIfEmpty(99f).Min();
                 float score = hits > 0 || off ? 0f : Math.Min(Scale(-closest, -NoseMargin, 0f), Scale(gapIn, 15f, 40f));
                 return (score, $"closest nose to tail {closest:0.0} m, {gapIn:0.0} m behind at turn-in, {(off ? "off the track, " : "")}{hits} contacts");
+            }
+            case "T20a":
+            case "T20b":
+            case "T20c":
+            case "T20d":
+            {
+                // Same model, the first car quicker: passes cleanly within 3 laps when 1.5% quicker (a, c),
+                // and may stay behind when only 0.5% quicker (b, d). A pass counts once it stays ahead.
+                float lap = run.Race.Racers[0].Pilot.Profile.LapTime;
+                Frame pass = null;
+                foreach (Frame f in fs)
+                    if (run.Gap(f, 0, 1) < -CarL) pass ??= f; else pass = null;
+                bool must = run.S.Id == "T20a" || run.S.Id == "T20c";
+                float score = pass == null ? (must ? 0f : 100f) : must ? 60f + 0.4f * Scale(pass.T, lap, 3f * lap) : 100f;
+                return (score, pass == null ? "stayed behind" : $"passed at {pass.T:0} s, lap {pass.T / lap + 1f:0.0}, at {run.At(pass, 0):0} m");
             }
         }
         return (0f, "no score");
@@ -821,7 +856,9 @@ static partial class Check
         };
         if (Environment.GetEnvironmentVariable("PILE_LOG") == "1") foreach (string p in piles.PileUps) Console.WriteLine("PILE " + p);
         if (lapped) m.Add(loss.LappedLost / carHours);
-        return new RaceResult { Measures = m.ToArray(), Line = $"A place {race.Racers.Count(x => x.Distance > a.Distance) + 1}, A laps {a.Laps}, {race.PassCount} passes" };
+        // Same-class passes with no contact for either car from 5 s before to 2 s after: reported, not scored.
+        int cleanClass = race.ClassPasses.Count(p => !race.Contacts.Any(c => c.Time > p.Time - 5f && c.Time < p.Time + 2f && (c.A == p.By || c.B == p.By || c.A == p.Of || c.B == p.Of)));
+        return new RaceResult { Measures = m.ToArray(), Line = $"A place {race.Racers.Count(x => x.Distance > a.Distance) + 1}, A laps {a.Laps}, {race.PassCount} passes, {cleanClass / carHours:0.00} clean same-class passes /car-hour ({cleanClass} of {race.ClassPasses.Count})" };
     }
 
     /// <summary>The game's full field: the season's roster by class, quickest class first, the A car at the back.</summary>

@@ -112,6 +112,42 @@ namespace TarmacGauntlet.Raceday
             },
             new Situation
             {
+                Id = "H3b", Title = "inside car slightly ahead", At = T7 - 180f, Seconds = 8f,
+                Cars = new[]
+                {
+                    new SituationCar { Model = "b-25", Off = -4f },
+                    new SituationCar { Model = "b-24", Ahead = -1.8f, Seed = 2 },
+                },
+            },
+            new Situation
+            {
+                Id = "H3c", Title = "inside car a bit ahead", At = T7 - 180f, Seconds = 8f,
+                Cars = new[]
+                {
+                    new SituationCar { Model = "b-25", Off = -4f },
+                    new SituationCar { Model = "b-24", Ahead = -4.8f, Seed = 2 },
+                },
+            },
+            new Situation
+            {
+                Id = "H3d", Title = "inside car further ahead", At = T7 - 180f, Seconds = 8f,
+                Cars = new[]
+                {
+                    new SituationCar { Model = "b-25", Off = -4f },
+                    new SituationCar { Model = "b-24", Ahead = -7.8f, Seed = 2 },
+                },
+            },
+            new Situation
+            {
+                Id = "H3e", Title = "inside car well ahead", At = T7 - 180f, Seconds = 8f,
+                Cars = new[]
+                {
+                    new SituationCar { Model = "b-25", Off = -4f },
+                    new SituationCar { Model = "b-24", Ahead = -9.8f, Seed = 2 },
+                },
+            },
+            new Situation
+            {
                 Id = "H4", Title = "one defensive move on the straight", At = 2960f, Seconds = 15f,
                 Cars = new[]
                 {
@@ -376,6 +412,22 @@ namespace TarmacGauntlet.Raceday
                     new SituationCar { Model = "b-25", Speed = 285f, Wear = 0.95f },
                     new SituationCar { Model = "b-24", Ahead = 15f, Speed = 285f, Seed = 2 },
                 },
+            },
+            // Same model, nose to tail onto the back straight. The paces give the first car a solo lap
+            // 1.5% (a, c) or 0.5% (b, d) quicker: F1's 1.5 s a lap that lets a car pass, scaled to the lap.
+            T20("T20a", "a-29", 70.75f, 350f),
+            T20("T20b", "a-29", 90f, 350f),
+            T20("T20c", "f-01", 50.75f, 610f),
+            T20("T20d", "f-01", 82.5f, 610f),
+        };
+
+        private static Situation T20(string id, string model, float slowPace, float seconds) => new Situation
+        {
+            Id = id, Title = $"same model, {(slowPace < 80f ? "1.5" : "0.5")}% quicker, {model}", At = 2960f, Seconds = seconds,
+            Cars = new[]
+            {
+                new SituationCar { Model = model, Pace = 100f },
+                new SituationCar { Model = model, Ahead = 12f, Pace = slowPace, Seed = 2 },
             },
         };
 

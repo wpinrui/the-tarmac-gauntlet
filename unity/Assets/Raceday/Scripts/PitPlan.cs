@@ -13,7 +13,9 @@ namespace TarmacGauntlet.Raceday
     }
 
     /// <summary>
-    /// A stop in the box: refuelling to full, then a new set of tyres, with the clock running. The
+    /// A stop in the box: refuelling, then a new set of tyres, with the clock running. The car's
+    /// <see cref="PitOrders"/> can ask for fewer litres than a full tank or for the tyres to stay on,
+    /// and are put back to a full tank and new tyres once the stop starts. The
     /// car's Pit Stop Time stat makes the crew quicker or slower. In a career race the car's
     /// <see cref="CarRaceLog"/> decides the rest: tyres only while a set is left, the next driver in,
     /// the active issues fixed while the spares last, and the crew's size and Engineer skill scale the work.
@@ -27,6 +29,10 @@ namespace TarmacGauntlet.Raceday
         public readonly float Duration;
         public float Elapsed { get; private set; }
         public bool Done => Elapsed >= Duration;
+        /// <summary>True once the fuel is in.</summary>
+        public bool Fuelled { get; private set; }
+        /// <summary>True when the stop changes the tyres, and when it changes the driver.</summary>
+        public readonly bool NewTyres, NewDriver;
 
         private readonly Consumables supplies;
         private readonly float startFuel, litres, scale;
@@ -36,10 +42,14 @@ namespace TarmacGauntlet.Raceday
         {
             this.supplies = supplies;
             startFuel = supplies.Fuel;
-            litres = Mathf.Max(supplies.Capacity - supplies.Fuel, 0f);
+            PitOrders orders = supplies.Orders;
+            litres = Mathf.Clamp(orders.Litres ?? float.PositiveInfinity, 0f, Mathf.Max(supplies.Capacity - supplies.Fuel, 0f));
             scale = 0.85f + 0.3f * (float)spec.Stats.PitStopTime / 100f;
-            PitWork work = supplies.Log?.Pit(true);
-            tyres = work == null || work.ChangeTyres;
+            PitWork work = supplies.Log?.Pit(orders.Tyres);
+            tyres = work == null ? orders.Tyres : work.ChangeTyres;
+            NewTyres = tyres;
+            NewDriver = work?.NewDriver != null;
+            orders.Reset();
             if (work != null) scale *= (float)work.CrewMultiplier;
             float extra = work != null ? (float)work.ExtraSeconds : 0f;
             Duration = (Settle + litres / RefuelRate + (tyres ? TyreChange : 0f)) * scale + extra;
@@ -54,6 +64,7 @@ namespace TarmacGauntlet.Raceday
             Elapsed += dt;
             float refuel = Mathf.Clamp01((Elapsed / scale - Settle) / Mathf.Max(litres / RefuelRate, 0.01f));
             supplies.Fuel = startFuel + litres * refuel;
+            Fuelled = refuel >= 1f;
             if (!Done) return;
             supplies.Fuel = startFuel + litres;
             if (tyres) supplies.Wear = 0f;
@@ -65,7 +76,8 @@ namespace TarmacGauntlet.Raceday
     /// When an AI car pits and how it drives the stop, with no Unity objects so it can be tested
     /// outside Unity. Each lap, a little before the pit entry, it checks whether the fuel or the tyres
     /// will last another lap. If not, the car takes its pit route, slows to the limiter, stops in its
-    /// own box, is serviced, waits for the fast lane to be clear and rejoins. A retired car comes in
+    /// own box, is serviced, waits for the fast lane to be clear and rejoins. A car the team calls in
+    /// (<see cref="PitOrders.Requested"/>) comes in at the next pit entry. A retired car comes in
     /// at the first pit entry and parks in its box for good.
     /// </summary>
     public sealed class PitPlan
@@ -76,7 +88,8 @@ namespace TarmacGauntlet.Raceday
         public const float DecideBefore = 450f;
         private const float StopBraking = 3.5f;     // m/s² into the box
         private const float CarLength = 4.8f;
-        private const float WearLimit = 0.9f;
+        /// <summary>The car comes in before its tyres are this worn.</summary>
+        public const float WearLimit = 0.9f;
 
         public readonly PitLane Lane;
         public readonly int Garage;
@@ -128,8 +141,8 @@ namespace TarmacGauntlet.Raceday
             }
             lapFuel = s.Fuel;
             lapWear = s.Wear;
-            // A retired car limps in at the first chance and stays.
-            if (s.Retired) return true;
+            // A retired car limps in at the first chance and stays, and a car the team calls in comes in.
+            if (s.Retired || s.Orders.Requested) return true;
             // Another lap must leave a fifth of a lap's fuel spare, and the tyres short of worn out.
             // With no tyre sets left a stop can't change them, so only the fuel brings the car in.
             return s.Fuel < FuelPerLap * 1.2f + 0.5f || (s.TyresLeft && s.Wear + WearPerLap > WearLimit);
