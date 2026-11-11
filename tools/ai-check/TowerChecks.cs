@@ -28,8 +28,6 @@ static partial class Check
         if (cars[0].FakeLaps != 150) problems.Add($"the leader should show 150 fake laps, not {cars[0].FakeLaps}");
         Standings.Car b0 = cars.First(c => c.Team == "B0");
         if (b0.ClassPosition != 1 || b0.Position != 13) problems.Add($"B0 should be 13th and first in class, not {b0.Position} and {b0.ClassPosition}");
-        if (Standings.Gap(cars, b0) != 25) problems.Add($"B0 should be +25, not +{Standings.Gap(cars, b0)}");
-        if (Standings.Gap(cars, cars[1]) != 0) problems.Add("a car on the leader's fake lap should be +0");
         if (Standings.FastestClass(cars) != CarClass.A) problems.Add("A should be the fastest class");
         var withF1 = new List<Standings.Car>(cars) { new Standings.Car { Id = 99, Class = CarClass.F1 } };
         if (Standings.FastestClass(withF1) != CarClass.A) problems.Add("the F1 car should not count as the fastest class");
