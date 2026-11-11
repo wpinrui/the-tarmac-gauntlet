@@ -40,6 +40,9 @@ namespace TarmacGauntlet.Raceday
         private MeshFilter[][] driverFigures;
         private Renderer[][] driverRenderers;
         private LiveDriver[][] liveDrivers;
+        /// <summary>Each car's opening doors, and how far open the change last set them.</summary>
+        private CarDoors[] carDoors;
+        private float[] doorSet;
         private MaterialPropertyBlock[] suits, helmets;
         private readonly Stack<LiveDriver> driverPool = new Stack<LiveDriver>();
         private readonly Mesh[] driverStills = new Mesh[3];
@@ -61,6 +64,8 @@ namespace TarmacGauntlet.Raceday
             liveDrivers = new LiveDriver[n][];
             suits = new MaterialPropertyBlock[n];
             helmets = new MaterialPropertyBlock[n];
+            carDoors = new CarDoors[n];
+            doorSet = new float[n];
             bool any = false;
             for (int i = 0; i < n; i++)
             {
@@ -74,6 +79,7 @@ namespace TarmacGauntlet.Raceday
                 swaps[i] = new DriverSwap(complex, spots, g, DoorOnLeft, 3000 + g);
                 if (crews[i] != null) crews[i].DoorSide = swaps[i].DoorSide;
                 (suits[i], helmets[i]) = DriverKit(colours[i]);
+                carDoors[i] = cars[i].GetComponentInChildren<CarDoors>();
                 DriverFigures(i);
             }
         }
@@ -233,7 +239,10 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Swings car i's driver's door to how far open the change wants it.</summary>
         private void Swing(int car, float openness)
         {
-            // Slice F's door hinges (CarDoors) are wired in here once they land.
+            CarDoors d = carDoors[car];
+            if (d == null || !d.HasDoors || openness == doorSet[car]) return;
+            doorSet[car] = openness;
+            d.Snap(openness);
         }
 
         private static DriverPose PoseFor(DriverFigure d) => d.Lift > 0.5f ? DriverPose.Seated : d.Body.Clip == "Walk" ? DriverPose.Walking : DriverPose.Standing;
