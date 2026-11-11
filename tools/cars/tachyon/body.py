@@ -1,4 +1,4 @@
-"""The Vortice's outer skin, lofted from the measured sections in rows.json, in pure numpy.
+"""The Tachyon's outer skin, lofted from the measured sections in rows.json, in pure numpy.
 
 Each station holds a centre height zc and a radius at even angles round (0, zc), from the
 bottom centre round the left side to the top centre. Each radius and the centre height become

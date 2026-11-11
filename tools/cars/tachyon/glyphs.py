@@ -1,4 +1,4 @@
-"""The Vortice's name as letter outlines in the Feretti brand font, Allura.
+"""The Tachyon's name as letter outlines in the Archer brand font, Michroma.
 
 Run: python3 glyphs.py  -> glyphs.json"""
 import json
@@ -11,6 +11,6 @@ from glyphs import outlines  # noqa: E402
 HERE = Path(__file__).resolve().parent
 
 if __name__ == "__main__":
-    g = outlines(HERE / "font" / "Allura-Regular.ttf", "Vortice")
+    g = outlines(HERE / "font" / "Michroma-Regular.ttf", "Tachyon")
     (HERE / "glyphs.json").write_text(json.dumps(g))
     print("wrote glyphs.json", len(g["pieces"]), "pieces")

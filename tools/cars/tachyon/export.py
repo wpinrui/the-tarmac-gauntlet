@@ -1,4 +1,4 @@
-"""Builds the Feretti Vortice in Blender and writes FerettiVortice.obj and .mtl.
+"""Builds the Archer Tachyon in Blender and writes ArcherTachyon.obj and .mtl.
 
 Run: python3 export.py out            every badge and name option, for the viewer
      python3 export.py <dir> --game   only Ivan's picks, Unity axes
@@ -67,6 +67,8 @@ def build(game=False):
         parts.headlamps(ref, cutters, out, sgn)
     parts.front_parts(ref, cutters, out)
     parts.glass_parts(ref, cutters, out)
+    parts.louvres(ref, out)
+    cutters += parts.side_intake_cut(ref)
     print("laid", len(out), "parts,", len(cutters), "cutters")
 
     arch, tubs = parts.arches()
@@ -89,9 +91,7 @@ def build(game=False):
     cut(shell, cutters)
     print("openings cut, hollows dropped:", blend.drop_voids(shell))
     join(shell, blend.union_all(parts.mirrors(), "mirrors"))
-    pcut, lamps = parts.tail_pods()
-    cut(shell, pcut)
-    out += lamps
+    out += parts.mirror_arms()
     mcut, mglass = parts.mirror_recess()
     cut(shell, mcut)
     out += mglass

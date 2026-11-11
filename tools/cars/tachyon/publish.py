@@ -1,4 +1,4 @@
-"""Writes viewer.html, the orbitable viewer of out/FerettiVortice.obj with every option.
+"""Writes viewer.html, the orbitable viewer of out/ArcherTachyon.obj with every option.
 
 Run: python3 export.py out && python3 publish.py"""
 import sys
@@ -12,5 +12,5 @@ import viewer  # noqa: E402
 from parts import GROUPS, LAMPS, MATERIALS, R  # noqa: E402
 
 if __name__ == "__main__":
-    viewer.write(HERE / "out" / f"{R['name']}.obj", HERE / "viewer.html", "Feretti Vortice",
+    viewer.write(HERE / "out" / f"{R['name']}.obj", HERE / "viewer.html", "Archer Tachyon",
                  MATERIALS, R["picks"], LAMPS, GROUPS)

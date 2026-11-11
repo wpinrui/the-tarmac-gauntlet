@@ -1,18 +1,18 @@
-"""Measured rows for the Feretti Vortice, based on the Ferrari 458 Italia.
+"""Measured rows for the Archer Tachyon, based on the McLaren MP4-12C.
 
-Reference: Ivan's 3D model of a 2013 458 Italia (a .glb, kept out of the repo), given for
+Reference: Ivan's 3D model of a 2012 MP4-12C (a .glb, kept out of the repo), given for
 measurements only. Ivan wants simple, clean, smooth shapes over close copies, so every outline
 here is simplified and every section is smoothed hard.
   - body sections: the outer skin cut across at stations along the car, read as a radius at
     even angles round a centre point, so every station has the same number of points;
   - glass, lamps, intakes, shut lines, mirror and exhaust: outlines of the matching meshes,
     seen from the side, front, rear or top, or as 3D loops for the head lamps.
-The model is scaled so its wheelbase is the published 2650 mm, with the front axle one
-published front tyre radius (235/35 R20) off the ground. Its length then matches the
-published 4527 mm within a centimetre and its width the published 1937 mm.
+The model is scaled so its wheelbase is the published 2670 mm, with each axle one published
+tyre radius (235/35 R19 front, 305/30 R20 rear) off the ground. Its length then sits near the
+published 4509 mm and its width near the published 1908 mm.
 Build space: metres, x forward from mid wheelbase, y left, z up from the ground.
 
-Run: python3 rows.py [path/to/458.glb]  -> rows.json
+Run: python3 rows.py [path/to/mp4-12c.glb]  -> rows.json
 """
 import json
 import sys
@@ -418,7 +418,8 @@ def measure(path):
     quarter = biggest(project(left(P("Glass_Lights", 17)), 0, 2))
     screen = P("Glass_Lights", 4)
     so = plain(project(screen, 0, 1).buffer(-0.004), 0.02)
-    centre = so[np.abs(so[:, 1]) < 0.06]
+    sv = screen.reshape(-1, 3)
+    centre = sv[np.abs(sv[:, 1]) < 0.1]
     engine_glass = plain(project(P("Glass_Lights", 9), 0, 1), 0.02)
 
     # the panels: door (side), bonnet and engine cover (top), side intake (side)
