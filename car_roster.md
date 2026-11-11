@@ -21,7 +21,7 @@
 | 8 | Seorak Hwaeum | 2013 Toyota Corolla | $22,500 | 22 | 24 | 86 | 82 | 62 | 94 | 88 | 50 |
 | 9 | Liberty Fortress | 2018 Ford Focus | $25,000 | 26 | 26 | 76 | 74 | 50 | 82 | 86 | 53 |
 | 10 | Kaiser Oboe | 2009 VW Golf | $27,500 | 24 | 28 | 78 | 76 | 56 | 84 | 86 | 55 |
-| 11 | Liberty Mantle | 2011 Ford Mondeo | $30,000 | 22 | 24 | 74 | 78 | 72 | 88 | 88 | 60 |
+| 11 | Liberty Mantle | 2011 Ford Mondeo | $30,000 | 22 | 24 | 74 | 78 | 72 | 96 | 84 | 60 |
 
 ### Class D
 
@@ -29,7 +29,7 @@
 |---|----------------|----------|------|-----|-----|----|----|-----|-----|-----|--------|
 | 12 | Seorak Hoeori | 2020 Subaru BRZ | $70,000 | 38 | 46 | 64 | 60 | 28 | 86 | 76 | 50 |
 | 13 | Kaiser Cappuccino | 2017 VW Scirocco | $75,000 | 40 | 44 | 60 | 56 | 42 | 80 | 78 | 55 |
-| 14 | Seorak Rally | 2007 Subaru WRX | $80,000 | 42 | 42 | 54 | 50 | 30 | 76 | 78 | 60 |
+| 14 | Seorak Rally | 2007 Subaru WRX | $80,000 | 42 | 42 | 54 | 62 | 30 | 84 | 78 | 60 |
 | 15 | Tora Hanabi | 2008 Honda S2000 | $85,000 | 44 | 48 | 56 | 52 | 22 | 82 | 74 | 50 |
 
 ### Class C
@@ -40,7 +40,7 @@
 | 17 | Kaiser Elevate | 2021 Audi A6 | $212,500 | 58 | 58 | 58 | 62 | 82 | 78 | 66 | 73 |
 | 18 | Tora Zero | 2005 Honda NSX | $235,000 | 62 | 66 | 44 | 48 | 34 | 74 | 56 | 65 |
 | 19 | Kaiser Klassik | 2025 Porsche 911 | $257,500 | 64 | 68 | 38 | 44 | 38 | 76 | 44 | 64 |
-| 20 | Tora Giga | 2020 Nissan GT-R | $280,000 | 66 | 64 | 32 | 38 | 36 | 62 | 48 | 74 |
+| 20 | Tora Giga | 2020 Nissan GT-R | $280,000 | 66 | 64 | 32 | 38 | 55 | 62 | 40 | 74 |
 
 ### Class B
 
@@ -48,7 +48,7 @@
 |---|----------------|----------|------|-----|-----|----|----|-----|-----|-----|--------|
 | 21 | Feretti Vortice | 2015 Ferrari 458 Italia | $750,000 | 76 | 82 | 28 | 36 | 26 | 58 | 36 | 86 |
 | 22 | Archer Tachyon | 2014 McLaren MP4-12C | $800,000 | 78 | 80 | 30 | 34 | 22 | 54 | 32 | 72 |
-| 23 | Archer Jet Black | 2014 Mercedes SLS AMG Black | $850,000 | 80 | 78 | 26 | 32 | 32 | 52 | 38 | 80 |
+| 23 | Archer Jet Black | 2014 Mercedes SLS AMG Black | $850,000 | 80 | 78 | 26 | 32 | 32 | 52 | 32 | 95 |
 | 24 | Kaiser Scream | 2005 Porsche Carrera GT | $900,000 | 82 | 84 | 22 | 28 | 16 | 46 | 30 | 92 |
 | 25 | Liberty Bounty | 2022 Ford GT | $950,000 | 84 | 86 | 26 | 30 | 18 | 50 | 24 | 65 |
 
@@ -60,7 +60,7 @@
 | 27 | Archer Hypernova | 2015 McLaren P1 | $2,625,000 | 92 | 92 | 22 | 22 | 10 | 36 | 20 | 72 |
 | 28 | Kaiser K24 Dynamo | 2016 Audi R18 e-tron quattro | $2,750,000 | 92 | 96 | 34 | 30 | 8 | 40 | 14 | 68 |
 | 29 | Seorak Cheonma CX-24Si | 2020 Toyota TS050 Hybrid | $2,875,000 | 94 | 98 | 36 | 32 | 8 | 44 | 12 | 68 |
-| 30 | Liberty GE67 | 2022 Peugeot 9X8 | $3,000,000 | 94 | 96 | 32 | 26 | 8 | 34 | 14 | 68 |
+| 30 | Liberty GE67 | 2022 Peugeot 9X8 | $3,000,000 | 94 | 96 | 40 | 26 | 14 | 34 | 8 | 80 |
 
 ### Class F1
 
@@ -99,7 +99,7 @@
 |---|----------------|--------|-------|--------|-------|--------|
 | 12 | Seorak Hoeori | 50 | 70 | 58 | 68 | 42 |
 | 13 | Kaiser Cappuccino | 52 | 66 | 56 | 64 | 54 |
-| 14 | Seorak Rally | 54 | 60 | 54 | 58 | 44 |
+| 14 | Seorak Rally | 54 | 60 | 54 | 70 | 44 |
 | 15 | Tora Hanabi | 56 | 62 | 60 | 60 | 36 |
 
 ### Class C
@@ -110,7 +110,7 @@
 | 17 | Kaiser Elevate | 70 | 64 | 70 | 68 | 90 |
 | 18 | Tora Zero | 74 | 50 | 78 | 56 | 46 |
 | 19 | Kaiser Klassik | 76 | 44 | 78 | 52 | 50 |
-| 20 | Tora Giga | 78 | 38 | 76 | 46 | 48 |
+| 20 | Tora Giga | 78 | 38 | 76 | 46 | 65 |
 
 ### Class B
 
@@ -130,7 +130,7 @@
 | 27 | Archer Hypernova | — | — | — | — | 18 |
 | 28 | Kaiser K24 Dynamo | — | — | — | — | 16 |
 | 29 | Seorak Cheonma CX-24Si | — | — | — | — | 16 |
-| 30 | Liberty GE67 | — | — | — | — | 14 |
+| 30 | Liberty GE67 | — | — | — | — | 20 |
 
 ### Class F1
 
