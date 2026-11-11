@@ -39,6 +39,14 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Share of the grip the fastest driver (pace 100) uses.</summary>
         public const float GripAtPace100 = 0.95f;
 
+        // Fatigue.
+        /// <summary>
+        /// A tired driver's target speeds are the race maths' lap time factor to this power, inverted.
+        /// More than 1 because the car still accelerates as hard below its targets, so lower targets
+        /// cost less lap time than they take off: at 1.35 the lap slows by the race maths' share.
+        /// </summary>
+        public const float FatigueSpeedPower = 1.35f;
+
         // Per driver.
         /// <summary>Spacing margins are scaled by this for a driver of safety 0...</summary>
         public const float MarginAtSafety0 = 0.8f;

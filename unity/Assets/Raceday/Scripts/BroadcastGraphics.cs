@@ -48,7 +48,7 @@ namespace TarmacGauntlet.Raceday
 
         private float k, offset;
         private Font bold, semiBold, regular;
-        private GUIStyle pos, team, badge, name, first, small, timer, gapStyle;
+        private GUIStyle pos, team, badge, nameStyle, first, small, timer, gapStyle;
         private Texture2D slash, lead, arrow, disc, fuel, tyre, helmet;
         private TrackMap map;
 
@@ -184,7 +184,7 @@ namespace TarmacGauntlet.Raceday
             string letter = RaceTower.ClassLetter(Classes[i]);
 
             float initialWidth = initial.Length > 0 ? first.CalcSize(new GUIContent(initial)).x / k + 6f : 0f;
-            float nameWidth = name.CalcSize(new GUIContent(surname)).x / k;
+            float nameWidth = nameStyle.CalcSize(new GUIContent(surname)).x / k;
             float row2 = small.CalcSize(new GUIContent(teamName)).x / k + 14f + small.CalcSize(new GUIContent(Models[i])).x / k + 14f + 40f;
             float width = Mathf.Max(520f, Mathf.Max(68f + 14f + 10f + 14f + initialWidth + nameWidth + 24f, 82f + row2 + 24f));
             float x = 72f, y = 1080f - 96f - 108f;
@@ -193,7 +193,7 @@ namespace TarmacGauntlet.Raceday
             Draw(R(x + 82f, y + 14f, 16f, 40f), slash, Colours[i], false);
             float nx = x + 82f + 30f;
             if (initial.Length > 0) Label(R(nx, y, initialWidth, 68f), initial, first, Color.white, TextAnchor.MiddleLeft);
-            Label(R(nx + initialWidth, y, nameWidth + 4f, 68f), surname, name, Color.white, TextAnchor.MiddleLeft);
+            Label(R(nx + initialWidth, y, nameWidth + 4f, 68f), surname, nameStyle, Color.white, TextAnchor.MiddleLeft);
             Rect under = R(x, y + 68f, width, 40f);
             GUI.DrawTexture(under, Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, Under, Vector4.zero, new Vector4(0f, 0f, 9f * k, 9f * k));
             float tw = small.CalcSize(new GUIContent(teamName)).x / k;
@@ -281,7 +281,7 @@ namespace TarmacGauntlet.Raceday
             pos = Make(bold, 30f);
             team = Make(bold, 26f);
             badge = Make(bold, 16f);
-            name = Make(bold, 34f);
+            nameStyle = Make(bold, 34f);
             first = Make(regular, 26f);
             small = Make(semiBold, 19f);
             timer = Make(bold, 46f);

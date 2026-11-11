@@ -94,6 +94,18 @@ need after a hard hit on a barrier. `C` cycles the chase, bonnet and bumper view
 The car's physics come from its game stats (`Raceday/Scripts/CarSpec.cs`): Power sets the engine,
 Handling sets tyre grip and downforce. Grass and gravel have less grip and slow the car.
 
+Every race rolls its own weather (`Weather.cs`, `WeatherPlan`): a late October day at 50 degrees north whose kind of
+weekend (settled, thundery, changeable or unsettled) sets the cloud and how ready the air is to shower. Fronts come often, with
+hours of thickening cloud, a band of rain and showers behind; showers build most in the early afternoon; low cloud can drizzle
+through the night. The track holds a film of water that rain fills, the surplus drains off and the sun, wind and cars dry. A wet
+track (`RaceWeather.cs`) costs grip, about a quarter when fully wet, through `Consumables.GripScale`, so every car, driven
+or gliding, laps about 13% slower, wears its tyres less and makes more mistakes. `WeatherView.cs` plays it: the sky greys
+and loses its sun and shadows (`WeatherSky.cs`), the track darkens and shines, rain falls round the camera and the dozen
+cars nearest it throw spray. `weatherSeed` on `CircuitScene` replays one race's weather; 0 rolls a new one.
+`bash tools/weather-check/run.sh` rolls 4,000 races and checks how often it rains, when, how fast the track dries and what
+the grip does (`--races 40` draws a strip per race, `--table SEED` one race hour by hour). `run.sh wet` in the AI check
+drives every class on a wet track.
+
 Engine sound is synthesised live, with no recordings (`Raceday/Scripts/Audio/`). Each class has a
 package in `EngineSounds.Tier` and each car is that package with a few values changed in `EngineSounds.Cars`.
 `EngineSynth` fires an exhaust pulse per cylinder down a pipe, then adds the intake, valvetrain, gear whine,
