@@ -12,6 +12,7 @@ namespace TarmacGauntlet.Simulation
     {
         private static readonly Dictionary<string, string> ById = new Dictionary<string, string>
         {
+            { "e-07", "Assets/Art/Vehicles/LibertyFantasy/LibertyFantasy.obj" },
             { "b-22", "Assets/Art/Vehicles/ArcherTachyon/ArcherTachyon.obj" },
         };
 

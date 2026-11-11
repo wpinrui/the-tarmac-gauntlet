@@ -246,11 +246,11 @@ def front_parts(ref, cutters, out):
     for i, z in enumerate(SLATS):
         bar = box(-1, z - 0.007, 1, z + 0.007).intersection(lo.buffer(-0.004))
         if not bar.is_empty:
-            out += blend.lay(ref, f"grille_slat_{i}", bar, fr, -0.0245, -0.006, "trim", 0.006, along_ray=True)
+            out += blend.lay(ref, f"grille_slat_{i}", bar, fr, -0.027, -0.006, "trim", 0.006, along_ray=True)
     # the chin lip
     chin = soft(mirrored(poly(R["chin"])), 0.02)
     near = lambda p: p[0] > NOSE - 0.35
-    out += blend.lay(ref, "chin", chin.intersection(box(-1, -1, 1, 0.19)), fr, 0.0015, 0.005, "trim", 0.01, accept=near)
+    out += blend.lay(ref, "chin", chin.intersection(box(-1, -1, 1, 0.19)), fr, 0.0025, 0.005, "trim", 0.01, accept=near)
     # round fog lamps in black bezels
     fy, fz, fr_r = R["fog"]
     for sgn, side in ((1, "l"), (-1, "r")):
@@ -269,7 +269,7 @@ def rear_parts(ref, cutters, out):
     for _x, y in exhaust_ends(ref):
         d = d.difference(Point(y, e["z"]).buffer(e["r"] + 0.006, 48))
     near = lambda p: p[0] < TAIL + 0.4
-    out += blend.lay(ref, "diffuser", d, fr, 0.0015, 0.006, "trim", 0.01, accept=near)
+    out += blend.lay(ref, "diffuser", d, fr, 0.0025, 0.006, "trim", 0.01, accept=near)
     refl = soft(poly(R["reflector"]), 0.008)
     for sgn, side in ((1, "l"), (-1, "r")):
         g = refl if sgn > 0 else flip(refl)
@@ -459,7 +459,7 @@ def glass_parts(ref0, cutters, out):
     fr, _o, g, t = rear_shapes()
     cutters += blend.lay(ref0, "cut_rear", g.buffer(-0.003), fr, -0.08, 0.004, "trim", along_ray=True)
     out += blend.lay(ref0, "rear_glass", g.buffer(-0.006), fr, -0.008, -0.004, "glass", 0.02, along_ray=True)
-    out += blend.lay(ref0, "rear_trim", t, fr, 0.0015, 0.0035, "trim", 0.01)
+    out += blend.lay(ref0, "rear_trim", t, fr, 0.0022, 0.0035, "trim", 0.01)
 
 
 # ---------------------------------------------------------------- shut lines
@@ -901,12 +901,14 @@ def _flat(ref, g, size, fr, a, b, up, name, d0, d1, mat, step=0.004):
     return blend.lay(ref, name, sscale(g, size, size, origin=(0, 0)), pf, d0, d1, mat, step)
 
 
-def badge(ref, size, fr, a, b, up, name):
-    """The badge: its dark field just proud of the panel, the chrome standing above it."""
+def badge(ref, size, fr, a, b, up, name, base=0.0012):
+    """The badge: its dark field just proud of the panel, the chrome standing above it. base:
+    how far out from the skin it starts, to sit on a part laid over the skin. The field is a
+    hair smaller and the chrome starts inside it, so no faces of the two coincide."""
     obs = []
     (field, m0), (chrome, m1) = badge_shapes()
-    obs += _flat(ref, field, size, fr, a, b, up, f"{name}_f", 0.0012, 0.003, m0, 0.003)
-    obs += _flat(ref, chrome, size, fr, a, b, up, f"{name}_c", 0.0012, 0.0055, m1, 0.003)
+    obs += _flat(ref, field.buffer(-0.004), size, fr, a, b, up, f"{name}_f", base, base + 0.0018, m0, 0.003)
+    obs += _flat(ref, chrome, size, fr, a, b, up, f"{name}_c", base + 0.001, base + 0.0043, m1, 0.003)
     return obs
 
 
@@ -922,7 +924,7 @@ def options(ref):
             ob.name = f"opt_{group}_{n}_{i}"
             out.append(ob)
     # front: 1 on the upper grille (the reference's place), 2 on the bonnet's nose
-    add("frontbadge", 1, badge(ref, 0.07, front_fr(), 0, sp["grille_z"], up, "fb"))
+    add("frontbadge", 1, badge(ref, 0.07, front_fr(), 0, sp["grille_z"], up, "fb", base=0.004))
     add("frontbadge", 2, badge(ref, 0.08, top_fr(), sp["bonnet_x"], 0, fwd, "fb"))
     # rear: 1 on the tailgate under the glass (the reference's place), 2 lower down
     add("rearbadge", 1, badge(ref, 0.075, rear_fr(), 0, sp["tailgate_z"], up, "rb"))
