@@ -620,14 +620,12 @@ static partial class Check
             }
             case "T8":
             {
-                // After a pass, moves back as soon as its rear is past the other car's front; never swipes.
+                // After a pass, back on the line by the next braking zone; off it on the straight is fine (H14, Ivan). Never swipes.
                 bool swiped = fs.Any(f => Math.Abs(run.Gap(f, 0, 1)) < CarL && Math.Abs(f.L[1] - f.L[0]) < CarW + 0.2f);
                 Frame clear = fs.FirstOrDefault(f => -run.Gap(f, 0, 1) > CarL);
                 if (clear == null) return (0f, "never cleared the other car");
-                Frame turn = fs.FirstOrDefault(f => f.T >= clear.T && Math.Abs(f.Off[0]) < Math.Abs(clear.Off[0]) - 0.3f);
-                float took = turn == null ? 99f : turn.T - clear.T;
-                float offClear8 = run.OffLineClear(0, clear.T);
-                return (hits > 0 || swiped ? 0f : Math.Min(Scale(took, 0.3f, 2f), Scale(offClear8, 0.5f, 3f)), $"started back {(turn == null ? "never" : $"{took:0.0} s after clearing")}, off the line once clear {offClear8:0.0} s, {(swiped ? "swiped across" : "no swipe")}, {hits} contacts");
+                float offClear8 = run.OffLineClear(0, clear.T, true);
+                return (hits > 0 || swiped ? 0f : Scale(offClear8, 0.5f, 3f), $"off the line braking once clear {offClear8:0.0} s, {(swiped ? "swiped across" : "no swipe")}, {hits} contacts");
             }
             case "T9":
             {
