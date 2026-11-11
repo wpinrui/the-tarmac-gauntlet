@@ -17,8 +17,6 @@ namespace TarmacGauntlet.Management
     /// </summary>
     internal sealed class NewspaperView
     {
-        public const string Masthead = "The Gauntlet Gazette";
-
         private const float SheetWidth = 1600, SheetHeight = 900, OpenSeconds = 0.45f, CloseSeconds = 0.35f;
 
         private static readonly Color Paper = new Color32(0xf7, 0xf5, 0xef, 0xff);
@@ -198,7 +196,10 @@ namespace TarmacGauntlet.Management
         private void Build(Newspaper paper)
         {
             var mast = Box("np-mast");
-            mast.Add(Text(Masthead, "np-masthead", black, Ink));
+            var masthead = Box("np-masthead");
+            masthead.style.backgroundImage = Resources.Load<Texture2D>("Wordmark/gazette-masthead");
+            mast.Add(masthead);
+            mast.Add(Box("np-thick"));
             mast.Add(Box("np-rule"));
             mast.Add(Text("YEAR " + paper.Year.ToString(CultureInfo.InvariantCulture), "np-dateline", semiBold, Ink));
             mast.Add(Box("np-double"));
