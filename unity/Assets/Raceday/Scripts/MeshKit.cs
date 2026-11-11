@@ -64,24 +64,27 @@ namespace TarmacGauntlet.Raceday
             Strip(new[] { new[] { backLeft, backRight }, new[] { frontLeft, frontRight } }, tile, tile);
         }
 
-        /// <summary>A box with its sizes along the local right, up (world up) and forward axes.</summary>
-        public void Box(Vector3 centre, Vector3 right, Vector3 forward, Vector3 size)
+        /// <summary>
+        /// A box with its sizes along the local right, up (world up) and forward axes. With a UV, every corner
+        /// takes it, so the box is one texel of a palette texture.
+        /// </summary>
+        public void Box(Vector3 centre, Vector3 right, Vector3 forward, Vector3 size, Vector2? uv = null)
         {
             Vector3 h = size * 0.5f;
             Vector3 P(float x, float y, float z) => centre + right * (x * h.x) + Vector3.up * (y * h.y) + forward * (z * h.z);
-            Face(P(-1, -1, 1), P(1, -1, 1), P(-1, 1, 1), P(1, 1, 1), centre);
-            Face(P(-1, -1, -1), P(1, -1, -1), P(-1, 1, -1), P(1, 1, -1), centre);
-            Face(P(1, -1, -1), P(1, -1, 1), P(1, 1, -1), P(1, 1, 1), centre);
-            Face(P(-1, -1, -1), P(-1, -1, 1), P(-1, 1, -1), P(-1, 1, 1), centre);
-            Face(P(-1, 1, -1), P(1, 1, -1), P(-1, 1, 1), P(1, 1, 1), centre);
-            Face(P(-1, -1, -1), P(1, -1, -1), P(-1, -1, 1), P(1, -1, 1), centre);
+            Face(P(-1, -1, 1), P(1, -1, 1), P(-1, 1, 1), P(1, 1, 1), centre, uv);
+            Face(P(-1, -1, -1), P(1, -1, -1), P(-1, 1, -1), P(1, 1, -1), centre, uv);
+            Face(P(1, -1, -1), P(1, -1, 1), P(1, 1, -1), P(1, 1, 1), centre, uv);
+            Face(P(-1, -1, -1), P(-1, -1, 1), P(-1, 1, -1), P(-1, 1, 1), centre, uv);
+            Face(P(-1, 1, -1), P(1, 1, -1), P(-1, 1, 1), P(1, 1, 1), centre, uv);
+            Face(P(-1, -1, -1), P(1, -1, -1), P(-1, -1, 1), P(1, -1, 1), centre, uv);
         }
 
         /// <summary>
         /// One quad with corners a, b along one edge and c, d along the opposite edge
         /// (a opposite c, b opposite d), facing away from <paramref name="inside"/>.
         /// </summary>
-        public void Face(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 inside)
+        public void Face(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 inside, Vector2? uv = null)
         {
             Vector3 n = -Vector3.Cross(b - a, c - a).normalized;
             Vector3 mid = (a + b + c + d) * 0.25f;
@@ -95,7 +98,8 @@ namespace TarmacGauntlet.Raceday
             vertices.Add(a); vertices.Add(b); vertices.Add(c); vertices.Add(d);
             for (int i = 0; i < 4; i++) normals.Add(n);
             float w = Vector3.Distance(a, b), hgt = Vector3.Distance(a, c);
-            uvs.Add(new Vector2(0, 0)); uvs.Add(new Vector2(w, 0)); uvs.Add(new Vector2(0, hgt)); uvs.Add(new Vector2(w, hgt));
+            if (uv is Vector2 one) { uvs.Add(one); uvs.Add(one); uvs.Add(one); uvs.Add(one); }
+            else { uvs.Add(new Vector2(0, 0)); uvs.Add(new Vector2(w, 0)); uvs.Add(new Vector2(0, hgt)); uvs.Add(new Vector2(w, hgt)); }
             triangles.Add(s); triangles.Add(s + 2); triangles.Add(s + 1);
             triangles.Add(s + 1); triangles.Add(s + 2); triangles.Add(s + 3);
         }
@@ -171,6 +175,30 @@ namespace TarmacGauntlet.Raceday
                 int a = remap[triangles[t]], b = remap[triangles[t + 1]], c = remap[triangles[t + 2]];
                 if (a == b || b == c || c == a) continue;
                 kit.triangles.Add(a); kit.triangles.Add(b); kit.triangles.Add(c);
+            }
+            return kit;
+        }
+
+        /// <summary>
+        /// The same triangles with corners that match exactly in position, normal and UV made one vertex, so hard
+        /// edges stay hard while a mesh built a triangle at a time doesn't carry three corners each.
+        /// </summary>
+        public MeshKit Indexed()
+        {
+            var kit = new MeshKit();
+            var index = new Dictionary<(Vector3, Vector3, Vector2), int>();
+            foreach (int t in triangles)
+            {
+                var key = (vertices[t], normals[t], uvs[t]);
+                if (!index.TryGetValue(key, out int j))
+                {
+                    j = kit.vertices.Count;
+                    index[key] = j;
+                    kit.vertices.Add(vertices[t]);
+                    kit.normals.Add(normals[t]);
+                    kit.uvs.Add(uvs[t]);
+                }
+                kit.triangles.Add(j);
             }
             return kit;
         }
