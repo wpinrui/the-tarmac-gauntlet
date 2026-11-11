@@ -806,6 +806,14 @@ static partial class Check
                 int turn = PathChooser.NextTurnAt(circuit, here);
                 bool blocked = turn != 0 && r.Racers.Any(o => o != x && !o.Ghost && Gap(o.Distance - x.Distance) > 0f
                     && Gap(o.Distance - x.Distance) < CarL + 2f && (o.Car.Lateral - x.Car.Lateral) * turn > CarW);
+                // Nor is lifting while the car braked for moves across into the slot beside it: a second on, it is there.
+                if (ahead != null && !blocked)
+                {
+                    int ka = Math.Max(ahead.Car.TrackIndex, 0);
+                    float across = ahead.Car.Vx * circuit.Left[ka].x + ahead.Car.Vz * circuit.Left[ka].z;
+                    float clear = CarW + 1f, passAt = ahead.Car.Lateral + (ahead.Car.Lateral > 0f ? -clear : clear);
+                    blocked = Math.Abs(ahead.Car.Lateral + across * 1f - passAt) < clear;
+                }
                 if (ahead != null && !blocked && RoomBeside(r, x, ahead.Id)) Seconds[x] = (Seconds.TryGetValue(x, out float s) ? s : 0f) + Race.Dt;
             }
         }
