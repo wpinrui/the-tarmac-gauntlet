@@ -75,6 +75,8 @@ namespace TarmacGauntlet.Raceday
         private static readonly float BehindRisk = Knob("BRISK", 0f), BehindFrom = Knob("BFROM", 0.5f), ToLine = Knob("TOLINE", 1f), OffLine = Knob("OFFLINE", OffLineCost);
         /// <summary>How far the room left to a car alongside on the inside goes from the passing margin to the room owed (H2: no more than owed, Ivan).</summary>
         private static readonly float OweTight = Knob("OWETIGHT", 0.7f);
+        /// <summary>Score for covering the inside of the next corner with a car close behind (H4), s; how far across counts as covering it, m; and how close behind, s, but no closer than a car it has just passed, m.</summary>
+        private static readonly float Defend = Knob("DEFEND", 0.3f), DefendCover = Knob("DCOVER", 3f), DefendWithin = Knob("DWITHIN", 0.45f), DefendFrom = Knob("DFROM", 10f);
         /// <summary>Score per second a pull-out waits: of two near-equal moves, the later one, so the car stays in the tow until it must move.</summary>
         private static readonly float LateBonus = Knob("LATE", 0.1f);
         /// <summary>Side-to-side gap H1 keeps to a car alongside, m.</summary>
@@ -214,6 +216,10 @@ namespace TarmacGauntlet.Raceday
             if (nextTurn != 0)
                 foreach (TrafficCar o in others)
                     if (Mathf.Abs(Road(o.Distance - me.Distance, lap)) < 2f * CarL && Mathf.Sign(o.Lateral - me.Lateral) == -nextTurn && Mathf.Abs(o.Speed) >= StoppedSpeed) owedNear = true;
+            // H4: with a car close behind on a straight, one move to cover the inside of the next corner is worth something (Ivan).
+            int coverTurn = NextTurn(c, here, float.PositiveInfinity);
+            bool cover = Defend > 0f && defending && !exempt && !zone && movePhase != 2 && coverTurn != 0 && -attackerGap < DefendWithin * Mathf.Max(mySpeed, 1f) && -attackerGap > DefendFrom;
+            float CoverBonus(float shift) => cover ? Defend * Mathf.Clamp01(-coverTurn * shift / DefendCover) : 0f;
             for (int s = owedNear ? -3 : -2; s < shifts.Length; s++)
                 for (int p = 0; p < pedals; p++)
                 {
@@ -233,6 +239,7 @@ namespace TarmacGauntlet.Raceday
                     cand.Score -= (zone ? Hysteresis + ZoneHyst : Hysteresis) * LineChange(cand.Shift, lastShift) + (cand.Pedal != lastPedal ? 0.01f : 0f) + OffLine * Mathf.Abs(cand.Shift);
                     // Changing sides of the car ahead mid-move weaves across the cars behind: only for a clearly better path.
                     if (Mathf.Abs(cand.Shift) > 1f && Mathf.Abs(lastShift) > 1f && Mathf.Sign(cand.Shift) != Mathf.Sign(lastShift)) cand.Score -= SideSwitch;
+                    cand.Score += CoverBonus(cand.Shift);
                     // Once braking for a car in the braking zone, it stays on the brakes rather than flick back on the throttle.
                     if (zone && lastPedal == Pedal.Brake && cand.Pedal == Pedal.Go) cand.Score -= ZoneSwitch;
                     Candidates.Add(cand);
@@ -245,6 +252,7 @@ namespace TarmacGauntlet.Raceday
                         else later.Rejected = cand.Rejected;
                         Simulate(pilot, me, later, ahead, nextTurn, margin, brakes, riskWeight, passCost, freeSpeed);
                         later.Score -= (zone ? Hysteresis + ZoneHyst : Hysteresis) * LineChange(later.Shift, lastShift) + OffLine * Mathf.Abs(later.Shift);
+                        later.Score += CoverBonus(later.Shift);
                         Candidates.Add(later);
                     }
                     // In the tow on a straight, of near-equal moves the later one wins, while a still later one
@@ -635,11 +643,11 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>The way the next bend within 300 m turns, the one the car is in included, or 0 for none.</summary>
-        private static int NextTurn(Circuit c, float here)
+        private static int NextTurn(Circuit c, float here, float within = 300f)
         {
             int now = TurnAt(c, here);
             if (now != 0) return now;
-            float best = 300f;
+            float best = within;
             int dir = 0;
             foreach (CornerData k in c.Data.corners)
             {
