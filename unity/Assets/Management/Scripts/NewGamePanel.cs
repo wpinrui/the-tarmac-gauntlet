@@ -342,9 +342,8 @@ namespace TarmacGauntlet.Management
             int left = Left;
             menus.Dialog(dialogBody =>
             {
-                dialogBody.Add(menus.Text("UNALLOCATED SKILL POINTS", "dialog-title", true));
-                dialogBody.Add(menus.Text(left.ToString(CultureInfo.InvariantCulture) + " skill points will be lost.", "dialog-text"));
-            }, "Cancel", "Confirm", Begin);
+                dialogBody.Add(menus.Text(left.ToString(CultureInfo.InvariantCulture) + " UNSPENT SKILL POINTS", "dialog-title", true));
+            }, "Cancel", "Start", Begin);
         }
 
         private void Begin()
