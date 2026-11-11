@@ -148,18 +148,9 @@ namespace TarmacGauntlet.Management
                 VisualElement fill = Fill();
                 fill.Add(ClassLabels.Make(r.CarClass, "cls-sm"));
                 row.Add(fill);
-                if (r.Retired)
-                {
-                    Label dnf = Cell("DNF", "c-pos", true);
-                    dnf.AddToClassList("v-lo");
-                    row.Add(dnf);
-                    row.Add(Cell("", "c-class-pos"));
-                }
-                else
-                {
-                    row.Add(Place(Num(r.Position), r.Position, "c-pos"));
-                    row.Add(Place(Num(cp), cp, "c-class-pos"));
-                }
+                row.EnableInClassList("out", r.Retired);
+                row.Add(Place(Num(r.Position), r.Position, "c-pos"));
+                row.Add(Place(Num(cp), cp, "c-class-pos"));
                 list.Add(row);
             }
             side.Add(list);
