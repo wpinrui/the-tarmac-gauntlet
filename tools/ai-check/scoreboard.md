@@ -18,3 +18,25 @@ One row per run, win or lose. Full-suite runs only, plus dev runs marked as such
 | 2026-11-11 | dev, failed | E1.7 + BOVER | TORCS full braking leaves out a car already overlapping (never triggered: no change) | 5.8 | 12.3 | 1.24 | 0 | 53.0 |
 | 2026-11-11 | dev, failed | E1.7 + SSWITCH 1 | Switching sides of the car ahead mid-move costs 1 | 5.9 | 13.3 | 1.43 | 0 | 50.4 |
 | 2026-11-11 | dev | E1.8 | Switching sides of the car ahead mid-move costs 0.3: less weaving while braking into the hairpin | 5.7 | 14.5 | 1.08 | 0 | 55.0 |
+| 2026-11-11 | dev, failed | E1.8 + FALLTOL 5 | With every path failing, prefer the smaller move among those that keep the limit within 5 ticks | 5.8 | 12.7 | 2.00 | 1.00 | 36.3 |
+| 2026-11-11 | dev, failed | E1.8 + FALLTOL 10 | The same, 10 ticks | 5.5 | 12.3 | 1.61 | 0 | 53.5 |
+| 2026-11-11 | dev, failed | E1.8 + HEAD 0.1 | Nose-to-tail gap 0.1 s of speed instead of 0.15 s | | | | | 43.1 |
+| 2026-11-11 | dev, failed | E1.8 + HEAD 0.05 | The same, 0.05 s: the A car is quicker than v1 but rear-ends treble | 5.0 | 8.4 | 3.18 | 0.25 | 51.4 |
+| 2026-11-11 | dev, failed | E1.8 + PASS 1.5 | Passing weighed 1.5 times as much | | | | | 48.6 |
+| 2026-11-11 | dev | E1.8 + FALLBEHIND 3 | With every path failing, moving across into a car from behind counts as failing 3 ticks sooner (within the spread: not merged) | 5.5 | 11.4 | 1.39 | 0 | 55.9 |
+| 2026-11-11 | dev, failed | E1.8 + FALLBEHIND 10 | The same, 10 ticks | 5.7 | 13.2 | 1.55 | 0.50 | 44.7 |
+| 2026-11-11 | dev | E1.8 + HEADZONE 0.15, HEAD 0.05 | Short nose-to-tail gap on straights, the full one from 4 s before a corner and on lap one (within the spread) | 5.5 | 14.3 | 0.94 | 0 | 56.0 |
+| 2026-11-11 | dev | the same, HEAD 0.08 | | 5.6 | 12.1 | 1.24 | 0 | 55.8 |
+| 2026-11-11 | dev, failed | the same, from 7 s before | | 5.8 | 14.3 | 1.33 | 0 | 53.1 |
+| 2026-11-11 | dev | FALLBEHIND 3 + HEADZONE 0.15, HEAD 0.05 | Both together | 5.5 | 12.3 | 1.33 | 0 | 55.4 |
+| 2026-11-11 | dev | FALLBEHIND 3 + HEADZONE 0.15, HEAD 0.08 | Both together | 5.7 | 10.6 | 1.49 | 0 | 55.9 |
+| 2026-11-11 | dev, failed | FALLBEHIND 3 + HEADZONE 0.2 | A longer gap before corners | 5.9 | 13.9 | 0.90 | 0 | 53.2 |
+| 2026-11-11 | dev | E1.8 + BOPEN 4 | Braking opens a short gap at 4 m/s² instead of 12 (within the spread) | 5.8 | 12.1 | 1.12 | 0 | 56.5 |
+| 2026-11-11 | dev, failed | E1.8 + BOPEN 7 | The same, 7 m/s² | 5.6 | 12.8 | 1.57 | 0 | 53.2 |
+| 2026-11-11 | dev, failed | BOPEN 4 + FALLBEHIND 3 | Both together | 5.6 | 11.5 | 1.37 | 0 | 52.9 |
+| 2026-11-11 | dev | E1.8 + ZHYST 0.1 | In a braking zone, each metre of change of lane costs 0.1 more (within the spread) | 5.6 | 12.5 | 1.24 | 0 | 55.5 |
+| 2026-11-11 | dev, failed | E1.8 + ZHYST 0.3 | The same, 0.3 | 6.3 | 15.9 | 1.41 | 0 | 48.3 |
+| 2026-11-11 | dev, failed | ZHYST 0.3 + BOPEN 4 | Both together | 6.1 | 13.0 | 1.22 | 0 | 54.3 |
+| 2026-11-11 | dev | v1 + RJ LANE 3 | Rejoin: a car more than 3 m across from the joining lane doesn't hold a rejoining car (no gain on v1) | 4.2 | 9.4 | 0.47 | 0 | 63.9 |
+| 2026-11-11 | dev, failed | E1.8 + RJ LANE 3 | The same on E1 | 6.0 | 14.2 | 1.63 | 0 | 48.6 |
+| 2026-11-11 | dev, unfinished | RJ BRAKE 9, SECS 0.5 (v1 and E1); RJ LANE 4.5 (E1) | Rejoin assumes the car coming brakes at 9 m/s² with 0.5 s to spare; stopped when Ivan paused the work | | | | | |
