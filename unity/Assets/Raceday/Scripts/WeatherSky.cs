@@ -5,10 +5,15 @@ namespace TarmacGauntlet.Raceday
     /// <summary>
     /// What the weather does to the sky's light (<see cref="SkyClock"/>): cloud spreads over the sky,
     /// greys it and takes the sun's direct light and its shadows; rain darkens the cloud base and
-    /// draws the haze in close.
+    /// draws the haze in close. At night the floodlights' glow lifts the light, more under cloud.
     /// </summary>
     public static class WeatherSky
     {
+        /// <summary>Colour of the floodlights' glow on the night sky.</summary>
+        private static readonly Color Floodlit = new Color(0.52f, 0.5f, 0.46f);
+        /// <summary>How much the floodlights' glow lifts the night: on a clear night, and more under cloud.</summary>
+        public const float NightGlow = 0.26f, CloudGlow = 0.2f;
+
         /// <summary>Cloud density threshold for the sky shader, from the share of the sky under cloud: lower is more cloud.</summary>
         public static float Cover(float cloud) => Mathf.Lerp(0.8f, 0.1f, cloud);
 
@@ -50,7 +55,17 @@ namespace TarmacGauntlet.Raceday
             s.AmbientSky = Color.Lerp(s.AmbientSky, skyLight, o);
             s.AmbientEquator = Color.Lerp(s.AmbientEquator, skyLight * 0.85f, o);
             s.Fog = Color.Lerp(s.Fog, baseGrey * 0.95f, Mathf.Max(o * 0.8f, heavy));
-            s.Zenith.a = s.Horizon.a = s.CloudLit.a = s.CloudShade.a = s.AmbientSky.a = s.AmbientEquator.a = s.Fog.a = 1f;
+            // At night the circuit's floodlights light the haze and the underside of the cloud, so a
+            // cloudy night is brighter than a clear one and the track never goes black.
+            float skyglow = s.Night * (NightGlow + CloudGlow * o);
+            s.AmbientSky += Floodlit * (skyglow * 1.5f);
+            s.AmbientEquator += Floodlit * (skyglow * 1.3f);
+            s.AmbientGround += Floodlit * (skyglow * 0.6f);
+            s.Horizon += Floodlit * (skyglow * 0.8f);
+            s.CloudLit += Floodlit * (skyglow * 1.6f);
+            s.CloudShade += Floodlit * (skyglow * 1.2f);
+            s.Fog += Floodlit * (skyglow * 0.8f);
+            s.Zenith.a = s.Horizon.a = s.CloudLit.a = s.CloudShade.a = s.AmbientSky.a = s.AmbientEquator.a = s.AmbientGround.a = s.Fog.a = 1f;
         }
     }
 }
