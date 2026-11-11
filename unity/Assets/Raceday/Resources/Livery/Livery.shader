@@ -33,6 +33,8 @@ Shader "TarmacGauntlet/Livery"
         // Up to four number boxes: centre and height in atlas uv, then the turn in radians.
         float4 _NumBox[4];
         float4 _NumInk[4];
+        // Each box's width in atlas uv: a number too wide for its box is drawn smaller to fit.
+        float4 _NumWidth;
         float _NumBoxes;
         // The number's digits, most significant first, and how many there are (0: none drawn).
         float4 _NumDigits;
@@ -78,7 +80,8 @@ Shader "TarmacGauntlet/Livery"
                 float2 d = q - box.xy;
                 float s = sin(box.w), c = cos(box.w);
                 // Into the box's own frame, in digit heights: x right, y down, centred.
-                float2 l = float2(c * d.x + s * d.y, -s * d.x + c * d.y) / max(box.z, 1e-5);
+                float h = min(box.z, _NumWidth[i] / max(width, 1e-5));
+                float2 l = float2(c * d.x + s * d.y, -s * d.x + c * d.y) / max(h, 1e-5);
                 float x = l.x + width / 2;
                 float k = clamp(floor(x / _DigitAdvance), 0, 2);
                 float digit = k < 0.5 ? _NumDigits.x : (k < 1.5 ? _NumDigits.y : _NumDigits.z);
