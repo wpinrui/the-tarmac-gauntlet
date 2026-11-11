@@ -9,13 +9,13 @@ namespace TarmacGauntlet.TeamHq
     /// </summary>
     public sealed class HqScene : MonoBehaviour
     {
-        /// <summary>Car models for the bays, left to right from the doors; an empty path stands in a painted box.</summary>
-        private static readonly string[] BayModels =
+        /// <summary>Cars in the bays while no game is loaded, left to right from the doors.</summary>
+        private static readonly HqCarLook?[] DemoCars =
         {
-            "Assets/Art/Vehicles/LibertyCollier/LibertyCollier.obj",
-            "Assets/Art/Vehicles/CheonmaCX24Si/CheonmaCX24Si.obj",
-            "",
-            "Assets/Art/Vehicles/LibertyCollier/LibertyCollier.obj",
+            new HqCarLook { Key = "demo-0", AssetPath = "Assets/Art/Vehicles/LibertyCollier/LibertyCollier.obj" },
+            new HqCarLook { Key = "demo-1", AssetPath = "Assets/Art/Vehicles/CheonmaCX24Si/CheonmaCX24Si.obj" },
+            null,
+            new HqCarLook { Key = "demo-3", AssetPath = "Assets/Art/Vehicles/LibertyCollier/LibertyCollier.obj" },
         };
 
         private void Awake()
@@ -27,7 +27,7 @@ namespace TarmacGauntlet.TeamHq
             var props = new GameObject("Props").transform;
             props.SetParent(transform, false);
             foreach (HqProp prop in geometry.Props) HqProps.Place(props, prop);
-            for (int i = 0; i < geometry.Bays.Count; i++) AddCar(geometry.Bays[i], i < BayModels.Length ? BayModels[i] : "", i == 3);
+            gameObject.AddComponent<HqCars>().Init(geometry.Bays, DemoCars);
             AddLights(geometry);
 
             var camObject = new GameObject("Menu Camera") { tag = "MainCamera" };
@@ -55,52 +55,6 @@ namespace TarmacGauntlet.TeamHq
             r.sharedMaterial = HqMaterials.For(key);
             // Walls and planes are one-sided, so they cast from both faces to keep daylight to the windows.
             r.shadowCastingMode = HqMaterials.NoShadow.Contains(key) ? ShadowCastingMode.Off : ShadowCastingMode.TwoSided;
-        }
-
-        private void AddCar(HqBay bay, string modelPath, bool repaint)
-        {
-            if (string.IsNullOrEmpty(bay.Paint)) return;
-            GameObject prefab = null;
-#if UNITY_EDITOR
-            if (!string.IsNullOrEmpty(modelPath)) prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(modelPath);
-#endif
-            // Cars face the bay doors.
-            Quaternion facing = Quaternion.Euler(0, 180, 0);
-            if (prefab != null)
-            {
-                GameObject car = Instantiate(prefab, bay.Position, facing, transform);
-                car.name = "Car " + prefab.name;
-                if (repaint)
-                {
-                    Material bodyPaint = HqMaterials.For(bay.Paint);
-                    foreach (Renderer r in car.GetComponentsInChildren<Renderer>())
-                    {
-                        Material[] mats = r.sharedMaterials;
-                        for (int k = 0; k < mats.Length; k++) if (mats[k] != null && mats[k].name.StartsWith("body")) mats[k] = bodyPaint;
-                        r.sharedMaterials = mats;
-                    }
-                }
-                return;
-            }
-            var stand = new GameObject("Car stand-in");
-            stand.transform.SetParent(transform, false);
-            stand.transform.SetPositionAndRotation(bay.Position, facing);
-            Material paint = HqMaterials.For(bay.Paint), tyre = HqMaterials.For("rubber"), glass = HqMaterials.For("dark");
-            Block(stand.transform, PrimitiveType.Cube, new Vector3(0, 0.55f, 0), new Vector3(1.85f, 0.6f, 4.4f), paint);
-            Block(stand.transform, PrimitiveType.Cube, new Vector3(0, 1.05f, 0.25f), new Vector3(1.55f, 0.48f, 2f), glass);
-            foreach (Vector2 w in new[] { new Vector2(-0.84f, 1.4f), new Vector2(0.84f, 1.4f), new Vector2(-0.84f, -1.42f), new Vector2(0.84f, -1.42f) })
-                Block(stand.transform, PrimitiveType.Cylinder, new Vector3(w.x, 0.33f, w.y), new Vector3(0.66f, 0.12f, 0.66f), tyre, Quaternion.Euler(0, 0, 90));
-        }
-
-        private static void Block(Transform parent, PrimitiveType type, Vector3 pos, Vector3 scale, Material m, Quaternion? rot = null)
-        {
-            GameObject g = GameObject.CreatePrimitive(type);
-            Destroy(g.GetComponent<Collider>());
-            g.transform.SetParent(parent, false);
-            g.transform.localPosition = pos;
-            g.transform.localRotation = rot ?? Quaternion.identity;
-            g.transform.localScale = scale;
-            g.GetComponent<Renderer>().sharedMaterial = m;
         }
 
         /// <summary>Fixed daylight through the high windows, a soft fill, and the warm lamps.</summary>

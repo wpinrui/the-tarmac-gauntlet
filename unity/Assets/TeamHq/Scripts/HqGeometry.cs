@@ -20,11 +20,10 @@ namespace TarmacGauntlet.TeamHq
         public bool Warm;
     }
 
-    /// <summary>A car bay: where the car stands, and its paint (the stand-in's when no model is loaded). No paint: the bay holds a prop.</summary>
+    /// <summary>A car bay: where the car stands. <see cref="HqCars"/> puts the cars in them.</summary>
     public struct HqBay
     {
         public Vector3 Position;
-        public string Paint;
     }
 
     /// <summary>A placed copy of a prop from Resources/Props: where it stands, its turn about Y in degrees, and its size.</summary>
@@ -240,14 +239,11 @@ namespace TarmacGauntlet.TeamHq
             Prop("korean_fire_extinguisher_01", -5.5f, 0, Z1 - 0.3f, 180);
             Prop("korean_fire_extinguisher_01", 4.5f, 0, Z1 - 0.3f, 180);
             Prop("fire_alarm", -0.5f, 1.5f, Z1, 180);
-            Prop("covered_car", BayX[2], 0, CarZ);
 
             // A soft shadow under every car, where the floor meets the tyres.
             foreach (float b in BayX) Plane("blob", 2.7f, 5.6f, V(b, 0.004f, CarZ), Rot.X(-90), 0);
 
-            // Bay 3 holds the covered car, a prop; the dealer's bay shows a repainted car.
-            string[] paint = { "owned", "race", "", "spare" };
-            for (int i = 0; i < BayX.Length; i++) Bays.Add(new HqBay { Position = V(BayX[i], 0, CarZ), Paint = paint[i] });
+            foreach (float b in BayX) Bays.Add(new HqBay { Position = V(b, 0, CarZ) });
         }
 
         private void Office()
