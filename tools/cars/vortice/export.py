@@ -103,9 +103,9 @@ def build(game=False):
     print("grooves cut")
 
     out += parts.interior(FLOOR)
-    door = parts.door(ref, shell, out, FLOOR)
-    print("door cut free:", [o.name for o in door])
-    for ob in (shell, door[0]):
+    doors = [parts.door(ref, shell, out, FLOOR, sgn)[0] for sgn in (1, -1)]
+    print("doors cut free")
+    for ob in [shell] + doors:
         blend.tidy(ob)
         blend.thin(ob, 0.55)
 
@@ -134,5 +134,5 @@ if __name__ == "__main__":
     obs = build(game)
     blend.export(obs, out_dir, R["name"], MATERIALS, game=game)
     if game:
-        blend.write_doors(out_dir / f"{R['name']}.doors.json", {"door_l": parts.door_hinge()})
+        blend.write_doors(out_dir / f"{R['name']}.doors.json", {"door_l": parts.door_hinge(1), "door_r": parts.door_hinge(-1)})
     print("wrote", out_dir / f"{R['name']}.obj")

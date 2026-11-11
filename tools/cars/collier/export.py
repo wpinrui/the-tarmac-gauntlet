@@ -481,12 +481,13 @@ def cabin(shell):
         y0, y1 = sorted((0.12 * s, 0.60 * s))
         bits += [parts.box(-0.05, 0.40, y0, y1, 0.30, 0.46),      # front seat base
                  parts.box(-0.20, -0.04, y0, y1, 0.30, 1.05),     # front seat back
-                 ] + ([] if s > 0 else [parts.box(-0.05, 0.80, -0.68, -0.58, 0.32, 0.78)])  # right door card
+                 ]
     bits += [parts.box(-0.82, -0.40, -0.62, 0.62, 0.30, 0.48),   # rear bench
              parts.box(-0.92, -0.78, -0.62, 0.62, 0.30, 0.98)]   # rear bench back
     for i, (v, f) in enumerate(bits):
         boolean(shell, make(f"interior_{i}", v, f, "interior"), "UNION")
-    door_card()
+    for s in (1, -1):
+        door_card(s)
 
 
 # ---------------------------------------------------------------- driver's door
@@ -497,19 +498,20 @@ DOOR_OPEN = 65.0      # degrees the door swings out
 CABIN_FLOOR = 0.30
 
 
-def door_card():
-    """The left door's card, its own part lying just inside the door's wall, so it swings
-    with the door."""
+def door_card(sgn):
+    """A door's card, its own part lying just inside the door's wall, so it swings with the
+    door. sgn picks the side: 1 left, -1 right."""
     xs, cv = body.curves(ROWS["stations"])
     rings = []
     for x in np.linspace(-0.05, 0.78, 10):
         sec = Polygon(body.section({k: float(cv[k](x)) for k in body.KEYS})).buffer(0)
-        band = sec.buffer(-0.033).difference(sec.buffer(-0.058)).intersection(sbox(0.3, 0.32, 1.2, 0.78))
+        side = sbox(0.3, 0.32, 1.2, 0.78) if sgn > 0 else sbox(-1.2, 0.32, -0.3, 0.78)
+        band = sec.buffer(-0.033).difference(sec.buffer(-0.058)).intersection(side)
         if band.geom_type != "Polygon":
             band = max(band.geoms, key=lambda g: g.area)
         r = resample(band, 48)
         rings.append(np.column_stack([np.full(len(r), x), r]))
-    return make("door_card_l", *body._close(rings), "interior")
+    return make("door_card_" + ("l" if sgn > 0 else "r"), *body._close(rings), "interior")
 
 
 def door_outline():
@@ -527,26 +529,28 @@ def mirror_footprint():
                 m["z"] + m["h_out"] / 2 + 0.05)
 
 
-def door_hinge(bvh):
+def door_hinge(bvh, sgn=1):
     """The hinge axis up the door's front edge, outside the skin, and the open angle. Turning
-    about an axis pointing up, a negative angle swings the door's back edge out."""
+    about an axis pointing up, a negative angle swings the left door's back edge out and a
+    positive one the right's. sgn picks the side: 1 left, -1 right."""
     d = np.array(ROWS["door_shut"])
     xf = float(d[:, 0].max()) + 0.004
     z0, z1 = float(d[:, 1].min()), float(d[:, 1].max())
-    y = max(hit(bvh, SIDE(1), xf - 0.01, z)[0][1] for z in np.linspace(z0 + 0.02, z1, 20)) + 0.003
-    return (xf, y, z0), (xf, y, z1), -DOOR_OPEN
+    y = max(abs(hit(bvh, SIDE(sgn), xf - 0.01, z)[0][1]) for z in np.linspace(z0 + 0.02, z1, 20)) + 0.003
+    return (xf, y * sgn, z0), (xf, y * sgn, z1), -DOOR_OPEN * sgn
 
 
-def door(bvh, shell, trim):
-    """Cut the left door free of the body and the window trim; its glass, card and mirror
-    glass go with it. Returns the door's pieces."""
+def door(bvh, shell, trim, sgn=1):
+    """Cut the left (sgn 1) or right (sgn -1) door free of the body and the window trim; its
+    glass, strip, card and mirror glass go with it. Returns the door's pieces."""
+    t = "l" if sgn > 0 else "r"
     o = door_outline()
     regions = [(o.intersection(sbox(-5, -1, 5, CABIN_FLOOR + 0.02)), DOOR_DEPTH),
                (o.intersection(sbox(-5, CABIN_FLOOR + 0.02, 5, 5)), DOOR_WALL), (mirror_footprint(), -0.004)]
-    roles = {"side_glass_l0": "glass", "side_strip_l": "strip", "side_strip_l_1": "strip",
-             "mirror_glass_l": "mirror", "door_card_l": "card"}
-    fr = common.frame((0, 0.7, 0), (1, 0, 0), (0, 0, 1), (0, -1, 0))
-    return common.free_door(bvh, fr, regions, DOOR_GAP, shell, [trim], roles, o)
+    roles = {f"side_glass_{t}0": "glass", f"side_strip_{t}": "strip", f"side_strip_{t}_1": "strip",
+             f"mirror_glass_{t}": "mirror", f"door_card_{t}": "card"}
+    fr = common.frame((0, 0.7 * sgn, 0), (1, 0, 0), (0, 0, 1), (0, -sgn, 0))
+    return common.free_door(bvh, fr, regions, DOOR_GAP, shell, [trim], roles, o, name=f"door_{t}")
 
 
 # ---------------------------------------------------------------- lamps, grille, rear
@@ -736,9 +740,10 @@ def main():
         boolean(shell, make(name, v, f, mat), "UNION")   # pipes run back into the bumper
     obs += wheels()
     if "--fast" not in sys.argv:
-        pieces = door(bvh, shell, trim)
-        print("door cut free:", [o.name for o in pieces])
-        obs += [p for p in pieces if p not in obs]
+        for sgn in (1, -1):
+            pieces = door(bvh, shell, trim, sgn)
+            print("door cut free:", [o.name for o in pieces])
+            obs += [p for p in pieces if p not in obs]
     for ob in obs:
         tidy(ob)
         smooth(ob)
@@ -759,7 +764,7 @@ def main():
                           export_triangulated_mesh=True, path_mode="RELATIVE", **axes)
     write_mtl(OUT / f"{NAME}.mtl")
     if GAME:
-        common.write_doors(OUT / f"{NAME}.doors.json", {"door_l": door_hinge(BVH[0])})
+        common.write_doors(OUT / f"{NAME}.doors.json", {"door_l": door_hinge(BVH[0], 1), "door_r": door_hinge(BVH[0], -1)})
 
 
 def write_mtl(path):

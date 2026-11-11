@@ -378,26 +378,28 @@ def mirror_footprint():
     return box(m["x_back"] - 0.05, R["belt_z"] - 0.06, m["x_front"] + 0.06, m["z1"] + 0.05)
 
 
-def door_hinge():
+def door_hinge(sgn=1):
     """The hinge axis up the door's front edge, outside the skin, and the open angle. Turning
-    about an axis pointing up, a negative angle swings the door's back edge out."""
+    about an axis pointing up, a negative angle swings the left door's back edge out and a
+    positive one the right's. sgn picks the side: 1 left, -1 right."""
     o = door_outline()
     _x0, z0, x1, z1 = o.bounds
     xf = x1 + 0.004
     y = max(body.y_at(xf - 0.01, z) for z in np.linspace(z0 + 0.02, R["belt_z"], 20)) + 0.003
-    return (xf, y, z0), (xf, y, R["belt_z"]), -DOOR_OPEN
+    return (xf, y * sgn, z0), (xf, y * sgn, R["belt_z"]), -DOOR_OPEN * sgn
 
 
-def door(ref, shell, obs, floor):
-    """Cut the left front door free of the body and its window trim; its glass, card and
+def door(ref, shell, obs, floor, sgn=1):
+    """Cut the left (sgn 1) or right (sgn -1) front door free of the body and its window trim; its glass, card and
     mirror glass go with it. Returns the door's pieces."""
+    side = "l" if sgn > 0 else "r"
     o = door_outline()
     regions = [(o.intersection(box(-5, -1, 5, floor + 0.02)), DOOR_DEPTH),
                (o.intersection(box(-5, floor + 0.02, 5, 5)), DOOR_WALL), (mirror_footprint(), -0.004)]
-    trim = [ob for ob in obs if ob.name == "window_trim_l"]
-    roles = {"side_glass_l": "glass", "side_glass_l_1": "glass", "side_glass_l_2": "glass",
-             "mirror_glass_l": "mirror", "door_card_l": "card"}
-    return blend.free_door(ref, side_fr(1), regions, DOOR_GAP, shell, trim, roles, o)
+    trim = [ob for ob in obs if ob.name == f"window_trim_{side}"]
+    roles = {f"side_glass_{side}": "glass", f"side_glass_{side}_1": "glass", f"side_glass_{side}_2": "glass",
+             f"mirror_glass_{side}": "mirror", f"door_card_{side}": "card"}
+    return blend.free_door(ref, side_fr(sgn), regions, DOOR_GAP, shell, trim, roles, o, name=f"door_{side}")
 
 
 def bonnet_loop():

@@ -2,11 +2,11 @@ laid 21 parts, 7 cutters
 cabin cut
 openings cut, hollows dropped: 0
 grooves cut
-door cut free: ['door_l', 'door_l_trim', 'door_l_glass', 'door_l_mirror', 'door_l_card']
-triangles 486306
+doors cut free
+triangles 496717
 Writing to out/FerettiVortice.obj
-OBJ export of 'FerettiVortice.obj' took 357.76 ms
+OBJ export of 'FerettiVortice.obj' took 572.76 ms
 Info: File exported successfully
 wrote out/FerettiVortice.obj
-wrote /home/user/the-tarmac-gauntlet/tools/cars/vortice/viewer.html 9091 KB
+wrote /home/user/the-tarmac-gauntlet/tools/cars/vortice/viewer.html 9316 KB
 exit 0

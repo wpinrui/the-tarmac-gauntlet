@@ -502,9 +502,8 @@ def roof_options(env_bvh, xs, rcv, plain):
             blend.boolean(top, c, "DIFFERENCE")
         objs = [top]
         for sgn, side in ((1, "l"), (-1, "r")):
-            # the left glass sits in the driver's door, as the reference's does, and swings with it
-            name = "door_l_glass" if sgn > 0 else f"roof_side_glass_{side}"
-            objs += blend.lay(env_bvh, name, sg.buffer(-0.002), side_fr(sgn), -0.012, -0.008, "glass", 0.02, along_ray=True)
+            # each side glass sits in its door, as the reference's does, and swings with it
+            objs += blend.lay(env_bvh, f"door_{side}_glass", sg.buffer(-0.002), side_fr(sgn), -0.012, -0.008, "glass", 0.02, along_ray=True)
             if n == 3:
                 band = sg.buffer(0.012).difference(sg.buffer(-0.002)).intersection(box(-5, BELT + 0.02, 5, 5))
                 objs += blend.lay(env_bvh, f"roof_side_band_{side}", band, side_fr(sgn), 0.0015, 0.0035, "trim", 0.008)
@@ -663,32 +662,34 @@ def door_outline():
     return unary_union([poly(d), box(d[-1][0], DOOR_TOP, d[0][0], top)])
 
 
-def _door_top(grow):
+def _door_top(grow, sgn=1):
     """The door top and mirror, straight through from the cockpit's edge outwards."""
     g = door_outline().intersection(box(-5, DOOR_TOP, 5, 5)).buffer(grow, join_style=2)
     ring = np.array(g.exterior.coords)[:-1]
-    rings = [np.column_stack([ring[:, 0], np.full(len(ring), y), ring[:, 1]]) for y in (DOOR_IN - grow, 1.4)]
+    rings = [np.column_stack([ring[:, 0], np.full(len(ring), y * sgn), ring[:, 1]]) for y in (DOOR_IN - grow, 1.4)]
     v, f = geom.close_rings(rings)
     return [blend.make("door_top", v, f, "interior")]
 
 
-def door_hinge():
+def door_hinge(sgn=1):
     """The hinge axis up the door's front edge, outside the skin, and the open angle. Turning
-    about an axis pointing up, a negative angle swings the door's back edge out."""
+    about an axis pointing up, a negative angle swings the left door's back edge out and a
+    positive one the right's. sgn picks the side: 1 left, -1 right."""
     d = np.array(R["door"])
     xf = float(d[:, 0].max()) + 0.004
     z0, z1 = float(d[:, 1].min()), float(d[:, 1].max())
     y = max(body.y_at(xf - 0.01, z) for z in np.linspace(z0 + 0.02, BELT - 0.02, 20)) + 0.003
-    return (xf, y, z0), (xf, y, z1), -DOOR_OPEN
+    return (xf, y * sgn, z0), (xf, y * sgn, z1), -DOOR_OPEN * sgn
 
 
-def door(ref, shell):
-    """Cut the left door free of the body; its card and mirror glass go with it. Returns the
-    door's pieces."""
+def door(ref, shell, sgn=1):
+    """Cut the left (sgn 1) or right (sgn -1) door free of the body; its card and mirror
+    glass go with it. Returns the door's pieces."""
+    side = "l" if sgn > 0 else "r"
     o = door_outline()
     regions = [(o.intersection(box(-5, -1, 5, DOOR_TOP + 0.01)), DOOR_WALL)]
-    roles = {"mirror_glass_l": "mirror", "door_card_l": "card"}
-    return blend.free_door(ref, side_fr(1), regions, DOOR_GAP, shell, [], roles, o, solids=_door_top)
+    roles = {f"mirror_glass_{side}": "mirror", f"door_card_{side}": "card"}
+    return blend.free_door(ref, side_fr(sgn), regions, DOOR_GAP, shell, [], roles, o, solids=lambda g: _door_top(g, sgn), name=f"door_{side}")
 
 
 # ---------------------------------------------------------------- mirrors and exhaust

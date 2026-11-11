@@ -1,5 +1,5 @@
 """Writes viewer.html, the orbitable viewer of out/LibertyCollier.obj with every option, a
-wireframe toggle, one toggle per lamp group and the driver's door on its hinge.
+wireframe toggle, one toggle per lamp group and both doors on their hinges.
 
 Run: python3 export.py out && python3 publish.py"""
 import sys
@@ -22,7 +22,9 @@ if __name__ == "__main__":
     export.reset()
     shell = build_shell()
     cut_arches(shell)
-    p0, p1, deg = door_hinge(export.BVHTree.FromObject(shell, bpy.context.evaluated_depsgraph_get()))
-    door = {"label": "Door", "parts": "door_l", "styles": {"Hinged at the front": {"axis": [p0, p1], "open": deg}}}
+    bvh = export.BVHTree.FromObject(shell, bpy.context.evaluated_depsgraph_get())
+    doors = [{"label": "Doors", "parts": f"door_{t}",
+              "styles": {"Hinged at the front": {"axis": list(door_hinge(bvh, sgn)[:2]), "open": door_hinge(bvh, sgn)[2]}}}
+             for sgn, t in ((1, "l"), (-1, "r"))]
     viewer.write(HERE / "out" / f"{NAME}.obj", HERE / "viewer.html", "Liberty Collier",
-                 MATERIALS, ROWS["picks"], LAMPS, GROUPS, doors=[door])
+                 MATERIALS, ROWS["picks"], LAMPS, GROUPS, doors=doors)

@@ -1,7 +1,8 @@
 door cut free: ['door_l', 'door_l_trim', 'door_l_glass', 'door_l_strip', 'door_l_mirror', 'door_l_card']
-triangles 406538
+door cut free: ['door_r', 'door_r_trim', 'door_r_glass', 'door_r_strip', 'door_r_mirror', 'door_r_card']
+triangles 430542
 Writing to out/LibertyCollier.obj
-OBJ export of 'LibertyCollier.obj' took 248.92 ms
+OBJ export of 'LibertyCollier.obj' took 539.04 ms
 Info: File exported successfully
-wrote /home/user/the-tarmac-gauntlet/tools/cars/collier/viewer.html 8132 KB
+wrote /home/user/the-tarmac-gauntlet/tools/cars/collier/viewer.html 8564 KB
 exit 0

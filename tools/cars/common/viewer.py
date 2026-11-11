@@ -1,6 +1,6 @@
 """Shared primitive: an orbitable viewer page for an exported OBJ, with a wireframe toggle,
 one toggle per lamp group, one per part that can be hidden, one row per placement option group,
-and a toggle that swings each door open on its hinge. The model is inlined."""
+and a toggle that swings the doors open on their hinges. The model is inlined."""
 import base64
 import gzip
 import json
@@ -84,16 +84,16 @@ new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzi
     for (const [label, names] of Object.entries(SHOW)) if (names.some(n => o.name.startsWith(n))) (parts[label] ||= []).push(o);
     for (const d of DOORS) if (o.name.replace(/^opt_[a-z]+_\d+_/, '').startsWith(d.parts)) { (d.obs ||= []).push(o); o.matrixAutoUpdate = false; }
   });
-  for (const d of DOORS) {
-    const keys = Object.keys(d.styles);
-    d.pick = d.pick || keys[0];
+  for (const label of [...new Set(DOORS.map(d => d.label))]) {
+    const ds = DOORS.filter(d => d.label === label), keys = Object.keys(ds[0].styles);
+    ds.forEach(d => d.pick = d.pick || keys[0]);
     if (keys.length < 2) continue;
     const set = document.createElement('div'); set.className = 'set';
-    const b = document.createElement('b'); b.textContent = d.label; set.appendChild(b);
-    const pick = k => { d.pick = k; set.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.k === k)); };
+    const b = document.createElement('b'); b.textContent = label; set.appendChild(b);
+    const pick = k => { ds.forEach(d => d.pick = k); set.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.k === k)); };
     keys.forEach(k => { const x = document.createElement('button'); x.textContent = k; x.dataset.k = k;
       x.addEventListener('click', () => pick(k)); set.appendChild(x); });
-    document.getElementById('options').appendChild(set); pick(d.pick);
+    document.getElementById('options').appendChild(set); pick(ds[0].pick);
   }
   scene.add(obj);
   const bar = document.getElementById('options');
@@ -118,7 +118,8 @@ toggle('Wireframe', on => Object.values(mats).forEach(m => m.wireframe = on));
 for (const [label, list] of Object.entries(LAMPS)) toggle(label, on => list.forEach(n => { const m = mats[n]; if (!m) return;
   m.emissive = on ? new THREE.Color(...m.userData.emit) : new THREE.Color(0, 0, 0); m.emissiveIntensity = on ? 2 : 0; m.needsUpdate = true; }));
 for (const label of Object.keys(SHOW)) toggle(label, on => (parts[label] || []).forEach(o => o.visible = on), true);
-for (const d of DOORS) { d.t = 0; d.goal = 0; toggle(d.label, on => d.goal = on ? 1 : 0); }
+for (const d of DOORS) { d.t = 0; d.goal = 0; }
+for (const label of new Set(DOORS.map(d => d.label))) toggle(label, on => DOORS.forEach(d => { if (d.label === label) d.goal = on ? 1 : 0; }));
 const toThree = p => new THREE.Vector3(p[0], p[2], -p[1]);
 function doors(dt) {
   for (const d of DOORS) {

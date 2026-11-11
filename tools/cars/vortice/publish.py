@@ -11,9 +11,10 @@ sys.path.insert(0, str(HERE.parent / "common"))
 import viewer  # noqa: E402
 from parts import GROUPS, LAMPS, MATERIALS, R, door_hinge  # noqa: E402
 
-p0, p1, deg = door_hinge()
-DOOR = {"label": "Door", "parts": "door_l", "styles": {"Hinged at the front": {"axis": [p0, p1], "open": deg}}}
+DOORS = [{"label": "Doors", "parts": f"door_{side}",
+          "styles": {"Hinged at the front": {"axis": list(door_hinge(sgn)[:2]), "open": door_hinge(sgn)[2]}}}
+         for sgn, side in ((1, "l"), (-1, "r"))]
 
 if __name__ == "__main__":
     viewer.write(HERE / "out" / f"{R['name']}.obj", HERE / "viewer.html", "Feretti Vortice",
-                 MATERIALS, R["picks"], LAMPS, GROUPS, doors=[DOOR])
+                 MATERIALS, R["picks"], LAMPS, GROUPS, doors=DOORS)
