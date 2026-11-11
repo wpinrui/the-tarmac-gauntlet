@@ -68,6 +68,9 @@ namespace TarmacGauntlet.TeamHq
         public static readonly float[] BayX = { -8f, -3f, 2f, 7f };
         /// <summary>Bay centres from the doors, in the viewer's frame (Unity's Z is the negative).</summary>
         public const float CarZ = 1.5f;
+        /// <summary>The newspaper on the coffee table: its centre in the viewer's frame, and its width and depth.</summary>
+        public static readonly Vector3 PaperCentre = new Vector3(8.1f, MZ + 0.395f, -3.4f);
+        public static readonly Vector2 PaperSize = new Vector2(0.45f, 0.32f);
         /// <summary>The bay that holds the race car.</summary>
         public const int RaceBay = 1;
         private const float DoorW = 3.6f, DoorH = 3.4f, DadoH = 1.2f;
@@ -291,7 +294,7 @@ namespace TarmacGauntlet.TeamHq
             Prop("sofa_02", 8, f, -4.75f);
             Prop("modern_arm_chair_01", 6.1f, f, -3.7f, 70);
             Prop("modern_coffee_table_01", 8, f, -3.4f, 90);
-            Box("paper", 0.45f, 0.01f, 0.32f, V(8.1f, f + 0.395f, -3.4f));
+            Box("paper", PaperSize.x, 0.01f, PaperSize.y, PaperCentre);
             Prop("potted_plant_01", -6.4f, f, -6.5f);
             Prop("korean_fire_extinguisher_01", 9.3f, f, Z0 + 0.25f);
 

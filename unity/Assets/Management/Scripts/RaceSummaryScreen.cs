@@ -15,11 +15,11 @@ namespace TarmacGauntlet.Management
     /// the player's car parked in its box. The results overall, by class and as class podiums sit on the left. The
     /// player's race sits on the right: the finish, a lap-by-lap position chart with each driver's stints shaded, and
     /// the stints, stops and issues. The race's 3 skill points are spent here, and Continue stays locked until they
-    /// are. Continue goes to the hub; the newspaper comes between them later.
+    /// are. Continue goes back to the Team HQ, where the race's newspaper opens first.
     /// </summary>
     public sealed class RaceSummaryScreen : MonoBehaviour
     {
-        /// <summary>The scene Continue goes to.</summary>
+        /// <summary>The scene Continue goes to. It opens the newspaper, then the hub.</summary>
         public const string HubScene = "TeamHq";
 
         /// <summary>Skill points a new career starts with, and what each race adds.</summary>
