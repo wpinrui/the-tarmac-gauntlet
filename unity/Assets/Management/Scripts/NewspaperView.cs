@@ -17,7 +17,7 @@ namespace TarmacGauntlet.Management
     /// </summary>
     internal sealed class NewspaperView
     {
-        public const string Masthead = "The Tarmac Times";
+        public const string Masthead = "The Gauntlet Gazette";
 
         private const float SheetWidth = 1600, SheetHeight = 900, OpenSeconds = 0.45f, CloseSeconds = 0.35f;
 
