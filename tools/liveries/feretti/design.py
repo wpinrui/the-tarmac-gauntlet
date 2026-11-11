@@ -8,7 +8,10 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-WORDMARK = HERE.parents[2] / "src" / "renderer" / "assets" / "brands" / "feretti" / "feretti-wordmark-colour.svg"
+BRAND = HERE.parents[2] / "src" / "renderer" / "assets" / "brands" / "feretti"
+WORDMARK = BRAND / "feretti-wordmark-colour.svg"
+BADGE = BRAND / "feretti-badge-colour.svg"
+TRICOLORE = ["#009246", "#f1f2f1", "#ce2b37"]
 sys.path.insert(0, str(HERE.parent / "common"))
 from livery import Livery  # noqa: E402
 
@@ -31,7 +34,6 @@ def common(lv, roof_x):
     """Marks every option shares: door and roof numbers, and the Feretti script under the door
     number. No sponsors: the nose badge and tail script are the model's own."""
     lv.side_number(DOOR_Z, DOOR_Y, DOOR_W, DOOR_H, WHITE)
-    lv.side_mark(WORDMARK, DOOR_Z, 0.285, 0.14, WHITE)
     lv.number("top", (roof_x, 0, -0.08), 0.56, 0.34, WHITE, rotate=180)  # reads from the car's left
 
 
@@ -51,7 +53,18 @@ def stripes(views):
     return lv
 
 
-OPTIONS = {"puro": puro, "stripes": stripes}
+def bonnet(angle):
+    """Bone stripes with the Feretti script across the bonnet's red half, turned angle degrees
+    (0 reads from the car's left, -90 from the nose)."""
+    def make(views):
+        lv = stripes(views)
+        lv.mark("top", WORDMARK, (-0.36, 0, 1.55), 0.17, WHITE, rotate=angle, underline=TRICOLORE)
+        lv.side_mark(BADGE, -0.72, 0.74, 0.22)
+        return lv
+    return make
+
+
+OPTIONS = {"puro": puro, "stripes": stripes, "bonnet-a": bonnet(-35), "bonnet-b": bonnet(-60), "bonnet-c": bonnet(-145)}
 
 if __name__ == "__main__":
     views = HERE / "out" / "views" / "views.json"
