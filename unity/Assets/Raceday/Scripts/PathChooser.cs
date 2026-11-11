@@ -115,6 +115,7 @@ namespace TarmacGauntlet.Raceday
         private static readonly bool CloseLeave = Knob("CLOSELEAVE", 1f) > 0f;
         /// <summary>T3: seconds of closing within which a car coming on the inside is owed its room, and the least closing speed that counts, m/s.</summary>
         private static readonly float CloseOwe = Knob("CLOSEOWE", 1.5f), CloseFrom = Knob("CLOSEFROM", 3f);
+        private static readonly bool AlongRoom = Knob("ALONGROOM", 1f) > 0f;
         private float myBrakes = 10f;
         /// <summary>T3: seconds ahead within which a car ahead is followed as if it may brake at its hardest.</summary>
         private static readonly float HardAhead = Knob("HARDAHEAD", 2f);
@@ -360,6 +361,12 @@ namespace TarmacGauntlet.Raceday
                     // T3: a car closing fast on the inside, alongside before long, is left its room too, not turned in on (Ivan).
                     if (CloseOwe > 0f && Road(o.Distance - me.Distance, lap) < 0f && -Road(o.Distance - me.Distance, lap) < CarL + CloseOwe * Mathf.Max(o.Speed - mySpeed, 0f)
                         && (o.Speed - mySpeed > CloseFrom || closeHeld && -Road(o.Distance - me.Distance, lap) < CarL + 2f) && Mathf.Sign(o.Lateral - me.Lateral) == -nextTurn && !o.Ghost)
+                    {
+                        owedNear = true;
+                        closeDepth = Mathf.Min(closeDepth, -nextTurn * o.Lateral);
+                    }
+                    // H3d, H3b: a car overlapping on the inside, not yet down at the edge, is left its room from where it is (Ivan).
+                    else if (AlongRoom && Mathf.Abs(Road(o.Distance - me.Distance, lap)) < CarL && Mathf.Sign(o.Lateral - me.Lateral) == -nextTurn && !o.Ghost && Mathf.Abs(o.Speed) >= StoppedSpeed)
                     {
                         owedNear = true;
                         closeDepth = Mathf.Min(closeDepth, -nextTurn * o.Lateral);
