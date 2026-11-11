@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs every garage's pit crew through stops with the game's own crew planner outside Unity and checks them.
+# Runs every garage's pit crew and drivers through stops with the game's own planners outside Unity and checks them.
 # Needs the .NET 8 SDK. Run from the repo root:
 #   bash tools/pit-crew/run.sh
 # Prints one line per rule, FAIL with the worst cases, and exits 1 if any rule fails.

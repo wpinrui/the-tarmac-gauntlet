@@ -16,6 +16,14 @@
 //   home after              25 s after the car is released everyone is back at their spot in the garage, idle,
 //                           and the crew rests
 //   out of the fast lane    no one steps into the fast lane, where cars pass the boxes at the limiter
+//   clear of passing cars   a car driving to or from any other box, or along the fast lane, keeps at least 0.5 m
+//                           from every place a crew works a job round a car standing in its box (0.25 m round them)
+//
+// And the two drivers of every box (DriverSwap), on the stops that change driver:
+//   driver changed in time  by the end of the stop the new driver is in the seat, the other out and the door shut
+//   drivers clear of the car neither driver comes within reach of the car, but for getting in and out by the door
+//   drivers clear of the crew a standing driver keeps 0.35 m from every crew member's middle
+//   drivers home after      25 s after the release the one who got out waits at the back of the garage
 //
 // TRACE="<a stop as a failure names it>" WHO=<person, from 1> prints that person through that stop.
 using System;
@@ -39,7 +47,19 @@ static class Check
     static readonly List<(float bad, string where)> late = new List<(float, string)>();
     static readonly List<(float bad, string where)> notHome = new List<(float, string)>();
     static readonly List<(float bad, string where)> inFastLane = new List<(float, string)>();
+    static readonly List<(float bad, string where)> notChanged = new List<(float, string)>();
+    static readonly List<(float bad, string where)> driverInCar = new List<(float, string)>();
+    static readonly List<(float bad, string where)> driverOnCrew = new List<(float, string)>();
+    static readonly List<(float bad, string where)> driverNotHome = new List<(float, string)>();
+    const float Apart = 0.35f;
+    static int changes;
     static int stops, people, jobs;
+    const float PassGap = 0.5f;
+    const float PassLength = 5.2f, PassWidth = 2.0f;   // the biggest car the stops are run with
+    // Per garage, every place its crew work a job at a stop, world x and z on a 5 cm grid.
+    static readonly Dictionary<int, HashSet<(int, int)>> workedAt = new Dictionary<int, HashSet<(int, int)>>();
+    static readonly List<(float bad, string where)> passing = new List<(float, string)>();
+    static float closestPass = float.MaxValue;
 
     /// <summary>One stop to run: its work and the car's way in and out.</summary>
     struct Stop
@@ -90,10 +110,17 @@ static class Check
                 }
             }
 
+        Passing(circuit, lane);
+
         Report("never through the car", throughCar, $"{stops} stops, {people} people", "m into the car");
         Report("at each job in its time", late, $"{jobs} jobs", "");
         Report("home after", notHome, $"{people} people home", "");
         Report("out of the fast lane", inFastLane, $"its edge {-fast:0.00} m out from the box's middle", "m into it");
+        Report("clear of passing cars", passing, $"closest {closestPass:0.00} m", "m short");
+        Report("driver changed in time", notChanged, $"{changes} changes", "");
+        Report("drivers clear of the car", driverInCar, $"{stops} stops", "m into the car");
+        Report("drivers clear of the crew", driverOnCrew, $"{Apart:0.00} m apart", "m too close");
+        Report("drivers home after", driverNotHome, $"{stops} stops", "");
         return failed ? 1 : 0;
     }
 
@@ -130,6 +157,11 @@ static class Check
     {
         stops++;
         var crew = new GarageCrew(complex, spots, g, n, 1000 + g);
+        var swap = new DriverSwap(complex, spots, g, true, 2000 + g);
+        crew.DoorSide = swap.DoorSide;
+        if (s.Driver) changes++;
+        float worstCar = 0f, worstCrew = 0f;
+        string carWho = "", crewWho = "";
         people += crew.People.Length;
         string tag = $"garage {g + 1}, {n} crew, {s.Name}";
         float box = lane.BoxLane[g];
@@ -149,6 +181,33 @@ static class Check
         var firstAt = new Dictionary<(int, int), float>();
         var worked = new Dictionary<(int, int), float>();
         float worstDepth = 0f, worstLane = 0f;
+        void Drivers(in StopClock c)
+        {
+            swap.Step(c, Dt);
+            Vector2 f = heading.normalized;
+            var side = new Vector2(-f.y, f.x);
+            for (int d = 0; d < 2; d++)
+            {
+                DriverFigure fig = swap.Figures[d];
+                if (fig.InCar || fig.Lift > 0f) continue;
+                Vector2 at = fig.Body.At;
+                if (c.CarNear)
+                {
+                    Vector2 r = at - c.Car;
+                    float a = Mathf.Abs(Vector2.Dot(r, f)) - c.CarLength * 0.5f, b = Mathf.Abs(Vector2.Dot(r, side)) - c.CarWidth * 0.5f;
+                    float outside = a > 0f && b > 0f ? Mathf.Sqrt(a * a + b * b) : Mathf.Max(a, b);
+                    if (Reach - outside > worstCar) { worstCar = Reach - outside; carWho = $"driver {d + 1} at {c.Stage} {c.Elapsed:0.0} s, at ({at.x:0.0}, {at.y:0.0})"; }
+                }
+                for (int p = 0; p < crew.People.Length; p++)
+                {
+                    float gap = (crew.People[p].At - at).magnitude;
+                    CrewTask? cur = crew.Current(crew.People[p]);
+                    if (Apart - gap > worstCrew) { worstCrew = Apart - gap; crewWho = $"driver {d + 1} and person {p + 1} {cur?.Job} at {c.Stage} {c.Elapsed:0.0} s, at ({at.x:0.0}, {at.y:0.0})"; }
+                }
+                float into = fastY - (at.y - Reach);
+                if (into > worstLane) { worstLane = into; laneWho = $"driver {d + 1} at {c.Stage} ({at.x:0.0}, {at.y:0.0})"; }
+            }
+        }
         worstWho = "";
         float stopAt = 0f + s.StopOff;   // where the car stops, m along the box from its middle
 
@@ -156,6 +215,7 @@ static class Check
         float dist = 140f;
         float t = 0f;
         clock.Stage = CrewStage.Ready;
+        clock.NewDriver = s.Driver;
         while (true)
         {
             float v = Mathf.Min(limit, Mathf.Sqrt(2f * 3.5f * Mathf.Max(dist, 0f)));
@@ -166,6 +226,7 @@ static class Check
             Car(crew, lane, across, g, i, there ? 0f : v, ref clock);
             crew.Step(clock, Dt);
             Watch(crew, clock, ref worstDepth, ref worstLane, fastY);
+            Drivers(clock);
             t += Dt;
             if (there) break;
         }
@@ -177,6 +238,7 @@ static class Check
         {
             clock.Elapsed = e;
             crew.Step(clock, Dt);
+            Drivers(clock);
             if (Environment.GetEnvironmentVariable("TRACE") == tag && (int)(e / Dt) % 10 == 0) Trace(crew, clock, e);
             Watch(crew, clock, ref worstDepth, ref worstLane, fastY);
             for (int p = 0; p < crew.People.Length; p++)
@@ -191,6 +253,20 @@ static class Check
             }
         }
         clock.Elapsed = duration;
+        // Where each job is worked, for the check on passing cars.
+        if (!workedAt.TryGetValue(g, out HashSet<(int, int)> at)) workedAt[g] = at = new HashSet<(int, int)>();
+        foreach (CrewMember m in crew.People)
+            foreach (CrewTask task in m.Tasks)
+            {
+                Vector3 w = crew.World(crew.PlaceOf(task).at);
+                at.Add((Mathf.RoundToInt(w.x * 20f), Mathf.RoundToInt(w.z * 20f)));
+            }
+        if (s.Driver)
+        {
+            DriverFigure now = swap.Figures[swap.Driving], other = swap.Figures[1 - swap.Driving];
+            if (!now.InCar || now.Lift < 1f || other.InCar || other.Lift > 0f || swap.Door > 0.001f)
+                notChanged.Add((1f, $"{tag}: in car {now.InCar}, out {!other.InCar}, door {swap.Door:0.00}, pace {swap.Pace:0.00}"));
+        }
 
         // Each job: there on time and working most of it; each of several wheels worked inside the tyre time.
         for (int p = 0; p < crew.People.Length; p++)
@@ -232,17 +308,79 @@ static class Check
             Car(crew, lane, across, g, i, speed, ref clock);
             crew.Step(clock, Dt);
             Watch(crew, clock, ref worstDepth, ref worstLane, fastY);
+            Drivers(clock);
         }
         // Back to racing: the crew must already be home.
         clock.Stage = CrewStage.Home;
         clock.CarNear = false;
         crew.Step(clock, Dt);
+        swap.Step(clock, Dt);
+        DriverFigure waiting = swap.Figures[1 - swap.Driving];
+        if (!swap.AtRest || waiting.Body.At != swap.Rest) driverNotHome.Add(((waiting.Body.At - swap.Rest).magnitude, $"{tag}: waiting driver at ({waiting.Body.At.x:0.0}, {waiting.Body.At.y:0.0}), {waiting.Body.Clip}"));
+        if (worstCar > 0f) driverInCar.Add((worstCar, tag + ": " + carWho));
+        if (worstCrew > 0f) driverOnCrew.Add((worstCrew, tag + ": " + crewWho));
         int away = crew.People.Count(m => (m.At - m.Home).magnitude > 0.01f || m.Clip != "Idle");
         if (away > 0 || !crew.AtRest) notHome.Add((away, $"{tag}: {away} not home and idle"));
 
         if (worstDepth > 0f) throughCar.Add((worstDepth, tag + ": " + worstWho));
         if (worstLane > 0f) inFastLane.Add((worstLane, tag + ": " + laneWho));
     }
+
+    /// <summary>
+    /// Drives the biggest car along the routes to and from the nearby boxes and along the fast lane, past each garage's
+    /// box, and finds how close its outline comes to any place its crew work a job round the car standing there.
+    /// </summary>
+    static void Passing(Circuit circuit, PitLane lane)
+    {
+        var from = new RacingLine(circuit);
+        var routes = new Dictionary<int, RacingLine>();
+        RacingLine RouteOf(int h) => routes.TryGetValue(h, out RacingLine r) ? r : routes[h] = lane.Route(from, h);
+        float hl = PassLength * 0.5f, hw = PassWidth * 0.5f;
+        foreach (KeyValuePair<int, HashSet<(int, int)>> kv in workedAt)
+        {
+            int g = kv.Key;
+            Vector2[] places = kv.Value.Select(q => new Vector2(q.Item1 / 20f, q.Item2 / 20f)).ToArray();
+            Vector3 box = lane.BoxPoint(g), left = lane.LaneLeft(lane.BoxLane[g]);
+            // A point in the box's frame: metres along the lane and across it, towards the garages.
+            Vector2 Local(float x, float z) => new Vector2((x - box.x) * left.z - (z - box.z) * left.x, (x - box.x) * left.x + (z - box.z) * left.z);
+            float worst = float.MaxValue;
+            string who = "";
+            var others = new List<int> { -1 };
+            for (int h = Mathf.Max(g - 4, 0); h <= Mathf.Min(g + 4, lane.Garages - 1); h++) if (h != g) others.Add(h);
+            foreach (int h in others)
+            {
+                RacingLine r = RouteOf(h);
+                int n = r.Count;
+                for (int k = 0; k < n; k++)
+                {
+                    Vector3 a = r.Point[k], b = r.Point[(k + 1) % n];
+                    if (Flat(a - box).magnitude > 45f) continue;
+                    // The car points the way the route runs here.
+                    Vector3 f3 = Flat(b - a).normalized;
+                    var fwd = new Vector2(f3.x, f3.z);
+                    var side = new Vector2(-fwd.y, fwd.x);
+                    for (int q = 0; q < 8; q++)
+                    {
+                        Vector3 c = Vector3.Lerp(a, b, q / 8f);
+                        foreach (Vector2 p in places)
+                        {
+                            Vector2 d = p - new Vector2(c.x, c.z);
+                            float da = Mathf.Abs(Vector2.Dot(d, fwd)) - hl, db = Mathf.Abs(Vector2.Dot(d, side)) - hw;
+                            float gap = (da > 0f && db > 0f ? Mathf.Sqrt(da * da + db * db) : Mathf.Max(da, db)) - Reach;
+                            if (gap >= worst) continue;
+                            worst = gap;
+                            Vector2 u = Local(p.x, p.y), v = Local(c.x, c.z);
+                            who = $"{(h < 0 ? "the fast lane" : $"garage {h + 1}'s route")}, crew at ({u.x:0.0}, {u.y:0.0}), car at ({v.x:0.0}, {v.y:0.0}) along and across the lane";
+                        }
+                    }
+                }
+            }
+            closestPass = Mathf.Min(closestPass, worst);
+            if (worst < PassGap) passing.Add((PassGap - worst, $"garage {g + 1}'s crew, {who}, {worst:0.00} m away"));
+        }
+    }
+
+    static Vector3 Flat(Vector3 v) => new Vector3(v.x, 0f, v.z);
 
     /// <summary>The car on its route at lane sample i, in the box's frame, into the clock.</summary>
     static void Car(GarageCrew crew, PitLane lane, MethodInfo across, int g, float i, float speed, ref StopClock clock)

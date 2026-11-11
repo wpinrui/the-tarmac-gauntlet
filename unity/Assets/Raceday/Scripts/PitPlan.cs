@@ -274,7 +274,8 @@ namespace TarmacGauntlet.Raceday
                 float a = d.x * along.x + d.z * along.z;
                 float across = d.x * left.x + d.z * left.z;
                 bool moving = o.Velocity.x * o.Velocity.x + o.Velocity.z * o.Velocity.z > 9f;
-                if (moving && a > -110f && a < 8f && across < -Lane.BoxLateral + Lane.FastLane + 2.5f && across > -12f) return false;
+                // Out past the line cars take by the boxes: a car swinging into a nearby box isn't fast lane traffic.
+                if (moving && a > -110f && a < 8f && across < Lane.PassLateral - Lane.BoxLateral - 0.3f && across > -12f) return false;
             }
             return true;
         }

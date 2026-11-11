@@ -17,5 +17,12 @@
     <Compile Include="../../unity/Assets/Raceday/Scripts/MeshKit.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/PitComplex.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/PitComplexBuilder.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/PitBoxKit.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/PitLane.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/RacingLine.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/CarSpec.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/SpeedProfile.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/PitStopSpots.cs" />
+    <Compile Include="../../unity/Assets/Simulation/**/*.cs" />
   </ItemGroup>
 </Project>

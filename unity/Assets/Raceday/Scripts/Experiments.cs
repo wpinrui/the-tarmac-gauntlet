@@ -14,8 +14,8 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Each experiment's revision, raised each time a better one is merged.</summary>
         public static readonly int[] Revisions = { 42, 2 };
 
-        /// <summary>The experiment switched on, or 0 for none.</summary>
-        public static int On;
+        /// <summary>The experiment switched on, or 0 for none. The game starts on E1, path choosing (Ivan): E0 is the comparison.</summary>
+        public static int On = 1;
 
         public static bool Is(int experiment) => On == experiment;
 

@@ -174,6 +174,62 @@ namespace TarmacGauntlet.Simulation.Tests
             Assert.That(me.Issues[0].FixedLap, Is.Null);
         }
 
+        // --- Fatigue ---
+
+        [Test]
+        public void FatigueBuildsWithTimeInTheCar()
+        {
+            (RaceDay race, CarRaceLog me) = PlayerRace(Never);
+            Assert.That(me.Fatigue, Is.EqualTo(0));
+            double perLap = Degradation.UpdateDriverFatigue(0, me.Stats.Comfort, me.Driver.Stats.Stamina, InstructionMode.Normal);
+            race.CompleteLap(me.Index, 90, 90, InstructionMode.Normal, false);
+            double half = me.Fatigue;
+            // Half the race maths' lap in the car: half its fatigue.
+            Assert.That(half, Is.EqualTo(perLap / 2).Within(1e-9));
+            race.CompleteLap(me.Index, 270, 180, InstructionMode.Normal, false);
+            // A lap twice as long tires the driver about twice as much (the worn car is a touch less comfortable).
+            Assert.That(me.Fatigue - half, Is.EqualTo(2 * half).Within(0.02 * half));
+        }
+
+        [Test]
+        public void PushingTiresTheDriverFaster()
+        {
+            (RaceDay a, CarRaceLog normal) = PlayerRace(Never);
+            (RaceDay b, CarRaceLog push) = PlayerRace(Never);
+            a.CompleteLap(normal.Index, 180, 180, InstructionMode.Normal, false);
+            b.CompleteLap(push.Index, 180, 180, InstructionMode.Push, false);
+            Assert.That(push.Fatigue, Is.GreaterThan(normal.Fatigue));
+        }
+
+        [Test]
+        public void FatigueStopsAtOneHundred()
+        {
+            (RaceDay race, CarRaceLog me) = PlayerRace(Never);
+            race.CompleteLap(me.Index, 1e6, 1e6, InstructionMode.Push, false);
+            Assert.That(me.Fatigue, Is.EqualTo(100));
+        }
+
+        [Test]
+        public void ADriverChangeBringsAFreshDriver()
+        {
+            (RaceDay race, CarRaceLog me) = PlayerRace(Never);
+            race.CompleteLap(me.Index, 1800, 1800, InstructionMode.Normal, false);
+            Assert.That(me.Fatigue, Is.GreaterThan(0));
+            me.Pit(true);
+            Assert.That(me.Fatigue, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void StayingInTheCarKeepsTheFatigue()
+        {
+            (RaceDay race, CarRaceLog me) = PlayerRace(Never);
+            race.CompleteLap(me.Index, 1800, 1800, InstructionMode.Normal, false);
+            double tired = me.Fatigue;
+            me.NextDriverIndex = me.DriverIndex;
+            me.Pit(true);
+            Assert.That(me.Fatigue, Is.EqualTo(tired));
+        }
+
         // --- Stops ---
 
         [Test]
