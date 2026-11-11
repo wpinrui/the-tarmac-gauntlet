@@ -25,7 +25,8 @@ namespace TarmacGauntlet.Management
         /// <summary>Skill points a new career starts with, and what each race adds.</summary>
         private const int StartingPoints = 15, PointsPerRace = 3, MaxSkill = 20;
 
-        private static readonly Color[] DriverColours =
+        /// <summary>Driver colours in the order they first drove. The race history uses them too.</summary>
+        internal static readonly Color[] DriverColours =
         {
             Color.white, new Color32(0x5a, 0xb8, 0xff, 0xff), new Color32(0xff, 0xb0, 0x20, 0xff),
             new Color32(0xc5, 0x8c, 0xff, 0xff), new Color32(0x3d, 0xdc, 0x84, 0xff),

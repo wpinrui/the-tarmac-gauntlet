@@ -110,6 +110,10 @@ namespace TarmacGauntlet.Management
             gameObject.AddComponent<DriversPanel>();
             gameObject.AddComponent<CrewPanel>();
             gameObject.AddComponent<LineupPanel>();
+            gameObject.AddComponent<FinancesPanel>();
+            gameObject.AddComponent<RaceHistoryPanel>();
+            gameObject.AddComponent<StandingsPanel>();
+            gameObject.AddComponent<ScoutingPanel>();
 
             GameSession.Changed += OnGameChanged;
             if (GameSession.State != null) OnGameChanged(GameSession.State);
@@ -392,6 +396,11 @@ namespace TarmacGauntlet.Management
             if (index > 0) group.AddToClassList("spaced");
             return group;
         }
+
+        /// <summary>The bold menu font, for class labels and other text built outside <see cref="Text"/>.</summary>
+        internal Font Bold => bold;
+
+        internal Font SemiBold => semiBold;
 
         internal Label Text(string text, string cls, bool isBold = false)
         {
