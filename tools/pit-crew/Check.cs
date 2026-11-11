@@ -25,6 +25,15 @@
 //   drivers clear of the crew a standing driver keeps 0.35 m from every crew member's middle
 //   drivers home after      25 s after the release the one who got out waits at the back of the garage
 //
+// And the kit every crew handles (KitWork), the hands a step in front of each person:
+//   fuel hose in step       on every stop that fuels, the nozzle is on the filler from the fuel's start (0.35 s
+//                           allowed) to its end, off within a frame of it, and never on outside the fuel time
+//   wheels changed in time  on every stop that changes tyres, each wheel's gun is on its hub while it is worked, and
+//                           each fresh tyre brought out is on the car, the car's wheels all back on, by the release
+//   lance in for the tyres  the rear jack has the lance in its socket for most of the tyre time (70 %)
+//   lines in reach          no hanging piece is taken further from the boom than its line reaches
+//   kit home after          25 s after the release every piece is back on its rest and the car down off its jacks
+//
 // TRACE="<a stop as a failure names it>" WHO=<person, from 1> prints that person through that stop.
 using System;
 using System.Collections.Generic;
@@ -53,6 +62,14 @@ static class Check
     static readonly List<(float bad, string where)> driverNotHome = new List<(float, string)>();
     const float Apart = 0.35f;
     static int changes;
+    static readonly List<(float bad, string where)> hoseLate = new List<(float, string)>();
+    static readonly List<(float bad, string where)> wheelsLate = new List<(float, string)>();
+    static readonly List<(float bad, string where)> lanceLate = new List<(float, string)>();
+    static readonly List<(float bad, string where)> notFetched = new List<(float, string)>();
+    static readonly List<(float bad, string where)> overReach = new List<(float, string)>();
+    static readonly List<(float bad, string where)> kitNotHome = new List<(float, string)>();
+    static int fuelStops, wheelsChanged, fetches;
+    static PitBoxKit boxKit;
     static int stops, people, jobs;
     const float PassGap = 0.5f;
     const float PassLength = 5.2f, PassWidth = 2.0f;   // the biggest car the stops are run with
@@ -80,6 +97,7 @@ static class Check
         var lane = new PitLane(circuit);
         var spots = new PitStopSpots(complex, lane);
         MethodInfo across = typeof(PitLane).GetMethod("Across", BindingFlags.NonPublic | BindingFlags.Instance);
+        boxKit = new PitBoxKit(complex);
 
         Stop[] kinds =
         {
@@ -94,7 +112,9 @@ static class Check
         // The fast lane's edge in each box's frame.
         float fast = -lane.Data.laneWidth * 0.5f + lane.Data.fastLane - lane.BoxLateral;
 
+        int only = int.TryParse(Environment.GetEnvironmentVariable("GARAGE"), out int og) ? og - 1 : -1;
         for (int g = 0; g < complex.Garages; g++)
+            if (only < 0 || g == only)
             for (int n = 1; n <= PitComplex.StandbySpots; n++)
             {
                 // Crew size and the car's Pit Stop Time stat and the player's Engineer skill scale the work, as PitService does.
@@ -121,6 +141,13 @@ static class Check
         Report("drivers clear of the car", driverInCar, $"{stops} stops", "m into the car");
         Report("drivers clear of the crew", driverOnCrew, $"{Apart:0.00} m apart", "m too close");
         Report("drivers home after", driverNotHome, $"{stops} stops", "");
+        Report("fuel hose in step", hoseLate, $"{fuelStops} stops fuelled", "");
+        Report("wheels changed in time", wheelsChanged > 0 ? wheelsLate : wheelsLate, $"{wheelsChanged} wheels", "");
+        Report("lance in for the tyres", lanceLate, "rear jacks", "");
+        // Not a rule: a fetch is let go when the car comes in too soon for it, as it does from the check's short way in.
+        Console.WriteLine($"info  kit fetched before the car stopped: {fetches - notFetched.Count} of {fetches} pieces");
+        Report("lines in reach", overReach, "every line", "m over");
+        Report("kit home after", kitNotHome, $"{stops} stops", "");
         return failed ? 1 : 0;
     }
 
@@ -159,6 +186,11 @@ static class Check
         var crew = new GarageCrew(complex, spots, g, n, 1000 + g);
         var swap = new DriverSwap(complex, spots, g, true, 2000 + g);
         crew.DoorSide = swap.DoorSide;
+        var work = new KitWork(complex, boxKit, crew);
+        float nozzleFirst = -1f, nozzleLast = -1f, nozzleOn = 0f, nozzleStray = 0f, lanceOn = 0f, reachOver = 0f;
+        var gunOnHub = new bool[4];
+        var carried = new bool[4];
+        string reachWho = "";
         if (s.Driver) changes++;
         float worstCar = 0f, worstCrew = 0f;
         string carWho = "", crewWho = "";
@@ -208,11 +240,36 @@ static class Check
                 if (into > worstLane) { worstLane = into; laneWho = $"driver {d + 1} at {c.Stage} ({at.x:0.0}, {at.y:0.0})"; }
             }
         }
+        Vector3 Hand(int p, bool right)
+        {
+            CrewMember m = crew.People[p];
+            Vector3 face = crew.WorldDirection(m.Facing).normalized;
+            Vector3 side = Vector3.Cross(Vector3.up, face);
+            return crew.World(m.At) + Vector3.up * (m.Low ? 0.55f : 0.9f) + face * (m.Low ? 0.35f : 0.15f) + side * (right ? 0.22f : -0.22f);
+        }
+        bool dump = Environment.GetEnvironmentVariable("DUMP") == tag;
+        var frames = new List<string>();
+        void Kit(in StopClock c)
+        {
+            if (dump) frames.Add(Frame(crew, work, c, swap));
+            Vector2 f = heading.normalized;
+            Vector3 fwd = crew.WorldDirection(f).normalized;
+            Vector3 mid = crew.Box + crew.Forward * c.Car.x + crew.ToGarage * c.Car.y;
+            mid.y = crew.Box.y;
+            work.Step(c, KitCar.Standing(mid, fwd, crew.ToGarage, c.CarLength, c.CarWidth), Hand, Dt);
+            for (KitItem item = KitItem.Nozzle; item <= KitItem.Lance; item++)
+            {
+                if (!work.Out[(int)item]) continue;
+                float over = (work.Pieces[(int)item].Position - work.Anchor(item)).magnitude - PitBoxKit.LineLength(item);
+                if (over > reachOver) { reachOver = over; reachWho = $"{item} at {c.Stage} {c.Elapsed:0.0} s"; }
+            }
+        }
         worstWho = "";
         float stopAt = 0f + s.StopOff;   // where the car stops, m along the box from its middle
 
         // Into the box: braking to stop at its mark from the limiter, the crew out to meet it.
-        float dist = 140f;
+        // The crew see the car coming from the pit entry: the further down the lane the box, the sooner.
+        float dist = 140f + 7f * g;
         float t = 0f;
         clock.Stage = CrewStage.Ready;
         clock.NewDriver = s.Driver;
@@ -227,6 +284,7 @@ static class Check
             crew.Step(clock, Dt);
             Watch(crew, clock, ref worstDepth, ref worstLane, fastY);
             Drivers(clock);
+            Kit(clock);
             t += Dt;
             if (there) break;
         }
@@ -234,11 +292,29 @@ static class Check
         // The stop.
         clock.Stage = CrewStage.Stop;
         clock.CarSpeed = 0f;
+        // What was fetched before the car stopped.
+        foreach (CrewMember m in crew.People)
+        {
+            if (m.FetchAt == null || m.FetchTyre && !s.Tyres) continue;
+            fetches++;
+            if (!m.Carrying) notFetched.Add((1f, $"{tag}: person {Array.IndexOf(crew.People, m) + 1} {m.Tasks[0].Job} {m.Tasks[0].Spot}"));
+        }
+        for (int w = 0; w < 4; w++) carried[w] = work.TyreHand(w) >= 0 && crew.People[work.TyreHand(w)].Carrying && s.Tyres;
         for (float e = 0f; e < duration; e += Dt)
         {
             clock.Elapsed = e;
             crew.Step(clock, Dt);
             Drivers(clock);
+            Kit(clock);
+            if (work.NozzleOn)
+            {
+                if (nozzleFirst < 0f) nozzleFirst = e;
+                nozzleLast = e;
+                if (e >= fuelFrom && e < fuelTo) nozzleOn += Dt;
+                nozzleStray = Mathf.Max(nozzleStray, Mathf.Max(fuelFrom - Dt - e, e - fuelTo - Dt));
+            }
+            if (work.LanceIn) lanceOn += Dt;
+            for (int w = 0; w < 4; w++) gunOnHub[w] |= work.OnHub[w];
             if (Environment.GetEnvironmentVariable("TRACE") == tag && (int)(e / Dt) % 10 == 0) Trace(crew, clock, e);
             Watch(crew, clock, ref worstDepth, ref worstLane, fastY);
             for (int p = 0; p < crew.People.Length; p++)
@@ -253,6 +329,34 @@ static class Check
             }
         }
         clock.Elapsed = duration;
+        // The fuel hose on the filler in step with the fuel time.
+        if (fuelTo - fuelFrom >= KitWork.MinFuel)
+        {
+            fuelStops++;
+            if (nozzleFirst < 0f) hoseLate.Add((fuelTo - fuelFrom, $"{tag}: never on"));
+            else if (nozzleFirst > fuelFrom + 0.35f) hoseLate.Add((nozzleFirst - fuelFrom, $"{tag}: on {nozzleFirst - fuelFrom:0.00} s late"));
+            else if (nozzleLast < fuelTo - 2f * Dt) hoseLate.Add((fuelTo - nozzleLast, $"{tag}: off {fuelTo - nozzleLast:0.00} s early"));
+            else if (nozzleOn < (fuelTo - Mathf.Max(fuelFrom, nozzleFirst)) - 2f * Dt) hoseLate.Add((1f, $"{tag}: on {nozzleOn:0.0} s of the fuel time"));
+        }
+        else if (nozzleFirst >= 0f) hoseLate.Add((1f, $"{tag}: on with no fuel"));
+        if (nozzleStray > 0f) hoseLate.Add((nozzleStray, $"{tag}: on {nozzleStray:0.00} s outside the fuel time"));
+        // Each wheel done by the release; the lance in for the tyre time.
+        if (s.Tyres)
+        {
+            for (int w = 0; w < 4; w++)
+            {
+                wheelsChanged++;
+                if (!gunOnHub[w]) wheelsLate.Add((1f, $"{tag}: wheel {w + 1} gun never on the hub"));
+                if (work.WheelOff[w]) wheelsLate.Add((1f, $"{tag}: wheel {w + 1} still off at the release"));
+                else if (carried[w] && !work.OldOut[w]) wheelsLate.Add((1f, $"{tag}: wheel {w + 1} fresh tyre brought out but not changed"));
+            }
+            int jack = Array.FindIndex(crew.People, m => m.Tasks.Any(k => k.Job == CrewTask.Kind.Jack && k.Spot == PitStopSpots.StopJob.RearJack));
+            if (jack >= 0)
+            {
+                (float from, float to) jw = crew.TimeOf(crew.People[jack].Tasks[0], clock);
+                if (jw.to - jw.from > 1f && lanceOn < (jw.to - jw.from) * 0.7f) lanceLate.Add((1f - lanceOn / (jw.to - jw.from), $"{tag}: in {lanceOn:0.0} s of {jw.to - jw.from:0.0} s"));
+            }
+        }
         // Where each job is worked, for the check on passing cars.
         if (!workedAt.TryGetValue(g, out HashSet<(int, int)> at)) workedAt[g] = at = new HashSet<(int, int)>();
         foreach (CrewMember m in crew.People)
@@ -309,12 +413,23 @@ static class Check
             crew.Step(clock, Dt);
             Watch(crew, clock, ref worstDepth, ref worstLane, fastY);
             Drivers(clock);
+            Kit(clock);
         }
         // Back to racing: the crew must already be home.
         clock.Stage = CrewStage.Home;
         clock.CarNear = false;
         crew.Step(clock, Dt);
         swap.Step(clock, Dt);
+        Kit(clock);
+        if (work.Busy || work.Lift > 0f)
+            kitNotHome.Add((1f, $"{tag}: out {string.Join(", ", Enumerable.Range(0, PitBoxKit.ItemCount).Where(k => work.Out[k]).Select(k => (KitItem)k))}{(work.OldOut.Any(o => o) ? ", an old wheel" : "")}"));
+        if (dump)
+        {
+            string anchors = string.Join(",", Enumerable.Range(0, 6).Select(k => V(work.Anchor((KitItem)k))));
+            File.WriteAllText(Environment.GetEnvironmentVariable("DUMP_TO") ?? "stop.json",
+                $"{{\"tag\":\"{tag}\",\"box\":{V(crew.Box)},\"fwd\":{V(crew.Forward)},\"toGarage\":{V(crew.ToGarage)},\"door\":{crew.Door:0.###},\"len\":{s.CarLength},\"wid\":{s.CarWidth},\"fuel\":[{fuelFrom:0.##},{fuelTo:0.##}],\"tyres\":[{fuelTo:0.##},{tyresTo:0.##}],\"duration\":{duration:0.##},\"anchors\":[{anchors}],\"frames\":[{string.Join(",", frames)}]}}");
+        }
+        if (reachOver > 0.05f) overReach.Add((reachOver, $"{tag}: {reachWho}"));
         DriverFigure waiting = swap.Figures[1 - swap.Driving];
         if (!swap.AtRest || waiting.Body.At != swap.Rest) driverNotHome.Add(((waiting.Body.At - swap.Rest).magnitude, $"{tag}: waiting driver at ({waiting.Body.At.x:0.0}, {waiting.Body.At.y:0.0}), {waiting.Body.Clip}"));
         if (worstCar > 0f) driverInCar.Add((worstCar, tag + ": " + carWho));
@@ -398,6 +513,24 @@ static class Check
         CrewMember m = crew.People[int.Parse(Environment.GetEnvironmentVariable("WHO") ?? "1") - 1];
         CrewTask? cur = crew.Current(m);
         Console.WriteLine($"{e:0.0} s at ({m.At.x:0.00}, {m.At.y:0.00}) {m.Clip} {cur?.Job} {cur?.Spot} working {m.Working}, car ({clock.Car.x:0.00}, {clock.Car.y:0.00})");
+    }
+
+    static string V(Vector3 v) => $"[{v.x:0.###},{v.y:0.###},{v.z:0.###}]";
+
+    /// <summary>One frame of a stop for DUMP: the clock, the car, the crew, the drivers and the kit, in the world.</summary>
+    static string Frame(GarageCrew crew, KitWork work, in StopClock c, DriverSwap swap)
+    {
+        Vector3 mid = crew.Box + crew.Forward * c.Car.x + crew.ToGarage * c.Car.y;
+        mid.y = crew.Box.y;
+        Vector3 fwd = crew.WorldDirection(heading.normalized).normalized;
+        var people = crew.People.Select(m => $"[{V(crew.World(m.At))},{V(crew.WorldDirection(m.Facing))},{(m.Low ? 1 : 0)}]");
+        var drivers = swap.Figures.Where(d => !d.InCar).Select(d => V(crew.World(d.Body.At)));
+        var pieces = Enumerable.Range(0, PitBoxKit.ItemCount).Select(k =>
+            $"[{V(work.Pieces[k].Position)},{V(work.Pieces[k].Forward)},{V(work.Pieces[k].Up)},{(work.Hidden[k] ? 1 : 0)}]");
+        var old = Enumerable.Range(0, 4).Select(w => work.OldOut[w] ? $"[{V(work.OldWheel[w].Position)},{V(work.OldWheel[w].Forward)}]" : "0");
+        return $"{{\"t\":\"{c.Stage} {c.Elapsed:0.0}\",\"car\":[{V(mid)},{V(fwd)}],\"people\":[{string.Join(",", people)}],\"drivers\":[{string.Join(",", drivers)}],"
+            + $"\"pieces\":[{string.Join(",", pieces)}],\"old\":[{string.Join(",", old)}],\"off\":[{string.Join(",", work.WheelOff.Select(o => o ? 1 : 0))}],"
+            + $"\"lift\":{work.Lift:0.##},\"door\":{swap.Door:0.##},\"nozzle\":{(work.NozzleOn ? 1 : 0)}}}";
     }
 
     static Vector2 heading;
