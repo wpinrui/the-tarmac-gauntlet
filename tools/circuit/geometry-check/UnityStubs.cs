@@ -11,6 +11,10 @@ namespace UnityEngine
         public static Vector2 operator /(Vector2 a, float d) => new Vector2(a.x / d, a.y / d);
         public static float Dot(Vector2 a, Vector2 b) => a.x * b.x + a.y * b.y;
         public float magnitude => (float)Math.Sqrt(x * x + y * y);
+        public float sqrMagnitude => x * x + y * y;
+        public static Vector2 Lerp(Vector2 a, Vector2 b, float t) { t = Mathf.Clamp01(t); return a + (b - a) * t; }
+        public static bool operator ==(Vector2 a, Vector2 b) => a.x == b.x && a.y == b.y;
+        public static bool operator !=(Vector2 a, Vector2 b) => !(a == b);
         public Vector2 normalized { get { float m = magnitude; return m > 1e-5f ? this / m : zero; } }
         public override bool Equals(object o) => o is Vector2 v && v.x == x && v.y == y;
         public override int GetHashCode() => HashCode.Combine(x, y); }

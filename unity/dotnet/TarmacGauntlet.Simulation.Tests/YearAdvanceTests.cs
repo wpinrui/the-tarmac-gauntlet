@@ -195,6 +195,21 @@ namespace TarmacGauntlet.Simulation.Tests
             Assert.That(resultPlayer.Budget, Is.EqualTo(playerTeam.Budget - playerTeam.CrewSize * 2_000));
         }
 
+        [Test]
+        public void AiCrew_ResizedFromPrestigeAndPaidForAtTheNewSize()
+        {
+            var low = MakeAiTeam("low", 0) with { Prestige = 10, CrewSize = 16 };
+            var high = MakeAiTeam("high", 0) with { Prestige = 80, CrewSize = 4 };
+            var player = MakePlayerTeam("player1") with { Prestige = 100 };
+            var result = Advance(Drivers(20, _ => 200), teams: new BaseTeam[] { player, low, high });
+            var byId = result.Teams.ToDictionary(t => t.Id);
+            Assert.That(byId["low"].CrewSize, Is.EqualTo(4));
+            Assert.That(byId["high"].CrewSize, Is.EqualTo(16));
+            Assert.That(byId["low"].Budget, Is.EqualTo(-4 * 2_000));
+            Assert.That(byId["high"].Budget, Is.EqualTo(-16 * 2_000));
+            Assert.That(byId["player1"].CrewSize, Is.EqualTo(player.CrewSize));
+        }
+
         // ---------------------------------------------------------------------------
         // Full-field smoke test
         // ---------------------------------------------------------------------------

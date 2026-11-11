@@ -28,6 +28,9 @@ namespace TarmacGauntlet.Raceday
         /// <summary>The marshals' poses: clip and time, one per pose number the builder hands out.</summary>
         private static readonly (string clip, float time)[] Poses = { ("Idle", 0.6f), ("Nod", 0.4f) };
 
+        /// <summary>Where the furniture stands.</summary>
+        public TrackFurniture Placed { get; private set; }
+
         private Circuit circuit;
         private FurnitureMaterials materials;
         private RaceFlags flags;
@@ -44,6 +47,7 @@ namespace TarmacGauntlet.Raceday
             t.circuit = circuit;
             t.materials = new FurnitureMaterials();
             var placed = new TrackFurniture(circuit, track, stands);
+            t.Placed = placed;
             var built = new FurnitureBuilder(circuit, placed, t.materials);
             Transform root = t.transform;
 
