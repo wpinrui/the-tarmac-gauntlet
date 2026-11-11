@@ -38,7 +38,7 @@ namespace TarmacGauntlet.Management
             public int Age;
             public int? Last;
             public int[] Values; // by Column, Last as 0 when unknown
-            public List<(string Name, int Ovr)> Drivers;
+            public List<(string Name, string Id, int Ovr)> Drivers;
             public bool Mine => Team is PlayerTeam;
         }
 
@@ -166,10 +166,12 @@ namespace TarmacGauntlet.Management
                 head.Add(ovrHead);
                 side.Add(head);
             }
-            foreach ((string name, int ovr) in s.Drivers)
+            foreach ((string name, string id, int ovr) in s.Drivers)
             {
                 VisualElement row = Box("of-row", "sc-driver");
-                row.Add(Menus.Text(name, "of-fill", true));
+                VisualElement fill = Box("of-fill");
+                fill.Add(DriverLink(Menus, name, id, "sc-driver-name"));
+                row.Add(fill);
                 Label value = Menus.Text(Num(ovr), "sc-ovr", true);
                 value.AddToClassList(ovr >= 60 ? "v-hi" : ovr >= 50 ? "v-mid" : "v-lo");
                 row.Add(value);
@@ -207,20 +209,20 @@ namespace TarmacGauntlet.Management
         }
 
         /// <summary>The team's drivers with their OVR, best first. The player's lineup includes the player.</summary>
-        private static List<(string, int)> Drivers(GameState game, BaseTeam team)
+        private static List<(string, string, int)> Drivers(GameState game, BaseTeam team)
         {
-            var drivers = new List<(string Name, int Ovr)>();
+            var drivers = new List<(string Name, string Id, int Ovr)>();
             if (team is PlayerTeam p)
             {
                 foreach (string id in p.Lineup)
                 {
-                    if (id == RaceEntry.PlayerCharacterDriverId) drivers.Add((p.PlayerName, p.Skills.Driver * 5));
-                    else if (game.Drivers.FirstOrDefault(d => d.Id == id) is Driver d) drivers.Add((d.Name, Ovr(d)));
+                    if (id == RaceEntry.PlayerCharacterDriverId) drivers.Add((p.PlayerName, id, p.Skills.Driver * 5));
+                    else if (game.Drivers.FirstOrDefault(d => d.Id == id) is Driver d) drivers.Add((d.Name, d.Id, Ovr(d)));
                 }
                 return drivers;
             }
             foreach (Contract c in game.Contracts.Where(c => c.TeamId == team.Id && c.RemainingYears > 0))
-                if (game.Drivers.FirstOrDefault(d => d.Id == c.DriverId) is Driver d) drivers.Add((d.Name, Ovr(d)));
+                if (game.Drivers.FirstOrDefault(d => d.Id == c.DriverId) is Driver d) drivers.Add((d.Name, d.Id, Ovr(d)));
             return drivers.OrderByDescending(d => d.Ovr).ToList();
         }
 

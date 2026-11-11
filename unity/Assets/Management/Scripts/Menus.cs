@@ -686,6 +686,9 @@ namespace TarmacGauntlet.Management
             Render();
         }
 
+        /// <summary>Opens a hub screen, even one already open.</summary>
+        internal void Open(string slug) => Go(Mode.Screen, slug);
+
         /// <summary>Closes the open screen and goes back to the hub.</summary>
         internal void CloseScreen()
         {

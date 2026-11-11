@@ -34,6 +34,7 @@ namespace TarmacGauntlet.Simulation
         public TransactionCategory Category { get; init; }
         public double Amount { get; init; } // positive = income, negative = expense
         public string Description { get; init; } = "";
+        public string? DriverId { get; init; } // the driver the description names, or null
     }
 
     // --- Car Markets ---

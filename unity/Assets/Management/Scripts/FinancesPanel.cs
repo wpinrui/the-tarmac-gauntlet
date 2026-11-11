@@ -44,9 +44,9 @@ namespace TarmacGauntlet.Management
             double net = income + expenses;
 
             VisualElement hero = Box("fin-hero");
-            hero.Add(Figure(Signed(net), "NET", net >= 0 ? "of-green" : "of-red", "fin-net"));
-            hero.Add(Figure(Signed(income), "INCOME", "of-green", "fin-sub-line"));
-            hero.Add(Figure(Menus.Money(expenses), "SPENDING", "of-red", "fin-sub-line"));
+            hero.Add(Figure(Signed(income), "INCOME", "of-green"));
+            hero.Add(Figure(Menus.Money(expenses), "SPENDING", "of-red"));
+            hero.Add(Figure(Signed(net), "NET", net >= 0 ? "of-green" : "of-red"));
             Body.Add(hero);
 
             ScrollView rows = Scroll("rs-scroll");
@@ -54,7 +54,7 @@ namespace TarmacGauntlet.Management
             {
                 VisualElement row = Box("of-row");
                 row.Add(Icon(IconFor(t.Category), "fin-icon"));
-                row.Add(Menus.Text(t.Description, "of-fill"));
+                row.Add(Description(game, t));
                 Label amount = Menus.Text(Signed(t.Amount), "fin-amount", true);
                 amount.AddToClassList(t.Amount >= 0 ? "of-green" : "of-red");
                 row.Add(amount);
@@ -65,14 +65,27 @@ namespace TarmacGauntlet.Management
             RenderPrizes(game);
         }
 
-        private VisualElement Figure(string value, string label, string colour, string size)
+        private VisualElement Figure(string value, string label, string colour)
         {
             VisualElement figure = Box("fin-figure");
-            Label v = Menus.Text(value, size, true);
+            figure.Add(Menus.Text(label, "fin-label", true));
+            Label v = Menus.Text(value, "fin-value", true);
             v.AddToClassList(colour);
             figure.Add(v);
-            figure.Add(Menus.Text(label, "rs-stat-label"));
             return figure;
+        }
+
+        /// <summary>The transaction's text, with the driver it names as a link to them.</summary>
+        private VisualElement Description(GameState game, TransactionRecord t)
+        {
+            string name = t.DriverId == null ? null : game.Drivers.FirstOrDefault(d => d.Id == t.DriverId)?.Name;
+            int at = name == null ? -1 : t.Description.IndexOf(name, System.StringComparison.Ordinal);
+            if (at < 0) return Menus.Text(t.Description, "of-fill");
+            VisualElement line = Box("of-fill", "fin-desc");
+            if (at > 0) line.Add(Menus.Text(t.Description.Substring(0, at).Trim(), "fin-desc-text"));
+            line.Add(DriverLink(Menus, name, t.DriverId, "fin-desc-text"));
+            if (at + name.Length < t.Description.Length) line.Add(Menus.Text(t.Description.Substring(at + name.Length).Trim(), "fin-desc-text"));
+            return line;
         }
 
         /// <summary>All 100 places in four columns, read down. The player's last finish is marked.</summary>
@@ -81,7 +94,7 @@ namespace TarmacGauntlet.Management
             int last = game.RaceHistory.LastOrDefault()?.Results.FirstOrDefault(r => r.TeamId == GameActions.PlayerTeamId)?.Position ?? 0;
             IReadOnlyList<double> table = PostRace.PrizeTable;
             int perColumn = (table.Count + PrizeColumns - 1) / PrizeColumns;
-            Menus.SideBody.Add(Menus.Text("PRIZE MONEY BY FINISH", "section-label"));
+            Menus.SideBody.Add(Menus.Text("PRIZE MONEY TABLE", "of-title", true));
             VisualElement grid = Box("prizes");
             for (int c = 0; c < PrizeColumns; c++)
             {

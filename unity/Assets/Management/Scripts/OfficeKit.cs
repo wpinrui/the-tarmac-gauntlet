@@ -45,6 +45,23 @@ namespace TarmacGauntlet.Management
             return tab;
         }
 
+        /// <summary>
+        /// A driver's name that opens the Drivers screen on them: the market, or the roster for one of the player's own.
+        /// </summary>
+        internal static Label DriverLink(Menus menus, string name, string driverId, string cls)
+        {
+            Label link = menus.Text(name, cls, true);
+            link.AddToClassList("of-link");
+            link.RegisterCallback<PointerEnterEvent>(_ => link.text = "<u>" + name + "</u>");
+            link.RegisterCallback<PointerLeaveEvent>(_ => link.text = name);
+            link.RegisterCallback<ClickEvent>(e =>
+            {
+                e.StopPropagation();
+                DriversPanel.Show(menus, driverId);
+            });
+            return link;
+        }
+
         /// <summary>A coloured square for a driver, as the race summary marks stints.</summary>
         internal static VisualElement Swatch(Color colour)
         {
