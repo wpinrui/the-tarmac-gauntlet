@@ -67,6 +67,7 @@ namespace TarmacGauntlet.Simulation
                     TeamName = team.Name,
                     Player = team is PlayerTeam,
                     Prestige = team.Prestige,
+                    RaceNumber = team.RaceNumber,
                     Car = entry.Instance,
                     Model = entry.Model,
                     Lineup = drivers,

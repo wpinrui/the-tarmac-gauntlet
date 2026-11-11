@@ -11,6 +11,8 @@ namespace TarmacGauntlet.Simulation
         public string TeamName { get; init; } = "";
         public bool Player { get; init; }
         public double Prestige { get; init; }
+        /// <summary>The team's race number this season, drawn on the car.</summary>
+        public int RaceNumber { get; init; }
         public CarInstance Car { get; init; } = new CarInstance();
         public CarModel Model { get; init; } = new CarModel();
         /// <summary>Drivers in stint order, the starter first.</summary>

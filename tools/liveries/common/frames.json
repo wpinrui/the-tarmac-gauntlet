@@ -1,0 +1,8 @@
+{
+  "_": "The five livery views, in the game model's OBJ axes (+X car's left, +Y up, +Z nose). u runs right across the drawing and v runs down it, both in metres; look is the way the view faces.",
+  "left":  {"u": [0, 0, -1], "v": [0, -1, 0], "look": [-1, 0, 0]},
+  "right": {"u": [0, 0, 1],  "v": [0, -1, 0], "look": [1, 0, 0]},
+  "top":   {"u": [0, 0, 1],  "v": [-1, 0, 0], "look": [0, -1, 0]},
+  "front": {"u": [1, 0, 0],  "v": [0, -1, 0], "look": [0, 0, -1]},
+  "rear":  {"u": [-1, 0, 0], "v": [0, -1, 0], "look": [0, 0, 1]}
+}

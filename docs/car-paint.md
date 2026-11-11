@@ -13,3 +13,19 @@ CarPaint.Respray(carModel, colour);
 The respray copies the material for that car, so other cars using the same model are not changed.
 
 Models are exported amber (see `docs/car-modelling.md`). Leave out `paint` to keep it.
+
+## Liveries
+
+A team with a livery wears it instead of the class paint. `CarBuilder.Spawn(modelId, circuit, keys, paint, team, raceNumber)` looks the team up in `CarArt.LiveryPath` and calls `CarLivery.Apply`; Raceday passes each grid car's team name and race number.
+
+- A livery is drawn on one model only. Its `livery.json` names that model, and `CarLivery` leaves any other model in the class paint.
+- Each livery lives in `unity/Assets/Art/Liveries/<Team>/` as `atlas.png` and `livery.json`, baked from the team's folder in `tools/liveries/`.
+- The `TarmacGauntlet/Livery` shader (`Raceday/Resources/Livery/`) replaces the `body` material. It projects the five views (left, right, top, front, rear) onto the paint by which way each face points, and draws the team's race number into the livery's number boxes from `Digits.png`.
+- The race number is never painted into the art. It changes each season (`BaseTeam.RaceNumber`).
+
+To make a livery:
+
+1. `node tools/liveries/common/views.js <model.obj> <team>/out/views` draws the car's five views at true scale, with every part edge as a guide.
+2. The team's `design.py` draws the art over them with `tools/liveries/common/livery.py`, in the car's own metres.
+3. `node tools/liveries/common/bake.js <views> <art> <out> --sample 8` bakes a preview; `python3 tools/liveries/common/viewer.py` shows it on the 3D car. With `--number`, the viewer draws the number the game's way on the game's atlas.
+4. `bake.js ... unity/Assets/Art/Liveries/<Team> --model <model asset path>` bakes the game's atlas. Add the team to `CarArt.LiveryPath`.
