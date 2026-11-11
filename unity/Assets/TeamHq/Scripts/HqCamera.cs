@@ -28,6 +28,8 @@ namespace TarmacGauntlet.TeamHq
         private struct Shot { public Vector3 Position; public Quaternion Rotation; public float Fov; }
 
         private readonly Dictionary<string, Shot> shots = new Dictionary<string, Shot>();
+        private readonly Dictionary<string, float> shifts = new Dictionary<string, float>();
+        private float currentShift;
         private Camera cam;
         private Shot from, to;
         private float glideStart = -1;
@@ -55,8 +57,9 @@ namespace TarmacGauntlet.TeamHq
         /// <summary>Cuts to a screen's shot at once.</summary>
         public void Cut(string screen)
         {
-            if (!shots.TryGetValue(screen, out Shot s)) return;
+            if (!TryShot(screen, out Shot s, out float shift)) return;
             Current = screen;
+            currentShift = shift;
             glideStart = -1;
             Apply(s);
         }
@@ -64,11 +67,30 @@ namespace TarmacGauntlet.TeamHq
         /// <summary>Glides to a screen's shot.</summary>
         public void Show(string screen)
         {
-            if (!shots.TryGetValue(screen, out Shot s) || screen == Current) return;
+            if (!TryShot(screen, out Shot s, out float shift) || (screen == Current && shift == currentShift)) return;
             Current = screen;
+            currentShift = shift;
             from = new Shot { Position = transform.position, Rotation = transform.rotation, Fov = cam.fieldOfView };
             to = s;
             glideStart = Time.unscaledTime;
+        }
+
+        /// <summary>
+        /// Slides a screen's shot along the bays by <paramref name="dx"/> metres, to frame another car. Glides there
+        /// when that screen is showing.
+        /// </summary>
+        public void Shift(string screen, float dx)
+        {
+            shifts[screen] = dx;
+            if (screen == Current) Show(screen);
+        }
+
+        private bool TryShot(string screen, out Shot s, out float shift)
+        {
+            shift = 0;
+            if (!shots.TryGetValue(screen, out s)) return false;
+            if (shifts.TryGetValue(screen, out shift)) s.Position += new Vector3(shift, 0, 0);
+            return true;
         }
 
         private void LateUpdate()

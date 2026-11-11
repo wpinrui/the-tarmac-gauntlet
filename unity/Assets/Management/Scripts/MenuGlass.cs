@@ -62,7 +62,7 @@ namespace TarmacGauntlet.Management
     }
 
     /// <summary>
-    /// Makes frosted glass panels: the blurred scene behind them, a 140 degree white sheen from 16% to 6%, a 1px edge
+    /// Makes frosted glass panels: the blurred scene behind them, a near-black tint at 66% under a 140 degree white sheen from 8% to 0%, a 1px edge
     /// and a soft drop shadow. <see cref="Refresh"/> keeps every panel's slice of the blurred scene lined up each frame.
     /// </summary>
     public sealed class MenuGlass
@@ -144,7 +144,7 @@ namespace TarmacGauntlet.Management
             p.Shadow = s;
         }
 
-        /// <summary>White at 16% in the top left corner fading to 6% in the bottom right, at 140 degrees.</summary>
+        /// <summary>White at 8% in the top left corner fading to nothing by 60% of the way, at 140 degrees.</summary>
         private static Texture2D Sheen()
         {
             const int n = 64;
@@ -159,7 +159,7 @@ namespace TarmacGauntlet.Management
                 // Texture rows run bottom to top, so the top row is the screen's top edge.
                 var p = new Vector2(x / (n - 1f) - 0.5f, 0.5f - y / (n - 1f));
                 float k = Mathf.Clamp01(Vector2.Dot(p, dir) / halfLine * 0.5f + 0.5f);
-                px[y * n + x] = new Color(1, 1, 1, Mathf.Lerp(0.16f, 0.06f, k));
+                px[y * n + x] = new Color(1, 1, 1, Mathf.Lerp(0.08f, 0f, Mathf.Clamp01(k / 0.6f)));
             }
             t.SetPixels32(px);
             t.Apply();
