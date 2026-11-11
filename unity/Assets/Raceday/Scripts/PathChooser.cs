@@ -80,7 +80,9 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Gap kept nose to tail when moving across in front of a car behind, m: never across its nose (T8).</summary>
         private static readonly float SwipeGap = Knob("SWIPE", 1f);
         /// <summary>How far ahead of where the car is the line leaving a car its width may aim, m (H2).</summary>
-        private static readonly float OweLead = Knob("OWELEAD", 2f);
+        private static readonly float OweLead = Knob("OWELEAD", 2f), CommitLead = Knob("CLEAD", 1f);
+        /// <summary>Room owed only to a car alongside and only on the track (Ivan, H2).</summary>
+        private static readonly bool OweTrack = Knob("OWETRACK", 0f) > 0f, OweH1 = Knob("OWEH1", 1f) > 0f, OweCommit = Knob("OWECOMMIT", 1f) > 0f, OweEdge = Knob("OWEEDGE", 1f) > 0f;
         /// <summary>Score per second a pull-out waits: of two near-equal moves, the later one, so the car stays in the tow until it must move.</summary>
         private static readonly float LateBonus = Knob("LATE", 0.1f);
         /// <summary>Side-to-side gap H1 keeps to a car alongside, m.</summary>
@@ -219,7 +221,7 @@ namespace TarmacGauntlet.Raceday
             bool owedNear = false;
             if (nextTurn != 0)
                 foreach (TrafficCar o in others)
-                    if (Mathf.Abs(Road(o.Distance - me.Distance, lap)) < 2f * CarL && Mathf.Sign(o.Lateral - me.Lateral) == -nextTurn && Mathf.Abs(o.Speed) >= StoppedSpeed) owedNear = true;
+                    if (Mathf.Abs(Road(o.Distance - me.Distance, lap)) < (OweTrack ? CarL : 2f * CarL) && Mathf.Sign(o.Lateral - me.Lateral) == -nextTurn && Mathf.Abs(o.Speed) >= StoppedSpeed) owedNear = true;
             // H4: with a car close behind on a straight, one move to cover the inside of the next corner is worth something (Ivan).
             int coverTurn = NextTurn(c, here, float.PositiveInfinity);
             bool cover = Defend > 0f && defending && !exempt && !zone && movePhase != 2 && coverTurn != 0 && -attackerGap < DefendWithin * Mathf.Max(mySpeed, 1f) && -attackerGap > DefendFrom;
@@ -288,6 +290,15 @@ namespace TarmacGauntlet.Raceday
             // aims across the car it owes (H2).
             float owe = pilot.Offset + best.SoonOff;
             if (best.Owe && OweLead > 0f) owe = Mathf.Clamp(owe, myOffset + best.SoonOff - OweLead, myOffset + best.SoonOff + OweLead);
+            if (best.Owe && OweCommit && nextTurn != 0)
+            {
+                // Committed to the lane that leaves the car alongside its width from the inside edge, or the
+                // racing line where that is wider: steered and taken at that lane's speed, not re-planned wider.
+                int kh = pilot.Index;
+                float bnd = c.HalfWidth(kh) - 1.5f * CarW - RoomMargin - 0.15f, lineK = line.Lateral[kh];
+                owe = -nextTurn * lineK > bnd ? -nextTurn * bnd - lineK : 0f;
+                if (CommitLead > 0f) owe = Mathf.Clamp(owe, myOffset - CommitLead, myOffset + CommitLead);   // no further from where the car is than it can follow
+            }
             Target = best.Owe ? owe : best.Delay > 0f ? pilot.Offset : best.Shift;
             Cap = CapAt(best.Pedal, ahead, 0, mySpeed, me.Distance, margin);
             lastShift = best.Shift;
@@ -374,15 +385,18 @@ namespace TarmacGauntlet.Raceday
                 lat = Mathf.Clamp(line.Lateral[k] + off, -edge, edge);
                 if (cand.Owe && nextTurn != 0)
                 {
-                    // Its width from the edge, and clear of the car there now, wherever that car has got to.
+                    // A car's width from the inside edge, measured from the edge and nothing else: once that is
+                    // left, it just turns. A car diving deeper is that car's problem (Ivan, H2).
                     float ins = -nextTurn;
                     float bound = c.HalfWidth(k) - 1.5f * CarW - RoomMargin - 0.15f;
-                    for (int j = 0; j < others.Count; j++)
-                    {
-                        float gj = Road(od[j, s] - d, lap);
-                        if (stopped[j] || Mathf.Abs(gj) > CarL + 2f || ins * (ol[j, s] - lat) <= 0f) continue;
-                        bound = Mathf.Min(bound, ins * ol[j, s] - (Mathf.Lerp(Clear(margin), CarW + RoomMargin, OweTight) + reach[j] - 0.5f * CarW + 0.1f));
-                    }
+                    if (!OweTrack)
+                        for (int j = 0; j < others.Count; j++)
+                        {
+                            float gj = Road(od[j, s] - d, lap);
+                            if (stopped[j] || Mathf.Abs(gj) > CarL + 2f || ins * (ol[j, s] - lat) <= 0f) continue;
+                            bound = Mathf.Min(bound, ins * ol[j, s] - (Mathf.Lerp(Clear(margin), CarW + RoomMargin, OweTight) + reach[j] - 0.5f * CarW + 0.1f));
+                        }
+                    if (OweEdge) bound = Mathf.Max(bound, -edge);   // never off the track's far side
                     if (ins * lat > bound) { lat = ins * bound; off = lat - line.Lateral[k]; }
                 }
                 if (s == 1) cand.SoonOff = off - holdOffset;
@@ -438,7 +452,15 @@ namespace TarmacGauntlet.Raceday
                     // A car coming from behind is its own to miss: this car only must not move across into it.
                     bool behind = from < -0.3f * CarL;
                     bool into = !behind || apart < Mathf.Abs(ol[j, s] - me.Lateral) - 0.05f;
-                    if (g > (behind ? -CarL - SwipeGap : -0.3f * CarL) && g < CarL + (g > 0f ? buffer : 0f) && apart < need && into && (!touching || apart < Mathf.Min(start - 0.1f, need) || apart < CarW + 0.05f && (TouchClose <= 0f || g < from - TouchClose))) { broke = "H1"; by = others[j].Id; brokeBehind = behind; }
+                    // A car alongside on the inside is owed its width from the inside edge and no more: a path that
+                    // leaves that is clear of it, and if it dives deeper still that is its own to miss (Ivan, H2).
+                    bool leftRoom = false;
+                    if (OweH1 && nextTurn != 0 && !stopped[j] && Mathf.Abs(g) < CarL && Mathf.Sign(side) == -nextTurn)
+                    {
+                        float owedRoom = side > 0f ? c.HalfWidth(k) - (lat + 0.5f * CarW) : lat - 0.5f * CarW + c.HalfWidth(k);
+                        leftRoom = owedRoom >= CarW + RoomMargin && apart > CarW;
+                    }
+                    if (!leftRoom && g > (behind ? -CarL - SwipeGap : -0.3f * CarL) && g < CarL + (g > 0f ? buffer : 0f) && apart < need && into && (!touching || apart < Mathf.Min(start - 0.1f, need) || apart < CarW + 0.05f && (TouchClose <= 0f || g < from - TouchClose))) { broke = "H1"; by = others[j].Id; brokeBehind = behind; }
                     else if (!stopped[j] && Mathf.Abs(g) < CarL && OnTrack(c, ol[j, s], od[j, s]))
                     {
                         // H2 and H3: room for a car alongside, on the inside always, on the outside once its front is level or ahead.
