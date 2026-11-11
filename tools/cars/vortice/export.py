@@ -108,6 +108,9 @@ def build(game=False):
     for ob in [shell] + doors:
         blend.tidy(ob)
         blend.thin(ob, 0.55)
+    for ob in bpy.context.scene.objects:
+        if "_trim" in ob.name or ob.name.startswith("window_trim"):
+            blend.tidy(ob)      # the trims were split along the shut lines too
 
     out += parts.engine()
     out += parts.wheels()
@@ -115,11 +118,11 @@ def build(game=False):
     if game:
         picks = R["picks"]
         for ob in opts:
-            _o, g, n, i = ob.name.split("_")
+            _o, g, n, i = ob.name.split("_", 3)
             if int(n) != picks[g]:
                 bpy.data.objects.remove(ob)
             else:
-                ob.name = f"{g}_{i}"
+                ob.name = i if i.startswith("door_") else f"{g}_{i}"
     bpy.data.objects.remove(plain)
     obs = [o for o in bpy.context.scene.objects if o.type == "MESH"]
     for ob in obs:
