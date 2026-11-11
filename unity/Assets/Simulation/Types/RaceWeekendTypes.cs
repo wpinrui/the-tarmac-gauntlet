@@ -78,9 +78,14 @@ namespace TarmacGauntlet.Simulation
         public CarClass CarClass { get; init; }
         public int Laps { get; init; }
         public bool Retired { get; init; }
+        /// <summary>Ran to the end but is no finisher: too few laps, or too slow a flag lap (<see cref="RaceDay.Finished"/>).</summary>
+        public bool Unclassified { get; init; }
         public FailureType? RetirementReason { get; init; }
         public double? BestLap { get; init; }
         public double PrizeMoney { get; init; }
+
+        /// <summary>A finisher: neither retired nor unclassified.</summary>
+        public bool Finished() => !Retired && !Unclassified;
     }
 
     /// <summary>What the race summary shows: the results, and the player's own race.</summary>

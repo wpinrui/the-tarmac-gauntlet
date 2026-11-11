@@ -109,15 +109,15 @@ namespace TarmacGauntlet.Management
             foreach (ClassifiedCar r in overall ? race.Classification : race.Classification.Where(x => x.CarClass.ToString() == views.Results))
             {
                 VisualElement row = Row(null, IsMe(r) ? "me" : null);
-                row.EnableInClassList("out", r.Retired);
+                row.EnableInClassList("out", !r.Finished());
                 row.Add(Place(Num(overall ? r.Position : r.ClassPosition), overall ? r.Position : r.ClassPosition, "c-pos"));
                 row.Add(ClassLabels.Make(r.CarClass, "cls-sm"));
                 VisualElement team = ResultTeam(r);
                 team.AddToClassList("fill");
                 row.Add(team);
                 row.Add(Cell(Num(r.Laps), "c-laps"));
-                Label prize = Cell(r.Retired ? "DNF" : Money(r.PrizeMoney), "c-prize", true);
-                prize.AddToClassList(r.Retired ? "v-lo" : "v-hi");
+                Label prize = Cell(r.Finished() ? Money(r.PrizeMoney) : "DNF", "c-prize", true);
+                prize.AddToClassList(!r.Finished() ? "v-lo" : "v-hi");
                 row.Add(prize);
                 list.Add(row);
             }
@@ -145,7 +145,7 @@ namespace TarmacGauntlet.Management
             block.Add(letter);
             VisualElement rows = Box("podium-rows");
             int place = 0;
-            foreach (ClassifiedCar r in race.Classification.Where(x => x.CarClass == c && !x.Retired).Take(3))
+            foreach (ClassifiedCar r in race.Classification.Where(x => x.CarClass == c && x.Finished()).Take(3))
             {
                 place++;
                 VisualElement row = Row(null, "two-line", IsMe(r) ? "me" : null);
@@ -174,8 +174,8 @@ namespace TarmacGauntlet.Management
             into.Add(inClass);
             into.Add(Figure(Num(me.Laps), "LAPS", null));
             if (me.BestLap is double best) into.Add(Figure(LapTime(best), "BEST LAP", "best"));
-            Label end = Text(me.Retired ? "DNF" : Money(me.PrizeMoney), "hero-prize", true);
-            end.AddToClassList(me.Retired ? "v-lo" : "v-hi");
+            Label end = Text(me.Finished() ? Money(me.PrizeMoney) : "DNF", "hero-prize", true);
+            end.AddToClassList(!me.Finished() ? "v-lo" : "v-hi");
             into.Add(end);
         }
 

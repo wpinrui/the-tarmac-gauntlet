@@ -98,6 +98,13 @@ namespace TarmacGauntlet.Simulation.Tests
             new PrizeEligibility { TeamId = teamId, Position = position, LapsCompleted = lapsCompleted };
 
         [Test]
+        public void ANonFinisherReceivesNothing()
+        {
+            var results = new[] { new PrizeEligibility { TeamId = "t", Position = 1, LapsCompleted = 40, Finished = false } };
+            Assert.That(PostRace.DistributePrizeMoney(results, schedule)["t"], Is.EqualTo(0));
+        }
+
+        [Test]
         public void WinnerReceivesTheMaximumPrize()
         {
             var results = new[] { R("winner", 1, 48), R("last", 100, 1) };

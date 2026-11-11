@@ -10,14 +10,12 @@ namespace TarmacGauntlet.Raceday
     /// power, grip, fuel efficiency and tyre life until a stop fixes them, and a retired car limps to
     /// its box, or stops beside the track after a fatal crash (<see cref="Retire"/>). After a stop's driver change, the new driver drives at their own pace.
     /// The driver at the wheel tires lap by lap (<see cref="CarRaceLog.Fatigue"/>), which slows the car until a stop puts in someone fresh. When the
-    /// race clock runs out each car takes the flag the next time it crosses the line, and once all
-    /// have, or <see cref="FlagWait"/> after the time ran out, the race is settled into the career
+    /// race clock runs out each car takes the flag the next time it crosses the line, and once no car
+    /// can still change the result (<see cref="RaceDay.Over"/>), the race is settled into the career
     /// (<see cref="RaceWeekend.Finish"/>) and the player's car is parked in its box for the race summary.
     /// </summary>
     public sealed class RaceDirector : MonoBehaviour
     {
-        /// <summary>The race is called this long after the time runs out, s, for cars that never come round.</summary>
-        public const float FlagWait = 400f;
         /// <summary>Share of its power a car limping back to the pits has.</summary>
         public const float LimpPower = 0.6f;
         /// <summary>Share of its racing speed a car limping back to the pits drives at.</summary>
@@ -41,7 +39,6 @@ namespace TarmacGauntlet.Raceday
         private float[] crossed;
         private bool started;
         private float startTime;
-        private float timeUpAt = -1f;
 
         private void Start()
         {
@@ -67,7 +64,6 @@ namespace TarmacGauntlet.Raceday
                 }
             }
             bool timeUp = Tower.RaceTime >= RaceTower.RaceLength;
-            if (timeUp && timeUpAt < 0f) timeUpAt = Time.time;
 
             for (int i = 0; i < Cars.Length; i++)
             {
@@ -100,7 +96,7 @@ namespace TarmacGauntlet.Raceday
                 if (Drivers[i].Fatigue != (float)log.Fatigue) Drivers[i].Fatigue = (float)log.Fatigue;
             }
 
-            if (Day.AllFlagged || (timeUpAt >= 0f && Time.time - timeUpAt > FlagWait)) Finish();
+            if (timeUp && Day.Over(Time.time - startTime)) Finish();
         }
 
         /// <summary>

@@ -152,7 +152,7 @@ namespace TarmacGauntlet.Simulation
                 {
                     CarClass = cls,
                     Places = summary.Classification
-                        .Where(c => c.CarClass == cls && !c.Retired)
+                        .Where(c => c.CarClass == cls && c.Finished())
                         .Take(3)
                         .Select(c => new PodiumPlace { TeamId = c.TeamId, TeamName = c.TeamName, ModelName = ModelName(c.ModelId), Laps = c.Laps })
                         .ToArray(),
@@ -212,7 +212,7 @@ namespace TarmacGauntlet.Simulation
             private Story? MostSurprising()
             {
                 var best = Field
-                    .Where(x => !x.Retired && x.ClassPosition <= 3)
+                    .Where(x => x.Finished() && x.ClassPosition <= 3)
                     .Select(x => (Car: x, Rank: PrestigeRank(x)))
                     .Where(x => x.Rank.Rank - x.Car.ClassPosition >= 3)
                     .OrderByDescending(x => x.Rank.Rank - x.Car.ClassPosition).ThenBy(x => x.Car.Position)
@@ -232,7 +232,7 @@ namespace TarmacGauntlet.Simulation
             private Story? BiggestMover()
             {
                 var best = Field
-                    .Where(x => !x.Retired)
+                    .Where(x => x.Finished())
                     .Select(x => (Car: x, Gain: GridPosition(x.CarId) - x.Position))
                     .Where(x => x.Gain >= 10)
                     .OrderByDescending(x => x.Gain).ThenBy(x => x.Car.Position)
@@ -256,8 +256,8 @@ namespace TarmacGauntlet.Simulation
                     .GroupBy(x => x.CarClass)
                     .Select(g => g.OrderByDescending(x => PrestigeBefore(x.TeamId)).ThenBy(x => GridPosition(x.CarId)).First())
                     .Where(x => x.TeamId != GameActions.PlayerTeamId && x.TeamId != winner?.TeamId)
-                    .Where(x => x.Retired || x.ClassPosition >= 4)
-                    .OrderByDescending(x => x.Retired ? int.MaxValue : x.ClassPosition).ThenByDescending(x => PrestigeBefore(x.TeamId))
+                    .Where(x => !x.Finished() || x.ClassPosition >= 4)
+                    .OrderByDescending(x => !x.Finished() ? int.MaxValue : x.ClassPosition).ThenByDescending(x => PrestigeBefore(x.TeamId))
                     .FirstOrDefault();
                 if (favourites == null) return null;
                 ClassifiedCar c = favourites;
@@ -265,9 +265,11 @@ namespace TarmacGauntlet.Simulation
                 var paragraphs = new List<string> { $"{Introduce(c)} arrived as the top team in class {cls} on prestige." };
                 if (c.Retired)
                     paragraphs.Add($"Their {model} lasted {c.Laps} laps before {(c.RetirementReason == FailureType.Crash ? "a crash" : "a mechanical failure")} ended it.");
+                else if (c.Unclassified)
+                    paragraphs.Add($"Their {model} ran {c.Laps} laps but was not classified.");
                 else
                 {
-                    ClassifiedCar? classWinner = summary.Classification.FirstOrDefault(x => x.CarClass == c.CarClass && !x.Retired);
+                    ClassifiedCar? classWinner = summary.Classification.FirstOrDefault(x => x.CarClass == c.CarClass && x.Finished());
                     int behind = classWinner == null ? 0 : classWinner.Laps - c.Laps;
                     string gap = classWinner == null || behind <= 0 ? "" : $", {Count(behind, "lap")} behind class winners {classWinner.TeamName}";
                     paragraphs.Add($"They finished {Ordinal(c.ClassPosition)} in class and {Ordinal(c.Position)} overall{gap}.");
@@ -280,7 +282,7 @@ namespace TarmacGauntlet.Simulation
             private Story? VeteranPerformance()
             {
                 var best = Field
-                    .Where(x => !x.Retired && x.ClassPosition <= 3)
+                    .Where(x => x.Finished() && x.ClassPosition <= 3)
                     .SelectMany(x => DriversOf(x.CarId).Select(d => (Car: x, Driver: d)))
                     .Where(x => x.Driver.Age >= 36)
                     .OrderByDescending(x => x.Driver.Age).ThenBy(x => x.Car.Position)
@@ -302,7 +304,7 @@ namespace TarmacGauntlet.Simulation
             private Story? RookieDebut()
             {
                 var best = Field
-                    .Where(x => !x.Retired && x.ClassPosition <= 5)
+                    .Where(x => x.Finished() && x.ClassPosition <= 5)
                     .SelectMany(x => DriversOf(x.CarId).Select(d => (Car: x, Driver: d)))
                     .Where(x => x.Driver.Age <= 22 && FirstRace(x.Driver.Id))
                     .OrderBy(x => x.Car.ClassPosition).ThenBy(x => x.Driver.Age).ThenBy(x => x.Car.Position)
@@ -341,7 +343,7 @@ namespace TarmacGauntlet.Simulation
             private PlayerCoverage Coverage(ClassifiedCar p)
             {
                 PlayerCoverage tier = CoverageFor(summary.PrestigeAfter);
-                bool strong = !p.Retired && (p.ClassPosition == 1 || p.Position <= 3);
+                bool strong = p.Finished() && (p.ClassPosition == 1 || p.Position <= 3);
                 if (strong && tier < PlayerCoverage.Front) tier++;
                 return tier;
             }
@@ -358,12 +360,15 @@ namespace TarmacGauntlet.Simulation
                 {
                     string line = p.Retired
                         ? $"{team} retired from class {cls} after {p.Laps} laps with {reason}."
+                        : p.Unclassified
+                        ? $"{team} were not classified in class {cls} after {p.Laps} laps."
                         : $"{team} were {Ordinal(p.ClassPosition)} in class {cls} and {Ordinal(p.Position)} overall after {p.Laps} laps.";
                     return new Story { Paragraphs = new[] { line }, TeamId = p.TeamId };
                 }
 
                 string headline;
                 if (p.Retired) headline = p.RetirementReason == FailureType.Crash ? $"{team} crash out" : $"{team} retire on lap {p.Laps}";
+                else if (p.Unclassified) headline = $"{team} not classified";
                 else if (p.ClassPosition == 1) headline = $"{team} win class {cls}";
                 else if (p.ClassPosition <= 3) headline = $"{team} take {Ordinal(p.ClassPosition)} in class {cls}";
                 else if (lastYear != null && lastYear.Value - p.Position >= 5) headline = $"{team} climb to {Ordinal(p.Position)}";
@@ -373,6 +378,8 @@ namespace TarmacGauntlet.Simulation
                 string start = grid > 0 ? $"Starting {Ordinal(grid)}, " : "";
                 paragraphs.Add(p.Retired
                     ? $"{team} started {(grid > 0 ? Ordinal(grid) : "the race")} and ran {p.Laps} laps before {reason} ended their race."
+                    : p.Unclassified
+                    ? $"{start}{team} ran {p.Laps} laps but were not classified as finishers."
                     : $"{start}{team} finished {Ordinal(p.Position)} overall and {Ordinal(p.ClassPosition)} in class {cls} with {p.Laps} laps.");
 
                 IReadOnlyList<string> crew = DriverNames(p.CarId, p.TeamId);
@@ -381,7 +388,7 @@ namespace TarmacGauntlet.Simulation
                 second += issues > 0 ? $" It picked up {Count(issues, "issue")} along the way." : " It ran without an issue.";
                 paragraphs.Add(second);
 
-                if (lastYear != null && !p.Retired)
+                if (lastYear != null && p.Finished())
                 {
                     int change = lastYear.Value - p.Position;
                     if (change > 0) paragraphs.Add($"That is {Count(change, "place")} better than last year.");
@@ -396,6 +403,8 @@ namespace TarmacGauntlet.Simulation
                         paragraphs.Add($"{anchor.Value.Name} did the most, {anchor.Value.Laps} laps across {Count(anchor.Value.Stints, "stint")}, and the car stopped {Count(summary.PitStops.Count, "time")}.");
                     standfirst = p.Retired
                         ? $"The {model} is out after {p.Laps} laps."
+                        : p.Unclassified
+                        ? $"The {model} ran {p.Laps} laps but is not classified."
                         : crew.Count > 0 ? $"{List(crew)} {(crew.Count == 1 ? "brings" : "bring")} the {model} home {Ordinal(p.Position)}." : $"The {model} comes home {Ordinal(p.Position)}.";
                 }
                 return new Story { Headline = headline, Standfirst = standfirst, Paragraphs = paragraphs, TeamId = p.TeamId };

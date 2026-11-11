@@ -315,6 +315,112 @@ namespace TarmacGauntlet.Simulation.Tests
             Assert.That(race.Cars[0].Laps, Is.EqualTo(1));
         }
 
+        // --- Finishers ---
+
+        /// <summary>Two grid slots whose cars are in the same class.</summary>
+        private static (int A, int B) SameClass(RaceDay race)
+        {
+            CarRaceLog a = race.Cars.First(c => race.Cars.Count(o => o.Car.Model.CarClass == c.Car.Model.CarClass) >= 2);
+            CarRaceLog b = race.Cars.First(c => c != a && c.Car.Model.CarClass == a.Car.Model.CarClass);
+            return (a.Index, b.Index);
+        }
+
+        /// <summary>Runs one car <paramref name="laps"/> laps of 100 s, the last one taking the flag after <paramref name="flagLap"/> s.</summary>
+        private static void Drive(RaceDay race, int index, int laps, double flagLap = 100)
+        {
+            for (int lap = 1; lap < laps; lap++) race.CompleteLap(index, lap * 100, 100, InstructionMode.Normal, false);
+            race.CompleteLap(index, (laps - 1) * 100 + flagLap, flagLap, InstructionMode.Normal, true);
+        }
+
+        [Test]
+        public void SeventyPercentOfTheClassLeadersLapsFinishes()
+        {
+            var race = new RaceDay(RaceWeekend.BuildSetup(Career()), Never);
+            (int leader, int other) = SameClass(race);
+            Drive(race, leader, 10);
+            Drive(race, other, 7);
+            Assert.That(race.Finished(race.Cars[leader]), Is.True);
+            Assert.That(race.Finished(race.Cars[other]), Is.True);
+        }
+
+        [Test]
+        public void UnderSeventyPercentDoesNotFinish()
+        {
+            var race = new RaceDay(RaceWeekend.BuildSetup(Career()), Never);
+            (int leader, int other) = SameClass(race);
+            Drive(race, leader, 10);
+            Drive(race, other, 6);
+            Assert.That(race.Finished(race.Cars[other]), Is.False);
+        }
+
+        [Test]
+        public void AFlagLapSlowerThanTheAllowanceDoesNotFinish()
+        {
+            var race = new RaceDay(RaceWeekend.BuildSetup(Career()), Never);
+            (int leader, int parked) = SameClass(race);
+            Drive(race, leader, 10);
+            Drive(race, parked, 9, 100 * RaceDay.FlagLapAllowance + 1);
+            Assert.That(race.FlagLapLimit(race.Cars[leader].Car.Model.CarClass), Is.EqualTo(100 * RaceDay.FlagLapAllowance));
+            Assert.That(race.Finished(race.Cars[parked]), Is.False);
+
+            var slowButFair = new RaceDay(RaceWeekend.BuildSetup(Career()), Never);
+            Drive(slowButFair, leader, 10);
+            Drive(slowButFair, parked, 9, 100 * RaceDay.FlagLapAllowance);
+            Assert.That(slowButFair.Finished(slowButFair.Cars[parked]), Is.True);
+        }
+
+        [Test]
+        public void ACarThatNeverTakesTheFlagDoesNotFinish()
+        {
+            var race = new RaceDay(RaceWeekend.BuildSetup(Career()), Never);
+            (int leader, int other) = SameClass(race);
+            Drive(race, leader, 10);
+            for (int lap = 1; lap <= 10; lap++) race.CompleteLap(other, lap * 100, 100, InstructionMode.Normal, false);
+            Assert.That(race.Finished(race.Cars[other]), Is.False);
+        }
+
+        [Test]
+        public void FinishersClassifyAheadOfNonFinishers()
+        {
+            var race = new RaceDay(RaceWeekend.BuildSetup(Career()), Never);
+            (int leader, int other) = SameClass(race);
+            Drive(race, leader, 10);
+            Drive(race, other, 11, 1000);   // the most laps of all, but parked for its flag lap
+            IReadOnlyList<CarRaceLog> order = race.Classify();
+            Assert.That(order[0].Index, Is.EqualTo(leader));
+            Assert.That(order.Last(c => c.Laps > 0).Index, Is.EqualTo(other));
+        }
+
+        [Test]
+        public void TheRaceIsOverOnceNoCarCanStillFinish()
+        {
+            var race = new RaceDay(RaceWeekend.BuildSetup(Career()), Never);
+            (int leader, int other) = SameClass(race);
+            Drive(race, leader, 10);
+            for (int lap = 1; lap <= 9; lap++) race.CompleteLap(other, lap * 100, 100, InstructionMode.Normal, false);
+            // Everyone else in the field has no lap yet, so nothing to wait for. The other car last crossed at 900 s.
+            double limit = 100 * RaceDay.FlagLapAllowance;
+            Assert.That(race.Over(900 + limit), Is.False);
+            Assert.That(race.Over(900 + limit + 1), Is.True);
+        }
+
+        [Test]
+        public void NonFinishersEarnNothing()
+        {
+            GameState game = Career();
+            var race = new RaceDay(RaceWeekend.BuildSetup(game), Never);
+            (int leader, int other) = SameClass(race);
+            Drive(race, leader, 10);
+            Drive(race, other, 5);
+            (GameState after, RaceSummary summary) = RaceWeekend.Settle(race);
+            ClassifiedCar slow = summary.Classification.First(c => c.CarId == race.Cars[other].Car.Car.Id);
+            Assert.That(slow.Unclassified, Is.True);
+            Assert.That(slow.Finished(), Is.False);
+            Assert.That(slow.PrizeMoney, Is.EqualTo(0));
+            Assert.That(after.RaceHistory[0].Results.First(r => r.CarId == slow.CarId).Unclassified, Is.True);
+            Assert.That(summary.Classification.First(c => c.CarId == race.Cars[leader].Car.Car.Id).PrizeMoney, Is.EqualTo(PostRace.PrizeTable[0]));
+        }
+
         // --- Settling ---
 
         private static RaceDay RunRace(GameState game)

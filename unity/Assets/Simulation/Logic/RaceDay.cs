@@ -53,6 +53,8 @@ namespace TarmacGauntlet.Simulation
         public double LastLineTime { get; private set; }
         /// <summary>True once the car has crossed the line after the race time ran out.</summary>
         public bool Flagged { get; private set; }
+        /// <summary>The lap on which the car took the flag, seconds, or null before the flag.</summary>
+        public double? FlagLap => Flagged ? lapTimes[lapTimes.Count - 1] : (double?)null;
         public double FuelAdded { get; private set; }
         public int DriverIndex { get; private set; }
         /// <summary>
@@ -269,10 +271,19 @@ namespace TarmacGauntlet.Simulation
     /// <summary>
     /// The driven race as it happens, one <see cref="CarRaceLog"/> per car in grid order, plus the
     /// running order at the end of each of the leader's laps. Classifies the field at the flag:
-    /// most laps first, then whoever completed their last lap soonest.
+    /// finishers first, then everyone else, each by most laps and then whoever completed their
+    /// last lap soonest.
     /// </summary>
     public sealed class RaceDay
     {
+        /// <summary>Share of its class leader's laps a car needs to be a finisher.</summary>
+        public const double FinisherShare = 0.7;
+        /// <summary>
+        /// A finisher's flag lap may take up to this many times the class's fastest lap: room for
+        /// an amateur at the wheel and a stop on the way, but not for a car parked until the end.
+        /// </summary>
+        public const double FlagLapAllowance = 2;
+
         public readonly RaceSetup Setup;
         public readonly IReadOnlyList<CarRaceLog> Cars;
         public FastestLap? FastestLap { get; private set; }
@@ -305,14 +316,51 @@ namespace TarmacGauntlet.Simulation
         /// <summary>True once every car still running has taken the flag.</summary>
         public bool AllFlagged => Cars.All(c => c.Retired || c.Flagged);
 
-        /// <summary>The field in finishing order: most laps, then soonest across the line.</summary>
+        /// <summary>
+        /// True once no car can still change the result after the time ran out at
+        /// <paramref name="raceTime"/>: each has retired, taken the flag, or been out on its lap
+        /// longer than its flag lap may take.
+        /// </summary>
+        public bool Over(double raceTime) => Cars.All(c =>
+        {
+            if (c.Retired || c.Flagged) return true;
+            double? limit = FlagLapLimit(c.Car.Model.CarClass);
+            return limit == null || raceTime - c.LastLineTime > limit;
+        });
+
+        /// <summary>The longest a finisher's flag lap may take in this class, s, or null before anyone in it has set a lap.</summary>
+        public double? FlagLapLimit(CarClass carClass)
+        {
+            double? best = Cars.Where(c => c.Car.Model.CarClass == carClass && c.BestLap != null).Min(c => c.BestLap);
+            return best * FlagLapAllowance;
+        }
+
+        /// <summary>
+        /// A finisher took the flag under its own power, on a flag lap within
+        /// <see cref="FlagLapLimit"/>, having run at least <see cref="FinisherShare"/> of the laps
+        /// of the class's leader at the flag.
+        /// </summary>
+        public bool Finished(CarRaceLog car)
+        {
+            if (car.Retired || !car.Flagged) return false;
+            CarClass cls = car.Car.Model.CarClass;
+            int leader = Cars.Where(c => c.Car.Model.CarClass == cls && c.Flagged && !c.Retired).Max(c => c.Laps);
+            double? limit = FlagLapLimit(cls);
+            return car.Laps >= FinisherShare * leader && limit != null && car.FlagLap <= limit;
+        }
+
+        /// <summary>The field in finishing order: finishers first, then most laps, then soonest across the line.</summary>
         public IReadOnlyList<CarRaceLog> Classify() =>
+            Cars.OrderByDescending(Finished).ThenByDescending(c => c.Laps).ThenBy(c => c.LastLineTime).ThenBy(c => c.Index).ToArray();
+
+        /// <summary>The running order while racing: most laps, then soonest across the line.</summary>
+        private IReadOnlyList<CarRaceLog> RunningOrder() =>
             Cars.OrderByDescending(c => c.Laps).ThenBy(c => c.LastLineTime).ThenBy(c => c.Index).ToArray();
 
         /// <summary>Snapshots everyone's position, as the leader starts a new lap.</summary>
         private void RecordPositions()
         {
-            IReadOnlyList<CarRaceLog> order = Classify();
+            IReadOnlyList<CarRaceLog> order = RunningOrder();
             var row = new int[Cars.Count];
             for (int i = 0; i < order.Count; i++) row[order[i].Index] = i + 1;
             positions.Add(row);

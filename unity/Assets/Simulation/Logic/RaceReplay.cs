@@ -38,6 +38,7 @@ namespace TarmacGauntlet.Simulation
                     CarClass = r.CarClass,
                     Laps = r.LapsCompleted,
                     Retired = r.Retired,
+                    Unclassified = r.Unclassified,
                     PrizeMoney = r.PrizeMoney,
                 };
             }).ToArray();

@@ -21,6 +21,8 @@ namespace TarmacGauntlet.Simulation
         public string TeamId { get; init; } = "";
         public int Position { get; init; }
         public int LapsCompleted { get; init; }
+        /// <summary>False for a car that retired or was unclassified: it earns nothing.</summary>
+        public bool Finished { get; init; } = true;
     }
 
     /// <summary>Port of simulation/postRace.ts.</summary>
@@ -82,6 +84,7 @@ namespace TarmacGauntlet.Simulation
         ///
         /// Rules:
         ///   - Cars that completed 0 laps receive $0 (GDD §7: "prize money eligibility: all cars with ≥1 lap").
+        ///   - Cars that did not finish (retired, or unclassified) receive $0.
         ///   - All other cars receive the prize for their finishing position from the schedule.
         ///   - If a position has no matching schedule entry (e.g., fewer cars than schedule entries),
         ///     the car receives $0.
@@ -99,7 +102,7 @@ namespace TarmacGauntlet.Simulation
 
             foreach (var r in results)
             {
-                if (r.LapsCompleted == 0)
+                if (r.LapsCompleted == 0 || !r.Finished)
                 {
                     prizes[r.TeamId] = 0;
                 }

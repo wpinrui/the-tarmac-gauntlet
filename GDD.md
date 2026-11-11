@@ -172,7 +172,7 @@ Failure probability is influenced by: car condition (strongest factor), car age,
 
 When a failure occurs, it is either a **mechanical failure** (75%) or a **crash** (25%):
 
-**Terminal mechanical failure** (e.g., blown engine) — the car stops permanently. The team still receives prize money based on total laps completed.
+**Terminal mechanical failure** (e.g., blown engine) — the car stops permanently. It is a non-finisher and earns no prize money (see Race Results).
 
 **Crash** — the driver's **Safety stat** determines whether they survive:
 - A base survival chance is boosted by higher Safety — a high-Safety driver survives far more often than a low-Safety one
@@ -191,9 +191,11 @@ Crash issues (e.g., "front wing damage," "rear impact damage," "bent suspension 
 
 ### Race Results
 
-- All 100 cars are ranked by **total laps completed**
-- There is no distinction between finishers and retired cars — a car that fails at lap 30 simply has 30 laps on the board
-- Prize money is distributed based on this ranking (see §7: Prize Money)
+- A **finisher** takes the chequered flag under its own power, having completed at least **70% of its class leader's laps**, on a flag lap no slower than **2× its class's fastest lap** of the race. The flag-lap limit leaves room for an amateur at the wheel and a stop, but stops a car parking in its garage and crawling out for the flag
+- Retired cars, and cars that run to the end but miss either test, are **non-finishers**
+- Finishers are ranked first, then non-finishers, each by **total laps completed**, then by who crossed the line first
+- The race is called once every car has taken the flag, retired, or been out on its lap longer than its flag lap may take
+- Only finishers earn prize money (see §7: Prize Money)
 
 ### Race UI Layout
 
@@ -481,7 +483,7 @@ Prize money is distributed from a **hardcoded static table** — not a formula. 
 - **P1: $750,000** · P2: $700,000 · P3: $675,000 · ... · P10: $500,000
 - Mid-pack drops steadily: P50: $50,000 · P75: $5,000
 - **P100: $500**
-- Cars that complete **0 laps receive nothing**. All others are paid by position.
+- **Non-finishers receive nothing** (see §2: Race Results). Finishers are paid by position.
 - The complete prize money schedule is viewable on the **Finances tab** (its only location — it is not repeated on other screens)
 - Prize money is the **sole source of income**
 
@@ -789,5 +791,5 @@ The following are explicitly **out of scope for v1** but the design accommodates
 | Mode change timing | Takes effect next lap |
 | Mode reset | Resets to Normal on every pit stop |
 | Starting budget | $1,000 |
-| Prize money eligibility | All cars with ≥1 lap completed |
+| Prize money eligibility | Finishers only: ≥70% of class leader's laps, chequered flag taken, flag lap ≤2× class fastest lap |
 | Race consumables | 3 (spare parts, tyre sets, fuel) |

@@ -148,7 +148,7 @@ namespace TarmacGauntlet.Management
                 VisualElement fill = Fill();
                 fill.Add(ClassLabels.Make(r.CarClass, "cls-sm"));
                 row.Add(fill);
-                if (r.Retired)
+                if (!r.Finished())
                 {
                     Label dnf = Cell("DNF", "c-pos", true);
                     dnf.AddToClassList("v-lo");

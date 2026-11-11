@@ -14,6 +14,7 @@ namespace TarmacGauntlet.Simulation
         public int Position { get; init; }
         public int LapsCompleted { get; init; }
         public bool Retired { get; init; }
+        public bool Unclassified { get; init; }
     }
 
     public sealed record PostRaceFinancialInput
@@ -64,6 +65,7 @@ namespace TarmacGauntlet.Simulation
                     TeamId = r.TeamId,
                     Position = r.Position,
                     LapsCompleted = r.LapsCompleted,
+                    Finished = !r.Retired && !r.Unclassified,
                 }),
                 schedule);
 
@@ -83,6 +85,7 @@ namespace TarmacGauntlet.Simulation
                     LapsCompleted = r.LapsCompleted,
                     PrizeMoney = prizeMoney.TryGetValue(r.TeamId, out var p) ? p : 0,
                     Retired = r.Retired,
+                    Unclassified = r.Unclassified,
                 }).ToList(),
                 FastestLap = null, // Populated by the race loop, not here
             };

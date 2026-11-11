@@ -502,7 +502,7 @@ namespace TarmacGauntlet.Management
         {
             int leaderLaps = race.PositionByLap.Count;
             ClassifiedCar me = race.Player;
-            int pace = me.Retired ? race.Classification.FirstOrDefault(c => c.CarClass == me.CarClass && !c.Retired)?.Laps ?? me.Laps : me.Laps;
+            int pace = me.Retired ? race.Classification.FirstOrDefault(c => c.CarClass == me.CarClass && c.Finished())?.Laps ?? me.Laps : me.Laps;
             return pace > 0 && leaderLaps > 0 ? leaderLaps / (float)pace : 1f;
         }
 
