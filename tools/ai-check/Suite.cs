@@ -279,6 +279,9 @@ static partial class Check
             }
             case "H3":
             case "H3b":
+            case "H3c":
+            case "H3d":
+            case "H3e":
             {
                 // The outside car, its front level or ahead, keeps a car's width beside the first car.
                 float least = float.MaxValue;
