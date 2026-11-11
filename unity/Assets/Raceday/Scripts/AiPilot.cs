@@ -50,6 +50,14 @@ namespace TarmacGauntlet.Raceday
 
         /// <summary>Where to drive relative to the racing line, metres, positive left. Set by racecraft.</summary>
         public float Offset;
+        /// <summary>
+        /// A fixed place across the track to hold, metres from the centre, positive left, or NaN. Set by
+        /// racecraft: the car then steers for that path's own heading and bend, not the line's.
+        /// </summary>
+        public float HoldLateral = float.NaN;
+        /// <summary>Path choosing's knobs for a held place: its heading and bend in the steering, and its own speeds.</summary>
+        public static float HoldBend = 1f, HoldHead = 1f;
+        public static bool PlaceSpeeds = true;
         /// <summary>Fastest the car may go right now, m/s: 0 when racecraft brakes for the car ahead.</summary>
         public float SpeedCap = float.PositiveInfinity;
         /// <summary>Share of the target speed to drive at.</summary>
@@ -115,6 +123,8 @@ namespace TarmacGauntlet.Raceday
             Consistency = Mathf.Clamp(consistency, 0f, 100f);
             Safety = Mathf.Clamp(safety, 0f, 100f);
             float limit = LimitFor(Pace);
+            placeLimit = limit;
+            placeMax = maxSpeed;
             Lanes = new RacingLine[LaneShifts.Length];
             LaneProfiles = new SpeedProfile[LaneShifts.Length];
             SpeedProfile only = lanes ? null : new SpeedProfile(line, spec, limit, maxSpeed);
@@ -175,6 +185,40 @@ namespace TarmacGauntlet.Raceday
             return StraightSpeed(Mathf.Lerp(LaneProfiles[a].Speed[k], LaneProfiles[a + 1].Speed[k], blend), k, offset);
         }
 
+        /// <summary>Spacing of the fixed places across the track that have their own speeds, metres.</summary>
+        public const float PlaceStep = 0.5f;
+        private const float PlaceReach = 15f;
+        private SpeedProfile[] places;
+        private readonly float placeLimit;
+        private readonly float[] placeMax;
+
+        /// <summary>
+        /// The speeds for a path at a fixed place across the track, built the first time it is asked for:
+        /// through a corner that path bends with the track, tighter than the line or a lane beside it.
+        /// </summary>
+        private SpeedProfile Place(int i)
+        {
+            places ??= new SpeedProfile[Mathf.RoundToInt(2f * PlaceReach / PlaceStep) + 1];
+            i = Mathf.Clamp(i, 0, places.Length - 1);
+            return places[i] ??= new SpeedProfile(new RacingLine(Line.Circuit, i * PlaceStep - PlaceReach), Spec, placeLimit, placeMax);
+        }
+
+        private void PlaceBlend(float lateral, out SpeedProfile a, out SpeedProfile b, out float t)
+        {
+            float x = (Mathf.Clamp(lateral, -PlaceReach, PlaceReach) + PlaceReach) / PlaceStep;
+            int i = Mathf.FloorToInt(x);
+            t = x - i;
+            a = Place(i);
+            b = Place(i + 1);
+        }
+
+        /// <summary>Target speed at a line sample for a path held at a fixed place across the track, m/s.</summary>
+        public float PlaceSpeed(int k, float lateral)
+        {
+            PlaceBlend(lateral, out SpeedProfile a, out SpeedProfile b, out float t);
+            return StraightSpeed(Mathf.Lerp(a.Speed[k], b.Speed[k], t), k, lateral - Line.Lateral[k]);
+        }
+
         /// <summary>
         /// Where the car's path is at a line sample for an offset from the racing line: on the blend of
         /// the lanes either side, which keep to the track, so it is what the car steers for.
@@ -230,6 +274,16 @@ namespace TarmacGauntlet.Raceday
             int k = frontIndex;
             Vector3 tangent = Vector3.Lerp(Lanes[a].Tangent[k], Lanes[b].Tangent[k], blend).normalized;
             Vector3 left = new Vector3(-tangent.z, 0f, tangent.x);
+            // A fixed place across the track: the offset grows as the line sweeps the other way, so the
+            // path heads off the lane by that slope (H1, T20c: else it trails the lane wide).
+            int n = Mathf.Max(1, Mathf.RoundToInt(3f / c.Step));
+            float holdSlope = 0f;
+            if (!float.IsNaN(HoldLateral))
+            {
+                holdSlope = -(Line.Lateral[c.Wrap(k + n)] - Line.Lateral[c.Wrap(k - n)]) / (2f * n * c.Step);
+                tangent = (tangent + left * HoldHead * holdSlope).normalized;
+                left = new Vector3(-tangent.z, 0f, tangent.x);
+            }
             Vector3 offset = front - Vector3.Lerp(Lanes[a].Point[k], Lanes[b].Point[k], blend);
             LateralError = Vector3.Dot(new Vector3(offset.x, 0f, offset.z), left);
             // Heading of travel, not of the body: at the limit the body is yawed into the corner.
@@ -240,6 +294,9 @@ namespace TarmacGauntlet.Raceday
             float ahead = k + speed * 0.1f / c.Step;
             int ka = c.Wrap(Mathf.RoundToInt(ahead));
             float kappa = Mathf.Lerp(Lanes[a].Curvature[ka], Lanes[b].Curvature[ka], blend);
+            // ...and bends with the line's sweep: an offset bending left is a bend left, negative.
+            if (!float.IsNaN(HoldLateral))
+                kappa += HoldBend * (Line.Lateral[c.Wrap(ka + n)] - 2f * Line.Lateral[ka] + Line.Lateral[c.Wrap(ka - n)]) / (n * c.Step * n * c.Step);
             float wheelbase = 2f * Spec.HalfWheelbase;
             float steer = Mathf.Atan(wheelbase * kappa)
                 + HeadingGain * headingError
@@ -271,10 +328,17 @@ namespace TarmacGauntlet.Raceday
             int la = c.Wrap(Mathf.RoundToInt(lookahead));
             float scale = ScaleAt(la);
             float laneSpeed = StraightSpeed(Mathf.Lerp(LaneProfiles[a].SpeedAt(lookahead), LaneProfiles[b].SpeedAt(lookahead), blend), la, Offset);
+            float laneAccel = Mathf.Lerp(LaneProfiles[a].Accel[la], LaneProfiles[b].Accel[la], blend);
+            if (!float.IsNaN(HoldLateral) && PlaceSpeeds)
+            {
+                // Held at a fixed place across the track: that path's own speeds, not the lane's beside the line.
+                PlaceBlend(HoldLateral, out SpeedProfile pa, out SpeedProfile pb, out float pt);
+                laneSpeed = StraightSpeed(Mathf.Lerp(pa.SpeedAt(lookahead), pb.SpeedAt(lookahead), pt), la, HoldLateral - Line.Lateral[la]);
+                laneAccel = Mathf.Lerp(pa.Accel[la], pb.Accel[la], pt);
+            }
             float worn = Mathf.Sqrt(Mathf.Clamp(Grip, 0.3f, 1f));
             float target = laneSpeed * scale * SpeedScale * worn;
             // Held back by the car ahead: match the cap and drop the profile's own acceleration.
-            float laneAccel = Mathf.Lerp(LaneProfiles[a].Accel[la], LaneProfiles[b].Accel[la], blend);
             if (Towed && laneAccel > 0f && scale >= 1f) target = Mathf.Max(target, speed);
             FreeSpeed = target;
             bool held = SpeedCap < target;

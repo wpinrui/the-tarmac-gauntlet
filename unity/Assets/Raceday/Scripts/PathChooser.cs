@@ -526,6 +526,15 @@ namespace TarmacGauntlet.Raceday
             Target = best.Owe ? owe : best.Delay > 0f ? pilot.Offset : best.Shift;
             fixedOn = best.Fixed;
             fixedLat = best.Lat;
+            // T20c: a path that moves later holds the car's place across the track for now, not its offset
+            // from a line that sweeps under it (Ivan).
+            if (HoldAbs && pilot.Index >= 0 && !best.Owe && !best.Fixed && best.Delay > 0f && (!HoldFree || FreeStretch(pilot)) && Mathf.Abs(pilot.Offset) > HoldOff)
+            {
+                // On the track: never a place held past its edge.
+                float holdEdge = Mathf.Max(c.HalfWidth(pilot.Index) - RacingLine.EdgeMargin, 0f);
+                fixedOn = true;
+                fixedLat = Mathf.Clamp(line.Lateral[pilot.Index] + pilot.Offset, -holdEdge, holdEdge);
+            }
             Cap = CapAt(best.Pedal, ahead, 0, mySpeed, me.Distance, margin);
             if (YellowCap)
                 for (int j = 0; j < others.Count; j++)
@@ -621,6 +630,8 @@ namespace TarmacGauntlet.Raceday
             float holdOffset = me.Lateral - line.Lateral[c.IndexOf(Mathf.Repeat(d, lap))], off = holdOffset;
             float over = 0f, risk = 0f, yellow = 0f, lifted = 0f;
             bool tuckZone = BrakingZone(pilot);   // H8, T6b: only braking for the corner
+            // On the line, holding where it is means keeping to the line (T1).
+            bool holdHere = (!HoldFree || FreeStretch(pilot)) && Mathf.Abs(pilot.Offset) > HoldOff;
             bool escapeZone = !tuckZone && TurnAt(c, me.Distance) == 0;   // H1: out of the corner
             // T20: the tow is for the straight, seconds clear of the next corner's braking.
             bool towZone = escapeZone && Road(NextCornerStart(c, Mathf.Repeat(me.Distance, lap)) - Mathf.Repeat(me.Distance, lap), lap) > TowNear * me.Speed;
@@ -639,7 +650,8 @@ namespace TarmacGauntlet.Raceday
                 // The pilot steers the line plus an offset, and the offset is what moves at the overtake rate.
                 float wantOff = cand.Stay ? me.Lateral - line.Lateral[k] : s * Tick <= cand.Delay ? holdOffset : cand.Fixed ? cand.Lat - line.Lateral[k] : cand.Shift;
                 // H1: a fixed place moves across the track at the overtake rate, whatever the line does under it (Ivan).
-                if (cand.Fixed && FixedAbs) { lat = Mathf.Clamp(Mathf.MoveTowards(lat, cand.Lat, Endurance.OvertakeOffsetRate * Tick), -edge, edge); off = lat - line.Lateral[k]; }
+                if (HoldAbs && holdHere && !cand.Stay && !cand.Owe && !cand.Fixed && s * Tick <= cand.Delay) { lat = Mathf.Clamp(me.Lateral, -edge, edge); off = lat - line.Lateral[k]; }
+                else if (cand.Fixed && FixedAbs) { lat = Mathf.Clamp(Mathf.MoveTowards(lat, cand.Lat, Endurance.OvertakeOffsetRate * Tick), -edge, edge); off = lat - line.Lateral[k]; }
                 else
                 {
                     off = Mathf.MoveTowards(off, wantOff, Endurance.OvertakeOffsetRate * Tick);
@@ -662,7 +674,9 @@ namespace TarmacGauntlet.Raceday
                     if (ins * lat > bound) { lat = ins * bound; off = lat - line.Lateral[k]; }
                 }
                 if (s == 1) cand.SoonOff = off - holdOffset;
-                float lane = pilot.LaneSpeed(k, lat - line.Lateral[k]);
+                // A fixed or held place across the track goes at that path's own speeds (H1, T20c).
+                bool place = PlaceSpeeds && ((cand.Fixed && FixedAbs) || (HoldAbs && holdHere && !cand.Stay && !cand.Owe && s * Tick <= cand.Delay));
+                float lane = place ? pilot.PlaceSpeed(k, lat) : pilot.LaneSpeed(k, lat - line.Lateral[k]);
                 float cap = CapAt(cand.Pedal, ahead, s, me.Speed, d, margin);
                 float limit = Mathf.Min(lane, cap);
                 // Off the throttle for a car ahead, short of what its lane allows.
@@ -1021,6 +1035,14 @@ namespace TarmacGauntlet.Raceday
         private static readonly bool NoWait = Knob("NOWAIT", 1f) > 0f;
         /// <summary>H1: a fixed place is reached across the track at the overtake rate, not the line's offset.</summary>
         public static readonly bool FixedAbs = Knob("FIXEDABS", 1f) > 0f;
+        /// <summary>T20c: a path that moves later holds a fixed place across the track on the free stretch, once off the line.</summary>
+        public static readonly bool HoldAbs = Knob("HOLDABS", 1f) > 0f;
+        private static readonly float HoldOff = Knob("HOLDOFF", 0.5f);
+        private static readonly bool HoldFree = Knob("HOLDFREE", 1f) > 0f;
+        /// <summary>A fixed or held place goes at the speeds of its own path, which bends with the track.</summary>
+        public static readonly bool PlaceSpeeds = Knob("PLACESPEED", 1f) > 0f;
+        private static readonly bool holdKnobs = SetHold();
+        private static bool SetHold() { AiPilot.HoldBend = Knob("HOLDBEND", 1f); AiPilot.HoldHead = Knob("HOLDHEAD", 1f); AiPilot.PlaceSpeeds = PlaceSpeeds; return true; }
         /// <summary>The fixed place across the track the chosen path holds, when it holds one.</summary>
         public bool FixedOn => fixedOn;
         public float FixedLat => fixedLat;
