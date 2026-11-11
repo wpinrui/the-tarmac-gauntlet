@@ -66,7 +66,7 @@ namespace TarmacGauntlet.Raceday
         private float besideSpeed = float.PositiveInfinity;
         /// <summary>The nearest car ahead not quite in this car's lane, which braking slows for when none is.</summary>
         private int aheadWide = -1;
-        private static readonly float WideAhead = Knob("WIDE", 3f), ZoneSwitch = Knob("ZSWITCH", 0f), SideSwitch = Knob("SSWITCH", 0f);
+        private static readonly float WideAhead = Knob("WIDE", 3f), ZoneSwitch = Knob("ZSWITCH", 0f), SideSwitch = Knob("SSWITCH", 0.3f);
         /// <summary>Score per second a pull-out waits: of two near-equal moves, the later one, so the car stays in the tow until it must move.</summary>
         private static readonly float LateBonus = Knob("LATE", 0.1f);
         /// <summary>Side-to-side gap H1 keeps to a car alongside, m.</summary>

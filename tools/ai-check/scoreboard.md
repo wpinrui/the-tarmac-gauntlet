@@ -15,3 +15,6 @@ One row per run, win or lose. Full-suite runs only, plus dev runs marked as such
 | 2026-11-11 | dev, failed | E1.6 + SSWITCH 1 | Switching sides of the car ahead mid-move costs 1 (T9 back to 5 of 5 seeds) | 5.8 | 14.3 | 1.39 | 0.75 | 41.6 |
 | 2026-11-11 | dev, failed | E1.6 + SSWITCH 0.5 | The same, weaker | 5.8 | 12.0 | 1.47 | 1.00 | 43.4 |
 | 2026-11-11 | dev | E1.7 | A car slowed to a crawl may pass through a stopped ghost it can't get round (H12's safety net) | 5.8 | 12.3 | 1.24 | 0 | 53.0 |
+| 2026-11-11 | dev, failed | E1.7 + BOVER | TORCS full braking leaves out a car already overlapping (never triggered: no change) | 5.8 | 12.3 | 1.24 | 0 | 53.0 |
+| 2026-11-11 | dev, failed | E1.7 + SSWITCH 1 | Switching sides of the car ahead mid-move costs 1 | 5.9 | 13.3 | 1.43 | 0 | 50.4 |
+| 2026-11-11 | dev | E1.8 | Switching sides of the car ahead mid-move costs 0.3: less weaving while braking into the hairpin | 5.7 | 14.5 | 1.08 | 0 | 55.0 |
