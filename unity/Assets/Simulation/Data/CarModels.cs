@@ -128,7 +128,7 @@ namespace TarmacGauntlet.Simulation
             new RawCar("a-27", "Archer Hypernova", CarClass.A, 2_625_000, new double[] { 92, 92, 22, 22, 10, 36, 20, 72 }, new RawPot(comfort: 18)),
             new RawCar("a-28", "Kaiser K24 Dynamo", CarClass.A, 2_750_000, new double[] { 92, 96, 34, 30, 8, 40, 14, 68 }, new RawPot(comfort: 16)),
             new RawCar("a-29", "Seorak Cheonma CX-24Si", CarClass.A, 2_875_000, new double[] { 94, 98, 36, 32, 8, 44, 12, 68 }, new RawPot(comfort: 16)),
-            new RawCar("a-30", "Liberty GE67", CarClass.A, 3_000_000, new double[] { 94, 96, 40, 26, 14, 34, 8, 80 }, new RawPot(comfort: 20)),
+            new RawCar("a-30", "Liberty GE67", CarClass.A, 3_000_000, new double[] { 94, 96, 44, 26, 14, 34, 8, 68 }, new RawPot(comfort: 20)),
 
             // --- Class F1 ---
             new RawCar("f1-31", "Feretti F-256V8T", CarClass.F1, 15_000_000, new double[] { 99, 99, 8, 5, 2, 12, 6, 30 }, new RawPot()),

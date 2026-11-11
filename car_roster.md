@@ -60,7 +60,7 @@
 | 27 | Archer Hypernova | 2015 McLaren P1 | $2,625,000 | 92 | 92 | 22 | 22 | 10 | 36 | 20 | 72 |
 | 28 | Kaiser K24 Dynamo | 2016 Audi R18 e-tron quattro | $2,750,000 | 92 | 96 | 34 | 30 | 8 | 40 | 14 | 68 |
 | 29 | Seorak Cheonma CX-24Si | 2020 Toyota TS050 Hybrid | $2,875,000 | 94 | 98 | 36 | 32 | 8 | 44 | 12 | 68 |
-| 30 | Liberty GE67 | 2022 Peugeot 9X8 | $3,000,000 | 94 | 96 | 40 | 26 | 14 | 34 | 8 | 80 |
+| 30 | Liberty GE67 | 2022 Peugeot 9X8 | $3,000,000 | 94 | 96 | 44 | 26 | 14 | 34 | 8 | 68 |
 
 ### Class F1
 
