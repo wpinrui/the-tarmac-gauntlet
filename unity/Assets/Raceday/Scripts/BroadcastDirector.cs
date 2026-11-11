@@ -39,12 +39,28 @@ namespace TarmacGauntlet.Raceday
         private Vector3 anchor, heli;
         private bool placed;
 
+        private int onAir = -10;
+
         private float Now => Time.unscaledTime;
+
+        /// <summary>True while the director has the camera: the broadcast graphics show only then.</summary>
+        public bool OnAir => onAir >= Time.frameCount - 1;
+        /// <summary>The car the story is about, or -1.</summary>
+        public int Subject => subject;
+        /// <summary>The chasing car in a fight, or -1.</summary>
+        public int Other => story == Story.Battle || story == Story.LeadBattle ? other : -1;
+        /// <summary>True while the story is a stop.</summary>
+        public bool Stopping => story == Story.Stop;
+        /// <summary>True during a helicopter shot.</summary>
+        public bool Helicopter => shot == Shot.Helicopter;
+        /// <summary>Counts the cuts to a new story or car, so graphics can tell a new one has started.</summary>
+        public int Stories { get; private set; }
 
         /// <summary>Puts the camera where the current shot wants it, thinking first if it is time to.</summary>
         public void Frame(Camera cam)
         {
             if (Cars == null || Circuit == null) return;
+            onAir = Time.frameCount;
             if (Now >= nextThink)
             {
                 nextThink = Now + 1f;
@@ -160,6 +176,7 @@ namespace TarmacGauntlet.Raceday
             subject = car;
             other = with;
             shotCount = newStory ? 0 : shotCount + 1;
+            if (newStory) Stories++;
             shot = Pick(s, shotCount);
             // A stop is shown until it's over: once the car leaves its box the story moves on.
             if (s == Story.Stop && shotCount > 0) shot = Shot.Trackside;

@@ -53,6 +53,10 @@ the story once a real second: a car stopped off the track, a fight for a class l
 0.5 s, your car, a class leader's stop or yours, a car rejoining, the leader. It cuts between trackside, pan,
 helicopter, onboard and pit lane shots. While you drive, the TV view is your onboard.
 
+The director's shots carry the broadcast graphics (`BroadcastGraphics.cs`): a battle strip with the gap in a
+fight, a driver strip the first time a car is on air in a stint, a pit timer with fuel, tyres and driver
+change lit as each is done, and the track map during helicopter shots. `M` toggles the map.
+
 `T` opens live timing while the AI drives your car (`LiveTiming.cs`), with the race at 16x behind it: every
 car in race order by class, your car's onboard and the track map, its driver, fuel, tyres and condition with
 the laps each lasts on the engine map in use, the engine map, and the next stop. Pit Now calls the car in at the
