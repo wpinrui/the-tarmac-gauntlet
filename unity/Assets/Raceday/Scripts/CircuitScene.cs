@@ -5,7 +5,7 @@ using UnityEngine;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// Builds the circuit, the sky and its sun (<see cref="TimeOfDay"/>), the career's field and the cameras when the scene starts. The
+    /// Builds the circuit, the country round it (<see cref="Landscape"/>), the trackside furniture (<see cref="Trackside"/>), the sky and its sun (<see cref="TimeOfDay"/>), the career's field and the cameras when the scene starts. The
     /// field is every team with a car, from <see cref="RaceWeekend.Setup"/>, gridded by prestige: each
     /// car on a full tank and new tyres, its starting driver at the wheel. Run on its own, the scene
     /// makes a new career in which the player owns the Cheonma. The <see cref="RaceDirector"/> keeps
@@ -70,25 +70,23 @@ namespace TarmacGauntlet.Raceday
             Time.fixedDeltaTime = 0.01f;
             var circuit = new Circuit(CircuitData.Load());
             var track = new GameObject("Circuit");
-            var builder = new CircuitBuilder(circuit, new CircuitMaterials());
+            var materials = new CircuitMaterials();
+            var builder = new CircuitBuilder(circuit, materials);
             List<CircuitPart> parts = builder.Build();
-            parts.AddRange(new Grandstands(circuit, builder, new StandMaterials(StandLook.Colours), StandLook.Main, StandLook.Corners).Build());
-            foreach (CircuitPart part in parts)
-            {
-                var go = new GameObject(part.Name) { isStatic = true };
-                go.transform.SetParent(track.transform, false);
-                Mesh mesh = part.Kit.ToMesh(part.Name);
-                go.AddComponent<MeshFilter>().sharedMesh = mesh;
-                var renderer = go.AddComponent<MeshRenderer>();
-                renderer.sharedMaterial = part.Material;
-                if (!part.CastsShadows) renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                if (part.Solid)
-                {
-                    go.AddComponent<MeshCollider>().sharedMesh = mesh;
-                    go.AddComponent<TrackSurface>().Kind = TrackSurface.ForPart(part.Name);
-                }
-            }
+            var stands = new Grandstands(circuit, builder, new StandMaterials(StandLook.Colours), StandLook.Main, StandLook.Corners);
+            parts.AddRange(stands.Build());
+            foreach (CircuitPart part in parts) AddPart(track.transform, part);
+            Landscape.Build(circuit, builder, materials, LandscapeLooks.Current);
+            Complex = new PitComplex(circuit, builder.GarageFloors);
+            var pitMaterials = new PitMaterials();
+            var buildings = new GameObject("Pit complex");
+            foreach (CircuitPart part in new PitComplexBuilder(Complex, pitMaterials).Build())
+                AddPart(buildings.transform, part);
             TimeOfDay sky = new GameObject("Sky").AddComponent<TimeOfDay>();
+            PitComplexView view = buildings.AddComponent<PitComplexView>();
+            view.Sky = sky;
+            view.Materials = pitMaterials;
+            Trackside trackside = Trackside.Build(circuit, builder, stands.Footprints);
 
             keys = new GameObject("Keyboard").AddComponent<KeyboardState>();
             var line = new RacingLine(circuit);
@@ -171,8 +169,13 @@ namespace TarmacGauntlet.Raceday
             // Run on its own the scene is for AI testing, so it starts on the chase camera.
             if (!career) views.StartInChase();
             RaceTower tower = Tower(circuit, racing, field, teams, watched, starter);
+            if (player >= 0 && TeamColour(setup.Game, grid[player].TeamId) is Color own) tower.Colours[player] = own;
+            view.Fit(Complex, tower.Colours, pits.Garages);
             tv.Classes = tower.Classes;
             sky.RaceSeconds = () => tower.RaceTime;
+            trackside.Cars = racing;
+            trackside.Racing = tower.Racing;
+            if (starter is RaceStart formation) trackside.PaceCarOut = () => !formation.Racing;
             director = new GameObject("Race director").AddComponent<RaceDirector>();
             director.Day = day;
             director.Cars = racing;
@@ -243,6 +246,33 @@ namespace TarmacGauntlet.Raceday
             hidden.Add(paceCar.gameObject);
             lab.Race = hidden.ToArray();
             rolling.Pits = pits;
+        }
+
+        /// <summary>The pit complex's layout: garages, the pit building's stations and where the crews stand.</summary>
+        public PitComplex Complex { get; private set; }
+
+        private static void AddPart(Transform parent, CircuitPart part)
+        {
+            var go = new GameObject(part.Name) { isStatic = true };
+            go.transform.SetParent(parent, false);
+            Mesh mesh = part.Kit.ToMesh(part.Name);
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var renderer = go.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = part.Material;
+            if (!part.CastsShadows) renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            if (part.Solid)
+            {
+                go.AddComponent<MeshCollider>().sharedMesh = mesh;
+                go.AddComponent<TrackSurface>().Kind = TrackSurface.ForPart(part.Name);
+            }
+        }
+
+        /// <summary>The team's own colour, picked at new game, or null for a team without one.</summary>
+        private static Color? TeamColour(GameState game, string teamId)
+        {
+            foreach (BaseTeam t in game.Teams)
+                if (t.Id == teamId && t is PlayerTeam p && ColorUtility.TryParseHtmlString(p.TeamColour, out Color c)) return c;
+            return null;
         }
 
         /// <summary>

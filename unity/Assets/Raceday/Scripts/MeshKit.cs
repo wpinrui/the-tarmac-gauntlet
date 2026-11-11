@@ -180,6 +180,30 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>
+        /// The same triangles with corners that match exactly in position, normal and UV made one vertex, so hard
+        /// edges stay hard while a mesh built a triangle at a time doesn't carry three corners each.
+        /// </summary>
+        public MeshKit Indexed()
+        {
+            var kit = new MeshKit();
+            var index = new Dictionary<(Vector3, Vector3, Vector2), int>();
+            foreach (int t in triangles)
+            {
+                var key = (vertices[t], normals[t], uvs[t]);
+                if (!index.TryGetValue(key, out int j))
+                {
+                    j = kit.vertices.Count;
+                    index[key] = j;
+                    kit.vertices.Add(vertices[t]);
+                    kit.normals.Add(normals[t]);
+                    kit.uvs.Add(uvs[t]);
+                }
+                kit.triangles.Add(j);
+            }
+            return kit;
+        }
+
+        /// <summary>
         /// Splits the triangles into square cells of the given size in plan, by where each triangle's centre
         /// falls, so each piece can be skipped when it is off screen.
         /// </summary>

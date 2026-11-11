@@ -5,7 +5,15 @@ namespace UnityEngine
 {
     public struct Vector2 { public float x, y; public Vector2(float x, float y) { this.x = x; this.y = y; } public static Vector2 zero => new Vector2(0, 0);
         public static Vector2 operator +(Vector2 a, Vector2 b) => new Vector2(a.x + b.x, a.y + b.y);
-        public static Vector2 operator *(Vector2 a, float d) => new Vector2(a.x * d, a.y * d); }
+        public static Vector2 operator *(Vector2 a, float d) => new Vector2(a.x * d, a.y * d);
+        public static Vector2 operator -(Vector2 a, Vector2 b) => new Vector2(a.x - b.x, a.y - b.y);
+        public static Vector2 operator -(Vector2 a) => new Vector2(-a.x, -a.y);
+        public static Vector2 operator /(Vector2 a, float d) => new Vector2(a.x / d, a.y / d);
+        public static float Dot(Vector2 a, Vector2 b) => a.x * b.x + a.y * b.y;
+        public float magnitude => (float)Math.Sqrt(x * x + y * y);
+        public Vector2 normalized { get { float m = magnitude; return m > 1e-5f ? this / m : zero; } }
+        public override bool Equals(object o) => o is Vector2 v && v.x == x && v.y == y;
+        public override int GetHashCode() => HashCode.Combine(x, y); }
     public struct Vector3
     {
         public float x, y, z;
@@ -28,6 +36,8 @@ namespace UnityEngine
         public static Vector3 forward => new Vector3(0, 0, 1); public static Vector3 back => new Vector3(0, 0, -1);
         public static Vector3 left => new Vector3(-1, 0, 0); public static Vector3 right => new Vector3(1, 0, 0);
         public static Vector3 zero => new Vector3(0, 0, 0);
+        public override bool Equals(object o) => o is Vector3 v && v.x == x && v.y == y && v.z == z;
+        public override int GetHashCode() => HashCode.Combine(x, y, z);
     }
     public static class Mathf
     {

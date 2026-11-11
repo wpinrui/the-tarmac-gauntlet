@@ -50,8 +50,20 @@ namespace TarmacGauntlet.Raceday
         private readonly float[] laneToTrack;              // per lane sample: gap from the lane surface's track side to the nearest road edge
         private readonly int[] laneNearest;                // per lane sample: the nearest track sample
 
+        /// <summary>Each garage's floor height, as laid. Filled by <see cref="Build"/>.</summary>
+        public float[] GarageFloors { get; private set; }
+
         /// <summary>How far out from the road edge the runoff reaches on a side (0 = left), or 0 where the side is open.</summary>
         public float RunoffReach(int side, int k) => open[side][k] ? 0f : barrier[side][k];
+
+        /// <summary>True where armco or a pit wall stands on a side (0 = left) at <see cref="RunoffReach"/>.</summary>
+        public bool Fenced(int side, int k) => !open[side][k] && (fenced[side][k] || pitWall[side][k]);
+
+        /// <summary>True where the barrier on a side (0 = left) is the pit wall.</summary>
+        public bool PitWallAt(int side, int k) => !open[side][k] && pitWall[side][k];
+
+        /// <summary>A point on the verge or runoff as laid, at a lateral offset past the road edge.</summary>
+        public Vector3 RunoffPoint(int k, float lateral) => Point(k, lateral, 0f, true);
 
         /// <param name="materials">May be null outside Unity (tests and previews).</param>
         public CircuitBuilder(Circuit circuit, CircuitMaterials materials)
@@ -139,6 +151,7 @@ namespace TarmacGauntlet.Raceday
             PitLane();
             PitEntryAndExit();
             Garages();
+            Paddock();
             LinesAcross();
             Grid();
         }
@@ -824,6 +837,7 @@ namespace TarmacGauntlet.Raceday
         private void Garages()
         {
             PitData pit = c.Data.pit;
+            GarageFloors = new float[pit.garages.Length];
             var walls = new MeshKit();
             var roof = new MeshKit();
             var paint = new MeshKit();
@@ -852,6 +866,7 @@ namespace TarmacGauntlet.Raceday
                 var floor = new Vector3(gd.x, gd.y, gd.z);
                 int li = NearestLanePoint(floor);
                 floor.y = LanePoint(li, laneHalf, 0).y;
+                GarageFloors[g] = floor.y;
                 Vector3 side = -along; // local x, so that x, up and toLane form a left-handed frame
                 Vector3 L(float x, float y, float z) => floor + side * x + Vector3.up * y + toLane * z;
 
@@ -891,6 +906,71 @@ namespace TarmacGauntlet.Raceday
             Emit("Garage roofs", roof, m?.Concrete);
             Emit("Pit box lines", paint, m?.White);
         }
+
+        /// <summary>Paddock surface falls away from the garages' back wall at this grade, past the first few metres.</summary>
+        private const float PaddockFall = 0.01f;
+
+        /// <summary>
+        /// The paddock: asphalt behind the garages' back wall, <see cref="PitComplex.PaddockDepth"/> deep along the
+        /// whole row, level with the garage floors by the wall and falling gently away, with a parking bay painted
+        /// behind each garage.
+        /// </summary>
+        private void Paddock()
+        {
+            var pc = new PitComplex(c, GarageFloors);
+            float back = -pc.Depth * 0.5f;
+            const int across = 11;
+            const int perBay = 4;
+            int last = (pc.Stations - 1) * perBay;
+            var rows = new List<Vector3[]>();
+            // Past its far edge the paddock eases down onto the ground over this far, m.
+            const float ease = 4f;
+            // Its two ends step down in a metre, beside the garages' end walls.
+            const float endEase = 1f;
+            for (int h = -1; h <= last + 1; h++)
+            {
+                float st = Mathf.Clamp(h, 0, last) / (float)perBay;
+                float beyondEnd = h < 0 || h > last ? endEase : 0f;
+                Vector3 endward = h < 0 ? -pc.RowAlong(0f) : pc.RowAlong(pc.Stations - 1);
+                var row = new Vector3[across + 2];
+                for (int a = -2; a < across; a++)
+                {
+                    // Left to right driving along the row: from the far edge in to the back wall.
+                    float z = back - PitComplex.PaddockDepth * (1f - Mathf.Max(a, 0) / (float)(across - 1));
+                    float beyondEdge = a < 0 ? -a * ease * 0.5f : 0f;
+                    Vector3 p = pc.RowPoint(st, PaddockHeight(back - z), z) - pc.RowOut(st) * beyondEdge + endward * beyondEnd;
+                    float t = Mathf.Max(beyondEnd / endEase, beyondEdge / ease);
+                    if (t > 0f) p.y = Mathf.Lerp(p.y, c.TerrainHeight(p.x, p.z) + 0.03f, t);
+                    row[a + 2] = p;
+                }
+                rows.Add(row);
+            }
+            var surface = new MeshKit();
+            surface.Strip(rows, 4f, 4f);
+            Emit("Paddock", surface, m?.PitAsphalt, true);
+
+            // A bay behind each garage: a line at each station from the wall out, and one along their ends.
+            var paint = new MeshKit();
+            const float bayFrom = 2f, bayTo = 14f;
+            for (int j = 0; j < pc.Stations; j++)
+            {
+                Vector3 a = pc.RowPoint(j, PaddockHeight(bayFrom) + Paint, back - bayFrom);
+                Vector3 b = pc.RowPoint(j, PaddockHeight(bayTo) + Paint, back - bayTo);
+                Line(paint, a, b, pc.RowAlong(j), EdgeLine * 0.5f);
+            }
+            for (int j = 0; j < pc.Stations - 1; j++)
+                for (int h = 0; h < 2; h++)
+                {
+                    float s0 = j + h * 0.5f, s1 = s0 + 0.5f;
+                    Vector3 a = pc.RowPoint(s0, PaddockHeight(bayTo) + Paint, back - bayTo);
+                    Vector3 b = pc.RowPoint(s1, PaddockHeight(bayTo) + Paint, back - bayTo);
+                    Line(paint, a, b, pc.RowOut(s0 + 0.25f), EdgeLine * 0.5f);
+                }
+            Emit("Paddock lines", paint, m?.White);
+        }
+
+        /// <summary>The paddock's height over the garage floor, this far out from the back wall.</summary>
+        private static float PaddockHeight(float fromWall) => -0.05f - PaddockFall * Mathf.Max(0f, fromWall - 4f);
 
         /// <summary>A six-sided slab, x across from -width/2 to width/2 and z from back to front, with corners from <paramref name="corner"/>.</summary>
         private static void Slab(MeshKit kit, Func<float, float, bool, Vector3> corner, float width, float back, float front, Vector3 inside)
