@@ -7,6 +7,7 @@ number. Holds no colours or designs.
 """
 import base64
 import json
+import re
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -51,6 +52,24 @@ class Livery:
             f'<text x="{u:.4f}" y="{v:.4f}" font-family="Titillium" font-size="{height / 0.72:.4f}" '
             f'letter-spacing="{spacing * height:.4f}" fill="{fill}" text-anchor="middle" dominant-baseline="central" '
             f'transform="rotate({rotate} {u:.4f} {v:.4f})">{s}</text>')
+
+    def mark(self, view, svg_path, p, height, ink=None, rotate=0):
+        """An existing brand mark (SVG file), height metres tall, centred on p. ink recolours
+        every fill, for a mark that would vanish on the paint."""
+        src = Path(svg_path).read_text()
+        vb = [float(x) for x in re.search(r'viewBox="([^"]+)"', src).group(1).split()]
+        inner = re.search(r"<svg[^>]*>(.*)</svg>", src, re.S).group(1)
+        if ink:
+            inner = re.sub(r'fill="(?!none)[^"]*"', f'fill="{ink}"', inner)
+        w = height * vb[2] / vb[3]
+        u, v = self.uv(view, p)
+        self.art[view].append(
+            f'<g transform="translate({u:.4f} {v:.4f}) rotate({rotate})"><svg x="{-w / 2:.4f}" y="{-height / 2:.4f}" '
+            f'width="{w:.4f}" height="{height:.4f}" viewBox="{" ".join(map(str, vb))}">{inner}</svg></g>')
+
+    def side_mark(self, svg_path, z, y, height, ink=None):
+        for view in ("left", "right"):
+            self.mark(view, svg_path, self._side(view, z, y), height, ink)
 
     def number(self, view, centre, w, h, ink, rotate=0):
         """Where the game draws the race number: a box w by h metres, upright in the drawing
