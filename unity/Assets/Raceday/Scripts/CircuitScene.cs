@@ -88,8 +88,8 @@ namespace TarmacGauntlet.Raceday
             view.Sky = sky;
             view.Materials = pitMaterials;
             Trackside trackside = Trackside.Build(circuit, builder, stands.Footprints);
-            var floodMaterials = new FloodMaterials(NightLook.Flood);
-            var floods = new Floodlights(circuit, Complex, stands.RoofLamps, builder.PitWallRuns, parts);
+            var floodMaterials = new FloodMaterials();
+            var floods = new Floodlights(circuit, Complex, stands.RoofLamps, builder.PitWallRuns, parts, GantrySpan.Of(circuit, trackside.Placed));
             var lit = new GameObject("Floodlights");
             foreach (CircuitPart part in floods.Build(floodMaterials.Steel, floodMaterials.Lens, floodMaterials.Pool))
                 AddPart(lit.transform, part);

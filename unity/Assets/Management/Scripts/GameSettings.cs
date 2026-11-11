@@ -84,6 +84,23 @@ namespace TarmacGauntlet.Management
             }
         }
 
+        /// <summary>
+        /// Most real lights at night in the race: the rest of the night lighting is drawn glowing. The race reads it from
+        /// the same key (NightLights in Raceday).
+        /// </summary>
+        public const string RealLightsKey = "settings.reallights";
+        public const int MostRealLights = 24;
+
+        public static int RealLights
+        {
+            get => Mathf.Clamp(PlayerPrefs.GetInt(RealLightsKey, 6), 0, MostRealLights);
+            set
+            {
+                PlayerPrefs.SetInt(RealLightsKey, Mathf.Clamp(value, 0, MostRealLights));
+                PlayerPrefs.Save();
+            }
+        }
+
         /// <summary>0 to 1.</summary>
         public static float Volume
         {

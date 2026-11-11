@@ -14,9 +14,9 @@ namespace TarmacGauntlet.Raceday
         private static readonly int EmissionId = Shader.PropertyToID("_EmissionColor"), ColorId = Shader.PropertyToID("_Color"),
             LiftId = Shader.PropertyToID("_Lift");
 
-        public FloodMaterials(FloodColour colour)
+        public FloodMaterials()
         {
-            tint = NightLook.FloodTint(colour);
+            tint = NightLook.Flood;
             Steel = Standard("Floodlight steel", new Color(0.55f, 0.57f, 0.58f), 0.4f, 0.5f);
             Lens = Standard("Floodlight lenses", new Color(0.55f, 0.57f, 0.56f), 0.9f, 0f);
             Lens.EnableKeyword("_EMISSION");

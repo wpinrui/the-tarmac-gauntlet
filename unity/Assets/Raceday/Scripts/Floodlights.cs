@@ -5,6 +5,28 @@ namespace TarmacGauntlet.Raceday
 {
     public enum FloodKind { Stand, PitRoof, PitWall, StartLine }
 
+    /// <summary>The start gantry's span: its two feet and the height of the underside of its beam.</summary>
+    public readonly struct GantrySpan
+    {
+        public readonly Vector3 Left, Right;
+        public readonly float Bottom;
+        /// <summary>Half the depth of the beam along the track, from its middle to a face.</summary>
+        public readonly float HalfDepth;
+
+        public GantrySpan(Vector3 left, Vector3 right, float bottom, float halfDepth)
+        {
+            Left = left;
+            Right = right;
+            Bottom = bottom;
+            HalfDepth = halfDepth;
+        }
+
+        /// <summary>The gantry where the trackside furniture placed it.</summary>
+        public static GantrySpan Of(Circuit circuit, TrackFurniture placed) =>
+            new GantrySpan(placed.GantryLeft, placed.GantryRight, circuit.Centre[placed.GantrySample].y + TrackFurniture.GantryClearance,
+                FurnitureBuilder.LegHalf + 0.07f);
+    }
+
     /// <summary>One floodlight: where its lens is, where it aims, and the pool of light it throws on the ground.</summary>
     public readonly struct Floodlight
     {
@@ -41,8 +63,8 @@ namespace TarmacGauntlet.Raceday
     /// <summary>
     /// The floodlights round the pits, the stands and the start line, laid out from the circuit with no Unity objects
     /// so they can be checked outside Unity. Lamps hang under each covered stand's roof edge (<see cref="Grandstands.RoofLamps"/>),
-    /// off the pit building's roof edge over the pit lane, and on masts along the pit wall, with a taller four lamp
-    /// mast at the start line. Each lamp has a glowing lens and throws a pool of light on the ground below its aim:
+    /// off the pit building's roof edge over the pit lane, on masts along the pit wall, and under the start gantry's
+    /// beam, three aimed down the grid and one over the line. Uplights at the gantry's feet light the gantry itself. Each lamp has a glowing lens and throws a pool of light on the ground below its aim:
     /// a mesh drawn over the ground that brightens what is already there, so the whole lit area costs a few draw
     /// calls and no lights. <see cref="NightLights"/> adds real lights, for the cars only, near the camera.
     /// </summary>
@@ -50,8 +72,6 @@ namespace TarmacGauntlet.Raceday
     {
         /// <summary>Height of a pit wall mast's lamps above the wall, m.</summary>
         public const float MastHeight = 15f;
-        /// <summary>Height of the start line mast's lamps above the wall, m.</summary>
-        public const float StartMastHeight = 20f;
         /// <summary>Distance between masts along the pit wall, m.</summary>
         public const float MastSpacing = 48f;
         /// <summary>Pit building lamps are hung at every this many stations along the garage row.</summary>
@@ -75,12 +95,18 @@ namespace TarmacGauntlet.Raceday
         private const float OfficeTop = 18.6f, OfficeFront = 9.5f;
         /// <summary>Where across the pit lane the pit building's lamps aim, from the garages' middle line, m.</summary>
         private const float LaneAim = 15f;
-        /// <summary>No pit wall mast stands this near the start line mast, m.</summary>
-        private const float StartClear = 30f;
-        /// <summary>Lap distances the start line mast's four lamps aim at, down the grid and over the line.</summary>
+        /// <summary>No pit wall mast stands this near either of the start gantry's feet, m.</summary>
+        private const float StartClear = 32f;
+        /// <summary>Lap distances the gantry's four lamps aim at, down the grid and over the line.</summary>
         private static readonly float[] StartAims = { -75f, -45f, -18f, 10f };
+        /// <summary>Where along the gantry's span each of those lamps hangs, clear of the start light box in the middle.</summary>
+        private static readonly float[] StartHooks = { 0.15f, 0.3f, 0.7f, 0.85f };
+        /// <summary>The gantry's lamps hang this far under its beam, m.</summary>
+        private const float GantryDrop = 0.45f;
 
         public readonly List<Floodlight> Lights = new List<Floodlight>();
+        /// <summary>Lights at the gantry's feet aimed up at its beam: where they stand and where they aim.</summary>
+        public readonly List<(Vector3 position, Vector3 aim)> Uplights = new List<(Vector3, Vector3)>();
 
         private readonly Circuit c;
         private readonly PitComplex pc;
@@ -89,15 +115,16 @@ namespace TarmacGauntlet.Raceday
         /// <param name="standLamps">Under the stands' roofs, from <see cref="Grandstands.RoofLamps"/>.</param>
         /// <param name="pitWall">The pit wall's runs, from <see cref="CircuitBuilder.PitWallRuns"/>.</param>
         /// <param name="built">The circuit's parts as built: the pools lie on those in <see cref="GroundParts"/>.</param>
+        /// <param name="gantry">The start gantry, from <see cref="TrackFurniture"/>.</param>
         public Floodlights(Circuit circuit, PitComplex complex, IReadOnlyList<LampMount> standLamps, IReadOnlyList<Vector3[]> pitWall,
-            IEnumerable<CircuitPart> built)
+            IEnumerable<CircuitPart> built, GantrySpan gantry)
         {
             c = circuit;
             pc = complex;
             foreach (LampMount m in standLamps) Stand(m);
             PitRoof();
-            Vector3? start = StartMast(pitWall);
-            foreach (Vector3[] run in pitWall) Masts(run, start);
+            Gantry(gantry);
+            foreach (Vector3[] run in pitWall) Masts(run, gantry);
             var under = new GroundGrid();
             foreach (Floodlight f in Lights) under.Cover(f.Target, Mathf.Sqrt(f.Long * f.Long + f.Wide * f.Wide) + 1f);
             foreach (CircuitPart part in built)
@@ -144,29 +171,37 @@ namespace TarmacGauntlet.Raceday
             }
         }
 
-        /// <summary>The start line's mast: four lamps on a bar, on the pit wall where it passes the line, or nothing if it doesn't.</summary>
-        private Vector3? StartMast(IReadOnlyList<Vector3[]> pitWall)
+        /// <summary>
+        /// Four lamps hung under the gantry's beam over the road, three on its grid side aimed down the grid and one on
+        /// the far side aimed over the line, and an uplight at each foot aimed at the beam's middle.
+        /// </summary>
+        private void Gantry(GantrySpan g)
         {
-            Vector3 line = c.Centre[0];
-            Vector3? best = null;
-            float nearest = 40f * 40f;
-            foreach (Vector3[] run in pitWall)
-                foreach (Vector3 p in run)
-                {
-                    float d = Flat2(p - line);
-                    if (d < nearest) { nearest = d; best = p; }
-                }
-            if (best is Vector3 foot)
+            Vector3 span = Flat(g.Right - g.Left), along = Vector3.Cross(span, Vector3.up);
+            Vector3 forward = c.Forward[c.IndexOf(0f)];
+            if (Vector3.Dot(along, forward) < 0f) along = -along;
+            Vector3 l = new Vector3(g.Left.x, g.Bottom, g.Left.z), r = new Vector3(g.Right.x, g.Bottom, g.Right.z);
+            for (int i = 0; i < StartAims.Length; i++)
             {
-                var targets = new Vector3[StartAims.Length];
-                for (int i = 0; i < targets.Length; i++) targets[i] = OnGround(c.Centre[c.IndexOf(Mathf.Repeat(StartAims[i], c.Lap))]);
-                Mast(FloodKind.StartLine, foot, StartMastHeight, targets, 16f, 20f, 1.2f, 0.8f);
+                bool ahead = StartAims[i] > 0f;
+                Vector3 hook = Vector3.Lerp(l, r, StartHooks[i]) + along * ((ahead ? 1f : -1f) * g.HalfDepth);
+                Vector3 target = OnGround(c.Centre[c.IndexOf(Mathf.Repeat(StartAims[i], c.Lap))]);
+                Vector3 lens = hook + Vector3.down * GantryDrop + along * (ahead ? 0.3f : -0.3f);
+                var f = new Floodlight(FloodKind.StartLine, lens, target, Flat(target - lens), 18f, 16f);
+                Lights.Add(f);
+                Beam(steel, hook, lens - f.Aim * 0.2f, 0.1f);
+                Head(f, 1.0f, 0.65f);
             }
-            return best;
+            Vector3 middle = (l + r) * 0.5f;
+            foreach (Vector3 foot in new[] { g.Left, g.Right })
+            {
+                Vector3 p = foot + Flat(middle - foot) * 1.5f + along * (g.HalfDepth + 1.2f) + Vector3.up * 0.3f;
+                Uplights.Add((p, (middle - p).normalized));
+            }
         }
 
         /// <summary>Masts along one pit wall run, each with two lamps aimed at the track either side of it.</summary>
-        private void Masts(Vector3[] run, Vector3? start)
+        private void Masts(Vector3[] run, GantrySpan gantry)
         {
             float along = 0f, next = MastSpacing * 0.5f;
             for (int i = 1; i < run.Length; i++)
@@ -175,7 +210,7 @@ namespace TarmacGauntlet.Raceday
                 if (along < next) continue;
                 next += MastSpacing;
                 Vector3 foot = run[i];
-                if (start is Vector3 s && Flat2(foot - s) < StartClear * StartClear) continue;
+                if (Flat2(foot - gantry.Left) < StartClear * StartClear || Flat2(foot - gantry.Right) < StartClear * StartClear) continue;
                 int k = NearestTrack(foot, -1);
                 float d = c.DistanceAt(k, foot);
                 var targets = new[]
@@ -183,7 +218,7 @@ namespace TarmacGauntlet.Raceday
                     OnGround(c.Centre[c.IndexOf(Mathf.Repeat(d - 14f, c.Lap))]),
                     OnGround(c.Centre[c.IndexOf(Mathf.Repeat(d + 14f, c.Lap))]),
                 };
-                Mast(FloodKind.PitWall, foot, MastHeight, targets, 15f, 22f, 1.1f, 0.75f);
+                Mast(foot, targets);
             }
         }
 
@@ -191,8 +226,9 @@ namespace TarmacGauntlet.Raceday
         /// A mast standing on the pit wall with its lamps on a bar across the top, the bar running along the track. The
         /// lamps are spread along the bar in the order their targets are given.
         /// </summary>
-        private void Mast(FloodKind kind, Vector3 foot, float height, Vector3[] targets, float longRadius, float wideRadius, float w, float h)
+        private void Mast(Vector3 foot, Vector3[] targets)
         {
+            const float height = MastHeight, w = 1.1f, h = 0.75f;
             int k = NearestTrack(foot, -1);
             Vector3 toTrack = Flat(c.Centre[k] - foot), bar = Flat(c.Forward[k]);
             Vector3 top = foot + Vector3.up * height;
@@ -202,7 +238,7 @@ namespace TarmacGauntlet.Raceday
             for (int i = 0; i < targets.Length; i++)
             {
                 Vector3 lens = top + bar * (i * (w + 0.4f) - span * 0.5f) + toTrack * 0.45f;
-                var f = new Floodlight(kind, lens, targets[i], toTrack, longRadius, wideRadius);
+                var f = new Floodlight(FloodKind.PitWall, lens, targets[i], toTrack, 15f, 22f);
                 Lights.Add(f);
                 Beam(steel, lens - f.Aim * 0.3f + Vector3.up * 0.1f, lens - toTrack * 0.45f + Vector3.up * 0.65f, 0.1f);
                 Head(f, w, h);

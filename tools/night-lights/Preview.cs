@@ -98,8 +98,8 @@ static class Preview
             path,
             skies = new[] { Sky(22.75f), Sky(1.5f) },
             haze = SkyClock.Look.Haze,
-            flood = Enum.GetValues(typeof(FloodColour)).Cast<FloodColour>().ToDictionary(f => f.ToString(), f => Rgb(NightLook.FloodTint(f))),
-            headlamps = Enum.GetValues(typeof(HeadlampColour)).Cast<HeadlampColour>().ToDictionary(h => h.ToString(), h => Rgb(NightLook.HeadlampTint(h))),
+            flood = Rgb(NightLook.Flood),
+            headlamps = Rgb(NightLook.Headlamps),
             red = Rgb(NightLook.Red),
             look = new
             {

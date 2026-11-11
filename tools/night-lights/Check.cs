@@ -8,6 +8,8 @@
 //   on the ground     every pool corner lies on the built ground under it: never under it, so it shows, and no more than
 //                     0.35 m above it, so it doesn't float
 //   clear of the cars no mast, bracket or lamp is lower than 5 m over the road or the pit lane
+//   clear of the gantry no mast stands within 30 m of the start gantry's feet, and no lamp or bracket under the beam
+//                     lies inside the start light box
 //   no dark gaps      the start straight's centre line from the start of the main stand to its end, and the pit lane in
 //                     front of every garage, are lit at least a third as bright as a pool's middle
 //
@@ -35,7 +37,9 @@ static class Check
         List<CircuitPart> standParts = stands.Build();
         var pc = new PitComplex(circuit, builder.GarageFloors);
         List<CircuitPart> pitParts = new PitComplexBuilder(pc, null).Build();
-        var floods = new Floodlights(circuit, pc, stands.RoofLamps, builder.PitWallRuns, track);
+        var placed = new TrackFurniture(circuit, builder, stands.Footprints);
+        List<CircuitPart> furniture = new FurnitureBuilder(circuit, placed, null).Parts;
+        var floods = new Floodlights(circuit, pc, stands.RoofLamps, builder.PitWallRuns, track, GantrySpan.Of(circuit, placed));
         List<CircuitPart> lit = floods.Build(null, null, null);
 
         Console.WriteLine($"      {floods.Lights.Count} lamps: " + string.Join(", ", floods.Lights.GroupBy(f => f.Kind).Select(g => $"{g.Count()} {g.Key}")));
@@ -44,8 +48,9 @@ static class Check
         AimedDown(floods);
         OnGround(lit, ground);
         ClearOfCars(circuit, lit, ground);
+        ClearOfGantry(placed, lit);
         NoGaps(circuit, pc, floods, stands);
-        if (args.Length > 1) Preview.Write(args[1], circuit, pc, floods, track, standParts, pitParts, lit);
+        if (args.Length > 1) Preview.Write(args[1], circuit, pc, floods, track, standParts, pitParts.Concat(furniture).ToList(), lit);
         return failed ? 1 : 0;
     }
 
@@ -124,6 +129,26 @@ static class Check
                     bad.Add($"{p.Name} {v.y - floor:0.0} m over the {(overRoad ? "road" : "pit lane")} at {v.x:0},{v.z:0}");
             }
         Report("clear of the cars", bad, $"{n} corners");
+    }
+
+    static void ClearOfGantry(TrackFurniture placed, List<CircuitPart> lit)
+    {
+        var bad = new List<string>();
+        // Masts are the only steel reaching down to the pit wall: anything below 3 m over a foot's level is one.
+        foreach (CircuitPart p in lit.Where(p => p.Name == "Floodlight steel"))
+            foreach (Vector3 v in p.Kit.Vertices)
+                foreach (Vector3 foot in new[] { placed.GantryLeft, placed.GantryRight })
+                    if (Flat(v - foot).magnitude < 30f && v.y < foot.y + 3f) { bad.Add($"mast {Flat(v - foot).magnitude:0.0} m from a gantry foot"); break; }
+        // The start light box: 3.4 m wide over the middle of the road, from the beam down 1.45 m, on the grid side.
+        Vector3 mid = (placed.GantryLeft + placed.GantryRight) * 0.5f;
+        Vector3 span = Flat(placed.GantryRight - placed.GantryLeft).normalized;
+        foreach (CircuitPart p in lit.Where(p => p.Name != "Floodlight pools"))
+            foreach (Vector3 v in p.Kit.Vertices)
+            {
+                Vector3 d = Flat(v - mid);
+                if (Math.Abs(Vector3.Dot(d, span)) < 1.9f && d.magnitude < 3f && v.y > mid.y + 3f) bad.Add($"{p.Name} in the start light box");
+            }
+        Report("clear of the gantry", bad.Distinct().ToList(), "no mast near its feet, nothing in the start light box");
     }
 
     static void NoGaps(Circuit c, PitComplex pc, Floodlights floods, Grandstands stands)

@@ -21,6 +21,8 @@ namespace TarmacGauntlet.Raceday
         /// <summary>How quickly the measured deceleration follows the speed, per second.</summary>
         private const float DecelRate = 4f;
 
+        /// <summary>False for a car built without headlamps, such as an F1 car: it shows no beam.</summary>
+        public bool HasHeadlamps { get; private set; } = true;
         /// <summary>Middle of the headlamps, in the car's space.</summary>
         public Vector3 Nose { get; private set; } = new Vector3(0f, 0.7f, 2.3f);
 
@@ -54,7 +56,7 @@ namespace TarmacGauntlet.Raceday
             lamps.car = car;
             if (model != null) lamps.FitModel(model);
             else lamps.FitBox();
-            lamps.Beam();
+            if (lamps.HasHeadlamps) lamps.Beam();
             return lamps;
         }
 
@@ -90,6 +92,7 @@ namespace TarmacGauntlet.Raceday
                 if (changed) r.sharedMaterials = mats;
             }
             if (anyHead) Nose = transform.InverseTransformPoint(heads.center);
+            HasHeadlamps = anyHead;
         }
 
         private void FitBox()
@@ -186,7 +189,7 @@ namespace TarmacGauntlet.Raceday
 
         private LampMaterials()
         {
-            headTint = NightLook.HeadlampTint(NightLook.Headlamps);
+            headTint = NightLook.Headlamps;
             BoxHead = Glowing(Standard("Headlamp", new Color(0.78f, 0.8f, 0.82f), 0.92f));
             BoxTail = Glowing(Standard("Tail lamp", new Color(0.32f, 0.03f, 0.03f), 0.85f));
             BoxBrake = Glowing(Standard("Brake lamp", new Color(0.55f, 0.04f, 0.03f), 0.85f));

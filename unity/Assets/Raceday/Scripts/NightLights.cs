@@ -6,9 +6,10 @@ namespace TarmacGauntlet.Raceday
     /// <summary>
     /// Switches the night lighting on as the sky darkens: the floodlights' lenses and pools, the stands' glow and every
     /// car's lamps, all from the night amount of <see cref="SkyClock"/>. The ground is lit by the pools alone. Real
-    /// lights are kept for the cars near the camera, and light nothing but cars: a few spot lights hang at the
-    /// floodlights nearest the camera's view, and two more are the headlamps of the cars nearest the camera. A light
-    /// moving to another floodlight or car fades out first and back in there, so nothing pops.
+    /// lights are kept for the cars near the camera, and light nothing but cars: as many as the settings allow, a third
+    /// of them the headlamps of the cars nearest the camera and the rest at the floodlights nearest the camera's view. A light
+    /// moving to another floodlight or car fades out first and back in there, so nothing pops. Two uplights light the
+    /// start gantry while the camera is near it.
     /// </summary>
     public sealed class NightLights : MonoBehaviour
     {
@@ -17,8 +18,15 @@ namespace TarmacGauntlet.Raceday
         public FloodMaterials Materials;
         public StandMaterials Stands;
 
-        /// <summary>Real lights at floodlights, and at cars' headlamps.</summary>
-        public const int FloodSlots = 4, HeadSlots = 2;
+        /// <summary>
+        /// Where the settings menu keeps how many real lights to use (GameSettings.RealLights in Management, which this
+        /// assembly can't see), how many it allows, and how many there are before anyone sets it.
+        /// </summary>
+        public const string RealLightsKey = "settings.reallights";
+        public const int MostRealLights = 24, DefaultRealLights = 6;
+
+        /// <summary>The real lights from the settings: a third of them headlamps, the rest at floodlights.</summary>
+        public static int RealLights => Mathf.Clamp(PlayerPrefs.GetInt(RealLightsKey, DefaultRealLights), 0, MostRealLights);
         /// <summary>Real seconds between looks at the sky and at where the camera is.</summary>
         private const float Check = 0.25f;
         /// <summary>A real light fades in or out over this long, real seconds.</summary>
@@ -37,17 +45,34 @@ namespace TarmacGauntlet.Raceday
             public float Level;
         }
 
+        /// <summary>The gantry's uplights are on only while the camera is this near the start line, m.</summary>
+        private const float UplightReach = 350f;
+        private const float UplightIntensity = 1.5f, UplightRange = 26f, UplightCone = 50f;
+
         private Slot[] floods, heads;
+        private Light[] uplights;
         private float nextCheck, night = -1f;
         private readonly List<int> picks = new List<int>();
         private readonly List<float> scores = new List<float>();
 
         private void Start()
         {
-            floods = new Slot[FloodSlots];
-            heads = new Slot[HeadSlots];
+            int real = RealLights;
+            heads = new Slot[Mathf.RoundToInt(real / 3f)];
+            floods = new Slot[real - heads.Length];
             for (int i = 0; i < floods.Length; i++) floods[i] = new Slot { Light = Spot("Floodlight " + (i + 1), Materials.Tint) };
             for (int i = 0; i < heads.Length; i++) heads[i] = new Slot { Light = Spot("Headlamps " + (i + 1), LampMaterials.Shared.HeadTint) };
+            uplights = new Light[Layout.Uplights.Count];
+            for (int i = 0; i < uplights.Length; i++)
+            {
+                Light l = Spot("Gantry uplight " + (i + 1), Materials.Tint);
+                l.cullingMask = ~(1 << CarBuilder.CarLayer);
+                l.transform.SetPositionAndRotation(Layout.Uplights[i].position, Quaternion.LookRotation(Layout.Uplights[i].aim));
+                l.range = UplightRange;
+                l.spotAngle = UplightCone;
+                l.innerSpotAngle = UplightCone * 0.6f;
+                uplights[i] = l;
+            }
         }
 
         private Light Spot(string name, Color colour)
@@ -91,6 +116,14 @@ namespace TarmacGauntlet.Raceday
             float step = Time.unscaledDeltaTime / Fade;
             foreach (Slot s in floods) Follow(s, step, on * FloodIntensity, PlaceFlood);
             foreach (Slot s in heads) Follow(s, step, on * HeadIntensity, PlaceHead);
+            Camera cam = Camera.main;
+            foreach (Light l in uplights)
+            {
+                bool near = cam != null && (cam.transform.position - l.transform.position).sqrMagnitude < UplightReach * UplightReach;
+                l.intensity = on * UplightIntensity;
+                bool lit = near && on > 0.001f;
+                if (l.enabled != lit) l.enabled = lit;
+            }
         }
 
         /// <summary>Picks the floodlights and the cars the real lights should be at now.</summary>
@@ -107,7 +140,7 @@ namespace TarmacGauntlet.Raceday
                 for (int i = 0; i < Layout.Lights.Count; i++)
                 {
                     float d = (Layout.Lights[i].Target - focus).sqrMagnitude;
-                    if (d < FloodReach * FloodReach) Insert(i, d, FloodSlots);
+                    if (d < FloodReach * FloodReach) Insert(i, d, floods.Length);
                 }
             Share(floods, picks);
 
@@ -116,8 +149,9 @@ namespace TarmacGauntlet.Raceday
             if (dark)
                 for (int i = 0; i < CarLamps.All.Count; i++)
                 {
+                    if (!CarLamps.All[i].HasHeadlamps) continue;
                     float d = (CarLamps.All[i].transform.position - eye).sqrMagnitude;
-                    if (d < HeadReach * HeadReach) Insert(i, d, HeadSlots);
+                    if (d < HeadReach * HeadReach) Insert(i, d, heads.Length);
                 }
             Share(heads, picks);
         }
