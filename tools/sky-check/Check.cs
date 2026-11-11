@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using TarmacGauntlet.Raceday;
 using UnityEngine;
 
-/// <summary>Checks the sun path, the length of the night and that the light never jumps.</summary>
+/// <summary>Checks the September sun path, the length of the night and that the light never jumps.</summary>
 public static class Check
 {
     private static int failed;
@@ -13,10 +13,10 @@ public static class Check
         if (Array.IndexOf(args, "--table") >= 0) Table();
         SkyLook look = SkyClock.Look;
         float rise = Crossing(0f, 12f, -0.83f), set = Crossing(12f, 24f, -0.83f);
-        Expect("sunrise at about 05:25", rise > 5.1f && rise < 5.7f, Clock(rise));
-        Expect("sunset at about 21:45", set > 21.5f && set < 22f, Clock(set));
+        Expect("sunrise at about 07:10", rise > 6.9f && rise < 7.4f, Clock(rise));
+        Expect("sunset at about 19:15", set > 19f && set < 19.5f, Clock(set));
         float noon = Elevation(SkyClock.SolarNoon);
-        Expect("noon sun 63 degrees up", Math.Abs(noon - 63.44f) < 0.1f, $"{noon:0.00}");
+        Expect("noon sun 40 degrees up", Math.Abs(noon - 40f) < 0.1f, $"{noon:0.00}");
         Vector3 south = SkyClock.Direction(SkyClock.SolarNoon, SkyClock.Declination);
         Expect("noon sun due south", Math.Abs(south.x) < 1e-4f && south.z < 0f, $"{south.x:0.0000} {south.z:0.000}");
         Vector3 morning = SkyClock.Direction(8f, SkyClock.Declination);
@@ -41,8 +41,8 @@ public static class Check
                 finite &= Ok(c.r) && Ok(c.g) && Ok(c.b);
             finite &= Math.Abs(s.LightDir.magnitude - 1f) < 1e-3f;
         }
-        Expect("never full night: sun stays above -18 degrees", lowest > -18f, $"{lowest:0.0}");
-        Expect("stars out between 3 and 6 hours", darkHours > 3f && darkHours < 6f, $"{darkHours:0.00} h");
+        Expect("full night: sun goes below -18 degrees", lowest < -18f, $"{lowest:0.0}");
+        Expect("stars out between 9 and 12 hours", darkHours > 9f && darkHours < 12f, $"{darkHours:0.00} h");
         Expect("light changes smoothly, minute to minute", maxStep < 0.02f, $"{maxStep:0.0000} at {worst}");
         Expect("colours finite and in range", finite, "");
         SkyState midnight = SkyClock.At(1.6f, look);
