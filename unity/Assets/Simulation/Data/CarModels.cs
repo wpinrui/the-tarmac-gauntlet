@@ -101,7 +101,7 @@ namespace TarmacGauntlet.Simulation
             new RawCar("e-08", "Seorak Hwaeum", CarClass.E, 22_500, new double[] { 22, 24, 86, 82, 62, 94, 88, 50 }, new RawPot(power: 32, fuelEfficiency: 90, handling: 34, tyreDurability: 86, comfort: 74)),
             new RawCar("e-09", "Liberty Fortress", CarClass.E, 25_000, new double[] { 26, 26, 76, 74, 50, 82, 86, 53 }, new RawPot(power: 36, fuelEfficiency: 80, handling: 38, tyreDurability: 80, comfort: 62)),
             new RawCar("e-10", "Kaiser Oboe", CarClass.E, 27_500, new double[] { 24, 28, 78, 76, 56, 84, 86, 55 }, new RawPot(power: 34, fuelEfficiency: 82, handling: 40, tyreDurability: 82, comfort: 68)),
-            new RawCar("e-11", "Liberty Mantle", CarClass.E, 30_000, new double[] { 22, 24, 74, 78, 72, 88, 88, 60 }, new RawPot(power: 32, fuelEfficiency: 78, handling: 34, tyreDurability: 82, comfort: 80)),
+            new RawCar("e-11", "Liberty Mantle", CarClass.E, 30_000, new double[] { 25, 27, 74, 78, 72, 88, 88, 60 }, new RawPot(power: 32, fuelEfficiency: 78, handling: 34, tyreDurability: 82, comfort: 80)),
 
             // --- Class D ---
             new RawCar("d-12", "Seorak Hoeori", CarClass.D, 70_000, new double[] { 38, 46, 64, 60, 28, 86, 76, 50 }, new RawPot(power: 50, fuelEfficiency: 70, handling: 58, tyreDurability: 68, comfort: 42)),
@@ -118,8 +118,8 @@ namespace TarmacGauntlet.Simulation
 
             // --- Class B ---
             new RawCar("b-21", "Feretti Vortice", CarClass.B, 750_000, new double[] { 76, 82, 28, 36, 26, 58, 36, 86 }, new RawPot(power: 84, fuelEfficiency: 34, handling: 88, tyreDurability: 42, comfort: 36)),
-            new RawCar("b-22", "Archer Tachyon", CarClass.B, 800_000, new double[] { 78, 80, 30, 34, 22, 54, 32, 72 }, new RawPot(power: 86, fuelEfficiency: 36, handling: 88, tyreDurability: 40, comfort: 30)),
-            new RawCar("b-23", "Archer Jet Black", CarClass.B, 850_000, new double[] { 80, 78, 26, 32, 32, 52, 38, 80 }, new RawPot(power: 88, fuelEfficiency: 32, handling: 84, tyreDurability: 38, comfort: 42)),
+            new RawCar("b-22", "Archer Tachyon", CarClass.B, 800_000, new double[] { 79, 82, 30, 34, 22, 54, 32, 72 }, new RawPot(power: 86, fuelEfficiency: 36, handling: 88, tyreDurability: 40, comfort: 30)),
+            new RawCar("b-23", "Archer Jet Black", CarClass.B, 850_000, new double[] { 82, 80, 26, 32, 32, 52, 38, 80 }, new RawPot(power: 88, fuelEfficiency: 32, handling: 84, tyreDurability: 38, comfort: 42)),
             new RawCar("b-24", "Kaiser Scream", CarClass.B, 900_000, new double[] { 82, 84, 22, 28, 16, 46, 30, 92 }, new RawPot(power: 90, fuelEfficiency: 28, handling: 90, tyreDurability: 34)),
             new RawCar("b-25", "Liberty Bounty", CarClass.B, 950_000, new double[] { 84, 86, 26, 30, 18, 50, 24, 65 }, new RawPot(power: 90, fuelEfficiency: 32, handling: 92, tyreDurability: 36)),
 
