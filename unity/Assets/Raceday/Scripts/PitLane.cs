@@ -17,12 +17,14 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Track offset a pitting car keeps on the pit side until the entry road takes it further over.</summary>
         private const float EntrySide = 3f;
         private const int FastLaneEase = 20;   // lane samples (40 m) to move into or out of the fast lane
-        // Into the box: straight for 2 m either side of its middle, then out to Mid by 10 m away, which
-        // keeps clear of a car standing in the next box, then on to the fast lane by 30 m away.
-        private const float BoxHold = 1f;      // lane samples
-        private const float BoxClear = 5f;
-        private const float BoxEase = 15f;
-        private const float Mid = -1.1f;       // lane offset, the garage side of a car beside the next box
+        // Into the box, in metres along the lane from its middle: straight for BoxHold either side, out by
+        // BoxSwing towards the fast lane by BoxClear away, then on into the fast lane by BoxEase away. Out by
+        // BoxSwing, a car passes the crew working round a car standing in the next box (14 m on at the bend,
+        // 16 m on the straight) with over half a metre to spare.
+        private const float BoxHold = 2f;
+        private const float BoxClear = 10.5f;
+        private const float BoxEase = 40f;
+        private const float BoxSwing = 3.6f;
 
         public readonly Circuit Circuit;
         public readonly PitData Data;
@@ -32,11 +34,15 @@ namespace TarmacGauntlet.Raceday
         public readonly float FastLane;
         /// <summary>Lane offset of the middle of each box.</summary>
         public readonly float BoxLateral;
+        /// <summary>Lane offset a car keeps passing a box on its way to or from another, clear of the crew there.</summary>
+        public float PassLateral => BoxLateral - BoxSwing;
         /// <summary>Where each garage's box is along the lane, as a fractional lane sample.</summary>
         public readonly float[] BoxLane;
         public readonly int LimitStartLane, LimitEndLane;
 
         private readonly float[] laneAt;   // fractional lane sample beside each track sample, or -1
+        private readonly float[] laneMetres;   // distance along the lane to each lane sample, m
+        private readonly float[] boxMetres;    // distance along the lane to each box's middle, m
         private readonly float laneHalf;
         private readonly float side;       // +1 when the pits are on the left of the track
 
@@ -70,6 +76,9 @@ namespace TarmacGauntlet.Raceday
             LimitStartLane = NearestLane(Data.limitStart);
             LimitEndLane = NearestLane(Data.limitEnd);
 
+            laneMetres = new float[circuit.Lane.Length];
+            for (int i = 1; i < laneMetres.Length; i++) laneMetres[i] = laneMetres[i - 1] + Flat(circuit.Lane[i] - circuit.Lane[i - 1]).magnitude;
+
             BoxLane = new float[Data.garages.Length];
             for (int g = 0; g < BoxLane.Length; g++)
             {
@@ -87,6 +96,8 @@ namespace TarmacGauntlet.Raceday
                 float t = step.sqrMagnitude > 1e-4f ? Vector3.Dot(Flat(floor - circuit.Lane[best]), step) / step.sqrMagnitude : 0f;
                 BoxLane[g] = Mathf.Clamp(best + t, 0f, circuit.Lane.Length - 1);
             }
+            boxMetres = new float[BoxLane.Length];
+            for (int g = 0; g < BoxLane.Length; g++) boxMetres[g] = Metres(BoxLane[g]);
         }
 
         public int Garages => BoxLane.Length;
@@ -275,11 +286,18 @@ namespace TarmacGauntlet.Raceday
             float across = FastLane * Mathf.Min(into, outOf);
             if (garage >= 0)
             {
-                float off = Mathf.Abs(i - BoxLane[garage]);
-                if (off <= BoxClear) across = Mathf.Lerp(BoxLateral, Mid, Ease((off - BoxHold) / (BoxClear - BoxHold)));
-                else if (off < BoxEase) across = Mathf.Lerp(Mid, across, Ease((off - BoxClear) / (BoxEase - BoxClear)));
+                float off = Mathf.Abs(Metres(i) - boxMetres[garage]);
+                if (off <= BoxClear) across = Mathf.Lerp(BoxLateral, PassLateral, Swing((off - BoxHold) / (BoxClear - BoxHold)));
+                else if (off < BoxEase) across = Mathf.Lerp(PassLateral, across, Ease((off - BoxClear) / (BoxEase - BoxClear)));
             }
             return across;
+        }
+
+        /// <summary>Distance along the lane to a fractional lane sample, m.</summary>
+        private float Metres(float i)
+        {
+            int a = Mathf.Clamp((int)i, 0, laneMetres.Length - 2);
+            return Mathf.Lerp(laneMetres[a], laneMetres[a + 1], i - a);
         }
 
         private int NearestLane(float trackDistance)
@@ -294,6 +312,9 @@ namespace TarmacGauntlet.Raceday
             }
             return best;
         }
+
+        /// <summary>A half wave from 0 to 1: the gentlest bend for a sideways step, flat at both ends.</summary>
+        private static float Swing(float t) => 0.5f - 0.5f * Mathf.Cos(Mathf.PI * Mathf.Clamp01(t));
 
         private static float Ease(float t)
         {
