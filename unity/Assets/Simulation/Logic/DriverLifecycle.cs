@@ -99,7 +99,7 @@ namespace TarmacGauntlet.Simulation
 
         // --- Annual turnover ---
         /// <summary>Number of drivers retired and replaced each year (GDD §4).</summary>
-        private const int AnnualRetirements = 15;
+        public const int AnnualRetirements = 15;
 
         // ---------------------------------------------------------------------------
         // Stat curve

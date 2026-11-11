@@ -40,6 +40,14 @@ def make(name, verts, faces, mat, recalc=True):
     return ob
 
 
+def adopt(name, me, mat):
+    """An object for a mesh built elsewhere, linked to the scene, with material mat."""
+    ob = bpy.data.objects.new(name, me)
+    bpy.context.scene.collection.objects.link(ob)
+    me.materials.append(bpy.data.materials[mat])
+    return ob
+
+
 def boolean(target, other, op, tolerant=False):
     """Apply a boolean (UNION, DIFFERENCE, INTERSECT) and delete the other object.
     tolerant: the slower hole tolerant mode, for a pair the plain mode mangles."""
@@ -102,6 +110,19 @@ def drop_voids(ob):
         bm.to_mesh(ob.data)
     bm.free()
     return len(doomed)
+
+
+def inflate(ob, d):
+    """A copy of ob pushed out along its normals by d, for cutting a part to stand just off it."""
+    c = ob.copy(); c.data = ob.data.copy(); c.name = ob.name + "_inflated"
+    bpy.context.scene.collection.objects.link(c)
+    mod = c.modifiers.new("d", "DISPLACE")
+    mod.strength = d
+    mod.mid_level = 0.0
+    mod.direction = "NORMAL"
+    bpy.context.view_layer.objects.active = c
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    return c
 
 
 def union_all(obs, name):
@@ -296,6 +317,17 @@ def tidy(ob):
         bmesh.ops.collapse(bm, edges=[e for e in edges if e.is_valid])
     bmesh.ops.holes_fill(bm, edges=[e for e in bm.edges if e.is_boundary], sides=0)
     bmesh.ops.triangulate(bm, faces=bm.faces)
+    # a seam left open, or an edge shared by three faces: drop the faces round it, close the
+    # hole, and go again while any are left
+    for _ in range(4):
+        bad = {f for e in bm.edges if len(e.link_faces) != 2 for f in e.link_faces}
+        if not bad:
+            break
+        bmesh.ops.delete(bm, geom=list(bad), context="FACES_ONLY")
+        bmesh.ops.delete(bm, geom=[e for e in bm.edges if not e.link_faces], context="EDGES")
+        bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
+        bmesh.ops.holes_fill(bm, edges=[e for e in bm.edges if e.is_boundary], sides=0)
+        bmesh.ops.triangulate(bm, faces=bm.faces)
     bmesh.ops.collapse(bm, edges=[e for e in bm.edges if e.is_boundary and e.calc_length() < 5e-4])
     bmesh.ops.holes_fill(bm, edges=[e for e in bm.edges if e.is_boundary], sides=0)
     bmesh.ops.triangulate(bm, faces=bm.faces)
