@@ -312,6 +312,10 @@ namespace TarmacGauntlet.Raceday
                         brakeDist = Mathf.Max(brakeDist, brakesOnly);
                         // Not in the tutorial: only while closing. Inside the margin and already no faster
                         // than the car ahead, the tutorial still brakes, to a stop, until the gap opens.
+                        // T1: the car ahead moves on while I brake, so the gap shrinks by only (v-u)/(v+u) of
+                        // my braking distance. Off the braking zone the car ahead isn't braking for a corner.
+                        if (Experiments.Is(PathChooser.Experiment) && PathChooser.RelBrake > 0f && !BrakingZone(pilot) && currentSpeedSqr > allowedSpeedSqr && mySpeed - o.Speed < PathChooser.RelClose && o.Speed > PathChooser.RelFrom)
+                            brakeDist = brakeDist * (mySpeed - o.Speed) / (mySpeed + o.Speed) + PathChooser.RelBrake * (mySpeed - o.Speed);
                         if (brakeDist > distance && currentSpeedSqr > allowedSpeedSqr) { Braking = true; BrakeFor = o.Id; BrakeGap = distance; BrakeSide = carDist; brakeLateral = o.Lateral; }
                     }
                 }

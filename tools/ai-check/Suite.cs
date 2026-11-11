@@ -449,6 +449,15 @@ static partial class Check
                 float share = follow > 0 ? (float)onLine / follow : 0f;
                 // Flat in the tow, not lifting to sit at the speed of the car ahead (Ivan).
                 float lifted = run.LiftedBehind(0, 1);
+                // Nor lifting as it closes with seconds to spare, when the car ahead cuts across (Ivan).
+                AiPilot p0 = run.Race.Racers[0].Pilot;
+                foreach (Frame f in fs)
+                {
+                    float g = run.Gap(f, 0, 1) - CarL, closing = f.V[0] - f.V[1];
+                    if (g <= 0f || closing <= 0.5f || g / closing < 2f || f.Throttle[0] > 0.9f) continue;
+                    int k = f.K[0];
+                    if (f.V[0] < 0.98f * p0.LaneSpeed(k, f.L[0] - p0.Line.Lateral[k])) lifted += Race.Dt;
+                }
                 // Once past, back on the line.
                 Frame past = fs.FirstOrDefault(f => run.Gap(f, 0, 1) < 0f);
                 float offClear = past == null ? 0f : run.OffLineClear(0, past.T);
