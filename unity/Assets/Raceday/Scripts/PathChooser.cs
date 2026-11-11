@@ -79,6 +79,8 @@ namespace TarmacGauntlet.Raceday
         private static readonly bool FlatFirst = Knob("H15", 1f) > 0f, FlatFollow = Knob("H15F", 1f) > 0f;
         private static readonly bool FollowWhere = Knob("FOLLOWNOW", 1f) > 0f;
         private static readonly bool SideBuffer = Knob("SIDEBUF", 0f) > 0f;
+        /// <summary>Against changing its mind on the free stretch, per metre of change: with paths at every width, near-equal ones would weave it (T3).</summary>
+        private static readonly float FreeHyst = Knob("FREEHYST", 0.05f);
         /// <summary>H15: flat out in the lane up to a car it would catch before the corner is a dead end: a route round it goes first.</summary>
         private static readonly bool CaughtFirst = Knob("H15C", 0f) > 0f;
         /// <summary>H15, H1: on the free stretch, the room past a car ahead beyond the car's own width, m; below 0, the driver's own passing margin.</summary>
@@ -384,7 +386,7 @@ namespace TarmacGauntlet.Raceday
             // From the corner's exit to the next braking zone the racing line is only the default (Ivan):
             // nothing holds the car to a path it chose, so it takes the open side the moment that is better.
             bool free = FreeStretch(pilot);
-            float offLine = free ? FreeOff * OffLine : OffLine, hyst = free ? 0f : Hysteresis;
+            float offLine = free ? FreeOff * OffLine : OffLine, hyst = free ? FreeHyst : Hysteresis;
             headway = HeadZone >= 0f && (lapOne || zone || Road(NextCornerStart(c, here) - here, lap) < HeadNear * mySpeed) ? HeadZone : Headway;
             int nextTurn = NextTurn(c, here);
             float myOffset = me.Lateral - line.Lateral[pilot.Index];
