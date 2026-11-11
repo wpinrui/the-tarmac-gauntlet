@@ -55,7 +55,8 @@ namespace TarmacGauntlet.Simulation
         /// Order of operations:
         ///   1. Advance driver pool: age all drivers +1, retire bottom 15, add 15 rookies.
         ///   2. Decrement contract remaining years by 1; remove contracts that hit 0.
-        ///   3. Deduct annual salaries and crew costs for all teams.
+        ///   3. Size each AI team's crew from its prestige percentile, then deduct annual
+        ///      salaries and crew costs for all teams.
         ///   4. Age all car instances by 1 year (across all teams).
         ///   5. Generate new used car inventory.
         ///   6. Run AI spending for each AI team (greedy algorithm, highest-value-first).
@@ -81,7 +82,7 @@ namespace TarmacGauntlet.Simulation
                 .ToArray();
 
             // 3. Annual deductions: driver salaries + crew costs for ALL teams
-            var deductedTeams = input.Teams.Select(team =>
+            var deductedTeams = AiCrew.Assign(input.Teams).Select(team =>
             {
                 var teamContracts = updatedContracts.Where(c => c.TeamId == team.Id).ToList();
                 var totalSalary = teamContracts.Sum(c => c.AnnualSalary);

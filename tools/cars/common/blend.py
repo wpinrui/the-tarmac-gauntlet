@@ -376,6 +376,16 @@ def export(obs, out_dir, name, materials, game=False):
     bpy.ops.wm.obj_export(filepath=str(obj), export_selected_objects=False, export_materials=True,
                           export_normals=True, export_uv=False, export_triangulated_mesh=True,
                           path_mode="RELATIVE", **axes)
+    # Unity splits an OBJ into parts by its g groups, not its o objects, so each object gets a group of its own name.
+    # The game finds wheels by name to turn them.
+    text = []
+    for ln in obj.read_text().splitlines():
+        if ln.startswith("g "):
+            continue
+        text.append(ln)
+        if ln.startswith("o "):
+            text.append("g " + ln[2:])
+    obj.write_text("\n".join(text) + "\n")
     used = sorted({ln.split()[1] for ln in obj.read_text().splitlines() if ln.startswith("usemtl ")})
     lines = []
     for mname in used:
