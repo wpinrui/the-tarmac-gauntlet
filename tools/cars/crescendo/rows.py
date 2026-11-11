@@ -270,6 +270,25 @@ def sections(sp, m, arches):
     return [dict(x=round(float(x), 4), zc=round(float(zc), 4), r=r4(r)) for x, zc, r in zip(X, ZC, Rm)]
 
 
+TAIL_FACE = 0.62     # top of the small flat rear face; above it the tail leans in one plain curve
+TAIL_SHOULDER = 0.20  # the lid's back edge rolls down to the face over this length, with no bumper step
+TAIL_CORNER = 0.30    # the plan corners round in over this length
+TAIL_FACE_W = 0.42    # half width of the flat rear face
+
+
+def _round_in(x, x_end, run, v_end, v_full):
+    s = np.clip((x - x_end) / run, 0, 1)
+    return v_end + (v_full - v_end) * (1 - (1 - s) ** 2)
+
+
+def tail_top(x, full, x_end):
+    return _round_in(x, x_end, TAIL_SHOULDER, TAIL_FACE, full)
+
+
+def tail_width(x, full, x_end):
+    return _round_in(x, x_end, TAIL_CORNER, TAIL_FACE_W, full)
+
+
 def plain_ends(stations, xf, xr, arches, blend=0.12):
     """Ivan wants smooth, plain bumpers. Ahead of xf and behind xr each section is the section at
     xf (or xr) stretched to the smoothed side and plan outline there, so the nose and tail carry
@@ -293,6 +312,8 @@ def plain_ends(stations, xf, xr, arches, blend=0.12):
         lt, lb, lw = top[i0], bot[i0], wid[i0]
         for i in idx:
             lt, lb, lw = min(lt, top[i]), bot[i], min(lw, wid[i])     # top and width only shrink
+            if end == "rear":
+                lt, lw = tail_top(X[i], top[i0], X[-1 if end == "front" else 0]), tail_width(X[i], wid[i0], X[0])
             h = np.column_stack([ref[:, 0] * lw / w0, lb + (ref[:, 1] - b0) * (lt - lb) / (t0 - b0)])
             zc = (lt + lb) / 2
             full = np.vstack([h, (h * [-1, 1])[::-1]])
@@ -436,7 +457,7 @@ def measure(path):
         "lid": r4(lid),
         "spots": spots,
         # Ivan's picks from the viewer.
-        "picks": {},
+        "picks": {"frontbadge": 1, "rearbadge": 1, "name": 1},
     }
 
 

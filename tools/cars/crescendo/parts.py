@@ -215,19 +215,64 @@ def dlo_shapes():
     glass = glass.difference(box(b0 - 0.012, -1, b1 + 0.012, 3)).difference(box(d0 - 0.006, -1, d1 + 0.006, 3))
     glass = glass.difference(box(MIRROR_X0 + 0.04, -1, 5, 5))       # the corner ahead of the mirror is black
     glass = unary_union([soft(p, 0.008) for p in getattr(glass, "geoms", [glass])])
-    return dlo, glass, dlo.difference(glass)
+    return dlo, glass, dlo.difference(glass.buffer(-0.005))      # the band covers the cut edge
+
+
+GLASS_BAND = 0.014    # black band round the windscreen and the rear window
+
+
+def plain_glass(pts, lo, hi, r=0.05):
+    """A glass outline rebuilt from three plain fits to the measured one, so its edges carry
+    no waves: the low edge and the high edge as even curves across the car, and the sides as
+    straight lines. pts are (along, across); lo and hi pick the low and high edge points by
+    their along value."""
+    p = np.asarray(pts, float)
+    a, c = p[:, 0], np.abs(p[:, 1])
+    w = c.max()
+    sym = lambda m: (np.concatenate([p[m, 1], -p[m, 1]]), np.concatenate([a[m], a[m]]))
+    k_lo = np.polyfit(*sym(lo(a) & (c < 0.8 * w)), 2)
+    k_hi = np.polyfit(*sym(hi(a) & (c < 0.8 * w)), 2)
+    side = (c > 0.85 * w) & ~lo(a) & ~hi(a)
+    k_s = np.polyfit(a[side], c[side], 1)
+    ys = np.linspace(-1.2 * w, 1.2 * w, 61)
+    band = Polygon(np.vstack([np.column_stack([np.polyval(k_lo, ys), ys]),
+                              np.column_stack([np.polyval(k_hi, ys), ys])[::-1]]))
+    us = np.linspace(a.min() - 0.1, a.max() + 0.1, 41)
+    sides = Polygon(np.vstack([np.column_stack([us, np.polyval(k_s, us)]),
+                               np.column_stack([us, -np.polyval(k_s, us)])[::-1]]))
+    return soft(band.intersection(sides), r)
 
 
 def screen_shapes():
-    outline = soft(poly(R["screen"]["outline"]), 0.03)
-    glass = outline.buffer(-0.03, join_style=1)
-    return outline, glass, outline.difference(glass)
+    s = R["screen"]
+    mid = (s["x_base"] + s["x_top"]) / 2
+    span = s["x_base"] - s["x_top"]
+    outline = plain_glass(R["screen"]["outline"], lambda a: a > s["x_base"] - 0.2 * span,
+                          lambda a: a < s["x_top"] + 0.2 * span)
+    glass = outline.buffer(-GLASS_BAND, join_style=1)
+    return outline, glass, outline.difference(glass.buffer(-0.005))
+
+
+def rear_glass_fr():
+    """A frame square to the rear window's slope, so its band lands as wide as it is drawn,
+    and a map from the rear view (y, z) into it."""
+    p = np.array(R["rear_glass_side"])
+    k = np.polyfit(p[:, 0], p[:, 1], 1)
+    lo = np.array([(p[:, 1].min() - k[1]) / k[0], p[:, 1].min()])
+    t = np.array([1.0, 0.0, k[0]]); t /= np.linalg.norm(t)
+    d = np.array([t[2], 0.0, -t[0]])                 # into the car, square to the glass
+    fr = blend.frame((lo[0], 0, lo[1]), (0, 1, 0), t, d)
+    return fr, lambda g: sscale(translate(g, 0, -lo[1]), 1, 1 / t[2], origin=(0, 0))
 
 
 def rear_shapes():
-    rg = soft(poly(R["rear_glass"]), 0.03)
-    glass = rg.buffer(-0.016, join_style=1)
-    return rg, glass, rg.difference(glass)
+    p = np.array(R["rear_glass"])[:, ::-1]          # (z, y)
+    z0, z1 = p[:, 0].min(), p[:, 0].max()
+    span = z1 - z0
+    g = plain_glass(p, lambda a: a < z0 + 0.2 * span, lambda a: a > z1 - 0.2 * span, r=0.04)
+    rg = Polygon(np.array(g.exterior.coords)[:, ::-1])  # back to (y, z)
+    glass = rg.buffer(-GLASS_BAND, join_style=1)
+    return rg, glass, rg.difference(glass.buffer(-0.005))
 
 
 def glass_parts(ref, cutters, out):
@@ -241,14 +286,16 @@ def glass_parts(ref, cutters, out):
     cutters += blend.lay(ref, "cut_screen", g.buffer(-0.003), top_fr(), -0.08, 0.006, "trim", along_ray=True)
     out += blend.lay(ref, "screen_glass", g.buffer(-0.006), top_fr(), -0.008, -0.004, "glass", 0.02, along_ray=True)
     out += blend.lay(ref, "screen_trim", t, top_fr(), 0.0015, 0.0035, "trim", 0.01)
-    _o, g, t = rear_shapes()
-    cutters += blend.lay(ref, "cut_rear", g.buffer(-0.003), rear_fr(), -0.08, 0.004, "trim", along_ray=True)
-    out += blend.lay(ref, "rear_glass", g.buffer(-0.006), rear_fr(), -0.008, -0.004, "glass", 0.02, along_ray=True)
-    out += blend.lay(ref, "rear_trim", t, rear_fr(), 0.0015, 0.0035, "trim", 0.01)
+    fr, to_fr = rear_glass_fr()
+    _o, g, t = (to_fr(q) for q in rear_shapes())
+    cutters += blend.lay(ref, "cut_rear", g.buffer(-0.003), fr, -0.08, 0.004, "trim", along_ray=True)
+    out += blend.lay(ref, "rear_glass", g.buffer(-0.006), fr, -0.008, -0.004, "glass", 0.02, along_ray=True)
+    out += blend.lay(ref, "rear_trim", t, fr, 0.0015, 0.0035, "trim", 0.01)
 
 
 # ---------------------------------------------------------------- shut lines
-FRONT_DOOR_X = 0.88      # the front door's front edge at the belt
+FRONT_DOOR_X = 0.60      # the front door's front edge at its furthest forward, below the belt
+WING_NAME_X = 1.04       # the name on the front wing
 
 
 def belt(x):
@@ -294,11 +341,11 @@ def door_paths():
     z_end = bottom + 0.004
     xs = float(np.interp(z_end, fe[::-1, 1] if fe[0, 1] > fe[-1, 1] else fe[:, 1],
                          fe[::-1, 0] if fe[0, 1] > fe[-1, 1] else fe[:, 0]))
-    x0 = MIRROR_X0 + MIRROR_D + 0.03       # clear of the mirror arm
-    front = [_into_glass((x0, belt(x0)))] + geom.catmull_open([
-        (x0, belt(x0) - 0.002), (FRONT_DOOR_X - 0.06, belt(FRONT_DOOR_X - 0.06) + 0.004),
-        (FRONT_DOOR_X, belt(FRONT_DOOR_X) - 0.05), (FRONT_DOOR_X + 0.01, 0.72), (FRONT_DOOR_X - 0.005, 0.5),
-        (FRONT_DOOR_X - 0.06, bottom + 0.004)], 8).tolist()
+    x0 = MIRROR_X0 + MIRROR_D + 0.012      # just ahead of the mirror arm, at the window's front corner
+    front = geom.catmull_open([
+        (x0, belt(x0) + 0.04), (x0 + 0.01, belt(x0) - 0.03), (FRONT_DOOR_X - 0.07, 0.82),
+        (FRONT_DOOR_X - 0.01, 0.68), (FRONT_DOOR_X, 0.52), (FRONT_DOOR_X - 0.02, 0.40),
+        (FRONT_DOOR_X - 0.07, bottom + 0.004)], 8).tolist()
     front += [[xs - 0.002, z_end]]
     return rear, front
 
@@ -645,12 +692,16 @@ def _flat(ref, g, size, fr, a, b, up, name, d0, d1, mat, step=0.004):
     return blend.lay(ref, name, sscale(g, size, size, origin=(0, 0)), pf, d0, d1, mat, step)
 
 
+BADGE_T = 0.009    # badges stand proud of the panel by this much
+NAME_T = 0.004     # the name's letters stand proud by this much
+
+
 def badge(ref, style, size, fr, a, b, up, name, lift=0.0):
     if style == "chrome":
-        return _flat(ref, badge_chrome(), size, fr, a, b, up, name, 0.0012 + lift, 0.0032 + lift, "chrome", 0.003)
+        return _flat(ref, badge_chrome(), size, fr, a, b, up, name, 0.0012 + lift, BADGE_T + lift, "chrome", 0.003)
     obs = []
     for i, (g, m) in enumerate(badge_colour()):
-        obs += _flat(ref, g, size, fr, a, b, up, f"{name}_{i}", 0.0012 + lift, 0.0032 + lift, m, 0.003)
+        obs += _flat(ref, g, size, fr, a, b, up, f"{name}_{i}", 0.0012 + lift, BADGE_T + lift, m, 0.003)
     return obs
 
 
@@ -676,10 +727,10 @@ def options(ref):
         add("rearbadge", 3 + k, badge(ref, style, 0.05, rear_fr(), 0, sp["spoiler_z"] - 0.05, up, "rb"))
     cap = 0.026
     lid_y = 0.32
-    add("name", 1, _flat(ref, nm, cap, rear_fr(), -lid_y, sp["lid_z"] - 0.01, up, "nm", 0.0012, 0.0025, "chrome"))
-    add("name", 2, _flat(ref, nm, cap, rear_fr(), lid_y, sp["lid_z"] - 0.01, up, "nm", 0.0012, 0.0025, "chrome"))
+    add("name", 1, _flat(ref, nm, cap, rear_fr(), -lid_y, sp["lid_z"] - 0.01, up, "nm", 0.0012, NAME_T, "chrome"))
+    add("name", 2, _flat(ref, nm, cap, rear_fr(), lid_y, sp["lid_z"] - 0.01, up, "nm", 0.0012, NAME_T, "chrome"))
     q = []
     for sgn in (1, -1):
-        q += _flat(ref, nm, cap, side_fr(sgn), FRONT_DOOR_X + 0.16, 0.64, up, "nm", 0.0012, 0.0025, "chrome")
+        q += _flat(ref, nm, cap, side_fr(sgn), WING_NAME_X, 0.64, up, "nm", 0.0012, NAME_T, "chrome")
     add("name", 3, q)
     return out
