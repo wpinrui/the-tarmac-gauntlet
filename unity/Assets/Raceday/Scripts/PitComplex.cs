@@ -60,8 +60,8 @@ namespace TarmacGauntlet.Raceday
         public const float ClearDepth = 6.5f;
         /// <summary>Bays the race offices span, centred on the garage beside the start line.</summary>
         public const int OfficeBays = 6;
-        /// <summary>Most crew a garage has spots for, waiting inside.</summary>
-        public const int StandbySpots = 12;
+        /// <summary>Most crew a garage has spots for, waiting inside: as many as a team can hire.</summary>
+        public const int StandbySpots = 16;
         /// <summary>Half a garage side wall's thickness, as the circuit builder lays them.</summary>
         public const float WallHalf = 0.15f;
 
@@ -176,7 +176,7 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>
-        /// Where the crew wait inside the garage, in two rows across the clear front, facing the door. Spot 0 is
+        /// Where the crew wait inside the garage, in rows of six across the clear front, facing the door. Spot 0 is
         /// nearest the door in the middle; later spots work outwards and back.
         /// </summary>
         public CrewSpot Standby(int garage, int spot)
