@@ -17,6 +17,12 @@ public static class Check
     public static int Main(string[] args)
     {
         float[] big = CloudField.Fbm(Size, 4, 5, 11), small = CloudField.Fbm(Size, 8, 4, 29);
+        int dump = Array.IndexOf(args, "--dump");
+        if (dump >= 0)
+        {
+            Dump(args[dump + 1], big, small);
+            return 0;
+        }
         CloudMap Map(float cover, float overcast, Vector4 offset = default) => new CloudMap
         {
             Big = big, Small = small, Size = Size, Tiles = CloudMap.TilesFor(CloudScale, overcast), Cover = cover, Overcast = overcast, Offset = offset,
@@ -133,6 +139,43 @@ public static class Check
         Expect("the night grades as before", Same(SkyGrade.For(night, 0f, 0f, 1f, broken), SkyGrade.For(night, 0f, 0f)), "");
         Expect("broken cloud is most between a third and a half of the sky", SkyGrade.Patchy(0.4f, WeatherSky.Overcast(0.4f)) > 0.8f
             && SkyGrade.Patchy(0.1f, 0f) < 0.05f && SkyGrade.Patchy(1f, WeatherSky.Overcast(1f)) < 0.05f, "");
+    }
+
+    /// <summary>
+    /// Writes what the cloud preview (tools/cloud-preview) needs to draw the sky as the game does: the cloud map's noise,
+    /// the 3D noise, and the sky's colours and light for each preview scene.
+    /// </summary>
+    private static void Dump(string dir, float[] big, float[] small)
+    {
+        System.IO.Directory.CreateDirectory(dir);
+        var map = new byte[Size * Size * 8];
+        Buffer.BlockCopy(big, 0, map, 0, Size * Size * 4);
+        Buffer.BlockCopy(small, 0, map, Size * Size * 4, Size * Size * 4);
+        System.IO.File.WriteAllBytes(System.IO.Path.Combine(dir, "map.f32"), map);
+        System.IO.File.WriteAllBytes(System.IO.Path.Combine(dir, "noise3d.u8"), CloudNoise.Field(CloudNoise.Size));
+        var scenes = new (string name, float hour, float cloud, float rain)[]
+        {
+            ("noon", 12.5f, 0.3f, 0f), ("partly-cloudy", 14f, 0.5f, 0f), ("golden-hour", 16.6f, 0.3f, 0f), ("overcast", 13f, 1f, 0.3f),
+        };
+        var json = new System.Text.StringBuilder("[\n");
+        for (int i = 0; i < scenes.Length; i++)
+        {
+            var sc = scenes[i];
+            SkyState s = SkyClock.At(sc.hour, SkyClock.Look);
+            var w = new WeatherState { Cloud = sc.cloud, Rain = sc.rain, Wind = 1f };
+            WeatherSky.Apply(ref s, w, WeatherSky.Lights(s.SunElevation, WeatherSky.Dusk(w)));
+            float o = WeatherSky.Overcast(sc.cloud);
+            float direct = s.LightIntensity;
+            string C(Color c) => $"[{c.r:0.0000},{c.g:0.0000},{c.b:0.0000}]";
+            string V(Vector3 v) => $"[{v.x:0.0000},{v.y:0.0000},{v.z:0.0000}]";
+            json.Append($"{{\"name\":\"{sc.name}\",\"cloud\":{sc.cloud},\"overcast\":{o:0.0000},\"cover\":{CloudMap.CoverFor(sc.cloud):0.0000},")
+                .Append($"\"tiles\":{CloudMap.TilesFor(0.45f, o):0.00000000},\"sunDir\":{V(s.LightDir)},\"sun\":{C(s.LightColour * direct)},")
+                .Append($"\"zenith\":{C(s.Zenith)},\"horizon\":{C(s.Horizon)},\"haze\":{C(s.Fog)},\"glow\":{C(s.Glow)},")
+                .Append($"\"cloudLit\":{C(s.CloudLit)},\"cloudShade\":{C(s.CloudShade)},\"ground\":{C(s.AmbientGround)},")
+                .Append($"\"hazeDistance\":{WeatherSky.Haze(s.Haze, w):0.0}}}{(i + 1 < scenes.Length ? "," : "")}\n");
+        }
+        json.Append("]\n");
+        System.IO.File.WriteAllText(System.IO.Path.Combine(dir, "scenes.json"), json.ToString());
     }
 
     private static bool Same(PostEffects.Grade a, PostEffects.Grade b) =>
