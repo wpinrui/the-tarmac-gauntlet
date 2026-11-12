@@ -150,12 +150,12 @@ public static class Check
             for (int i = 0; i < plan.Map.Length; i++)
             {
                 int x = i % plan.MapX, z = i / plan.MapX;
-                Color col = LandscapeLooks.Field(plan.Map[i], g.originX + x * cell, g.originZ + z * cell) * (0.94f + 0.12f * CloudField.Hash(x, z, 91));
+                plan.Mowing(i, out float fromRoad, out float reach, out float fresh, out float ax, out float az);
+                Color col = LandscapeLooks.Grass(plan.Map[i], g.originX + x * cell, g.originZ + z * cell, fromRoad > reach) * (0.94f + 0.12f * CloudField.Hash(x, z, 91));
                 fields[i * 3] = (byte)Math.Clamp(col.r * 255f + 0.5f, 0f, 255f);
                 fields[i * 3 + 1] = (byte)Math.Clamp(col.g * 255f + 0.5f, 0f, 255f);
                 fields[i * 3 + 2] = (byte)Math.Clamp(col.b * 255f + 0.5f, 0f, 255f);
-                float mown = plan.Mowing(i, out float fromRoad, out float ax, out float az);
-                w.Write(fromRoad); w.Write(mown); w.Write(ax); w.Write(az);
+                w.Write(fromRoad); w.Write(reach); w.Write(ax * fresh); w.Write(az * fresh);
             }
         File.WriteAllBytes(Path.Combine(dir, "fields.bin"), fields);
         File.WriteAllBytes(Path.Combine(dir, "map.bin"), Array.ConvertAll(plan.Map, u => (byte)u));
