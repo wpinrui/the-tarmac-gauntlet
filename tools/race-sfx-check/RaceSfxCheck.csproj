@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Runs the pit stop and collision sounds outside Unity: voice budgets, hit and scrape levels, the pit cues and the voice pool. Run through run.sh. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)../../out/race-sfx-check/obj/</BaseIntermediateOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Check.cs;Stubs.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/TrackSurface.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/SfxVoices.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/Impacts.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/PitCues.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/RaceSfx.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/ImpactAudio.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/PitAudio.cs" />
+  </ItemGroup>
+</Project>

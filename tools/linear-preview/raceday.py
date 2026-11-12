@@ -197,11 +197,49 @@ def read_layers(path):
 
 
 def trilight(s, n, srgb):
-    """Unity's trilight ambient by normal (Unity frame, y up): sRGB numbers for Gamma, linear for Linear."""
+    """Unity's trilight ambient by normal (Unity frame, y up): sRGB numbers for Gamma, linear for Linear, there matched
+    (LinearLight.Ambient) with the low sun's bounce (TimeOfDay.GoldenBounce)."""
     sky_, eq, gr = (s["amb_sky"], s["amb_eq"], s["amb_ground"])
-    if not srgb: sky_, eq, gr = lin(sky_), lin(eq), lin(gr)
+    if not srgb:
+        bounce = 1 + 0.6 * skyclock.golden(s["e"])
+        sky_, eq, gr = (skyclock.ambient(np.asarray(a) * bounce) for a in (sky_, eq, gr))
     y = n[..., 1:2]
     return np.where(y > 0, eq + (sky_ - eq) * y, eq + (gr - eq) * (-y))
+
+
+# The floodlights as NightLights draws them near the camera: real spot lights from the lenses to the pools' middles.
+FLOOD_REACH = math.hypot(11.4, 18.0)
+FLOOD_RANGE = FLOOD_REACH * 1.6 + 10
+FLOOD_GAMMA = 2.5 * 0.0301 * FLOOD_RANGE ** 2      # LightFalloff.Urp(FloodIntensity, range)
+FLOOD_SLOTS = 5
+
+
+def flood_linear():
+    """LightFalloff.UrpLinear for the floods: the Linear intensity that lights the pool's middle as brightly as before."""
+    f2 = (FLOOD_REACH / FLOOD_RANGE) ** 2
+    falloff = max(1 - f2 * f2, 0) ** 2 / FLOOD_REACH ** 2
+    tint = np.array([1, 0.95, 0.86])
+    return skyclock.match(tint, FLOOD_GAMMA * falloff, np.zeros(3), 1) / falloff
+
+
+def floods(cam_z):
+    """Spot lights at the nearest lenses, unit intensity: Unity's I lights a face-on surface d away with I / d^2."""
+    near = sorted(range(-2, 40), key=lambda k: abs(k * 45.0 - cam_z - 30))[:FLOOD_SLOTS]
+    for k in near:
+        z = k * 45.0
+        side = 1 if k % 2 else -1
+        lens, target = Vector(b((side * 14.4, 18, z))), Vector(b((side * 3.0, 0, z)))
+        l = bpy.data.lights.new(f"flood{k}", "SPOT")
+        l.energy = 4 * math.pi ** 2
+        l.shadow_soft_size = 0.3
+        l.spot_size = math.radians(107)
+        l.spot_blend = 0.4
+        o = bpy.data.objects.new(f"flood{k}", l)
+        o.location = lens
+        o.rotation_mode = "QUATERNION"
+        o.rotation_quaternion = (target - lens).to_track_quat("-Z", "Y")
+        o.lightgroup = "flood"
+        bpy.context.scene.collection.objects.link(o)
 
 
 def pools(s, pos):
@@ -235,6 +273,9 @@ def main():
     else:
         dirs = camera((8.0, 1.7, -6.0), (-1.0, 0.6, 60.0), 50)
     vl = sc.view_layers[0]
+    if night > 0.1:
+        floods(17.5 if shot == "car" else -6.0)
+        vl.lightgroups.add(name="flood")
     for attr in ("use_pass_diffuse_color", "use_pass_diffuse_direct", "use_pass_glossy_color", "use_pass_glossy_direct",
                  "use_pass_glossy_indirect", "use_pass_normal", "use_pass_z", "use_pass_emit", "use_pass_position"):
         setattr(vl, attr, True)
@@ -254,6 +295,10 @@ def main():
     gdir = np.minimum(gdir, GLINT)
     gind = np.minimum(gind, GLINT)
     emit = L["Emit"] if "Emit" in L else np.zeros_like(dcol)
+    # The floods' light, per unit of Unity intensity, taken out of the sun's.
+    flood = L["Combined_flood"][..., :3] / np.maximum(dcol, 1e-3) if "Combined_flood" in L else np.zeros_like(dcol)
+    flood = np.where(dcol > 1e-3, flood, 0)
+    ddir = np.maximum(ddir - flood, 0)
     n = L["Normal"][..., [0, 2, 1]]
     pos = L["Position"][..., [0, 2, 1]]
     depth = L["Depth"][..., 0] if L["Depth"].ndim == 3 else L["Depth"]
@@ -261,7 +306,7 @@ def main():
     c = s["colour"]
     i_g = s["light"]
     i_l = skyclock.match(c, i_g, s["amb_sky"], max(s["light_dir"][1], 0.3))
-    print(f"{tag}: sun or moon {i_g:.3f} in Gamma, {i_l:.3f} in Linear")
+    print(f"{tag}: sun or moon {i_g:.3f} in Gamma, {i_l:.3f} in Linear; floods {FLOOD_GAMMA:.0f} and {flood_linear():.0f}")
     sky_g = skyclock.sky(s, dirs)
     f = np.exp(-s["density"] * np.minimum(depth, 15000))[..., None]
     p = pools(s, pos)[..., None] * (night > 0.1)
@@ -269,7 +314,8 @@ def main():
     tint = np.array([1, 0.95, 0.86])
 
     # Gamma: shading on sRGB numbers, decoded by the post stack.
-    v = enc(dcol) * (ddir * i_g * c + trilight(s, n, True)) + enc(gcol) * (gdir * i_g * c + enc(gind)) + enc(emit)
+    fl_g, fl_l = FLOOD_GAMMA * on, flood_linear() * on
+    v = enc(dcol) * (ddir * i_g * c + trilight(s, n, True) + flood * fl_g * tint) + enc(gcol) * (gdir * i_g * c + enc(gind)) + enc(emit)
     bright = tint * ((1 + 7 * on) ** (1 / 2.2) - 1)
     v = v * (1 + bright * p) + tint * (0.035 * on) ** (1 / 2.2) * p
     v = s["fog"] + (v - s["fog"]) * f
@@ -277,14 +323,13 @@ def main():
     r_g = lin(v)
 
     # Linear.
-    r = dcol * (ddir * i_l * lin(c) + trilight(s, n, False)) + gcol * (gdir * i_l * lin(c) + gind) + emit
+    r = dcol * (ddir * i_l * lin(c) + trilight(s, n, False) + flood * fl_l * lin(tint)) + gcol * (gdir * i_l * lin(c) + gind) + emit
     r = r * (1 + lin(tint) * 7 * on * p) + lin(tint) * 0.035 * on * p
     fog = lin(s["fog"])
     r = fog + (r - fog) * f
     r_l = np.where(open_sky[..., None], lin(sky_g), r)
 
-    g = skyclock.grade(s)
-    for name, rad in (("gamma", r_g), ("linear", r_l)):
+    for name, rad, g in (("gamma", r_g, skyclock.grade(s, skyclock.EXPOSURE_NIGHT_GAMMA)), ("linear", r_l, skyclock.grade(s))):
         np.save(os.path.join(out_dir, f"{tag}-{name}.npy"), rad.astype(np.float32))
         save(os.path.join(out_dir, f"{tag}-{name}.png"), frame(rad, bloom=bloom(rad, g["exposure"]), **g))
     print("rendered", tag)

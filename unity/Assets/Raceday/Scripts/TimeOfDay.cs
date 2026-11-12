@@ -44,6 +44,8 @@ namespace TarmacGauntlet.Raceday
         private const float NightShine = 0.2f;
         /// <summary>The sun's light is matched for Linear colour space on a surface turned at least this far towards it (cosine).</summary>
         private const float MatchFacing = 0.3f;
+        /// <summary>How much more light the ground and the air throw back into the shade with the sun low and golden.</summary>
+        private const float GoldenBounce = 0.6f;
         /// <summary>
         /// The low mist's density at the ground, per m: a trace on a clear afternoon, thick in the morning mist and the rain,
         /// and a little damp at night for the floodlights' beams. And how fast it thins with height, m.
@@ -202,9 +204,12 @@ namespace TarmacGauntlet.Raceday
             lamp.intensity = LinearLight.Match(s.LightColour, s.LightIntensity, s.AmbientSky, Mathf.Max(s.LightDir.y, MatchFacing));
             lamp.enabled = s.LightIntensity > 0.001f;
 
-            RenderSettings.ambientSkyColor = s.AmbientSky;
-            RenderSettings.ambientEquatorColor = s.AmbientEquator;
-            RenderSettings.ambientGroundColor = s.AmbientGround;
+            // The ambient light was set in Gamma too: matched for Linear, with a little more bounce off the ground and
+            // the air round a low sun so the shade stays green and gold.
+            float bounce = 1f + GoldenBounce * SkyGrade.Golden(s.SunElevation, Mathf.Max(overcast, rain));
+            RenderSettings.ambientSkyColor = LinearLight.Ambient(s.AmbientSky * bounce);
+            RenderSettings.ambientEquatorColor = LinearLight.Ambient(s.AmbientEquator * bounce);
+            RenderSettings.ambientGroundColor = LinearLight.Ambient(s.AmbientGround * bounce);
             RenderSettings.fogColor = s.Fog;
             RenderSettings.fogDensity = SkyClock.Density(haze);
 

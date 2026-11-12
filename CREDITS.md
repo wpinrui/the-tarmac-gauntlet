@@ -12,6 +12,22 @@ The Team HQ's music (`unity/Assets/Management/Resources/Music`).
 
 Each Kevin MacLeod track is re-encoded to Ogg Vorbis and levelled to -18 LUFS. The music is otherwise unchanged.
 
+## Menu sounds
+
+The menus' UI sounds (`unity/Assets/Management/Resources/UiSounds`), made by `tools/ui-sounds/ui-sounds.py`.
+
+- Click, stepper and toggle: "Interface Sounds" by Kenney (www.kenney.nl), CC0. https://opengameart.org/content/interface-sounds. Filtered, given a small room and levelled.
+- Every other cue is made for the game.
+
+## Pit stop and collision sounds
+
+The race's recorded sounds (`unity/Assets/Raceday/Resources/RaceSfx`), cut, layered and levelled by `tools/race-sfx/build.py`. All are CC0, so no credit is owed; they are listed so they can be found again.
+
+- Wheel guns, air lines, air jacks, the fuel nozzle and pour, car boots and doors, sheet steel, a metal bin, crushed cans and a grinding gate: Joseph Sardin, BigSoundBank (https://bigsoundbank.com), CC0.
+- Clunks and thuds: BMacZero, "Mechanical Sounds" and "Metal Impact Sounds", OpenGameArt, CC0.
+- Metal scrapes: AntumDeluge, "Scrapes", OpenGameArt, CC0.
+- One heavy crash: qubodup, "Crash Collision", OpenGameArt, CC0.
+
 ## Race ambience
 
 The race's crowd, PA, rain, thunder and countryside (`unity/Assets/Raceday/Resources/Ambience`), cut, looped and levelled by `tools/ambience/build.py`. Every recording is public domain, so none needs credit; they are listed for thanks. The wind and the wet-road hiss are synthesised in the game.

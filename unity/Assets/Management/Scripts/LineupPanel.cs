@@ -124,6 +124,7 @@ namespace TarmacGauntlet.Management
         {
             GameState game = GameSession.State;
             if (game == null || Player?.EnteredCarId == null) return;
+            MenuSounds.Play(UiCue.Go);
             RaceWeekend.Begin(game);
             GameSession.DropRace();
             GameSession.Flush();

@@ -71,6 +71,18 @@ namespace TarmacGauntlet.Raceday
             }
         }
 
+        /// <summary>Car i's kit work, or null for a car with no crew.</summary>
+        public KitWork Work(int i) => works != null && i >= 0 && i < works.Length ? works[i] : null;
+
+        /// <summary>The number of cars, each with its box.</summary>
+        public int Count => works?.Length ?? 0;
+
+        /// <summary>Is car i's crew played live near the camera, its kit moving?</summary>
+        public bool Live(int i) => crews != null && crews.IsLive(i);
+
+        /// <summary>Where car i stands.</summary>
+        public Vector3 CarAt(int i) => cars[i].transform.position;
+
         private void LateUpdate()
         {
             if (works == null) return;

@@ -269,6 +269,12 @@ namespace TarmacGauntlet.Raceday
             tv.Drivers = drivers;
             tv.Player = player;
             views.Director = tv;
+            BroadcastDirector locked = views.gameObject.AddComponent<BroadcastDirector>();
+            locked.Circuit = circuit;
+            locked.Cars = racing;
+            locked.Drivers = drivers;
+            locked.Player = player;
+            views.Locked = locked;
             // Run on its own the scene is for AI testing, so it starts on the chase camera.
             if (!career) views.StartInChase();
             RaceTower tower = Tower(circuit, racing, field, teams, watched, starter);
@@ -283,8 +289,12 @@ namespace TarmacGauntlet.Raceday
             PitCrews crews = new GameObject("Pit crews").AddComponent<PitCrews>();
             crews.Build(Complex, pits, racing, drivers, tower.Colours, crewSizes);
             // The crews handle the kit at their stops: the fuel hose, the guns, the tyres, the jacks and the lollipop.
-            crews.gameObject.AddComponent<PitKitWork>().Build(Complex, crews, view.Kit, racing);
+            PitKitWork kitWork = crews.gameObject.AddComponent<PitKitWork>();
+            kitWork.Build(Complex, crews, view.Kit, racing);
+            // The guns, jacks and fuel rig sound at the stops near the camera.
+            crews.gameObject.AddComponent<PitAudio>().Build(kitWork);
             tv.Classes = tower.Classes;
+            locked.Classes = tower.Classes;
             sky.RaceSeconds = () => tower.RaceTime;
             // Every race rolls its own weather (WeatherPlan), played on the race clock.
             int seed = resume != null ? resume.WeatherSeed : weatherSeed != 0 ? weatherSeed : new System.Random().Next(1, int.MaxValue);

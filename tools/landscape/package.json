@@ -2,5 +2,8 @@
   "name": "landscape-tools",
   "private": true,
   "description": "Bakes the tree impostors and renders landscape previews. npm install here first.",
-  "dependencies": { "three": "0.170.0" }
+  "dependencies": {
+    "meshoptimizer": "^1.0.1",
+    "three": "0.170.0"
+  }
 }

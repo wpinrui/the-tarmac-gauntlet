@@ -1,0 +1,491 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/","meshoptimizer":"./node_modules/meshoptimizer/meshopt_simplifier.js"}}</script>
+</head><body><script type="module">
+// Turns one Poly Haven tree into the game's near 3D tree, in two levels of detail, from the same model and with the
+// same pivot, leaf thickening and crown shading as the impostor bake (bake.html), so it lines up with its impostor:
+//   bark: the trunk and branches, simplified (meshoptimizer), their texture transforms folded into the uvs;
+//   leaves: the leaf geometry is far too fine to draw, so it becomes cards. The crown is cut into cubes; each cube
+//   with leaves in it gets one card through the leaves' middle, turned out from the crown, showing a cluster of the
+//   tree's own leaves rendered from four sample cubes (the leaf atlas, 2 x 2 tiles).
+// Positions and normals come back in Unity's frame (three.js's with z turned round), relative to the pivot.
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptSimplifier } from 'meshoptimizer';
+
+const isLeaf = m => m.alphaMode === 'BLEND' || /leaves|twig/i.test(m.name);
+
+/** Scales every separate leaf card about its own middle, as bake.html does. */
+function thicken(geom, k) {
+  if (k === 1) return;
+  const pos = geom.attributes.position, idx = geom.index;
+  const n = pos.count, parent = new Int32Array(n);
+  for (let i = 0; i < n; i++) parent[i] = i;
+  const find = a => { while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; } return a; };
+  for (let t = 0; t < idx.count; t += 3) {
+    const a = find(idx.getX(t)), b = find(idx.getX(t + 1)), c = find(idx.getX(t + 2));
+    parent[b] = a; parent[find(c)] = a;
+  }
+  const sum = new Map();
+  for (let i = 0; i < n; i++) {
+    const r = find(i); let s = sum.get(r);
+    if (!s) sum.set(r, s = [0, 0, 0, 0]);
+    s[0] += pos.getX(i); s[1] += pos.getY(i); s[2] += pos.getZ(i); s[3]++;
+  }
+  for (let i = 0; i < n; i++) {
+    const s = sum.get(find(i)), cx = s[0] / s[3], cy = s[1] / s[3], cz = s[2] / s[3];
+    pos.setXYZ(i, cx + (pos.getX(i) - cx) * k, cy + (pos.getY(i) - cy) * k, cz + (pos.getZ(i) - cz) * k);
+  }
+  pos.needsUpdate = true;
+}
+
+const cache = {};
+async function load(url) {
+  if (!cache[url]) cache[url] = await new GLTFLoader().loadAsync(url);
+  return cache[url];
+}
+
+// A repeatable random number from a seed.
+function rng(seed) {
+  let s = seed >>> 0 || 1;
+  return () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return (s >>> 0) / 4294967296; };
+}
+
+/** A texture's image drawn square at a size, as a JPEG data URL. */
+function imageUrl(image, size) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  c.getContext('2d').drawImage(image, 0, 0, size, size);
+  return c.toDataURL('image/jpeg', 0.9);
+}
+
+/** Spreads the leaves' colour a few pixels into the clear round them, so the smaller mipmaps have no dark fringe. */
+function bleed(px, size, steps) {
+  const have = new Uint8Array(size * size);
+  for (let i = 0; i < have.length; i++) have[i] = px[i * 4 + 3] > 127 ? 1 : 0;
+  for (let s = 0; s < steps; s++) {
+    const next = have.slice();
+    for (let y = 0; y < size; y++)
+      for (let x = 0; x < size; x++) {
+        const i = y * size + x;
+        if (have[i]) continue;
+        let r = 0, g = 0, b = 0, n = 0;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const xx = x + dx, yy = y + dy;
+          if (xx < 0 || yy < 0 || xx >= size || yy >= size) continue;
+          const j = yy * size + xx;
+          if (!have[j]) continue;
+          r += px[j * 4]; g += px[j * 4 + 1]; b += px[j * 4 + 2]; n++;
+        }
+        if (n) { px[i * 4] = r / n; px[i * 4 + 1] = g / n; px[i * 4 + 2] = b / n; next[i] = 1; }
+      }
+    have.set(next);
+  }
+  // Beyond that, the leaves' mean colour: the smallest mipmaps average the whole tile, and black would darken them.
+  const mean = [0, 0, 0];
+  let n = 0;
+  for (let i = 0; i < have.length; i++) if (px[i * 4 + 3] > 127) { for (let k = 0; k < 3; k++) mean[k] += px[i * 4 + k]; n++; }
+  for (let i = 0; i < have.length; i++) {
+    if (!have[i]) for (let k = 0; k < 3; k++) px[i * 4 + k] = mean[k] / Math.max(n, 1);
+    px[i * 4 + 3] = px[i * 4 + 3] > 127 ? 255 : 0;
+  }
+}
+
+const tileVert = `
+  uniform mat3 uvMat; varying vec2 vUv;
+  void main() { vUv = (uvMat * vec3(uv, 1.0)).xy; gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.0); }`;
+const tileFrag = `
+  uniform sampler2D map; uniform bool hasMap; uniform vec3 tint; varying vec2 vUv;
+  void main() {
+    vec4 c = hasMap ? texture2D(map, vUv) : vec4(1.0);
+    if (c.a < 0.5) discard;
+    gl_FragColor = vec4(c.rgb * tint, 1.0);
+    #include <colorspace_fragment>
+  }`;
+
+/**
+ * spec: { url, node, leavesOnly, thicken, cube (LOD0's cube, m), keep (share of a cube's area in leaves to get a card),
+ *         card (card width over the cube's), bark0, bark1 (bark triangles at each LOD), tile (px),
+ *         tiers (a conifer: cards along, across and sloping down its branches, not turned out from the crown) }
+ * Returns { lods: [{ positions, normals, uvs, extra, bark, leaves }], barkImages: { uri: dataURL }, atlas: dataURL, meta }.
+ */
+window.build = async (spec) => {
+  const g = await load(spec.url);
+  const src = spec.node >= 0 ? g.scene.children[spec.node] : g.scene;
+  const tree = src.clone(true);
+  tree.position.set(0, 0, 0);
+  tree.updateMatrixWorld(true);
+  const meshes = [];
+  tree.traverse(o => { if (o.isMesh) meshes.push(o); });
+  const bark = [], leaves = [];
+  for (const o of meshes) {
+    const leaf = isLeaf(o.material);
+    if (spec.leavesOnly && !leaf) continue;
+    if (leaf) { o.geometry = o.geometry.clone(); thicken(o.geometry, spec.thicken || 1); leaves.push(o); }
+    else bark.push(o);
+  }
+  // The pivot, height and crown exactly as bake.html finds them.
+  const box = new THREE.Box3(), crown = new THREE.Box3(), v = new THREE.Vector3();
+  for (const o of [...bark, ...leaves]) {
+    const p = o.geometry.attributes.position, leaf = isLeaf(o.material);
+    for (let i = 0; i < p.count; i += 3) {
+      v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld);
+      box.expandByPoint(v);
+      if (leaf) crown.expandByPoint(v);
+    }
+  }
+  if (crown.isEmpty()) crown.copy(box);
+  const base = new THREE.Vector3((crown.min.x + crown.max.x) / 2, box.min.y, (crown.min.z + crown.max.z) / 2);
+  const height = box.max.y - box.min.y;
+  const crownCentre = crown.getCenter(new THREE.Vector3()).sub(base);
+  const crownRadii = crown.getSize(new THREE.Vector3()).multiplyScalar(0.5);
+
+  // ---- bark: one welded, indexed list per LOD, every material's uvs in its own layer
+  const barkImages = {};
+  const barkParts = [];
+  for (const o of bark) {
+    const m = o.material, map = m.map;
+    if (!map || !map.image) continue;
+    const assoc = g.parser.associations.get(map);
+    const uri = assoc && assoc.textures !== undefined ? g.parser.json.images[g.parser.json.textures[assoc.textures].source].uri : m.name;
+    if (!barkImages[uri]) barkImages[uri] = imageUrl(map.image, 512);
+    map.updateMatrix();
+    const geo = o.geometry, pos = geo.attributes.position, nor = geo.attributes.normal;
+    const uv = map.channel === 1 && geo.attributes.uv1 ? geo.attributes.uv1 : geo.attributes.uv;
+    const nm = new THREE.Matrix3().getNormalMatrix(o.matrixWorld);
+    const n = pos.count, P = new Float32Array(n * 3), N = new Float32Array(n * 3), U = new Float32Array(n * 2);
+    const w = new THREE.Vector3(), t = new THREE.Vector3();
+    for (let i = 0; i < n; i++) {
+      w.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld).sub(base);
+      P.set([w.x, w.y, w.z], i * 3);
+      t.fromBufferAttribute(nor, i).applyMatrix3(nm).normalize();
+      N.set([t.x, t.y, t.z], i * 3);
+      const q = new THREE.Vector3(uv.getX(i), uv.getY(i), 1).applyMatrix3(map.matrix);
+      U.set([q.x, q.y], i * 2);
+    }
+    const I = geo.index ? Uint32Array.from(geo.index.array) : Uint32Array.from({ length: n }, (_, i) => i);
+    let area = 0;
+    for (let k = 0; k < I.length; k += 3) {
+      const a = I[k] * 3, b = I[k + 1] * 3, c = I[k + 2] * 3;
+      const ux = P[b] - P[a], uy = P[b + 1] - P[a + 1], uz = P[b + 2] - P[a + 2], vx = P[c] - P[a], vy = P[c + 1] - P[a + 1], vz = P[c + 2] - P[a + 2];
+      area += Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx) / 2;
+    }
+    barkParts.push({ uri, P, N, U, I, area });
+  }
+  const barkLayers = Object.keys(barkImages);
+
+  await MeshoptSimplifier.ready;
+  const barkLod = (target, error) => {
+    const out = { P: [], N: [], U: [], L: [], I: [] };
+    // Shared out by surface area, so the trunk keeps its share however finely the twigs were modelled.
+    const total = barkParts.reduce((s, p) => s + p.area, 0);
+    for (const p of barkParts) {
+      const want = Math.min(p.I.length / 3, Math.max(60, Math.round(target * p.area / total))) * 3;
+      let idx = p.I;
+      // Twigs smaller than the error are dropped whole (Prune) rather than left as stray shards.
+      if (idx.length > want) [idx] = MeshoptSimplifier.simplify(p.I, p.P, 3, want, error, ['Prune']);
+      // Only the vertices still used.
+      const remap = new Map();
+      const layer = barkLayers.indexOf(p.uri);
+      for (const k of idx) {
+        if (!remap.has(k)) {
+          remap.set(k, out.P.length / 3);
+          out.P.push(p.P[k * 3], p.P[k * 3 + 1], p.P[k * 3 + 2]);
+          out.N.push(p.N[k * 3], p.N[k * 3 + 1], p.N[k * 3 + 2]);
+          out.U.push(p.U[k * 2], p.U[k * 2 + 1]);
+          out.L.push(layer);
+        }
+        out.I.push(remap.get(k));
+      }
+    }
+    return out;
+  };
+
+  // ---- leaves: every leaf triangle's middle, area and normal, turned out from the crown
+  const tris = [];
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), e1 = new THREE.Vector3(), e2 = new THREE.Vector3();
+  for (const o of leaves) {
+    const geo = o.geometry, pos = geo.attributes.position, idx = geo.index;
+    const count = idx ? idx.count : pos.count;
+    for (let k = 0; k < count; k += 3) {
+      const i0 = idx ? idx.getX(k) : k, i1 = idx ? idx.getX(k + 1) : k + 1, i2 = idx ? idx.getX(k + 2) : k + 2;
+      a.fromBufferAttribute(pos, i0).applyMatrix4(o.matrixWorld).sub(base);
+      b.fromBufferAttribute(pos, i1).applyMatrix4(o.matrixWorld).sub(base);
+      c.fromBufferAttribute(pos, i2).applyMatrix4(o.matrixWorld).sub(base);
+      e1.subVectors(b, a); e2.subVectors(c, a);
+      const n = new THREE.Vector3().crossVectors(e1, e2);
+      const area = n.length() / 2;
+      if (area <= 0) continue;
+      n.normalize();
+      const mid = new THREE.Vector3().addVectors(a, b).add(c).divideScalar(3);
+      if (n.dot(mid.clone().sub(crownCentre)) < 0) n.negate();
+      tris.push({ mid, area, n });
+    }
+  }
+
+  const cubes = size => {
+    const map = new Map();
+    for (const t of tris) {
+      const key = `${Math.floor(t.mid.x / size)},${Math.floor(t.mid.y / size)},${Math.floor(t.mid.z / size)}`;
+      let s = map.get(key);
+      if (!s) map.set(key, s = { area: 0, mid: new THREE.Vector3(), n: new THREE.Vector3() });
+      s.area += t.area; s.mid.addScaledVector(t.mid, t.area); s.n.addScaledVector(t.n, t.area);
+    }
+    const out = [];
+    for (const s of map.values()) {
+      if (s.area < spec.keep * size * size) continue;
+      s.mid.divideScalar(s.area); s.n.normalize();
+      out.push(s);
+    }
+    return out;
+  };
+
+  // Crown shading as the impostor bake gives it: leaves deep in the crown and low down are in each other's shade.
+  const shade = p => {
+    const d = p.clone().sub(crownCentre).divide(crownRadii);
+    const out_ = Math.min(Math.max(d.length(), 0), 1), up = Math.min(Math.max(d.y * 0.5 + 0.5, 0), 1);
+    const sm = x => { const t = Math.min(Math.max((x - 0.15) / 0.8, 0), 1); return t * t * (3 - 2 * t); };
+    return (0.42 + 0.58 * sm(out_)) * (0.72 + 0.33 * up);
+  };
+  // The crown's round shape: lights the crown as one mass, as the impostor's normals do.
+  const outward = p => p.clone().sub(crownCentre).divide(crownRadii).normalize();
+  // Level and away from the trunk.
+  const UP = new THREE.Vector3(0, 1, 0);
+  const radial = p => { const r = new THREE.Vector3(p.x - crownCentre.x, 0, p.z - crownCentre.z); return r.lengthSq() > 1e-6 ? r.normalize() : new THREE.Vector3(1, 0, 0); };
+
+  // ---- the leaf atlas: four sample cubes from LOD0, picked from the fullest, spread up the crown
+  const S = spec.tile, cube0 = spec.cube;
+  const samples = cubes(cube0).sort((p, q) => q.area - p.area);
+  const full = samples.slice(0, Math.max(4, Math.ceil(samples.length * 0.3))).sort((p, q) => p.mid.y - q.mid.y);
+  const picks = [0, 1, 2, 3].map(i => full[Math.min(full.length - 1, Math.floor((i + 0.5) / 4 * full.length))]);
+  const r = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true, alpha: true, premultipliedAlpha: false });
+  r.setPixelRatio(1);
+  r.setSize(S * 2, S * 2);
+  r.outputColorSpace = THREE.SRGBColorSpace;
+  r.setClearColor(0x000000, 0);
+  const scene = new THREE.Scene();
+  const holder = new THREE.Group();
+  holder.position.copy(base).negate();   // leaves drawn relative to the pivot
+  for (const o of leaves) {
+    const mesh = new THREE.Mesh(o.geometry, new THREE.ShaderMaterial({
+      vertexShader: tileVert, fragmentShader: tileFrag, side: THREE.DoubleSide,
+      uniforms: { map: { value: o.material.map }, hasMap: { value: !!o.material.map },
+        uvMat: { value: o.material.map ? (o.material.map.updateMatrix(), o.material.map.matrix.clone()) : new THREE.Matrix3() },
+        tint: { value: o.material.color ? o.material.color.clone() : new THREE.Color(1, 1, 1) } },
+    }));
+    mesh.matrixAutoUpdate = false;
+    mesh.matrix.copy(o.matrixWorld);
+    holder.add(mesh);
+  }
+  scene.add(holder);
+  const width0 = cube0 * spec.card;
+  r.setScissorTest(true);
+  r.setViewport(0, 0, S * 2, S * 2); r.setScissor(0, 0, S * 2, S * 2); r.clear();
+  picks.forEach((s, i) => {
+    const half = width0 / 2;
+    // Clipped to a slab one cube deep, so the tile holds that cube's own leaves.
+    const cam = new THREE.OrthographicCamera(-half, half, half, -half, 0.01, cube0 * 1.5);
+    if (spec.tiers) {
+      // A conifer's tiers: each tile looks along a branch from beside it, level.
+      cam.position.copy(s.mid).addScaledVector(new THREE.Vector3().crossVectors(UP, radial(s.mid)), cube0 * 0.75);
+      cam.up.copy(UP);
+    } else {
+      cam.position.copy(s.mid).addScaledVector(s.n, cube0 * 0.75);
+      cam.up.set(0, 1, 0);
+      if (Math.abs(s.n.y) > 0.95) cam.up.set(0, 0, -1);
+    }
+    cam.lookAt(s.mid);
+    const x = i % 2, y = i >> 1;
+    r.setViewport(x * S, y * S, S, S); r.setScissor(x * S, y * S, S, S);
+    r.render(scene, cam);
+  });
+  // Rounded off: a ragged circle, so the cards don't show square edges.
+  const ctx = document.createElement('canvas').getContext('2d');
+  ctx.canvas.width = ctx.canvas.height = S * 2;
+  ctx.drawImage(r.domElement, 0, 0);
+  const img = ctx.getImageData(0, 0, S * 2, S * 2);
+  const rand = rng(7);
+  // A conifer's is more ragged still, and flattened, as a branch seen from beside is a thin spray.
+  const ragged = new Float32Array(64).map(() => spec.tiers ? 0.55 + 0.45 * rand() : 0.65 + 0.35 * rand());
+  for (let y = 0; y < S * 2; y++)
+    for (let x = 0; x < S * 2; x++) {
+      const tx = (x % S) / S * 2 - 1, ty = (y % S) / S * 2 / (spec.tiers ? 0.75 : 1) - 1 / (spec.tiers ? 0.75 : 1);
+      const ang = Math.atan2(ty, tx), k = Math.floor((ang / (2 * Math.PI) + 0.5) * 64) % 64;
+      if (Math.hypot(tx, ty) > ragged[k]) img.data[(y * S * 2 + x) * 4 + 3] = 0;
+    }
+  bleed(img.data, S * 2, 8);
+  ctx.putImageData(img, 0, 0);
+  const atlas = ctx.canvas.toDataURL('image/png');
+  r.dispose();
+
+  // ---- the cards for a LOD: two crossed cards per cube, so one seen edge on still has the other showing leaves
+  const cardLod = (size, crossed) => {
+    const out = { P: [], N: [], U: [], E: [], I: [] };
+    const rand = rng(Math.round(size * 1000) + 11);
+    const w = size * spec.card;
+    for (const s of cubes(size)) {
+      const out_ = outward(s.mid);
+      const n = s.n.clone().multiplyScalar(0.4).add(out_.clone().multiplyScalar(0.6)).normalize();
+      const planes = spec.tiers ? 3 : crossed ? 2 : 1;
+      for (let p = 0; p < planes; p++) {
+        let face, t, bt, tile;
+        if (spec.tiers) {
+          // A conifer's branch, as three cards: one standing along it and drooping to its tip, one sloping down and out
+          // across it as the cone's own surface does, and one standing across it. No card lies flat, which from below
+          // shows as a pale plate. Each tile looks along a branch from beside it, the tip on its left.
+          const r = radial(s.mid), across = new THREE.Vector3().crossVectors(UP, r);
+          const droop = 0.25 + 0.25 * rand();
+          if (p === 0) { t = r.clone().addScaledVector(UP, -droop).normalize().negate(); bt = UP.clone().addScaledVector(r, droop).normalize(); }
+          else if (p === 1) { t = across; bt = r.clone().addScaledVector(UP, -1.2).normalize().negate(); }
+          else { t = across.clone().negate(); bt = UP.clone().addScaledVector(across, (rand() - 0.5) * 0.4).normalize(); }
+          tile = Math.floor(rand() * 4);
+        } else {
+          // Turned a little at random, so neighbouring cards don't line up into one flat plane.
+          face = n.clone().add(new THREE.Vector3(rand() - 0.5, rand() - 0.5, rand() - 0.5).multiplyScalar(0.8)).normalize();
+          if (p === 1) {
+            // The second card stands square to the first, through the same middle.
+            face = new THREE.Vector3(rand() - 0.5, rand() - 0.5, rand() - 0.5).cross(face).normalize();
+          }
+          const spin = rand() * Math.PI * 2;
+          const ref = Math.abs(face.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+          const t0 = new THREE.Vector3().crossVectors(ref, face).normalize(), b0 = new THREE.Vector3().crossVectors(face, t0);
+          t = t0.clone().multiplyScalar(Math.cos(spin)).addScaledVector(b0, Math.sin(spin));
+          bt = new THREE.Vector3().crossVectors(face, t);
+          tile = Math.floor(rand() * 4);
+        }
+        const tx = tile % 2, ty = tile >> 1;
+        const start = out.P.length / 3;
+        // Each card its own size, so the cards don't read as a regular pattern.
+        const half = w / 2 * (0.75 + 0.5 * rand());
+        for (let k = 0; k < 4; k++) {
+          const cx = k === 1 || k === 2 ? 1 : -1, cy = k >= 2 ? 1 : -1;
+          const q = s.mid.clone().addScaledVector(t, cx * half).addScaledVector(bt, cy * half);
+          out.P.push(q.x, q.y, q.z);
+          // The crown's round shape alone; the game turns it a little towards the viewer, as the impostor bake's
+          // leaf normals face the camera that baked them.
+          const nn = outward(q);
+          out.N.push(nn.x, nn.y, nn.z);
+          // Tiles were drawn with GL's viewport, row 0 at the bottom, as the atlas is read.
+          out.U.push((tx + (cx * 0.5 + 0.5)) / 2, (ty + (cy * 0.5 + 0.5)) / 2);
+          out.E.push(shade(q));
+        }
+        out.I.push(start, start + 1, start + 2, start, start + 2, start + 3);
+      }
+    }
+    return out;
+  };
+
+  const lods = [], parts = [];
+  for (let l = 0; l < 2; l++) {
+    const bk = barkLod(l === 0 ? spec.bark0 : spec.bark1, l === 0 ? 0.015 : 0.04);
+    const lf = cardLod(cube0 * (l === 0 ? 1 : 2), true);
+    parts.push({ bk, lf });
+    // Into Unity's frame: z turned round, and the winding with it.
+    const P = [], N = [], U = [], X = [];
+    const flip = (arr, out) => { for (let i = 0; i < arr.length; i += 3) out.push(arr[i], arr[i + 1], -arr[i + 2]); };
+    flip(bk.P, P); flip(bk.N, N); flip(lf.P, P); flip(lf.N, N);
+    for (let i = 0; i < bk.U.length; i += 2) U.push(bk.U[i], 1 - bk.U[i + 1]);
+    for (let i = 0; i < lf.U.length; i++) U.push(lf.U[i]);
+    // Extra per vertex: layer (bark layer, unused on leaves), shade, sway (how far up the tree, squared).
+    for (let i = 0; i < bk.L.length; i++) { const y = bk.P[i * 3 + 1] / height; X.push(bk.L[i], 0.75, y * y * 0.35); }
+    for (let i = 0; i < lf.E.length; i++) { const y = lf.P[i * 3 + 1] / height; X.push(-1, lf.E[i], y * y); }
+    const nb = bk.P.length / 3;
+    const barkIdx = [], leafIdx = [];
+    for (let i = 0; i < bk.I.length; i += 3) barkIdx.push(bk.I[i], bk.I[i + 2], bk.I[i + 1]);
+    for (let i = 0; i < lf.I.length; i++) leafIdx.push(lf.I[i] + nb);
+    lods.push({ positions: P, normals: N, uvs: U, extra: X, bark: barkIdx, leaves: leafIdx });
+  }
+  const barkColours = await Promise.all(barkLayers.map(uri => meanColour(barkImages[uri])));
+  const against = [];
+  for (const p of parts) against.push(await measure(spec, height, p, ctx.canvas, barkColours));
+  return { lods, barkLayers, barkImages, atlas, against, meta: { height, crownCentre: crownCentre.toArray(), leafTriangles: tris.length,
+    lods: lods.map(l => ({ vertices: l.positions.length / 3, bark: l.bark.length / 3, cards: l.leaves.length / 6 })) } };
+};
+
+/** An image's mean colour, linear. */
+async function meanColour(url) {
+  const img = await new THREE.ImageLoader().loadAsync(url);
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0, 64, 64);
+  const d = ctx.getImageData(0, 0, 64, 64).data, m = [0, 0, 0];
+  for (let i = 0; i < d.length; i += 4) for (let k = 0; k < 3; k++) m[k] += Math.pow(d[i + k] / 255, 2.2);
+  return m.map(v => v / (d.length / 4));
+}
+
+/** Direction from the tree to the viewer for frame (fx, fy), as bake.html has it. */
+function frameDir(fx, fy, N) {
+  const ax = fx / (N - 1) * 2 - 1, ay = fy / (N - 1) * 2 - 1;
+  const px = (ax + ay) / 2, pz = (ax - ay) / 2;
+  return new THREE.Vector3(px, Math.max(1 - Math.abs(px) - Math.abs(pz), 0), pz).normalize();
+}
+
+/**
+ * Draws a level of detail unlit from the impostor atlas's own 8 x 8 views and compares it with the atlas: how much of
+ * each frame it covers against the impostor, and the impostor's mean colour over its own (each channel, linear).
+ */
+async function measure(spec, height, part, leafCanvas, barkColours) {
+  // At the bake's own size, 256 px a frame, so neither side is read from its smallest mipmaps.
+  const N = 8, S = 256, R = spec.radius;
+  const img = await new THREE.ImageLoader().loadAsync(spec.impostor);
+  const c = document.createElement('canvas'); c.width = c.height = N * S;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0, N * S, N * S);
+  const imp = ctx.getImageData(0, 0, N * S, N * S).data;
+
+  const { bk, lf } = part;
+  const geo = (P, U, E, I) => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+    g.setAttribute('shade', new THREE.Float32BufferAttribute(E, 1));
+    g.setIndex(I);
+    return g;
+  };
+  const leafTex = new THREE.CanvasTexture(leafCanvas);
+  const vert = `attribute float shade; varying vec2 vUv; varying float vShade;
+    void main() { vUv = uv; vShade = shade; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+  const scene = new THREE.Scene();
+  scene.add(new THREE.Mesh(geo(lf.P, lf.U, lf.E, lf.I), new THREE.ShaderMaterial({ side: THREE.DoubleSide, uniforms: { map: { value: leafTex } }, vertexShader: vert,
+    fragmentShader: `uniform sampler2D map; varying vec2 vUv; varying float vShade;
+      void main() { vec4 c = texture2D(map, vUv); if (c.a < 0.5) discard; gl_FragColor = vec4(pow(pow(c.rgb, vec3(2.2)) * vShade, vec3(1.0 / 2.2)), 1.0); }` })));
+  // Bark by its texture's mean colour, enough to weigh it in.
+  for (let layer = 0; layer < barkColours.length; layer++) {
+    const I = [];
+    for (let i = 0; i < bk.I.length; i += 3) if (bk.L[bk.I[i]] === layer) I.push(bk.I[i], bk.I[i + 1], bk.I[i + 2]);
+    if (!I.length) continue;
+    const col = new THREE.Vector3(...barkColours[layer]).multiplyScalar(0.75);
+    scene.add(new THREE.Mesh(geo(bk.P, bk.U, bk.L.map(() => 1), I), new THREE.ShaderMaterial({ side: THREE.DoubleSide, uniforms: { col: { value: col } }, vertexShader: vert,
+      fragmentShader: `uniform vec3 col; void main() { gl_FragColor = vec4(pow(col, vec3(1.0 / 2.2)), 1.0); }` })));
+  }
+  const r = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true, alpha: true, premultipliedAlpha: false });
+  r.setPixelRatio(1); r.setSize(N * S, N * S);
+  r.outputColorSpace = THREE.LinearSRGBColorSpace;
+  r.setClearColor(0x000000, 0);
+  r.setScissorTest(true);
+  r.setViewport(0, 0, N * S, N * S); r.setScissor(0, 0, N * S, N * S); r.clear();
+  const centre = new THREE.Vector3(0, height / 2, 0);
+  const cam = new THREE.OrthographicCamera(-R, R, R, -R, 0.01, R * 4);
+  for (let fy = 0; fy < N; fy++)
+    for (let fx = 0; fx < N; fx++) {
+      const d = frameDir(fx, fy, N);
+      cam.position.copy(centre).addScaledVector(d, R * 2);
+      cam.up.set(...(Math.abs(d.y) > 0.999 ? [0, 0, -1] : [0, 1, 0]));
+      cam.lookAt(centre);
+      r.setViewport(fx * S, fy * S, S, S); r.setScissor(fx * S, fy * S, S, S);
+      r.render(scene, cam);
+    }
+  ctx.clearRect(0, 0, N * S, N * S);
+  ctx.drawImage(r.domElement, 0, 0);
+  const own = ctx.getImageData(0, 0, N * S, N * S).data;
+  r.dispose();
+  let a = 0, b = 0;
+  const ma = [0, 0, 0], mb = [0, 0, 0];
+  for (let i = 0; i < own.length; i += 4) {
+    if (imp[i + 3] > 127) { a++; for (let k = 0; k < 3; k++) ma[k] += Math.pow(imp[i + k] / 255, 2.2); }
+    if (own[i + 3] > 127) { b++; for (let k = 0; k < 3; k++) mb[k] += Math.pow(own[i + k] / 255, 2.2); }
+  }
+  return { coverage: b / a, colour: ma.map((v, k) => (v / a) / (mb[k] / b)) };
+}
+window.ready = true;
+</script></body></html>

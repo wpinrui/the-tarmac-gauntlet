@@ -358,7 +358,9 @@ namespace TarmacGauntlet.Management
                 bool can = !full && p.Budget >= cost;
                 VisualElement buy = RedButton("Buy out " + Money(cost), "panel-button", () =>
                 {
-                    if (can) Act(g => GameActions.BuyoutDriver(g, e.Id, e.Name, cost));
+                    if (!can) return;
+                    MenuSounds.Play(UiCue.Hire);
+                    Act(g => GameActions.BuyoutDriver(g, e.Id, e.Name, cost));
                 });
                 buy.EnableInClassList("disabled", !can);
                 detail.Add(buy);
@@ -384,7 +386,9 @@ namespace TarmacGauntlet.Management
             int length = contractLength;
             VisualElement hire = RedButton("Hire", "panel-button", () =>
             {
-                if (canHire) Act(g => GameActions.HireDriver(g, e.Id, e.Name, length, salary));
+                if (!canHire) return;
+                MenuSounds.Play(UiCue.Hire);
+                Act(g => GameActions.HireDriver(g, e.Id, e.Name, length, salary));
             });
             hire.EnableInClassList("disabled", !canHire);
             detail.Add(hire);

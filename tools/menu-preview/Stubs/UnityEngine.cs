@@ -11,6 +11,7 @@ namespace UnityEngine
         public string name { get; set; } = "";
         public HideFlags hideFlags { get; set; }
         public static void Destroy(Object o) { }
+        public static void DontDestroyOnLoad(Object o) { }
         public static T FindAnyObjectByType<T>() where T : Object => GameObject.All.SelectMany(g => g.Components).OfType<T>().FirstOrDefault();
         public static implicit operator bool(Object o) => o != null;
     }
@@ -172,6 +173,7 @@ namespace UnityEngine
                 if (file != null) made = new Texture2D(1, 1) { Path = file, name = path };
             }
             else if (typeof(T) == typeof(Font)) made = new Font { name = System.IO.Path.GetFileName(path) };
+            else if (typeof(T) == typeof(AudioClip)) made = new AudioClip { name = path };
             else if (typeof(T) == typeof(UnityEngine.UIElements.StyleSheet)) made = new UnityEngine.UIElements.StyleSheet { name = path };
             else if (typeof(T) == typeof(Shader)) made = null;
             Cache[key] = made;
@@ -237,6 +239,7 @@ namespace UnityEngine
 
     public static class PlayerPrefs
     {
+        public static void DeleteKey(string k) { }
         public static bool HasKey(string k) => false;
         public static int GetInt(string k, int d = 0) => d;
         public static float GetFloat(string k, float d = 0) => d;
@@ -349,6 +352,7 @@ namespace UnityEngine
         public static float Sin(float v) => (float)Math.Sin(v);
         public static float Cos(float v) => (float)Math.Cos(v);
         public static float Lerp(float a, float b, float t) => a + (b - a) * Clamp01(t);
+        public static float InverseLerp(float a, float b, float v) => a == b ? 0f : Clamp01((v - a) / (b - a));
         public static float Max(float a, float b) => Math.Max(a, b);
         public static float Floor(float v) => (float)Math.Floor(v);
         public static int Max(int a, int b) => Math.Max(a, b);

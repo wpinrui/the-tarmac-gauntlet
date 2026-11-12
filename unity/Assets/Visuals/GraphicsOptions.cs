@@ -97,6 +97,15 @@ namespace TarmacGauntlet.Visuals
         /// <summary>Advertising hoardings, TV camera towers and portable cabins round the track. Changes live.</summary>
         public static readonly GraphicsOption TracksideProps = Toggle("settings.tracksideprops", true);
 
+        /// <summary>
+        /// Blades of grass on the verges, the runoff and the fields near the camera, swaying in the wind: 1 thinner and
+        /// closer in, 2 thick and further out. Changes live.
+        /// </summary>
+        public static readonly GraphicsOption Grass = Count("settings.grass", 1, 2);
+
+        /// <summary>The trees nearest the camera drawn as real trees, not flat cards: 1 the nearest few, 2 out to about 100 m. Changes live.</summary>
+        public static readonly GraphicsOption NearTrees = Count("settings.neartrees", 1, 2);
+
         /// <summary>Stripes mown into the grass along the track. Changes live.</summary>
         public static readonly GraphicsOption Mowing = Toggle("settings.mowing", true);
 
@@ -168,6 +177,7 @@ namespace TarmacGauntlet.Visuals
             new GraphicsRow("Sky detail", OffAtLow, SkyDetail, SunRays),
             // Saved under new keys, so a game that saved it off while the clouds were reworked takes its level's setting.
             new GraphicsRow("Volumetric sky", OnFromHigh, VolumetricClouds, VolumetricFog, LensFlare),
+            new GraphicsRow("Foliage", new[] { 0, 1, 2, 2 }, Grass, NearTrees),
             new GraphicsRow("Crowd", AlwaysOn, Crowd),
             new GraphicsRow("HQ lighting", AlwaysOn, BakedLighting, BakedReflections, Wear),
         };

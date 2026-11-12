@@ -53,6 +53,7 @@ namespace TarmacGauntlet.Raceday
             root.AddComponent<EngineAudio>().Setup(modelId, ++spawned);
             TyreAudio.Fit(car, spawned);
             WetRoadAudio.Fit(car, spawned);
+            root.AddComponent<ImpactAudio>();
             return car;
         }
 
