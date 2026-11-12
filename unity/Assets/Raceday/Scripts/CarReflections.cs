@@ -56,7 +56,14 @@ namespace TarmacGauntlet.Raceday
         private const float Height = 0.8f;
         /// <summary>A car's probe covers its body and this much more all round, m.</summary>
         private const float Margin = 0.35f;
-        private const int SharedImportance = 100, NearImportance = 101, WaitingImportance = 0;
+        /// <summary>
+        /// A car's own probe matches the shared one's importance rather than outranking it. Outranking, two cars' probes
+        /// took both of a 200 m road piece's probe slots wherever two cars drove on it, the shared probe dropped out, and
+        /// the road round them flicked to URP's sky fallback and back as probes were handed between cars. Matched, the
+        /// road piece takes the probe it overlaps most, the shared one, and a car still takes its own: Unity blends equal
+        /// probes by how much of the renderer each holds, and URP lets the smaller one win inside its box.
+        /// </summary>
+        private const int SharedImportance = 100, NearImportance = SharedImportance, WaitingImportance = 0;
 
         private sealed class Near
         {
