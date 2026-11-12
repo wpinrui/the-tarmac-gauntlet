@@ -86,6 +86,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>H15, H1: on the free stretch, the room past a car ahead beyond the car's own width, m; below 0, the driver's own passing margin.</summary>
         private static readonly float GapWidth = Knob("GAPWIDTH", -1f);
         private static readonly bool AvoidGhosts = Knob("AVOIDGHOSTS", 1f) > 0f;
+        private static readonly bool GhostPast = Knob("GHOSTPAST", 1f) > 0f;
         /// <summary>H12: a recovering ghost keeps off the racing line, on its own side of it, until it is back up to speed (Ivan).</summary>
         private static readonly float AltLine = Knob("ALTLINE", 5f), AltClear = Knob("ALTCLEAR", CarW + RoomMargin + 1f);
         /// <summary>H12: a stopped car ahead caps the speed, braking to the yellow flag's share by <see cref="YellowReach"/> before it.</summary>
@@ -1037,7 +1038,9 @@ namespace TarmacGauntlet.Raceday
                 if (o.Id == me.Id) continue;
                 // A ghost is left out, unless it is stopped on the track: then it is an obstacle.
                 bool still = o.Ghost && !me.Ghost && Mathf.Abs(o.Speed) < StoppedSpeed
-                    && Mathf.Abs(o.Lateral) < c.HalfWidth(c.IndexOf(Mathf.Repeat(o.Distance, lap)));
+                    && Mathf.Abs(o.Lateral) < c.HalfWidth(c.IndexOf(Mathf.Repeat(o.Distance, lap)))
+                    // Two ghosts pass through each other: one stopped is crawled past, not waited behind for ever.
+                    || GhostPast && o.Ghost && me.Ghost && Mathf.Abs(o.Speed) < StoppedSpeed;
                 // A ghost getting back into the race is a car to plan round too, once near the track: the
                 // ghosting is only the safety net (Ivan, T17).
                 // T17: seen from when it heads back towards the track, not only once it is near it (Ivan).

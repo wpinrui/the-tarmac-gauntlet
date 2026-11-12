@@ -12,7 +12,7 @@ namespace TarmacGauntlet.Raceday
         public static readonly string[] All = { "path choosing", "rejoin without waiting" };
 
         /// <summary>Each experiment's revision, raised each time a better one is merged.</summary>
-        public static readonly int[] Revisions = { 49, 2 };
+        public static readonly int[] Revisions = { 50, 2 };
 
         /// <summary>The experiment switched on, or 0 for none. The game starts on E1, path choosing (Ivan): E0 is the comparison.</summary>
         public static int On = 1;
