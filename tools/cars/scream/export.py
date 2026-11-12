@@ -117,6 +117,7 @@ def build(game=False):
     cut(shell, ecut)
     out += pipes
     parts.rear_parts(ref, out)
+    cut(shell, parts.pillar_cutters(next(o for o in out if o.name == "screen_trim")))
     cut(shell, parts.grooves(ref))
     print("grooves cut")
 

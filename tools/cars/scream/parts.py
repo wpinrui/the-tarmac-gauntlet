@@ -452,7 +452,7 @@ def prism_y(name, g, y0, y1, mat="interior"):
 def _door_top(grow, sgn=1):
     """The door top, straight through from the cockpit's edge outwards."""
     g = biggest(door_outline().intersection(box(-5, DOOR_TOP, 5, 5)).buffer(grow, join_style=2))
-    return [prism_y("door_top", g, (COCKPIT_Y - 0.01 - grow) * sgn, 1.4 * sgn)]
+    return [prism_y("door_top", g, (COCKPIT_Y - 0.01 - grow) * sgn, 1.4 * sgn, mat="body")]
 
 
 def door_hinge(sgn=1):
@@ -490,6 +490,8 @@ def door(ref, shell, sgn=1):
 
 # ---------------------------------------------------------------- mirrors
 MIRROR_SWEEP = 0.12   # radians the housing turns back from square to the car
+MIRROR_DX = 0.22      # the housing moves this far forward of the model's, over the sail
+MIRROR_FOOT = 0.85    # its stalk lands on the sail at this height
 
 
 def _housing(sgn, inset=0.0, x0=None, x1=None):
@@ -500,11 +502,11 @@ def _housing(sgn, inset=0.0, x0=None, x1=None):
     y0, y1 = m["glass_y0"] - 0.012 + inset, m["glass_y1"] + 0.006 - inset
     face = soft(box(y0, zc - h, y1, zc + h), max(h - 0.01, 0.01))
     ring = ring_of(face, 96)
-    xb = m["x_back"] if x0 is None else x0
+    xb = m["x_back"] + MIRROR_DX if x0 is None else x0
     xf = xb + 0.10 if x1 is None else x1
     rings = []
     for x in np.linspace(xb, xf, 8):
-        t = (x - m["x_back"]) / 0.10
+        t = (x - m["x_back"] - MIRROR_DX) / 0.10
         k = 1 - 0.35 * max(0.0, t - 0.3) ** 2                       # the nose of the housing rounds off
         cy, cz = (y0 + y1) / 2, zc
         rr = np.column_stack([cy + (ring[:, 0] - cy) * k, cz + (ring[:, 1] - cz) * k])
@@ -517,13 +519,13 @@ def _housing(sgn, inset=0.0, x0=None, x1=None):
 def _sweep(ob, sgn):
     from mathutils import Matrix
     m = R["mirror"]
-    p = Matrix.Translation((m["x_back"] + 0.05, sgn * m["glass_y0"], 0))
+    p = Matrix.Translation((m["x_back"] + MIRROR_DX + 0.05, sgn * m["glass_y0"], 0))
     ob.data.transform(p @ Matrix.Rotation(sgn * MIRROR_SWEEP, 4, "Z") @ p.inverted())
     return ob
 
 
 def mirrors():
-    """Body coloured housings on a body coloured stalk down to the door top."""
+    """Body coloured housings on a body coloured stalk down to the black sail in the door glass."""
     m = R["mirror"]
     obs = []
     for sgn, side in ((1, "l"), (-1, "r")):
@@ -531,17 +533,17 @@ def mirrors():
         house = _sweep(blend.make(f"mirror_{side}", v, f, "body"), sgn)
         # the stalk: from under the housing's inner end, down and in to the door top
         za = (m["glass_z0"] + m["glass_z1"]) / 2 - 0.02
-        xa = m["x_back"] + 0.055
+        xa = m["x_back"] + MIRROR_DX + 0.055
         ya = m["glass_y0"] + 0.02
         face = soft(box(-0.022, -0.009, 0.022, 0.009), 0.008)
         rg = ring_of(face, 32)
         rings = []
-        yd = min(body.y_at(xa + 0.06, BELT - 0.01), COCKPIT_Y + 0.12) - 0.03
+        yd = SILL[0] - 0.004
         for t in np.linspace(0, 1, 10):
             s = t * t * (3 - 2 * t)
-            x = xa + 0.06 * t
+            x = xa + 0.02 * t
             y = ya + (yd - ya) * s
-            z = za + (BELT - 0.03 - za) * t
+            z = za + (MIRROR_FOOT - za) * t
             rings.append(np.column_stack([x + rg[:, 0] * 0.3, (y + rg[:, 0] * 0.7) * sgn, z + rg[:, 1]]))
         if sgn < 0:
             rings = [r[::-1] for r in rings]
@@ -556,9 +558,9 @@ def mirror_recess():
     m = R["mirror"]
     cut, glass = [], []
     for sgn, side in ((1, "l"), (-1, "r")):
-        v, f = geom.close_rings(_housing(sgn, 0.009, m["x_back"] - 0.03, m["x_back"] + 0.008))
+        v, f = geom.close_rings(_housing(sgn, 0.009, m["x_back"] + MIRROR_DX - 0.03, m["x_back"] + MIRROR_DX + 0.008))
         cut.append(_sweep(blend.make(f"cut_mirror_{side}", v, f, "trim"), sgn))
-        v, f = geom.close_rings(_housing(sgn, 0.0105, m["x_back"] + 0.003, m["x_back"] + 0.006))
+        v, f = geom.close_rings(_housing(sgn, 0.0105, m["x_back"] + MIRROR_DX + 0.003, m["x_back"] + MIRROR_DX + 0.006))
         glass.append(_sweep(blend.make(f"mirror_glass_{side}", v, f, "mirror_glass"), sgn))
     return cut, glass
 
@@ -668,8 +670,11 @@ TOP_EDGE = [(-0.47, 0.595, 0.985), (0.00, 0.570, 1.065)]   # the roof's edge, be
 TOP_CENTRE = [(-0.47, 1.000), (0.00, 1.150)]               # its centre line, likewise
 TOP_B = (0.585, 1.035)          # the edge's half width and height over the B pillar
 TOP_CB = 1.085                  # the centre's height over the B pillar
-SILL = (0.70, BELT - 0.015)     # the side's foot along the door top: half width, height
-A_PILLAR = 0.05                 # how far the A pillar runs back from the screen's side edge
+SILL = (0.735, BELT - 0.015)    # the side's foot along the door top: half width, height
+A_PILLAR = 0.035                # how far the A pillar runs back from the screen's side edge
+SAIL = (0.17, 0.48)             # the black sail in the glass's front lower corner: its length along
+                                # the door top, and its height up the pillar as a share
+SAIL_T = 0.002
 TOP_T = 0.025
 GLASS_T = 0.005
 REAR_WINDOW = (0.05, 0.03, 0.50)    # margins from the foot and the B pillar, half width as a share
@@ -753,13 +758,25 @@ def _panel(name, grids, t, mat, lining=None, keeps=None):
     return ob
 
 
-def _coons(bottom, top, rear, front, nt, nu):
+def _coons(bottom, top, rear, front):
     """A patch over four boundary curves, each a function of 0..1: bottom and top run rear to
-    front, rear and front run bottom to top."""
+    front, rear and front run bottom to top. Returns the patch as a function of (t, u)."""
     c00, c01, c10, c11 = bottom(0.0), bottom(1.0), top(0.0), top(1.0)
-    return np.array([[(1 - t) * bottom(u) + t * top(u) + (1 - u) * rear(t) + u * front(t)
-                      - ((1 - u) * (1 - t) * c00 + u * (1 - t) * c01 + (1 - u) * t * c10 + u * t * c11)
-                      for u in np.linspace(0, 1, nu)] for t in np.linspace(0, 1, nt)])
+    return lambda t, u: ((1 - t) * bottom(u) + t * top(u) + (1 - u) * rear(t) + u * front(t)
+                         - ((1 - u) * (1 - t) * c00 + u * (1 - t) * c01 + (1 - u) * t * c10 + u * t * c11))
+
+
+def pillar_cutters(trim):
+    """The skin left behind the screen's side edges above the belt, outboard: the A pillar and
+    the door glass take its place, so the pillar keeps an even width from cowl to roof."""
+    side, _T = _trim_edges(trim)
+    foot = (side[0][0] + 0.02 - A_PILLAR, BELT)                 # the glass's front foot: the cowl stays ahead of it
+    pts = [foot] + [(x + 0.005, z) for x, _y, z in side] + [(side[-1][0] + 0.005, 1.4), (CABIN_BACK, 1.4), (CABIN_BACK, BELT)]
+    g = Polygon(pts).buffer(0)
+    return [prism_y("cut_pillar_l", g, PILLAR_CUT_Y, 1.4), prism_y("cut_pillar_r", g, -1.4, -PILLAR_CUT_Y)]
+
+
+PILLAR_CUT_Y = 0.45   # the pillar cut stays outboard of this half width
 
 
 def hard_top(trim):
@@ -812,18 +829,27 @@ def hard_top(trim):
     sweep = np.array([[np.array([x, SILL[0], SILL[1]]) + (edge(x) - np.array([x, SILL[0], SILL[1]])) * t
                        for x in xx] for t in np.linspace(0, 1, 12)])
 
-    # the door glass
+    # the door glass, its front lower corner a black sail for the mirror to stand on
     b0 = np.array([xb, SILL[0], SILL[1]])
-    glass = _coons(lambda u: b0 + (p0 - b0) * u,
-                   lambda u: edge(xb + (p1[0] - xb) * u),
-                   lambda t: b0 + (edge(xb) - b0) * t, pil, 16, 48)
+    G = _coons(lambda u: b0 + (p0 - b0) * u,
+               lambda u: edge(xb + (p1[0] - xb) * u),
+               lambda t: b0 + (edge(xb) - b0) * t, pil)
+    u0 = 1 - SAIL[0] / (p0[0] - xb)
+    t1 = SAIL[1]
+    reach = lambda t: u0 + (1 - u0) * min(t / t1, 1.0)         # the glass's front edge, above the sail
+    glass = np.array([[G(t, reach(t) * u) for u in np.linspace(0, 1, 60)] for t in np.linspace(0, 1, 30)])
+    sail = np.array([[G(t1 * a, u0 + (1 - u0) * (b + (1 - b) * a)) for b in np.linspace(0, 1, 12)]
+                     for a in np.linspace(0, 1, 12)])
+    sail_out = sail + np.array([0.0, SAIL_T, 0.0])               # a hair proud of the glass
 
     mirror = lambda g: np.asarray(g) * [1, -1, 1]
     obs = [_panel("hard_top", [cap, sweep, mirror(sweep), a_pillar, mirror(a_pillar)], TOP_T, "body", "interior",
                   [lambda i, j: not window(i, j)] + [lambda i, j: True] * 4)]
     obs.append(_panel("rear_glass", [cap[i0:i1 + 1, j0:j1 + 1]], GLASS_T, "glass"))
-    for g, side_ in ((glass, "l"), (mirror(glass), "r")):
-        obs.append(_panel(f"door_{side_}_glass", [g], GLASS_T, "glass"))
+    for sgn, side_ in ((1, "l"), (-1, "r")):
+        f = (lambda g: g) if sgn > 0 else mirror
+        obs.append(_panel(f"door_{side_}_glass", [f(glass)], GLASS_T, "glass"))
+        obs.append(_panel(f"door_{side_}_sail", [f(sail_out)], GLASS_T + SAIL_T, "trim"))
     return obs
 
 

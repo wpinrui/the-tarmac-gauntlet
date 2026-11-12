@@ -207,6 +207,8 @@ DECK = (-1.75, -0.30)      # the engine deck and the cabin's back: open grilles 
                            # behind the seats in the model, a plain deck under the hard top here
 DECK_Y = 0.62              # out to this half width
 BRIDGE = [(-0.80, -0.38, 0.28, 0.78)]     # (x0, x1, z0, z1): recesses the skin spans over
+HUMP = (0.20, 0.80, 0.74, 0.70)           # (x0, x1, z0, y0): the model's mirror plinth, cut back to a straight
+                                          # shoulder above z0 and outboard of y0
 
 
 def sections(tris, arches):
@@ -266,6 +268,23 @@ def sections(tris, arches):
         ref = k if j < k else ANGLES - 1 - k
         z = ZC + Rm[:, ref] * np.sin(th[ref])
         Rm[:, j] = (z - ZC) / np.sin(th[j])
+    x0, x1, z0, y0 = HUMP                              # the shoulder runs straight past the mirror plinth
+    i0, i1 = int(np.argmin(np.abs(X - x0))), int(np.argmin(np.abs(X - x1)))
+    up = th > 0
+    def prof(i):
+        z, y = ZC[i] + Rm[i, up] * np.sin(th[up]), Rm[i, up] * np.cos(th[up])
+        o = np.argsort(z)
+        return z[o], y[o]
+    (za, ya), (zb, yb) = prof(i0), prof(i1)
+    for i in range(min(i0, i1) + 1, max(i0, i1)):
+        a = (X[i] - X[i0]) / (X[i1] - X[i0])
+        for j in np.where(up)[0]:
+            z, y = ZC[i] + Rm[i, j] * np.sin(th[j]), Rm[i, j] * np.cos(th[j])
+            if z < z0 or np.isnan(y) or y <= y0:
+                continue
+            lim = max(y0, (1 - a) * np.interp(z, za, ya) + a * np.interp(z, zb, yb))
+            if y > lim:
+                Rm[i, j] *= lim / y
     Rm = median_filter(Rm, size=(3, 5), mode="nearest")
     Rm = gaussian_filter(Rm, sigma=(1.6, 1.8), mode="nearest")      # smooth simple panels
     ZC = median_filter(ZC, size=5, mode="nearest")
