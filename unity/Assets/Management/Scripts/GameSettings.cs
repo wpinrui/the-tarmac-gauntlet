@@ -12,7 +12,8 @@ namespace TarmacGauntlet.Management
     /// </summary>
     public static class GameSettings
     {
-        private const string VolumeKey = "settings.volume", VSyncKey = "settings.vsync";
+        private const string VolumeKey = "settings.volume", VSyncKey = "settings.vsync", DisplayModeKey = "settings.displaymode",
+            WidthKey = "settings.width", HeightKey = "settings.height";
 
         public static readonly (FullScreenMode Mode, string Name)[] DisplayModes =
         {
@@ -22,13 +23,23 @@ namespace TarmacGauntlet.Management
         };
 
         /// <summary>
-        /// Applies the remembered settings. Unity remembers the display mode and resolution itself, and the quality level
-        /// applies itself as the game starts (<see cref="QualityLevels"/>).
+        /// Applies the remembered display mode, resolution, v-sync and volume as the game starts, whichever scene it starts
+        /// in. The game saves the display mode and resolution itself rather than trusting Unity to. The quality level applies
+        /// itself (<see cref="QualityLevels"/>), and each graphics option is read from its key when an effect asks.
         /// </summary>
-        public static void Load()
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void Load()
         {
             if (PlayerPrefs.HasKey(VSyncKey)) QualitySettings.vSyncCount = PlayerPrefs.GetInt(VSyncKey) != 0 ? 1 : 0;
             AudioListener.volume = PlayerPrefs.GetFloat(VolumeKey, 1);
+
+            FullScreenMode mode = PlayerPrefs.HasKey(DisplayModeKey)
+                ? DisplayModes[Mathf.Clamp(PlayerPrefs.GetInt(DisplayModeKey), 0, DisplayModes.Length - 1)].Mode
+                : Screen.fullScreenMode;
+            var size = new Vector2Int(PlayerPrefs.GetInt(WidthKey, 0), PlayerPrefs.GetInt(HeightKey, 0));
+            // A size the screen no longer offers, after a monitor change, keeps the size the game opened at.
+            if (size.x > 0 && size.y > 0 && Resolutions.Contains(size)) Screen.SetResolution(size.x, size.y, mode);
+            else if (mode != Screen.fullScreenMode) Screen.fullScreenMode = mode;
         }
 
         public static int DisplayMode
@@ -38,7 +49,13 @@ namespace TarmacGauntlet.Management
                 int i = Array.FindIndex(DisplayModes, m => m.Mode == Screen.fullScreenMode);
                 return i < 0 ? 1 : i;
             }
-            set => Screen.fullScreenMode = DisplayModes[Mathf.Clamp(value, 0, DisplayModes.Length - 1)].Mode;
+            set
+            {
+                int i = Mathf.Clamp(value, 0, DisplayModes.Length - 1);
+                Screen.fullScreenMode = DisplayModes[i].Mode;
+                PlayerPrefs.SetInt(DisplayModeKey, i);
+                PlayerPrefs.Save();
+            }
         }
 
         /// <summary>The screen's sizes, smallest first, each once.</summary>
@@ -57,7 +74,13 @@ namespace TarmacGauntlet.Management
         public static Vector2Int Resolution
         {
             get => new Vector2Int(Screen.width, Screen.height);
-            set => Screen.SetResolution(value.x, value.y, Screen.fullScreenMode);
+            set
+            {
+                Screen.SetResolution(value.x, value.y, Screen.fullScreenMode);
+                PlayerPrefs.SetInt(WidthKey, value.x);
+                PlayerPrefs.SetInt(HeightKey, value.y);
+                PlayerPrefs.Save();
+            }
         }
 
         public static string[] QualityNames => QualityLevels.Names;

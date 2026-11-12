@@ -82,7 +82,6 @@ namespace TarmacGauntlet.Management
             if (!booted)
             {
                 booted = true;
-                GameSettings.Load();
                 Application.quitting += GameSession.Flush;
                 GameSession.SaveFailed += e => Debug.LogException(e);
             }
