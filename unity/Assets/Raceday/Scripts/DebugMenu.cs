@@ -11,8 +11,7 @@ namespace TarmacGauntlet.Raceday
     /// hour and the flag, or the race finished and settled at once; weather held over the circuit, from dry to
     /// flooded; the watched car refuelled, on new tyres, fixed, given an issue, its driver fresh or spent, called
     /// in, retired or crashed out; and the race restarted with another start, kind of weather or start hour
-    /// (<see cref="DebugSettings"/>), or thrown away for the Team HQ. Clean hides every on-screen graphic. The AI
-    /// set-ups (<see cref="SituationMenu"/>) have a page of their own.
+    /// (<see cref="DebugSettings"/>), or thrown away for the Team HQ. Clean hides every on-screen graphic.
     /// </summary>
     public sealed class DebugMenu : MonoBehaviour
     {
@@ -23,16 +22,16 @@ namespace TarmacGauntlet.Raceday
         public RaceCameras Cameras;
         public RaceTower Tower;
         public RaceDirector Director;
-        public SituationMenu Lab;
         /// <summary>The career the race was set up from, raced again on a restart.</summary>
         public GameState Game;
 
         /// <summary>The race speed the menu holds, or null to leave it to the race.</summary>
         public float? Speed { get; private set; }
 
-        private enum Page { Main, Issues, Ai }
+        private enum Page { Main, Issues }
 
         private const string HubScene = "TeamHq";
+        private static readonly Color Chosen = new Color(0.3f, 1f, 0.4f);
         private static readonly float[] Speeds = { 0f, 0.25f, 1f, 4f, 16f, 64f };
         private static readonly string[] SpeedNames = { "Pause", "0.25x", "1x", "4x", "16x", "64x" };
         private static readonly float[] StartHours = { 6f, 10f, 15f, 19f, 23f };
@@ -61,8 +60,7 @@ namespace TarmacGauntlet.Raceday
                 page = Page.Main;
             }
             if (Director != null && Director.Finished) Speed = null;   // the race summary runs at normal speed
-            float? scale = Speed ?? (Lab != null && Lab.Running ? 1f : (float?)null);
-            if (scale is float s && Time.timeScale != s)
+            if (Speed is float s && Time.timeScale != s)
             {
                 Time.timeScale = s;
                 Time.maximumDeltaTime = Mathf.Max(1f / 3f, s / 30f);
@@ -118,7 +116,7 @@ namespace TarmacGauntlet.Raceday
             {
                 button = new GUIStyle(GUI.skin.button);
                 on = new GUIStyle(GUI.skin.button) { fontStyle = FontStyle.Bold };
-                on.normal.textColor = on.hover.textColor = SituationMenu.Chosen;
+                on.normal.textColor = on.hover.textColor = Chosen;
             }
             button.fontSize = on.fontSize = size;
 
@@ -130,7 +128,6 @@ namespace TarmacGauntlet.Raceday
             {
                 case Page.Main: Main(gap); break;
                 case Page.Issues: Issues(); break;
-                case Page.Ai: Ai(gap); break;
             }
             GUILayout.EndScrollView();
             GUILayout.EndArea();
@@ -138,7 +135,6 @@ namespace TarmacGauntlet.Raceday
 
         private void Main(float gap)
         {
-            bool race = Lab == null || !Lab.Running;
             CarController car = Watched;
             Consumables supplies = car != null ? car.Supplies : null;
             CarRaceLog log = supplies != null ? supplies.Log : null;
@@ -148,7 +144,7 @@ namespace TarmacGauntlet.Raceday
                 if (Button(SpeedNames[i], Speed == Speeds[i])) Speed = Speed == Speeds[i] ? (float?)null : Speeds[i];
             GUILayout.EndHorizontal();
 
-            if (race && Tower != null && Director != null && !Director.Finished)
+            if (Tower != null && Director != null && !Director.Finished)
             {
                 GUILayout.Space(gap);
                 GUILayout.BeginHorizontal();
@@ -167,7 +163,6 @@ namespace TarmacGauntlet.Raceday
                 if (Button(Skies[i].Name, sky == i)) Sky(i);
             GUILayout.EndHorizontal();
 
-            if (race)
             {
                 GUILayout.BeginHorizontal();
                 foreach (WeatherKind k in (WeatherKind[])Enum.GetValues(typeof(WeatherKind)))
@@ -225,7 +220,6 @@ namespace TarmacGauntlet.Raceday
             if (Button("Clean", Clean)) Clean = !Clean;
             if (Button("Restart")) Restart();
             if (Button("HQ")) Home();
-            if (Lab != null && Button("AI set-ups", !race)) page = Page.Ai;
             GUILayout.EndHorizontal();
         }
 
@@ -243,32 +237,6 @@ namespace TarmacGauntlet.Raceday
                 {
                     log.AddIssue(t.Id);
                     car.Supplies.Effects = log.Effects;
-                }
-            }
-        }
-
-        private void Ai(float gap)
-        {
-            if (Button("Back")) page = Page.Main;
-            Situation current = Lab.Current;
-            if (current != null)
-            {
-                GUILayout.Space(gap);
-                GUILayout.BeginHorizontal();
-                if (Button("Watch", Lab.Driving < 0)) Lab.Drive(-1);
-                for (int i = 0; i < current.Cars.Length; i++)
-                    if (Button(CarSpec.For(current.Cars[i].Model).Name, Lab.Driving == i)) Lab.Drive(i);
-                GUILayout.EndHorizontal();
-                if (Button("Restart")) Lab.Restart();
-            }
-            GUILayout.Space(gap);
-            foreach (Situation s in Situations.All)
-            {
-                if (!s.Ready) continue;
-                if (Button(s.Name, s == current))
-                {
-                    Lab.Pick(s);
-                    open = false;
                 }
             }
         }

@@ -43,7 +43,6 @@ namespace TarmacGauntlet.Raceday
         private const float SkipSpeed = 32f;
         private PitLaneStart pitLaneStart;
         private bool skipping;
-        private SituationMenu lab;
         private DebugMenu debug;
         private RaceDay day;
         private RaceDirector director;
@@ -219,7 +218,6 @@ namespace TarmacGauntlet.Raceday
             director.Cars = racing;
             director.Drivers = drivers;
             director.Tower = tower;
-            var hidden = new List<GameObject> { tower.gameObject, director.gameObject };
             if (player >= 0)
             {
                 timing = new GameObject("Live timing").AddComponent<LiveTiming>();
@@ -238,7 +236,6 @@ namespace TarmacGauntlet.Raceday
                 timing.Game = setup.Game;
                 timing.CanSkip = CanSkip;
                 timing.Skip = () => stintSkip = true;
-                hidden.Add(timing.gameObject);
             }
             BroadcastGraphics graphics = new GameObject("Broadcast graphics").AddComponent<BroadcastGraphics>();
             graphics.Director = tv;
@@ -255,24 +252,13 @@ namespace TarmacGauntlet.Raceday
             graphics.Player = player;
             graphics.Tower = tower;
             graphics.Keys = keys;
-            hidden.Add(graphics.gameObject);
-            foreach (CarController c in cars) hidden.Add(c.gameObject);
-            if (starter != null) hidden.Add(starter.gameObject);
             if (testing)
             {
-                var menu = new GameObject("Debug menu");
-                lab = menu.AddComponent<SituationMenu>();
-                lab.Circuit = circuit;
-                lab.Keys = keys;
-                lab.Cameras = views;
-                lab.Range = range;
-                lab.Race = hidden.ToArray();
-                debug = menu.AddComponent<DebugMenu>();
+                debug = new GameObject("Debug menu").AddComponent<DebugMenu>();
                 debug.Keys = keys;
                 debug.Cameras = views;
                 debug.Tower = tower;
                 debug.Director = director;
-                debug.Lab = lab;
                 debug.Game = setup.Game;
             }
             if (start == StartMode.PitLane)
@@ -292,8 +278,6 @@ namespace TarmacGauntlet.Raceday
             var rolling = (RaceStart)starter;
             rolling.Grid = racing;
             rolling.PaceCar = paceCar;
-            hidden.Add(paceCar.gameObject);
-            if (lab != null) lab.Race = hidden.ToArray();
             rolling.Pits = pits;
         }
 
@@ -358,7 +342,7 @@ namespace TarmacGauntlet.Raceday
 
         private void Update()
         {
-            if (keys == null || ai == null || lab != null && lab.Running) return;   // a debug set-up runs instead of the race
+            if (keys == null || ai == null) return;
             if (director.Finished) return;   // the race summary is up, at normal speed
             if (keys.Pressed(KeyCode.I)) ai.enabled = !ai.enabled;
             if (keys.Pressed(KeyCode.F))
