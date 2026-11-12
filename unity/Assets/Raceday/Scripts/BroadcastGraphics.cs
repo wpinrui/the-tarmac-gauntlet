@@ -10,6 +10,8 @@ namespace TarmacGauntlet.Raceday
     /// both cars and the gap in seconds, with an amber arrow while the chaser closes. The driver strip,
     /// bottom left, names the driver the first time a car is on air in a stint. The pit timer, bottom
     /// right, runs while a stop is on air, with its fuel, tyres and driver change lit as each is done.
+    /// The bottom graphics share one baseline, keep right of the timing tower, and the driver strip and
+    /// pit timer rise above the battle strip rather than sit over it.
     /// The track map, right, shows during helicopter shots, and on M. Laid out on a 1920 by 1080 screen.
     /// </summary>
     public sealed class BroadcastGraphics : MonoBehaviour
@@ -122,13 +124,35 @@ namespace TarmacGauntlet.Raceday
 
             int s = Director.Subject;
             if (s < 0 || Cars[s] == null) return;
-            if (Director.Other >= 0) Battle(s, Director.Other);
-            if (strip >= 0 && Time.unscaledTime < stripUntil && Cars[strip] != null) DriverStrip(strip);
-            if (Director.Stopping) PitTimer(s);
+            // The tower, on the layout: the strips keep clear of it and of each other.
+            Rect area = Tower != null ? Tower.Area : Rect.zero;
+            tower = area.width > 0f ? new Rect(area.x / k - offset, area.y / k, area.width / k, area.height / k) : Rect.zero;
+            Rect battle = Director.Other >= 0 ? Battle(s, Director.Other) : Rect.zero;
+            if (strip >= 0 && Time.unscaledTime < stripUntil && Cars[strip] != null) DriverStrip(strip, battle);
+            if (Director.Stopping) PitTimer(s, battle);
             if (showMap || Director.Helicopter) Map();
         }
 
-        private void Battle(int front, int back)
+        /// <summary>The space kept between graphics, px on the layout.</summary>
+        private const float Spacing = 16f;
+        /// <summary>The bottom of the lower graphics, px on the layout.</summary>
+        private const float Baseline = 1080f - 72f;
+
+        private Rect tower;
+
+        /// <summary>
+        /// Where a lower graphic of this size goes, px on the layout: on the baseline at x, or right of the
+        /// tower if it would sit over it, and lifted above the battle strip if it would sit over that.
+        /// </summary>
+        private Rect Place(float x, float width, float height, Rect battle)
+        {
+            var r = new Rect(x, Baseline - height, width, height);
+            if (tower.width > 0f && r.Overlaps(tower)) r.x = tower.xMax + Spacing;
+            if (battle.width > 0f && r.Overlaps(battle)) r.y = battle.yMin - Spacing - height;
+            return r;
+        }
+
+        private Rect Battle(int front, int back)
         {
             float h = 64f;
             float frontWidth = Block(front, 0f, 0f, h, false);
@@ -136,7 +160,8 @@ namespace TarmacGauntlet.Raceday
             float gapWidth = 44f + gapStyle.CalcSize(new GUIContent(gap)).x / k + 22f;
             float backWidth = Block(back, 0f, 0f, h, false);
             float width = frontWidth + gapWidth + backWidth;
-            float x = 960f - width / 2f, y = 1080f - 72f - h;
+            float x = 960f - width / 2f, y = Baseline - h;
+            if (tower.width > 0f && x < tower.xMax + Spacing && y < tower.yMax) x = tower.xMax + Spacing;
             Fill(R(x, y, width, h), Panel, 9f);
             Block(front, x, y, h, true);
             Rect g = R(x + frontWidth, y, gapWidth, h);
@@ -144,6 +169,7 @@ namespace TarmacGauntlet.Raceday
             if (trend < -0.005f) Draw(R(x + frontWidth + 22f, y + 25f, 16f, 14f), arrow, Amber, true);
             Label(R(x + frontWidth + 44f, y, gapWidth - 44f, h), gap, gapStyle, Color.white, TextAnchor.MiddleLeft);
             Block(back, x + frontWidth + gapWidth, y, h, true);
+            return new Rect(x, y, width, h);
         }
 
         /// <summary>A car's position, slash, team and class badge in a strip: draws it if asked, and returns its width, px on the layout.</summary>
@@ -164,7 +190,7 @@ namespace TarmacGauntlet.Raceday
             return width;
         }
 
-        private void DriverStrip(int i)
+        private void DriverStrip(int i, Rect battle)
         {
             CarRaceLog log = Day.Cars[i];
             string full = Game != null ? RaceWeekend.DriverName(log.Driver.Id, Game) : log.Driver.Id;
@@ -178,7 +204,8 @@ namespace TarmacGauntlet.Raceday
             float nameWidth = nameStyle.CalcSize(new GUIContent(surname)).x / k;
             float row2 = small.CalcSize(new GUIContent(teamName)).x / k + 14f + small.CalcSize(new GUIContent(Models[i])).x / k + 14f + 40f;
             float width = Mathf.Max(520f, Mathf.Max(68f + 14f + 10f + 14f + initialWidth + nameWidth + 24f, 82f + row2 + 24f));
-            float x = 72f, y = 1080f - 96f - 108f;
+            Rect at = Place(72f, width, 108f, battle);
+            float x = at.x, y = at.y;
             Fill(R(x, y, width, 108f), Panel, 9f);
             Label(R(x, y, 68f, 68f), Position(i).ToString(), pos, Color.white, TextAnchor.MiddleCenter);
             Draw(R(x + 82f, y + 14f, 16f, 40f), slash, Colours[i], false);
@@ -193,7 +220,7 @@ namespace TarmacGauntlet.Raceday
             Badge(R(x + width - 24f - 30f, y + 68f + 8f, 30f, 24f), letter, RaceTower.ClassColour(Classes[i]));
         }
 
-        private void PitTimer(int i)
+        private void PitTimer(int i, Rect battle)
         {
             PitService service = Drivers[i] != null && Drivers[i].Racer?.Pit != null ? Drivers[i].Racer.Pit.Service : null;
             if (service == null) service = Cars[i].Service;
@@ -202,7 +229,8 @@ namespace TarmacGauntlet.Raceday
             string letter = RaceTower.ClassLetter(Classes[i]);
             float tw = team.CalcSize(new GUIContent(teamName)).x / k;
             float width = Mathf.Max(72f + 14f + 10f + 14f + tw + 14f + 30f + 20f, 380f);
-            float x = 1920f - 72f - width, y = 1080f - 96f - 128f;
+            Rect at = Place(1920f - 72f - width, width, 128f, battle);
+            float x = at.x, y = at.y;
             Fill(R(x, y, width, 128f), Panel, 9f);
             Draw(R(x, y, 72f, 56f), lead, Red, false);
             Label(R(x, y, 64f, 56f), "PIT", small, Color.white, TextAnchor.MiddleCenter);
