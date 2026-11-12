@@ -165,16 +165,21 @@ public static class Check
             var w = new WeatherState { Cloud = sc.cloud, Rain = sc.rain, Wind = 1f };
             WeatherSky.Apply(ref s, w, WeatherSky.Lights(s.SunElevation, WeatherSky.Dusk(w)));
             float o = WeatherSky.Overcast(sc.cloud);
-            float direct = s.LightIntensity;
+            SkyPalette.Apply(ref s, o);
+            Color sun = s.LightColour * s.LightIntensity;
+            SkyPalette.CloudAmbient(s, sun, out Color above, out Color below);
             PostEffects.Grade g = SkyGrade.For(s, o, WeatherSky.Heavy(sc.rain), 0f, SkyGrade.Patchy(sc.cloud, o));
+            float haze = WeatherSky.Haze(s.Haze, w);
             string C(Color c) => $"[{c.r:0.0000},{c.g:0.0000},{c.b:0.0000}]";
             string V(Vector3 v) => $"[{v.x:0.0000},{v.y:0.0000},{v.z:0.0000}]";
             json.Append($"{{\"name\":\"{sc.name}\",\"cloud\":{sc.cloud},\"overcast\":{o:0.0000},\"cover\":{CloudMap.CoverFor(sc.cloud):0.0000},")
-                .Append($"\"tiles\":{CloudMap.TilesFor(0.45f, o):0.00000000},\"sunDir\":{V(s.LightDir)},\"sun\":{C(s.LightColour * direct)},")
-                .Append($"\"zenith\":{C(s.Zenith)},\"horizon\":{C(s.Horizon)},\"haze\":{C(s.Fog)},\"glow\":{C(s.Glow)},")
-                .Append($"\"cloudLit\":{C(s.CloudLit)},\"cloudShade\":{C(s.CloudShade)},\"ground\":{C(s.AmbientGround)},")
+                .Append($"\"skyCover\":{WeatherSky.Cover(sc.cloud):0.0000},\"tiles\":{CloudMap.TilesFor(0.45f, o):0.00000000},")
+                .Append($"\"sunDir\":{V(s.LightDir)},\"sun\":{C(sun)},\"sunColour\":{C(s.SunElevation > -2f ? s.LightColour : Color.black)},")
+                .Append($"\"zenith\":{C(s.Zenith)},\"horizon\":{C(s.Horizon)},\"haze\":{C(s.Fog)},\"glow\":{C(s.Glow)},\"goldenGlow\":{C(SkyPalette.Glow(s))},")
+                .Append($"\"deep\":{s.Deep:0.0000},\"cloudLit\":{C(s.CloudLit)},\"cloudShade\":{C(s.CloudShade)},\"ground\":{C(s.AmbientGround)},")
+                .Append($"\"skyLight\":{C(above)},\"groundLight\":{C(below)},")
                 .Append($"\"grade\":[{g.Exposure:0.000},{g.Contrast:0.00},{g.Saturation:0.00},{g.Temperature:0.00},{g.Tint:0.00}],\"elevation\":{s.SunElevation:0.00},")
-                .Append($"\"hazeDistance\":{WeatherSky.Haze(s.Haze, w):0.0}}}{(i + 1 < scenes.Length ? "," : "")}\n");
+                .Append($"\"hazeDistance\":{haze:0.0},\"hazeDensity\":{SkyClock.Density(haze):0.00000000}}}{(i + 1 < scenes.Length ? "," : "")}\n");
         }
         json.Append("]\n");
         System.IO.File.WriteAllText(System.IO.Path.Combine(dir, "scenes.json"), json.ToString());
