@@ -69,6 +69,8 @@ namespace TarmacGauntlet.Management.Editor
             PlayerSettings.gcIncremental = true;
             // A release build only records CPU and GPU frame times for the FPS counter with this on.
             PlayerSettings.enableFrameTimingStats = true;
+            // Lighting and blending are done in linear light (UsePipeline sets this in the editor too).
+            if (PlayerSettings.colorSpace != ColorSpace.Linear) PlayerSettings.colorSpace = ColorSpace.Linear;
             if (Directory.Exists(BuildFolder)) Directory.Delete(BuildFolder, true);
             UnityEngine.Rendering.RenderPipelineAsset[] pipelines = UseQualityAssets();
             BuildReport report;

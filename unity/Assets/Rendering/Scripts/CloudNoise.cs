@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 
 namespace TarmacGauntlet.Rendering
 {
@@ -34,7 +35,7 @@ namespace TarmacGauntlet.Rendering
                 making = null;
                 var px = new Color32[Size * Size * Size];
                 for (int i = 0; i < px.Length; i++) px[i] = new Color32(field[i * 2], field[i * 2 + 1], 0, 255);
-                texture = new Texture3D(Size, Size, Size, TextureFormat.RGBA32, false)
+                texture = new Texture3D(Size, Size, Size, GraphicsFormat.R8G8B8A8_UNorm, TextureCreationFlags.None)
                 {
                     name = "Cloud noise 3D",
                     wrapMode = TextureWrapMode.Repeat,

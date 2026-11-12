@@ -7,7 +7,8 @@ namespace TarmacGauntlet.Rendering.Editor
     /// <summary>
     /// Renders the project with the Universal Render Pipeline. ProjectSettings is not in the repository, so a fresh clone
     /// opens on the built-in pipeline: this puts the Medium quality level's pipeline asset in the graphics settings each time
-    /// the editor loads. In Play the game picks its quality level's asset itself (QualityLevels).
+    /// the editor loads. In Play the game picks its quality level's asset itself (QualityLevels). For the same reason it
+    /// sets Linear colour space here, which a fresh clone would otherwise open in Gamma.
     /// </summary>
     [InitializeOnLoad]
     internal static class UsePipeline
@@ -22,6 +23,8 @@ namespace TarmacGauntlet.Rendering.Editor
 
         private static void Apply()
         {
+            // Changing it reimports every texture, so it is set only when it differs.
+            if (PlayerSettings.colorSpace != ColorSpace.Linear) PlayerSettings.colorSpace = ColorSpace.Linear;
             var asset = AssetDatabase.LoadAssetAtPath<RenderPipelineAsset>(AssetPath);
             if (asset == null)
             {
