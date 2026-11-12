@@ -156,26 +156,45 @@ def plane_x(z):
     return px + (z - pz) * t[0] / t[1]
 
 
-def cockpit_cutters():
+def screen_x(glass):
+    """The screen glass's x at (y, z), fitted straight up each of a few slices across it."""
+    v = np.array([tuple(glass.matrix_world @ q.co) for q in glass.data.vertices])
+    ys = np.linspace(v[:, 1].min() + 0.02, v[:, 1].max() - 0.02, 15)
+    fits = np.array([np.polyfit(v[np.abs(v[:, 1] - y) < 0.03, 2], v[np.abs(v[:, 1] - y) < 0.03, 0], 1) for y in ys])
+    return lambda y, z: float(np.interp(y, ys, fits[:, 0]) * z + np.interp(y, ys, fits[:, 1]))
+
+
+def cockpit_cutters(half, glass):
     """The room inside the body below the door tops, narrower at the top so the doors keep a
-    ledge, and the opening above the door tops behind the screen and its header."""
+    ledge, and the opening behind the screen glass (screen_x) down to the dash, half wide:
+    outboard of it the pillar cutters take the skin, behind the A pillars' feet only."""
     from shapely.geometry.polygon import orient
     x1 = R["screen"]["x_base"] - 0.06
+    d, low = DOOR_FRONT[0][0], BELT - 0.07
     rings = []
     for x in np.linspace(CABIN_BACK, x1, 44):
-        g = body.inside(x, 0.035).intersection(box(-3, FLOOR, 3, BELT - 0.07)).union(
-            box(-COCKPIT_Y, FLOOR, COCKPIT_Y, BELT + 0.02))      # no skin left under the opening's floor
+        g = body.inside(x, 0.035).intersection(box(-3, FLOOR, 3, low))
+        if x < d:      # beside the doors no skin is left under the opening's floor
+            g = g.union(box(-COCKPIT_Y, FLOOR, COCKPIT_Y, BELT + 0.02))
         if g.geom_type != "Polygon":
             g = max(g.geoms, key=lambda q: q.area)
         rings.append(np.column_stack([np.full(96, x), ring_of(orient(g, 1), 96)]))
     v, f = geom.close_rings(rings)
     room = blend.make("cockpit_room", v, f, "interior")
-    top = 1.3
-    sec = Polygon([(CABIN_BACK, BELT), (plane_x(BELT), BELT), (plane_x(top), top), (CABIN_BACK, top)])
-    loop = ring_of(orient(sec, 1), 48)
-    rings = [np.column_stack([loop[:, 0], np.full(48, y), loop[:, 1]]) for y in (-1.4, 1.4)]
+    top, sx = 1.3, screen_x(glass)
+    half = min(half, max(abs((glass.matrix_world @ q.co)[1]) for q in glass.data.vertices))   # under the trim, not past it
+    rings = []
+    for y in np.linspace(-half, half, 31):
+        sec = [(CABIN_BACK, BELT), (d, BELT), (sx(y, low), low), (max(sx(y, top), CABIN_BACK + 0.05), top), (CABIN_BACK, top)]
+        rings.append(np.array([(x, y, z) for x, z in sec]))
     v, f = geom.close_rings(rings)
-    return [room, blend.make("cockpit_opening", v, f, "interior")]
+    opening = blend.make("cockpit_opening", v, f, "interior")
+    import bmesh
+    bm = bmesh.new(); bm.from_mesh(opening.data)
+    if bm.calc_volume(signed=True) < 0:
+        bmesh.ops.reverse_faces(bm, faces=bm.faces); bm.to_mesh(opening.data)
+    bm.free()
+    return [room, opening]
 
 
 GLASS_BAND = 0.016    # black band round the screen
@@ -220,7 +239,7 @@ def screen_fr():
 def screen_parts(ref, cutters, out):
     fr, to_fr = screen_fr()
     _o, g, t = (to_fr(q) for q in screen_shapes())
-    cutters += blend.lay(ref, "cut_screen", g.buffer(-0.003), fr, -0.12, 0.006, "trim", along_ray=True)
+    cutters += blend.lay(ref, "cut_screen", g.buffer(-0.003), fr, -0.03, 0.006, "trim", along_ray=True)
     out += blend.lay(ref, "screen_glass", g.buffer(-0.006), fr, -0.010, -0.005, "glass", 0.02, along_ray=True)
     out += blend.lay(ref, "screen_trim", t, fr, 0.0015, 0.0035, "trim", 0.01)
 
@@ -773,7 +792,7 @@ def pillar_cutters(trim):
     the door glass take its place, so the pillar keeps an even width from cowl to roof."""
     side, _T = _trim_edges(trim)
     foot = (side[0][0] + 0.02 - A_PILLAR, BELT)                 # the glass's front foot: the cowl stays ahead of it
-    pts = [foot] + [(x + 0.005, z) for x, _y, z in side] + [(side[-1][0] + 0.005, 1.4), (CABIN_BACK, 1.4), (CABIN_BACK, BELT)]
+    pts = [foot] + [(x - 0.002, z) for x, _y, z in side] + [(side[-1][0] - 0.002, 1.4), (CABIN_BACK, 1.4), (CABIN_BACK, BELT)]
     g = Polygon(pts).buffer(0)
     return [prism_y("cut_pillar_l", g, PILLAR_CUT_Y, 1.4), prism_y("cut_pillar_r", g, -1.4, -PILLAR_CUT_Y)]
 

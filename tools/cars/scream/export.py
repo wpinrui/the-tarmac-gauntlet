@@ -99,7 +99,9 @@ def build(game=False):
     print("laid", len(out), "parts,", len(cutters), "cutters")
 
     arch, tubs = parts.arches()
-    room, opening = parts.cockpit_cutters()
+    side0 = parts._trim_edges(next(o for o in out if o.name == "screen_trim"))[0][0]
+    print("screen side foot", side0)
+    room, opening = parts.cockpit_cutters(side0[1], next(o for o in out if o.name == "screen_glass"))
     for t in tubs:
         blend.boolean(room, t, "DIFFERENCE")
     cut(shell, arch)
