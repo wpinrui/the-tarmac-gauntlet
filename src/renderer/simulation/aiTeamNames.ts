@@ -41,7 +41,7 @@ export const AI_TEAM_ROSTER: AiTeamEntry[] = [
   // -----------------------------------------------------------------------
   // CLASS E — 20 teams
   // -----------------------------------------------------------------------
-  { name: "Dockyard Racing",              descriptor: "harbour-town mechanics turned racers", carClass: "E" },
+  { name: "Dockyard Racing",              descriptor: "from slipway to fast lane", carClass: "E" },
   { name: "Whitfield & Sons",             descriptor: "father-and-sons operation since forever", carClass: "E" },
   { name: "Copper Lane Autosport",        descriptor: "named after the street they wrench on", carClass: "E" },
   { name: "North Star Racing",            descriptor: "Scandinavian expats chasing points", carClass: "E" },
