@@ -79,6 +79,12 @@ namespace TarmacGauntlet.Visuals
         /// <summary>Rubber, chips and dust on the kerbs.</summary>
         public static readonly GraphicsOption KerbWear = Toggle("settings.kerbwear", true);
 
+        /// <summary>
+        /// The armco drawn as steel rails on posts, with catch fencing behind the tyre walls. Off, a plain band where the
+        /// armco stands. Changes live.
+        /// </summary>
+        public static readonly GraphicsOption ArmcoDetail = Toggle("settings.armcodetail", true);
+
         /// <summary>Stripes mown into the grass along the track. Changes live.</summary>
         public static readonly GraphicsOption Mowing = Toggle("settings.mowing", true);
 
@@ -100,6 +106,27 @@ namespace TarmacGauntlet.Visuals
         /// <summary>A fine mist hanging in the air behind fast cars on a wet track. Changes live.</summary>
         public static readonly GraphicsOption SprayMist = Toggle("settings.spraymist", true);
 
+        /// <summary>Smoke off locked and spinning tyres, lit by the sun and the sky. Changes live.</summary>
+        public static readonly GraphicsOption TyreSmoke = Toggle("settings.tyresmoke", true);
+
+        /// <summary>Sparks off a car's underside where it bottoms out at speed. Changes live.</summary>
+        public static readonly GraphicsOption Sparks = Toggle("settings.sparks", true);
+
+        /// <summary>Brake discs glowing red and orange after a hard stop. Changes live.</summary>
+        public static readonly GraphicsOption BrakeGlow = Toggle("settings.brakeglow", true);
+
+        /// <summary>The air wobbling in the heat behind the cars' exhausts. Changes live.</summary>
+        public static readonly GraphicsOption ExhaustHaze = Toggle("settings.exhausthaze", false);
+
+        /// <summary>The air shimmering over far tarmac on a hot, sunny day. Changes live.</summary>
+        public static readonly GraphicsOption TarmacShimmer = Toggle("settings.tarmacshimmer", false);
+
+        /// <summary>
+        /// Sharp reflections of what is on screen in the wet track, its puddles and the cars' clear coat, traced through the
+        /// depth buffer. Where a ray finds nothing the reflection probes show instead. Changes live.
+        /// </summary>
+        public static readonly GraphicsOption ScreenReflections = Toggle("settings.ssr", false);
+
         /// <summary>The Team HQ lit by its bake: lamp light, daylight and every bounce. Off, live lamps and a flat ambient light.</summary>
         public static readonly GraphicsOption BakedLighting = Toggle("settings.hqbakedlighting", true);
 
@@ -111,8 +138,8 @@ namespace TarmacGauntlet.Visuals
 
         private static readonly int[] OffAtLow = { 0, 1, 1 };
         private static readonly int[] AlwaysOn = { 1, 1, 1 };
-        /// <summary>Low, Medium, High and Ultra: the most expensive effects, for a card like an RTX 4070.</summary>
-        private static readonly int[] HighUp = { 0, 0, 1, 1 };
+        /// <summary>Low, Medium, High, and Ultra once there is one.</summary>
+        private static readonly int[] OnFromHigh = { 0, 0, 1, 1 };
 
         /// <summary>The settings menu's rows, in menu order. Every option is in one.</summary>
         public static readonly IReadOnlyList<GraphicsRow> Rows = new[]
@@ -120,11 +147,14 @@ namespace TarmacGauntlet.Visuals
             new GraphicsRow("Real lights", new[] { 2, 6, 12 }, RealLights),
             new GraphicsRow("Post effects", OffAtLow, ColourGrading, Bloom, AmbientOcclusion),
             new GraphicsRow("Depth of field", OffAtLow, DepthOfField),
-            new GraphicsRow("Car detail", OffAtLow, Clearcoat, PaintFlake, CarGlass, LampLenses, CarTrims, CarReflections),
-            new GraphicsRow("Track detail", AlwaysOn, TarmacDetail, RubberedLine, KerbWear, SkidMarks, Mowing),
+            new GraphicsRow("Car detail", OffAtLow, Clearcoat, PaintFlake, CarGlass, LampLenses, CarTrims, CarReflections, BrakeGlow),
+            new GraphicsRow("Track detail", AlwaysOn, TarmacDetail, RubberedLine, KerbWear, SkidMarks, Mowing, ArmcoDetail),
             new GraphicsRow("Rain effects", OffAtLow, WetTrack, Puddles, RainRipples, Spray, SprayMist),
+            new GraphicsRow("Smoke and sparks", OffAtLow, TyreSmoke, Sparks),
+            new GraphicsRow("Heat haze", OnFromHigh, ExhaustHaze, TarmacShimmer),
+            new GraphicsRow("Screen-space reflections", OnFromHigh, ScreenReflections),
             new GraphicsRow("Sky detail", OffAtLow, SkyDetail, SunRays),
-            new GraphicsRow("Volumetric sky", HighUp, VolumetricClouds, VolumetricFog, LensFlare),
+            new GraphicsRow("Volumetric sky", OnFromHigh, VolumetricClouds, VolumetricFog, LensFlare),
             new GraphicsRow("Crowd", AlwaysOn, Crowd),
             new GraphicsRow("HQ lighting", AlwaysOn, BakedLighting, BakedReflections, Wear),
         };

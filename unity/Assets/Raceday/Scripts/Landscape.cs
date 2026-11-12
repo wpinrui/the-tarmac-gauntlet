@@ -47,13 +47,13 @@ namespace TarmacGauntlet.Raceday
             for (int i = 0; i < px.Length; i++)
             {
                 int x = i % plan.MapX, z = i / plan.MapX;
-                Color col = LandscapeLooks.Field(plan.Map[i], g.originX + x * cell, g.originZ + z * cell) * (0.94f + 0.12f * CloudField.Hash(x, z, 91));
-                px[i] = col;
-                float mown = plan.Mowing(i, out float fromRoad, out float alongX, out float alongZ);
+                plan.Mowing(i, out float fromRoad, out float reach, out float fresh, out float alongX, out float alongZ);
+                px[i] = LandscapeLooks.Grass(plan.Map[i], g.originX + x * cell, g.originZ + z * cell, fromRoad > reach) * (0.94f + 0.12f * CloudField.Hash(x, z, 91));
+                // The road's way, its length how fresh the stripes are.
                 mowing[i * 4] = Mathf.FloatToHalf(fromRoad);
-                mowing[i * 4 + 1] = Mathf.FloatToHalf(mown);
-                mowing[i * 4 + 2] = Mathf.FloatToHalf(alongX);
-                mowing[i * 4 + 3] = Mathf.FloatToHalf(alongZ);
+                mowing[i * 4 + 1] = Mathf.FloatToHalf(reach);
+                mowing[i * 4 + 2] = Mathf.FloatToHalf(alongX * fresh);
+                mowing[i * 4 + 3] = Mathf.FloatToHalf(alongZ * fresh);
             }
             var map = new Texture2D(plan.MapX, plan.MapZ, TextureFormat.RGBA32, true)
                 { name = "Fields", wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear, anisoLevel = 4 };

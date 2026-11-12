@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using TarmacGauntlet.TeamHq;
+using TarmacGauntlet.Visuals;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -8,8 +9,8 @@ namespace TarmacGauntlet.Raceday
 {
     /// <summary>
     /// The trackside furniture in the scene: the start gantry, marshal posts with their marshals and flag panels,
-    /// and the distance boards. Each frame race control (<see cref="RaceFlags"/>) watches the cars and sets the start
-    /// lights and every panel. None of it has a collider, so it never touches the racing.
+    /// the distance boards, and the armco's rails, posts and catch fences (<see cref="ArmcoBuilder"/>). Each frame race
+    /// control (<see cref="RaceFlags"/>) watches the cars and sets the start lights and every panel. None of it has a collider, so it never touches the racing.
     /// </summary>
     public sealed class Trackside : MonoBehaviour
     {
@@ -39,6 +40,8 @@ namespace TarmacGauntlet.Raceday
         private Renderer red, green;
         private RaceFlags.Lights lights = (RaceFlags.Lights)(-1);
         private RaceFlags.Car[] states = new RaceFlags.Car[0];
+        private readonly List<Renderer> armcoDetail = new List<Renderer>();
+        private Renderer[] armcoPlain = new Renderer[0];
 
         /// <summary>Builds the furniture for a circuit laid by <paramref name="track"/>, clear of the grandstands.</summary>
         public static Trackside Build(Circuit circuit, CircuitBuilder track, IReadOnlyList<StandFootprint> stands)
@@ -66,7 +69,43 @@ namespace TarmacGauntlet.Raceday
             }
             t.flags = new RaceFlags(circuit.Lap, distances);
             t.AddMarshals(root, built.Marshals);
+
+            var armco = new ArmcoBuilder(circuit, track.ArmcoRuns, stands, placed.GantryLeft, placed.GantryRight);
+            var steel = new GameObject("Armco").transform;
+            steel.SetParent(root, false);
+            foreach ((MeshKit kit, Material material, string name) in new[]
+            {
+                (armco.Steel, t.materials.ArmcoSteel, "Armco steel"),
+                (armco.Fence, t.materials.CatchFence, "Armco catch fence"),
+                (armco.FencePosts, t.materials.Galvanised, "Armco catch fence posts"),
+            })
+                foreach (MeshKit chunk in kit.Indexed().Chunks(ArmcoChunk))
+                    if (!chunk.IsEmpty) t.armcoDetail.Add(t.Add(steel, name, chunk, material, true));
             return t;
+        }
+
+        /// <summary>The armco's meshes are cut into cells this wide, so those off screen are skipped.</summary>
+        private const float ArmcoChunk = 250f;
+
+        /// <summary>
+        /// The circuit's plain armco: drawn only while the armco's detail is off, and always there to hit. Its renderers
+        /// swap with the rails and fences when the setting changes.
+        /// </summary>
+        public void SetPlainArmco(Renderer[] plain)
+        {
+            armcoPlain = plain ?? new Renderer[0];
+            ShowArmco(GraphicsOptions.ArmcoDetail);
+        }
+
+        private void OnEnable() => GraphicsOptions.ArmcoDetail.Changed += ShowArmco;
+
+        private void OnDisable() => GraphicsOptions.ArmcoDetail.Changed -= ShowArmco;
+
+        private void ShowArmco(GraphicsOption option)
+        {
+            bool detail = option.On;
+            foreach (Renderer r in armcoDetail) r.enabled = detail;
+            foreach (Renderer r in armcoPlain) r.enabled = !detail;
         }
 
         private Renderer Add(Transform parent, string name, MeshKit kit, Material material, bool shadows)

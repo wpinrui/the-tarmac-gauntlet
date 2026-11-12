@@ -13,6 +13,19 @@ MonoBehaviour:
   m_Name: GlassBlurFeature
   m_EditorClassIdentifier: 
   m_Active: 1
+--- !u!114 &4158632371952350808
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 72b39e2616144ebd90375fde10180d6f, type: 3}
+  m_Name: HeatHazeFeature
+  m_EditorClassIdentifier: 
+  m_Active: 1
 --- !u!114 &7106324856298144521
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -39,6 +52,45 @@ MonoBehaviour:
     BlurQuality: 1
     Falloff: 120
     SampleCount: -1
+--- !u!114 &6437449012572248535
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fed54a20c9584d33a4ee13b22dae8887, type: 3}
+  m_Name: ScreenReflectionsFeature
+  m_EditorClassIdentifier: 
+  m_Active: 1
+--- !u!114 &4558995815536777414
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 048b01a89210493db29c593d3f94ac93, type: 3}
+  m_Name: VolumetricsFeature
+  m_EditorClassIdentifier: 
+  m_Active: 1
+--- !u!114 &1640188000470111460
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 56389409180e4335b017dab313d72562, type: 3}
+  m_Name: SunRaysFeature
+  m_EditorClassIdentifier: 
+  m_Active: 1
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -56,8 +108,12 @@ MonoBehaviour:
     debugReplacementPS: {fileID: 4800000, guid: cf852408f2e174538bcd9b7fda1c5ae7, type: 3}
   m_RendererFeatures:
   - {fileID: 7106324856298144521}
+  - {fileID: 6437449012572248535}
   - {fileID: 3486185710289404151}
-  m_RendererFeatureMap: 09032e4ecebc9e62f7c0d7d26e6b6130
+  - {fileID: 4158632371952350808}
+  - {fileID: 4558995815536777414}
+  - {fileID: 1640188000470111460}
+  m_RendererFeatureMap: 09032e4ecebc9e62d7d90e16c5695659f7c0d7d26e6b613058f6a8e11b6eb639c6d88f258ace443fe414e1dc4b1ec316
   m_UseNativeRenderPass: 0
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   xrSystemData: {fileID: 11400000, guid: 60e1133243b97e347b653163a8c01b64, type: 2}

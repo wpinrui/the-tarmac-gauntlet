@@ -10,6 +10,8 @@ namespace TarmacGauntlet.Raceday
     public sealed class FurnitureMaterials
     {
         public readonly Material GreenSteel, Concrete, WhitePaint, BlackSteel, Roof, Galvanised, BoardBack, Boards;
+        /// <summary>The armco's rails and posts, and the catch fencing behind it.</summary>
+        public readonly Material ArmcoSteel, CatchFence;
         public readonly Material RedOn, RedOff, GreenOn, GreenOff;
         /// <summary>Flag panel faces by what they show, indexed by <see cref="RaceFlags.Panel"/>.</summary>
         public readonly Material[] Panels;
@@ -27,6 +29,11 @@ namespace TarmacGauntlet.Raceday
             Galvanised = Make("Galvanised steel", null, 0.55f, 0.8f, new Color(0.62f, 0.64f, 0.66f));
             BoardBack = Make("Board back", null, 0.2f, 0f, new Color(0.3f, 0.31f, 0.32f));
             Boards = Make("Distance boards", Resources.Load<Texture2D>("Furniture/boards"), 0.25f);
+            // Weathered galvanised steel, more matt than new: bright enough to pick the rails out against the grass.
+            ArmcoSteel = Make("Armco steel", null, 0.5f, 0.25f, new Color(0.8f, 0.81f, 0.82f));
+            CatchFence = Make("Armco catch fence", ChainLink(), 0.4f, 0.5f, new Color(0.66f, 0.68f, 0.68f));
+            CatchFence.mainTextureScale = new Vector2(4f, 4f);
+            Lit.Cutout(CatchFence);
 
             Texture2D lens = Lens();
             RedOn = Glow("Start light red", lens, new Color(1f, 0.08f, 0.04f), 4f);
@@ -80,6 +87,40 @@ namespace TarmacGauntlet.Raceday
             }
             tex.SetPixels(px);
             tex.Apply(true);
+            return tex;
+        }
+
+        /// <summary>
+        /// Chain-link mesh, four diamonds a tile, wire opaque and the gaps cut out, with each smaller mip drawn afresh rather
+        /// than averaged. Averaged, the thin wire fades below the cutout and the fence vanishes a few metres off; drawn,
+        /// its wire stays at least a texel wide and the far mips are a fine dither, so the fence still reads as mesh.
+        /// </summary>
+        private static Texture2D ChainLink()
+        {
+            const int size = 64, cells = 4;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Bilinear, anisoLevel = 4 };
+            for (int level = 0; level < tex.mipmapCount; level++)
+            {
+                int s = Mathf.Max(1, size >> level);
+                float cell = s / (float)cells;
+                float half = Mathf.Max(1.3f / (1 << level), 0.6f);
+                var px = new Color[s * s];
+                for (int y = 0; y < s; y++)
+                    for (int x = 0; x < s; x++)
+                    {
+                        bool wire;
+                        if (s == 1) wire = false;
+                        else if (cell < 4f) wire = (x + y) % 2 == 0;
+                        else
+                        {
+                            float a = Mathf.Repeat(x + y + 0.5f, cell), b = Mathf.Repeat(x - y + 0.5f, cell);
+                            wire = Mathf.Min(a, cell - a) < half || Mathf.Min(b, cell - b) < half;
+                        }
+                        px[y * s + x] = new Color(1f, 1f, 1f, wire ? 1f : 0f);
+                    }
+                tex.SetPixels(px, level);
+            }
+            tex.Apply(false);
             return tex;
         }
 
