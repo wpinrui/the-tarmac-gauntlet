@@ -3,7 +3,9 @@ using UnityEngine;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// Frames per second in the top right corner, averaged over half a second, with frame times underneath. Always shown.
+    /// Frames per second, averaged over half a second, with frame times after it, on one line left of the top right
+    /// buttons and level with them. It keeps to the same 1920 by 1080 layout as those buttons, centred across a wider
+    /// screen, so it sits clear of them, the timing tower and the timing page's map at every resolution. Always shown.
     /// The frame times come from Unity's FrameTimingManager: CPU is the main thread's work, RT the render thread's and GPU
     /// the graphics card's, each in milliseconds. Each row is the average over the last second and, dimmer, the worst
     /// frame in it. Waiting for v-sync is left out of the CPU figure, so the rows show the headroom under a 60 fps cap.
@@ -72,26 +74,44 @@ namespace TarmacGauntlet.Raceday
             frames = 0;
         }
 
+        /// <summary>Where the line ends and how tall it is, px on the layout: left of the live timing buttons.</summary>
+        private const float End = 1708f - 28f, Top = 40f, Height = 44f;
+        /// <summary>Spaces on the layout: between a figure and its neighbour, and between one row and the next.</summary>
+        private const float Gap = 8f, RowGap = 28f;
+
         private void OnGUI()
         {
             if (Event.current.type != EventType.Repaint || DebugMenu.Bare) return;
-            float scale = Screen.height / 1080f;
-            if (style == null) style = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.UpperRight, fontStyle = FontStyle.Bold };
-            style.fontSize = Mathf.RoundToInt(28 * scale);
-            float right = Screen.width - 20f * scale, top = 16f * scale;
-            Label(new Rect(right - 200f * scale, top, 200f * scale, 40f * scale), shown, Color.white);
+            float k = Screen.height / 1080f;
+            float offset = (Screen.width / k - 1920f) / 2f;
+            if (style == null) style = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleRight, fontStyle = FontStyle.Bold, padding = new RectOffset(0, 0, 0, 0) };
 
-            style.fontSize = Mathf.RoundToInt(18 * scale);
-            float y = top + 40f * scale, line = 24f * scale, column = 58f * scale;
-            foreach (Row row in rows)
+            // Columns as wide as their widest figure, so the line keeps still as the numbers change.
+            style.fontSize = Mathf.RoundToInt(28 * k);
+            float fps = Width("000"), gap = Gap * k, rowGap = RowGap * k;
+            style.fontSize = Mathf.RoundToInt(18 * k);
+            float tag = Width("GPU"), figure = Width("000.0");
+            float row = tag + 2f * (gap + figure);
+            float x = (End + offset) * k - (fps + rows.Length * (rowGap + row)), y = Top * k, h = Height * k;
+
+            style.fontSize = Mathf.RoundToInt(28 * k);
+            Label(new Rect(x, y, fps, h), shown, Color.white);
+            x += fps;
+            style.fontSize = Mathf.RoundToInt(18 * k);
+            foreach (Row r in rows)
             {
-                if (row.Average.Length == 0) continue;
-                Label(new Rect(right - column, y, column, line), row.Worst, new Color(1f, 1f, 1f, 0.55f));
-                Label(new Rect(right - 2f * column, y, column, line), row.Average, Color.white);
-                Label(new Rect(right - 3f * column, y, column, line), row.Tag, new Color(1f, 1f, 1f, 0.55f));
-                y += line;
+                x += rowGap;
+                if (r.Average.Length > 0)
+                {
+                    Label(new Rect(x, y, tag, h), r.Tag, new Color(1f, 1f, 1f, 0.55f));
+                    Label(new Rect(x + tag + gap, y, figure, h), r.Average, Color.white);
+                    Label(new Rect(x + tag + 2f * gap + figure, y, figure, h), r.Worst, new Color(1f, 1f, 1f, 0.55f));
+                }
+                x += row;
             }
         }
+
+        private float Width(string text) => style.CalcSize(new GUIContent(text)).x;
 
         private void Label(Rect r, string text, Color colour)
         {
