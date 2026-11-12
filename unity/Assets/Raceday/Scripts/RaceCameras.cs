@@ -1,16 +1,20 @@
 using TarmacGauntlet.Simulation;
+using TarmacGauntlet.Visuals;
 using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// C cycles the car cameras: a TV camera locked to the car, then the chase, bonnet and bumper views.
-    /// B puts the broadcast on (<see cref="BroadcastDirector"/>) and B or C takes it off again. = rides
+    /// C cycles the car cameras: TV coverage locked to the car (a second <see cref="BroadcastDirector"/> with its
+    /// Lock set, cutting between trackside shots and onboards), then the chase, bonnet and bumper views, whose
+    /// places come from <see cref="CameraPresets"/> in the settings.
+    /// V puts the broadcast on (<see cref="BroadcastDirector"/>) and V or C takes it off again. Holding B
+    /// looks back on every camera, the broadcast showing the chase view turned round. = rides
     /// with the car behind in race order and - with the car ahead, leaving the broadcast for the chase view.
     /// While you are not driving your own car, the camera is yours to move: hold the right mouse button and
     /// drag to look, W A S D move, Q and E go down and up, Shift is 5x faster and the wheel changes speed.
     /// All of it stays relative to the car, so you still ride along. The locked TV camera takes the mouse
-    /// only: the drag orbits it round the car and the wheel zooms.
+    /// only: within each shot the drag orbits it round the car and the wheel zooms.
     /// The timing tower is seen from the car ridden with. Riding with another car leaves your own car
     /// in your hands: only it reads the driving keys.
     /// </summary>
@@ -30,6 +34,8 @@ namespace TarmacGauntlet.Raceday
         public KeyboardState Keys;
         /// <summary>Directs the broadcast.</summary>
         public BroadcastDirector Director;
+        /// <summary>Directs the TV camera locked to the car ridden with.</summary>
+        public BroadcastDirector Locked;
         /// <summary>Gives the race order for = and -, and is seen from the car ridden with.</summary>
         public RaceTower Tower;
 
@@ -47,13 +53,18 @@ namespace TarmacGauntlet.Raceday
         private Vector3 offset;
         private float yaw, pitch;
         private float speed = 10f;
-        // The locked TV camera: its angle round the car, height angle and lens.
-        private float orbit, rise, lens;
+        // The locked TV camera: your turn round the car and zoom within the shot, and the shot as the director placed it.
+        private float orbit, rise, zoom = 1f;
+        private int lockedShot = -1;
+        private Vector3 shotPosition;
+        private Quaternion shotRotation;
+        private bool shotHeld;
 
         // Mouse and Shift, read from IMGUI events so either input system works.
         private Vector2 drag;
         private float wheel;
         private bool shift;
+        private bool lookedBack;
 
         private void Start()
         {
@@ -67,7 +78,7 @@ namespace TarmacGauntlet.Raceday
         private void Update()
         {
             if (Keys == null) return;
-            if (Keys.Pressed(KeyCode.B))
+            if (Keys.Pressed(KeyCode.V))
             {
                 broadcast = !broadcast;
                 Apply();
@@ -80,7 +91,7 @@ namespace TarmacGauntlet.Raceday
             }
             if (Keys.Pressed(KeyCode.Equals)) Step(+1);
             if (Keys.Pressed(KeyCode.Minus)) Step(-1);
-            if (Driving && (offset != Vector3.zero || yaw != 0f || pitch != 0f)) Apply();   // taking the wheel puts the view back
+            if (Driving && (offset != Vector3.zero || yaw != 0f || pitch != 0f || orbit != 0f || rise != 0f || zoom != 1f)) Apply();   // taking the wheel puts the view back
         }
 
         private void OnGUI()
@@ -144,9 +155,9 @@ namespace TarmacGauntlet.Raceday
             chaseSettled = false;
             offset = Vector3.zero;
             yaw = pitch = 0f;
-            orbit = 215f;   // behind and to the left
-            rise = 9f;
-            lens = 25f;
+            orbit = rise = 0f;
+            zoom = 1f;
+            shotHeld = false;
         }
 
         /// <summary>Takes this frame's mouse and keys into the view, if you are not driving.</summary>
@@ -160,8 +171,8 @@ namespace TarmacGauntlet.Raceday
             if (view == View.Tv)
             {
                 orbit += look.x;
-                rise = Mathf.Clamp(rise + look.y, -5f, 80f);
-                if (scroll != 0f) lens = Mathf.Clamp(lens * (scroll > 0 ? 1.15f : 0.87f), 8f, 70f);
+                rise = Mathf.Clamp(rise + look.y, -80f, 80f);
+                if (scroll != 0f) zoom = Mathf.Clamp(zoom * (scroll > 0 ? 1.15f : 0.87f), 0.15f, 3f);
                 return;
             }
             yaw += look.x;
@@ -182,9 +193,14 @@ namespace TarmacGauntlet.Raceday
         {
             if (Car == null) return;
             Transform t = Car.transform;
+            bool back = Keys != null && Keys.Held(KeyCode.B);
+            if (back != lookedBack) chaseSettled = false;   // cut straight round, no swing
+            lookedBack = back;
+            bool director = broadcast && Director != null && !back;
+            bool locked = !broadcast && !back && view == View.Tv && Locked != null && LockIndex() >= 0;
             // The broadcast while the AI drives; the HUD is for driving.
-            if (Hud != null) Hud.Hidden = broadcast && Car.AiDriving;
-            if (broadcast && Director != null)
+            if (Hud != null) Hud.Hidden = director && Car.AiDriving;
+            if (director)
             {
                 drag = Vector2.zero;
                 wheel = 0f;
@@ -192,6 +208,12 @@ namespace TarmacGauntlet.Raceday
                 return;
             }
             Steer();
+            if (locked)
+            {
+                FrameLocked();
+                return;
+            }
+            shotHeld = false;
 
             // The car's heading on the ground, eased a little so bumps and slides don't shake the view.
             Vector3 flat = Vector3.ProjectOnPlane(t.forward, Vector3.up);
@@ -200,39 +222,62 @@ namespace TarmacGauntlet.Raceday
                 float want = Mathf.Atan2(flat.x, flat.z) * Mathf.Rad2Deg;
                 carYaw = chaseSettled ? Mathf.LerpAngle(carYaw, want, 1f - Mathf.Exp(-10f * Time.deltaTime)) : want;
             }
-            Quaternion ground = Quaternion.Euler(0f, carYaw, 0f);
-
-            switch (view)
+            // Looking back turns the whole view round the car.
+            Quaternion round = Quaternion.Euler(0f, back ? 180f : 0f, 0f);
+            Quaternion ground = Quaternion.Euler(0f, carYaw, 0f) * round;
+            // The broadcast and the TV camera turn round to the chase view behind the car.
+            View shown = broadcast || view == View.Tv ? View.Chase : view;
+            CameraPreset preset = shown == View.Bonnet ? CameraPresets.Bonnet : shown == View.Bumper ? CameraPresets.Bumper : CameraPresets.Chase;
+            cam.fieldOfView = preset.Fov;
+            Vector3 place = preset.Position;
+            Quaternion tilt = Quaternion.Euler(-preset.Tilt, 0f, 0f);
+            if (shown == View.Chase)
             {
-                case View.Tv:
-                {
-                    // A long lens on the car from a fixed angle in its frame: the car holds still in the shot.
-                    cam.fieldOfView = lens;
-                    Quaternion at = ground * Quaternion.Euler(rise, orbit, 0f);
-                    Vector3 aim = t.position + Vector3.up * 0.7f;
-                    transform.SetPositionAndRotation(aim - at * Vector3.forward * 18f, at);
-                    chaseSettled = true;
-                    break;
-                }
-                case View.Chase:
-                {
-                    Vector3 f = ground * Vector3.forward;
-                    Vector3 want = t.position - f * 7f + Vector3.up * 2.2f;
-                    chasePosition = chaseSettled ? Vector3.Lerp(chasePosition, want, 1f - Mathf.Exp(-10f * Time.deltaTime)) : want;
-                    chaseSettled = true;
-                    Quaternion basis = Quaternion.LookRotation(t.position + Vector3.up * 0.9f + f * 4f - chasePosition, Vector3.up);
-                    Ride(chasePosition, ground, Quaternion.Inverse(ground) * basis);
-                    break;
-                }
-                case View.Bonnet:
-                    chaseSettled = true;
-                    Ride(t.TransformPoint(new Vector3(0f, 1.2f, 0.3f)), t.rotation, Quaternion.identity);
-                    break;
-                case View.Bumper:
-                    chaseSettled = true;
-                    Ride(t.TransformPoint(new Vector3(0f, 0.4f, 2.45f)), t.rotation, Quaternion.identity);
-                    break;
+                // On the car's eased heading, and eased into place, so the car moves a little in the frame.
+                Vector3 want = t.position + ground * place;
+                chasePosition = chaseSettled ? Vector3.Lerp(chasePosition, want, 1f - Mathf.Exp(-10f * Time.deltaTime)) : want;
+                chaseSettled = true;
+                Ride(chasePosition, ground, tilt);
+                return;
             }
+            chaseSettled = true;
+            // Looking back from the bumper camera puts it on the back bumper.
+            if (back && shown == View.Bumper) place.z = -place.z;
+            Ride(t.TransformPoint(place), t.rotation * round, tilt);
+        }
+
+        /// <summary>The car ridden with in the locked director's list, or -1.</summary>
+        private int LockIndex()
+        {
+            if (Locked.Cars == null || Car == null) return -1;
+            for (int i = 0; i < Locked.Cars.Length; i++)
+                if (Locked.Cars[i] != null && Locked.Cars[i].gameObject == Car.gameObject) return i;
+            return -1;
+        }
+
+        /// <summary>
+        /// The locked TV camera: the director places the shot, then your orbit and zoom go on top. The director's own
+        /// pose is put back first each frame so its smooth aim doesn't follow your turn. Every cut starts from its own shot.
+        /// </summary>
+        private void FrameLocked()
+        {
+            Locked.Lock = LockIndex();
+            if (shotHeld) transform.SetPositionAndRotation(shotPosition, shotRotation);
+            Locked.Frame(cam);
+            shotPosition = transform.position;
+            shotRotation = transform.rotation;
+            shotHeld = true;
+            if (Locked.Shots != lockedShot)
+            {
+                lockedShot = Locked.Shots;
+                orbit = rise = 0f;
+                zoom = 1f;
+            }
+            cam.fieldOfView = Mathf.Clamp(cam.fieldOfView / zoom, 2f, 120f);
+            if (orbit == 0f && rise == 0f) return;
+            Vector3 centre = Locked.Centre;
+            Quaternion turn = Quaternion.AngleAxis(orbit, Vector3.up) * Quaternion.AngleAxis(rise, shotRotation * Vector3.right);
+            transform.SetPositionAndRotation(centre + turn * (shotPosition - centre), turn * shotRotation);
         }
 
         /// <summary>Places the camera at a view's own spot, moved and turned by your changes in the car's frame.</summary>
