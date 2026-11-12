@@ -356,7 +356,7 @@ namespace TarmacGauntlet.Raceday
 
         private void Wind(float breeze)
         {
-            bool onboard = Cameras != null && (Cameras.Onboard || (Cameras.Broadcasting && Broadcast != null && Broadcast.Onboard));
+            bool onboard = Cameras != null && (Cameras.Onboard || (Cameras.Broadcasting && Broadcast != null && Broadcast.OnboardShot));
             bool chase = Cameras != null && Cameras.Chasing;
             wind.Synth.Speed = cameraSpeed;
             wind.Synth.Exposure = AmbienceMix.Exposure(onboard, chase);
