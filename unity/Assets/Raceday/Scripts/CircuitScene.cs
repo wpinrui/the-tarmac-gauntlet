@@ -131,7 +131,7 @@ namespace TarmacGauntlet.Raceday
             track.AddComponent<CrowdView>().Material = standMaterials.Crowd;
             Lap("grandstands");
             yield return null;
-            Landscape.Build(circuit, builder, materials, LandscapeLooks.Current);
+            Landscape.Build(circuit, builder, stands.Footprints, materials, LandscapeLooks.Current);
             Lap("landscape");
             yield return null;
             Complex = new PitComplex(circuit, builder.GarageFloors);
@@ -146,6 +146,10 @@ namespace TarmacGauntlet.Raceday
             view.Sky = sky;
             view.Materials = pitMaterials;
             Trackside trackside = Trackside.Build(circuit, builder, stands.Footprints);
+            var plainArmco = new List<Renderer>();
+            foreach (Transform child in track.transform)
+                if (child.name == "Armco" && child.TryGetComponent(out Renderer drawn)) plainArmco.Add(drawn);
+            trackside.SetPlainArmco(plainArmco.ToArray());
             Lap("trackside");
             yield return null;
             var floodMaterials = new FloodMaterials();
@@ -249,6 +253,8 @@ namespace TarmacGauntlet.Raceday
             carControllers = cars;
             if (resumed) PlaceSaved(resume, cars, racing, drivers, pits);
             new GameObject("Skid marks").AddComponent<SkidMarks>().Cars = cars;
+            CarEffects effects = new GameObject("Car effects").AddComponent<CarEffects>();
+            effects.Cars = cars;
             PhysicsRange range = new GameObject("Physics range").AddComponent<PhysicsRange>();
             range.Drivers = drivers;
             range.Player = ai.Car;
@@ -289,6 +295,7 @@ namespace TarmacGauntlet.Raceday
             rain.Materials = materials;
             rain.Cars = racing;
             rain.Night = () => sky.Lights;
+            effects.Night = () => sky.Lights;
             sky.Weather = () => RaceWeather.Forced ?? weather.At(tower.RaceTime);
             trackside.Cars = racing;
             trackside.Racing = tower.Racing;

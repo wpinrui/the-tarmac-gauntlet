@@ -96,6 +96,19 @@ namespace TarmacGauntlet.Raceday
             return w == null || Asleep || !w.Grounded ? 0f : w.Skid;
         }
 
+        /// <summary>
+        /// How far wheel i's suspension is squeezed, 0 at full droop to 1 on its bump stop, and false in the air or with the car
+        /// off physics. With true, where its tyre touches the ground.
+        /// </summary>
+        public bool Squeeze(int i, out float squeeze, out Vector3 contact)
+        {
+            Wheel w = wheels[i];
+            bool on = w != null && !Asleep && w.Grounded && Spec != null && Spec.Travel > 0f;
+            squeeze = on ? Mathf.Clamp01(w.Compression / Spec.Travel) : 0f;
+            contact = w != null ? w.Contact : Vector3.zero;
+            return on;
+        }
+
         public void Setup(CarSpec spec, Transform[] wheelVisuals)
         {
             Spec = spec;

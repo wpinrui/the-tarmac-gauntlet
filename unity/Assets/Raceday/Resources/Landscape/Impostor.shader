@@ -7,7 +7,7 @@
 //
 // Per vertex: position is the foot of the trunk in world space; uv0 the quad corner (-1 to 1);
 // uv1 the quad's half size, the height of the tree's middle above its foot, its turn about the
-// vertical in radians and its kind; uv2.x a height squash for hedge bushes; colour the leaf tint.
+// vertical in radians and its kind; uv2.x a height squash for hedge bushes; colour half the leaf tint.
 Shader "Hidden/TarmacGauntlet/Impostor"
 {
     Properties
@@ -151,7 +151,7 @@ Shader "Hidden/TarmacGauntlet/Impostor"
                 half3 normalTS = normalize(SAMPLE_TEXTURE2D_ARRAY(_Normals, sampler_Normals, i.atlas.xy, i.atlas.z).xyz * 2 - 1);
                 half3 bitangent = -cross(i.normalWS, i.tangentWS);
                 half3 normalWS = TransformTangentToWorld(normalTS, half3x3(i.tangentWS, bitangent, i.normalWS));
-                half3 col = ShadeLambert(i.positionWS, normalWS, i.positionCS, i.fog, c.rgb * i.color.rgb);
+                half3 col = ShadeLambert(i.positionWS, normalWS, i.positionCS, i.fog, c.rgb * i.color.rgb * 2);
                 return half4(col, 1);
             }
             ENDHLSL

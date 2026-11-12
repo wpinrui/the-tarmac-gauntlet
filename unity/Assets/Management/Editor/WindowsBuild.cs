@@ -70,13 +70,22 @@ namespace TarmacGauntlet.Management.Editor
             // A release build only records CPU and GPU frame times for the FPS counter with this on.
             PlayerSettings.enableFrameTimingStats = true;
             if (Directory.Exists(BuildFolder)) Directory.Delete(BuildFolder, true);
-            BuildReport report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+            UnityEngine.Rendering.RenderPipelineAsset[] pipelines = UseQualityAssets();
+            BuildReport report;
+            try
             {
-                scenes = scenes,
-                locationPathName = Path.Combine(BuildFolder, ExeName),
-                target = BuildTarget.StandaloneWindows64,
-                options = BuildOptions.None,
-            });
+                report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+                {
+                    scenes = scenes,
+                    locationPathName = Path.Combine(BuildFolder, ExeName),
+                    target = BuildTarget.StandaloneWindows64,
+                    options = BuildOptions.None,
+                });
+            }
+            finally
+            {
+                PutBackQualityAssets(pipelines);
+            }
             if (report.summary.result == BuildResult.Succeeded)
             {
                 Debug.Log($"Built {GameName} to {BuildFolder} in {report.summary.totalTime.TotalSeconds:0}s");
@@ -137,6 +146,41 @@ namespace TarmacGauntlet.Management.Editor
                 list.GetArrayElementAtIndex(list.arraySize - 1).objectReferenceValue = shader;
             }
             if (settings.ApplyModifiedPropertiesWithoutUndo()) AssetDatabase.SaveAssets();
+        }
+
+        /// <summary>
+        /// URP keeps only the shader variants the build's pipeline assets use, and finds those assets on Unity's quality
+        /// levels. The game picks its own asset in code (QualityLevels), so while the build runs each of Unity's levels holds
+        /// one of the game's, Low to Ultra. Without this the variants only High and Ultra use, such as their soft shadows,
+        /// the other lights' shadows and the screen shadows, would be left out. Returns the levels' own assets.
+        /// </summary>
+        private static UnityEngine.Rendering.RenderPipelineAsset[] UseQualityAssets()
+        {
+            int current = QualitySettings.GetQualityLevel();
+            var before = new UnityEngine.Rendering.RenderPipelineAsset[QualitySettings.count];
+            if (before.Length < QualityLevels.Names.Length)
+                Debug.LogWarning($"Build: Unity has {before.Length} quality levels, fewer than the game's {QualityLevels.Names.Length}, so some of its shader variants may be left out.");
+            for (int i = 0; i < before.Length; i++)
+            {
+                QualitySettings.SetQualityLevel(i, false);
+                before[i] = QualitySettings.renderPipeline;
+                string name = QualityLevels.Names[Mathf.Min(i, QualityLevels.Names.Length - 1)];
+                QualitySettings.renderPipeline = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.RenderPipelineAsset>(
+                    "Assets/Rendering/Resources/Quality/" + name + ".asset");
+            }
+            QualitySettings.SetQualityLevel(current, false);
+            return before;
+        }
+
+        private static void PutBackQualityAssets(UnityEngine.Rendering.RenderPipelineAsset[] before)
+        {
+            int current = QualitySettings.GetQualityLevel();
+            for (int i = 0; i < before.Length && i < QualitySettings.count; i++)
+            {
+                QualitySettings.SetQualityLevel(i, false);
+                QualitySettings.renderPipeline = before[i];
+            }
+            QualitySettings.SetQualityLevel(current, false);
         }
 
         /// <summary>

@@ -16,7 +16,15 @@
 
 // Under a clear coat the base coat is less glossy: the shine is the coat's.
 #define CAR_COAT_BASE_SMOOTHNESS 0.55
-#define CAR_COAT_SMOOTHNESS 0.94
+#define CAR_COAT_SMOOTHNESS 0.965
+// The coat reflects more of the world than URP's clear coat alone: this much straight on, and this much more towards a
+// glancing angle, so doors mirror the trackside and roofs and bonnets the sky.
+#define CAR_COAT_SHEEN 0.1
+#define CAR_COAT_SHEEN_GRAZING 0.4
+// At night, what the coat reflects brighter than this (floodlight and pit lenses, lamps) is made this much brighter
+// again, so the lights streak across the paint and glow.
+#define CAR_GLINT_FROM 1.2
+#define CAR_GLINT_GAIN 10.0
 // Flaked paint is part metal.
 #define CAR_FLAKE_METALLIC 0.45
 // A flake cell, metres.
@@ -37,6 +45,40 @@ float3 TarmacHash33(float3 p)
     p = frac(p * float3(0.1031, 0.1030, 0.0973));
     p += dot(p, p.yxz + 33.33);
     return frac((p.xxy + p.yxx) * p.zyx);
+}
+
+// How far the night's lights are on, 0 by day to 1 at night: set by CarReflections.
+float _TarmacCarGlint;
+
+// URP's clear coat environment weight (EnvironmentBRDFClearCoat) at a full coat.
+half CarCoatUrpWeight(half NoV, half coatPerceptualRoughness)
+{
+    half roughness = coatPerceptualRoughness * coatPerceptualRoughness;
+    half grazing = saturate(1 - coatPerceptualRoughness + kDielectricSpec.x);
+    return lerp(kDielectricSpec.x, grazing, Pow4(1 - NoV)) / (roughness * roughness + 1);
+}
+
+// The coat's sheen on top of URP's weight.
+half CarCoatSheen(half NoV)
+{
+    half f = 1 - NoV;
+    return CAR_COAT_SHEEN + CAR_COAT_SHEEN_GRAZING * f * f * f;
+}
+
+// Everything the coat's reflection of the world is weighted by: URP's clear coat and the sheen. Anything that swaps the
+// coat's reflection for another (screen-space reflections) weights it by this.
+half CarCoatEnvWeight(half NoV, half coatPerceptualRoughness)
+{
+    return CarCoatUrpWeight(NoV, coatPerceptualRoughness) + CarCoatSheen(NoV);
+}
+
+// What the coat adds to URP's lighting: the sheen, and at night the boost on the brightest things reflected.
+half3 CarCoatExtra(half3 env, half NoV, half coatPerceptualRoughness)
+{
+    half sheen = CarCoatSheen(NoV);
+    half peak = max(env.r, max(env.g, env.b));
+    half hot = _TarmacCarGlint * CAR_GLINT_GAIN * max(peak - CAR_GLINT_FROM, 0) / max(peak, 1e-3);
+    return env * (sheen + hot * (CarCoatUrpWeight(NoV, coatPerceptualRoughness) + sheen));
 }
 
 // One flake per cell, leaning at random: how much of the half vector it catches.
@@ -86,6 +128,16 @@ half4 ShadeCarPaint(float3 positionWS, half3 normalWS, float4 positionCS, half f
     s.smoothness = FilteredSmoothness(s.smoothness, d.normalWS);
 
     half4 c = UniversalFragmentPBR(d, s);
+
+#if defined(_CLEARCOAT)
+    {
+        half NoV = saturate(dot(d.normalWS, d.viewDirectionWS));
+        half coatRoughness = PerceptualSmoothnessToPerceptualRoughness(s.clearCoatSmoothness);
+        half3 r = reflect(-d.viewDirectionWS, d.normalWS);
+        half3 env = GlossyEnvironmentReflection(r, d.positionWS, coatRoughness, 1, d.normalizedScreenSpaceUV);
+        c.rgb += CarCoatExtra(env, NoV, coatRoughness);
+    }
+#endif
 
 #if defined(_TARMAC_FLAKE)
     if (flakes > 0)

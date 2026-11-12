@@ -40,6 +40,8 @@ namespace TarmacGauntlet.Raceday
         public TreeKind Kind;
         /// <summary>Leaf colour variation, about 1.</summary>
         public float Shade;
+        /// <summary>Leaf hue, -1 cool and blue to 1 warm and yellow, 0 the kind's own (<see cref="LandscapeLooks.Leaves"/>).</summary>
+        public float Hue;
     }
 
     /// <summary>What a stretch of land is used for.</summary>
@@ -47,15 +49,21 @@ namespace TarmacGauntlet.Raceday
 
     /// <summary>
     /// Lays out the country round the circuit from its data and a look: fields in irregular parcels,
-    /// some with hedges round them, forest in others, copses and lone trees in the fields. Nothing
-    /// stands on the track, its runoff or the 35 m behind the armco, or round the paddock. Placement
+    /// some with hedges round them, forest in others, copses and lone trees in the fields, and a few
+    /// trees and bushes standing forward of the rest in the mown grass. Nothing stands on the track,
+    /// its runoff or the 15 m behind the armco, or round the paddock, and only those few within 35 m;
+    /// none of those on the inside of a bend, where a camera up the track looks across it. Placement
     /// is repeatable: the same circuit and look give the same trees. Free of Unity's runtime, so the
     /// offline checks and previews use it too.
     /// </summary>
     public sealed class LandscapePlan
     {
-        /// <summary>Nothing stands closer to the armco than this, m.</summary>
+        /// <summary>The woods, hedges and fields' trees stand no closer to the armco than this, m.</summary>
         public const float KeepClear = 35f;
+        /// <summary>The few trees standing forward of the rest (<see cref="Fringe"/>) stand no closer than this, m.</summary>
+        public const float NearClear = 15f;
+        /// <summary>No tree stands closer than <see cref="KeepClear"/> on the inside of a bend tighter than this radius, m.</summary>
+        public const float InsideRadius = 900f;
         /// <summary>Nothing stands within this of a garage on the pit side: the paddock and pit building, m.</summary>
         public const float PaddockClear = 120f;
         /// <summary>Spacing of the parcel seeds, m.</summary>
@@ -83,6 +91,7 @@ namespace TarmacGauntlet.Raceday
         private readonly Circuit c;
         private readonly Func<int, int, float> reach;
         private readonly LandscapeLook look;
+        private readonly IReadOnlyList<StandFootprint> stands;
         private readonly int seed;
         private readonly GroundData g;
         private readonly float minX, minZ, maxX, maxZ;
@@ -93,6 +102,9 @@ namespace TarmacGauntlet.Raceday
         // that is on (+1 left), and where nothing may stand.
         private readonly float[] edge;
         private readonly sbyte[] sideOf;
+        // Distance beyond the nearest road edge, and that stretch of road's sample (-1 out of reach).
+        private readonly float[] road;
+        private readonly int[] roadAt;
         private readonly bool[] blocked;
         private readonly float cell;
 
@@ -103,11 +115,13 @@ namespace TarmacGauntlet.Raceday
         private readonly float[] conifer;
 
         /// <param name="runoffReach">How far out from the road edge the runoff reaches on a side (0 = left) at a sample: <see cref="CircuitBuilder.RunoffReach"/>.</param>
-        public LandscapePlan(Circuit circuit, Func<int, int, float> runoffReach, LandscapeLook look, int seed = 1)
+        /// <param name="stands">The grandstands' footprints (<see cref="Grandstands.Footprints"/>): no tree stands forward in front of or beside one.</param>
+        public LandscapePlan(Circuit circuit, Func<int, int, float> runoffReach, LandscapeLook look, IReadOnlyList<StandFootprint> stands = null, int seed = 1)
         {
             c = circuit;
             reach = runoffReach;
             this.look = look;
+            this.stands = stands;
             this.seed = seed;
             g = c.Data.terrain;
             minX = g.originX;
@@ -119,6 +133,8 @@ namespace TarmacGauntlet.Raceday
             cell = g.spacing / MapPerCell;
             edge = new float[MapX * MapZ];
             sideOf = new sbyte[edge.Length];
+            road = new float[edge.Length];
+            roadAt = new int[edge.Length];
             blocked = new bool[edge.Length];
             EdgeField();
             BlockField();
@@ -149,6 +165,7 @@ namespace TarmacGauntlet.Raceday
             Forests();
             Hedges();
             Fields();
+            Fringe();
         }
 
         // ---------------------------------------------------------------- land use
@@ -197,7 +214,7 @@ namespace TarmacGauntlet.Raceday
         /// </summary>
         private void EdgeField()
         {
-            for (int i = 0; i < edge.Length; i++) { edge[i] = FieldReach; sideOf[i] = 1; }
+            for (int i = 0; i < edge.Length; i++) { edge[i] = road[i] = FieldReach; sideOf[i] = 1; roadAt[i] = -1; }
             for (int k = 0; k < c.Count; k++)
             {
                 Vector3 p = c.Centre[k];
@@ -212,9 +229,10 @@ namespace TarmacGauntlet.Raceday
                     {
                         float dx = minX + x * cell - p.x;
                         float lat = dx * c.Left[k].x + dz * c.Left[k].z;
-                        float e = Mathf.Sqrt(dx * dx + dz * dz) - half - (lat >= 0f ? left : right);
+                        float r0 = Mathf.Sqrt(dx * dx + dz * dz) - half, e = r0 - (lat >= 0f ? left : right);
                         int i = z * MapX + x;
                         if (e < edge[i]) { edge[i] = e; sideOf[i] = (sbyte)(lat >= 0f ? 1 : -1); }
+                        if (r0 < road[i]) { road[i] = r0; roadAt[i] = k; }
                     }
                 }
             }
@@ -259,6 +277,50 @@ namespace TarmacGauntlet.Raceday
             // The distance changes by at most a metre a metre, and the nearest map point is within
             // half a cell's diagonal.
             return blocked[i] || edge[i] < KeepClear + cell * 0.75f;
+        }
+
+        /// <summary>Width of one mower pass, one stripe, m.</summary>
+        public const float StripeWidth = 5f;
+
+        /// <summary>
+        /// The mowing at a map point: how far it is beyond the nearest road edge, m; how far out from the road the grass
+        /// is mown there, m, 0 where none is; how fresh the stripes are, 0.5 to 1; and which way that stretch of road
+        /// runs, across the ground. Stripes run nearly straight along the road, a pass at a time. Some stretches are mown a few
+        /// passes out and left long beyond, others all the way, and some were mown longer ago, so their stripes are faint.
+        /// </summary>
+        public void Mowing(int i, out float fromRoad, out float reach, out float fresh, out float alongX, out float alongZ)
+        {
+            int k = roadAt[i];
+            float x = minX + (i % MapX) * cell, z = minZ + (i / MapX) * cell;
+            // Nearly straight: the passes drift a little either way over tens of metres, as a mower steered by eye does.
+            fromRoad = Mathf.Max(road[i], 0f) * (1f + 0.05f * (Noise(x / 200f, z / 200f, 166) - 0.5f))
+                + 2.6f * (Noise(x / 60f, z / 60f, 162) - 0.5f);
+            reach = fresh = alongX = alongZ = 0f;
+            if (k < 0 || Map[i] != LandUse.Mown) return;
+            // Left is level and square to the road, so the road runs along (left.z, -left.x).
+            alongX = c.Left[k].z;
+            alongZ = -c.Left[k].x;
+            float far = Noise(x / 220f, z / 220f, 165);
+            reach = far > 0.6f ? FieldReach * 2f : StripeWidth * (2 + Mathf.FloorToInt(far * 12f));
+            fresh = Mathf.Clamp(0.5f + 1.5f * (Noise(x / 130f, z / 130f, 164) - 0.35f), 0.5f, 1f);
+        }
+
+        /// <summary>
+        /// True if a point lies on the inside of a bend tighter than <see cref="InsideRadius"/>, measured over 80 m either
+        /// side of the nearest stretch of road: a trackside camera looks up the track across there.
+        /// </summary>
+        public bool InsideBend(float x, float z)
+        {
+            int i = Nearest(x, z), k = roadAt[i];
+            if (k < 0) return false;
+            int n = Mathf.Max(1, Mathf.RoundToInt(80f / c.Step));
+            Vector3 mid = (c.Centre[c.Wrap(k - n)] + c.Centre[c.Wrap(k + n)]) * 0.5f - c.Centre[k];
+            // The chord's middle lies towards the inside; how far gives the radius.
+            float inward = mid.x * c.Left[k].x + mid.z * c.Left[k].z;
+            float sag = Mathf.Abs(inward), half = n * c.Step;
+            if (sag < 1e-3f || half * half / (2f * sag) >= InsideRadius) return false;
+            float lat = (x - c.Centre[k].x) * c.Left[k].x + (z - c.Centre[k].z) * c.Left[k].z;
+            return lat * inward > 0f;
         }
 
         // ---------------------------------------------------------------- planting
@@ -370,6 +432,55 @@ namespace TarmacGauntlet.Raceday
             }
         }
 
+        /// <summary>
+        /// A few trees and bushes standing forward of the rest, in the mown grass between <see cref="NearClear"/> and
+        /// <see cref="KeepClear"/> behind the armco, in loose clumps, so the tree line has layers in front of it rather
+        /// than standing as one wall. None on the inside of a tight bend.
+        /// </summary>
+        private void Fringe()
+        {
+            const float step = 9f;
+            int nx = Mathf.CeilToInt((maxX - minX) / step), nz = Mathf.CeilToInt((maxZ - minZ) / step);
+            float trees = Mathf.Clamp01(0.35f + look.Forest * 0.5f + look.Copses * 0.3f);
+            for (int j = 0; j < nz; j++)
+                for (int i = 0; i < nx; i++)
+                {
+                    float x = minX + (i + 0.1f + 0.8f * Rand(i, j, 71)) * step;
+                    float z = minZ + (j + 0.1f + 0.8f * Rand(i, j, 72)) * step;
+                    if (x < minX + 4f || z < minZ + 4f || x > maxX - 4f || z > maxZ - 4f) continue;
+                    int m = Nearest(x, z);
+                    float e = edge[m];
+                    if (blocked[m] || e < NearClear + cell * 0.75f || e >= KeepClear + cell * 0.75f) continue;
+                    // Clumps: only where a broad noise runs high, thicker the higher it runs.
+                    float clump = (Noise(x / 60f, z / 60f, 73) - 0.45f) / 0.3f;
+                    if (clump <= 0f || Rand(i, j, 74) > clump * 0.9f * trees) continue;
+                    if (InsideBend(x, z) || ByStand(x, z)) continue;
+                    float r = Rand(i, j, 75);
+                    if (r < 0.3f) { Bush(x, z, i, j + 5000); continue; }
+                    TreeKind kind = Rand(i, j, 76) < look.Conifer * 0.7f ? (TreeKind)((int)TreeKind.SpruceA + (int)(Rand(i, j, 77) * 1.999f))
+                        : (TreeKind)(int)(Rand(i, j, 77) * 2.999f);
+                    // Younger and smaller than the woods behind, so they read as a layer in front.
+                    Plant(x, z, kind, 0.6f + 0.35f * Rand(i, j, 78), i, j + 5000);
+                }
+        }
+
+        /// <summary>Room left clear along the track either side of a grandstand, so the trees stand off its ends, m.</summary>
+        private const float StandRoom = 40f;
+
+        /// <summary>True if a point is level with a grandstand, or within <see cref="StandRoom"/> of either end, on its side of the track.</summary>
+        private bool ByStand(float x, float z)
+        {
+            if (stands == null) return false;
+            int k = roadAt[Nearest(x, z)];
+            if (k < 0) return false;
+            float lat = (x - c.Centre[k].x) * c.Left[k].x + (z - c.Centre[k].z) * c.Left[k].z;
+            foreach (StandFootprint f in stands)
+                if ((f.Side == 0) == (lat > 0f)
+                    && Mathf.Repeat(k * c.Step - f.From + StandRoom, c.Lap) <= Mathf.Repeat(f.To - f.From, c.Lap) + 2f * StandRoom)
+                    return true;
+            return false;
+        }
+
         /// <summary>Grown heights by kind, smallest and largest, m.</summary>
         private static readonly float[] MinHeight = { 13f, 15f, 12f, 20f, 16f, 15f, 14f, 1.6f };
         private static readonly float[] MaxHeight = { 21f, 24f, 18f, 27f, 23f, 24f, 22f, 2.6f };
@@ -377,7 +488,12 @@ namespace TarmacGauntlet.Raceday
         private void Plant(float x, float z, TreeKind kind, float grow, int i, int j)
         {
             int k = (int)kind;
-            float height = Mathf.Lerp(MinHeight[k], MaxHeight[k], Rand(i, j, 51)) * grow;
+            // Stands of different ages, so the skyline rises and falls, with now and then a sapling or a
+            // tree standing well above its neighbours.
+            float age = 0.7f + 0.55f * Noise(x / 110f, z / 110f, 54);
+            float odd = Rand(i, j, 55);
+            float one = odd < 0.08f ? 0.55f : odd > 0.95f ? 1.3f : 1f;
+            float height = Mathf.Lerp(MinHeight[k], MaxHeight[k], Rand(i, j, 51)) * grow * age * one;
             Trees.Add(new TreeSpot
             {
                 Base = new Vector3(x, c.TerrainHeight(x, z) - 0.15f, z),
@@ -385,7 +501,8 @@ namespace TarmacGauntlet.Raceday
                 Squash = 1f,
                 Yaw = Rand(i, j, 52) * Mathf.PI * 2f,
                 Kind = kind,
-                Shade = 0.85f + 0.3f * Rand(i, j, 53),
+                Shade = ShadeAt(x, z, i, j, 53),
+                Hue = HueAt(x, z, i, j, 56),
             });
         }
 
@@ -402,9 +519,18 @@ namespace TarmacGauntlet.Raceday
                 Squash = height / (ModelHeight[k] * scale),
                 Yaw = Rand(i, j, 63) * Mathf.PI * 2f,
                 Kind = TreeKind.Bush,
-                Shade = 0.85f + 0.3f * Rand(i, j, 64),
+                Shade = ShadeAt(x, z, i, j, 64),
+                Hue = HueAt(x, z, i, j, 65),
             });
         }
+
+        /// <summary>Leaf shade: lighter and darker stands, and each tree a little different.</summary>
+        private float ShadeAt(float x, float z, int i, int j, int salt) =>
+            (0.82f + 0.36f * Noise(x / 80f, z / 80f, 57)) * (0.86f + 0.28f * Rand(i, j, salt));
+
+        /// <summary>Leaf hue: warmer and cooler stands, and each tree a little different.</summary>
+        private float HueAt(float x, float z, int i, int j, int salt) =>
+            Mathf.Clamp((Noise(x / 150f, z / 150f, 58) - 0.5f) * 2.6f + (Rand(i, j, salt) - 0.5f) * 0.6f, -1f, 1f);
 
         // ---------------------------------------------------------------- noise
 
