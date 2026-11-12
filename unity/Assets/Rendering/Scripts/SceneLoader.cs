@@ -37,6 +37,9 @@ namespace TarmacGauntlet.Rendering
         private VisualElement root, segment;
         private float sweep;
 
+        /// <summary>Raised as a load starts, before the loading screen is drawn, so sound can fade out with the old scene.</summary>
+        public static event System.Action Leaving;
+
         /// <summary>True while a load is under way, from the call to the end of the fade.</summary>
         public static bool Loading => current != null;
 
@@ -51,6 +54,7 @@ namespace TarmacGauntlet.Rendering
         public static void Load(string scene)
         {
             if (current != null) return;
+            Leaving?.Invoke();
             var go = new GameObject("Loading screen");
             DontDestroyOnLoad(go);
             current = go.AddComponent<SceneLoader>();
