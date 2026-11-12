@@ -11,13 +11,15 @@ float4 _FoliageWind;
 // shows the same trees as the screen.
 float4 _NearTreesAt;
 // x where an impostor starts to show, m from _NearTreesAt to the tree's middle; y 1 / the width of the cross-fade;
-// z 1 while near 3D trees are drawn, 0 when there are none and every impostor shows whole.
+// z 1 while near 3D trees are drawn, 0 when there are none and every impostor shows whole; w the frame, 0 to 63.
 float4 _NearTreeFade;
 
-// Interleaved gradient noise: an even spread of thresholds from 0 to 1 over neighbouring pixels.
+// Interleaved gradient noise: an even spread of thresholds from 0 to 1 over neighbouring pixels. It moves on each frame,
+// so STP's history (on at every level) averages the two sides of a hand-over into a smooth blend.
 float FoliageNoise(float2 pixel)
 {
-    return frac(52.9829189 * frac(dot(floor(pixel), float2(0.06711056, 0.00583715))));
+    pixel = floor(pixel) + 5.588238 * _NearTreeFade.w;
+    return frac(52.9829189 * frac(dot(pixel, float2(0.06711056, 0.00583715))));
 }
 
 // How much of an impostor shows, from 0 (its 3D tree stands there instead) to 1 (all of it), by its middle.

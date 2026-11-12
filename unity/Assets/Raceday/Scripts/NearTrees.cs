@@ -37,7 +37,7 @@ namespace TarmacGauntlet.Raceday
         private const int BarkQueue = (int)RenderQueue.Geometry, LeafDepthQueue = (int)RenderQueue.AlphaTest - 1, LeafQueue = (int)RenderQueue.AlphaTest;
 
         private static readonly int TreesId = Shader.PropertyToID("_Trees"), StartId = Shader.PropertyToID("_Start"), KindId = Shader.PropertyToID("_Kind");
-        private static readonly int ColourId = Shader.PropertyToID("_Colour");
+        private static readonly int ColourId = Shader.PropertyToID("_Colour"), BarkColourId = Shader.PropertyToID("_BarkColour");
         private static readonly int NearAtId = Shader.PropertyToID("_NearTreesAt"), NearFadeId = Shader.PropertyToID("_NearTreeFade");
 
         private readonly Mesh[,] meshes = new Mesh[Kinds, Lods];
@@ -51,8 +51,8 @@ namespace TarmacGauntlet.Raceday
         private readonly List<(int Tree, float Share)>[,] groups = new List<(int, float)>[Kinds, Lods];
         private readonly MaterialPropertyBlock[,] blocks = new MaterialPropertyBlock[Kinds, Lods];
         private readonly int[,] starts = new int[Kinds, Lods];
-        /// <summary>What each level's colour is multiplied by, so that lit it matches its impostor (trees3d-view.js --calibrate).</summary>
-        private readonly Vector4[,] colours = new Vector4[Kinds, Lods];
+        /// <summary>What each level's leaves and bark are multiplied by, so that lit they match the impostor (trees3d-view.js --calibrate).</summary>
+        private readonly Vector4[,] colours = new Vector4[Kinds, Lods], barkColours = new Vector4[Kinds, Lods];
 
         /// <summary>The meshes and materials for the plan's trees, or null if the shader or the baked trees are missing.</summary>
         public static NearTrees Load(IReadOnlyList<TreeSpot> trees)
@@ -130,6 +130,7 @@ namespace TarmacGauntlet.Raceday
                     blocks[k, l].SetBuffer(TreesId, buffer);
                     blocks[k, l].SetFloat(KindId, k);
                     blocks[k, l].SetVector(ColourId, colours[k, l]);
+                    blocks[k, l].SetVector(BarkColourId, barkColours[k, l]);
                 }
         }
 
@@ -156,15 +157,16 @@ namespace TarmacGauntlet.Raceday
             }
             if (bytes.Length < 20 || bytes[0] != 'T' || bytes[1] != 'G' || bytes[2] != '3' || bytes[3] != 'D') throw new InvalidOperationException("not a trees3d file");
             at = 4;
-            if (Int() != 2) throw new InvalidOperationException("wrong trees3d version");
+            if (Int() != 3) throw new InvalidOperationException("wrong trees3d version");
             int kindCount = Int(), lodCount = Int(), layers = Int();
             if (kindCount != Kinds || lodCount != Lods) throw new InvalidOperationException("wrong number of kinds or levels");
             for (int k = 0; k < Kinds; k++)
                 for (int l = 0; l < Lods; l++)
                 {
                     int nv = Int(), nb = Int(), nl = Int();
-                    float[] colour = Floats(3);
+                    float[] colour = Floats(3), barkColour = Floats(3);
                     colours[k, l] = new Vector4(colour[0], colour[1], colour[2], 1f);
+                    barkColours[k, l] = new Vector4(barkColour[0], barkColour[1], barkColour[2], 1f);
                     float[] p = Floats(nv * 3), nrm = Floats(nv * 3), uv = Floats(nv * 2), extra = Floats(nv * 3);
                     int[] barkIdx = Ints(nb), leafIdx = Ints(nl);
                     var verts = new Vector3[nv];
@@ -221,7 +223,8 @@ namespace TarmacGauntlet.Raceday
                 return;
             }
             Shader.SetGlobalVector(NearAtId, origin);
-            Shader.SetGlobalVector(NearFadeId, new Vector4(r.Start, 1f / (r.End - r.Start), 1f, 0f));
+            // w steps the dither on each frame, so the upscaler's history blends the hand-over smoothly, not as a stipple.
+            Shader.SetGlobalVector(NearFadeId, new Vector4(r.Start, 1f / (r.End - r.Start), 1f, Time.frameCount % 64));
 
             foreach (List<(int, float)> g in groups) g.Clear();
             float lod0 = r.LodAt - r.LodBand * 0.5f;

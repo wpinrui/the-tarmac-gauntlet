@@ -2,8 +2,9 @@
 // them for the game: Resources/Landscape/Trees3D/trees3d.bytes, the bark textures bark_NN.jpg and a leaf atlas per tree.
 // Usage: node trees3d.js <folder of Poly Haven <id>/<id>_1k.gltf> [Resources/Landscape folder] [name ...]
 //
-// trees3d.bytes, little-endian: "TG3D", int version 2, int kinds, int lods, int bark layers; then per kind, per LOD:
-// int vertices, int bark indices, int leaf indices, float3 colour (times the tint, to match the impostor), float3 positions, float3 normals, float2 uvs,
+// trees3d.bytes, little-endian: "TG3D", int version 3, int kinds, int lods, int bark layers; then per kind, per LOD:
+// int vertices, int bark indices, int leaf indices, float3 leaf colour and float3 bark colour (each times the tint, to
+// match the impostor; trees3d-view.js --calibrate sets them), float3 positions, float3 normals, float2 uvs,
 // float3 extra (bark layer, shade, sway), int bark indices, int leaf indices. Kinds in trees.json's order.
 const http = require('http'), fs = require('fs'), path = require('path');
 const { chromium } = require('playwright');
@@ -61,7 +62,7 @@ const server = http.createServer((req, res) => {
       for (let i = 0; i < lod.extra.length; i += 3) lod.extra[i] = lod.extra[i] >= 0 ? local[lod.extra[i]] : 0;
     fs.writeFileSync(path.join(out, `leaves_${name}.png`), Buffer.from(r.atlas.split(',')[1], 'base64'));
     // Each level's colour, so it averages to the impostor's over the same views.
-    r.lods.forEach((l, i) => { l.colour = r.against[i].colour.map(v => Math.min(Math.max(v, 0.35), 2.5)); });
+    r.lods.forEach((l, i) => { l.colour = r.against[i].colour.map(v => Math.min(Math.max(v, 0.35), 2.5)); l.barkColour = [1, 1, 1]; });
     kinds.push(r.lods);
     console.log(name, JSON.stringify(r.meta));
   }
@@ -72,13 +73,14 @@ const server = http.createServer((req, res) => {
   const parts = [];
   const head = Buffer.alloc(20);
   head.write('TG3D', 0, 'ascii');
-  head.writeInt32LE(2, 4); head.writeInt32LE(kinds.length, 8); head.writeInt32LE(2, 12); head.writeInt32LE(layers.length, 16);
+  head.writeInt32LE(3, 4); head.writeInt32LE(kinds.length, 8); head.writeInt32LE(2, 12); head.writeInt32LE(layers.length, 16);
   parts.push(head);
   for (const lods of kinds)
     for (const l of lods) {
-      const h = Buffer.alloc(24);
+      const h = Buffer.alloc(36);
       h.writeInt32LE(l.positions.length / 3, 0); h.writeInt32LE(l.bark.length, 4); h.writeInt32LE(l.leaves.length, 8);
       l.colour.forEach((v, k) => h.writeFloatLE(v, 12 + k * 4));
+      l.barkColour.forEach((v, k) => h.writeFloatLE(v, 24 + k * 4));
       parts.push(h, Buffer.from(Float32Array.from(l.positions).buffer), Buffer.from(Float32Array.from(l.normals).buffer),
         Buffer.from(Float32Array.from(l.uvs).buffer), Buffer.from(Float32Array.from(l.extra).buffer),
         Buffer.from(Int32Array.from(l.bark).buffer), Buffer.from(Int32Array.from(l.leaves).buffer));

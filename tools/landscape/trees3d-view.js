@@ -32,19 +32,27 @@ const server = http.createServer((req, rs) => {
   // With --calibrate, each level's colour is scaled so that, lit from several suns and seen level and from above, it
   // averages to its impostor's colour, and trees3d.bytes is written back.
   const suns = calibrate ? [[0.4, 0.75, 0.5], [-0.4, 0.5, -0.7], [0.9, 0.3, 0], [0, 1, 0.05], [-0.6, 0.35, 0.6]] : [null];
-  const fixes = {};
+  const fixes = {}, barkFixes = {};
   for (const [k, name] of KINDS.entries()) {
     if (only.length && !only.includes(name)) continue;
-    const sum = [[0, 0, 0], [0, 0, 0]];
+    const sum = [[0, 0, 0], [0, 0, 0]], trunk = [[0, 0, 0], [0, 0, 0]];
+    let levels = 0;
     for (const sun of suns)
       for (const [view, lift] of [['level', 0.05], ['above', 0.45]]) {
         await page.evaluate(s => { window.SUN = s; }, sun);
         const r = await page.evaluate(a => window.render(...a), [name, RADIUS[k], ABOVE[k], TINT[k], 1500, 600, lift]);
         if (!calibrate) fs.writeFileSync(path.join(outDir, `${name}-${view}.png`), Buffer.from(r.url.split(',')[1], 'base64'));
         for (let l = 0; l < 2; l++) for (let c = 0; c < 3; c++) sum[l][c] += Math.log(r.means[2][c] / r.means[l][c]);
+        // The trunk, seen level, where it shows: the bark's own colour.
+        if (view === 'level' && r.trunks.every(t => t[3] > 50)) {
+          levels++;
+          for (let l = 0; l < 2; l++) for (let c = 0; c < 3; c++) trunk[l][c] += Math.log(r.trunks[2][c] / r.trunks[l][c]);
+        }
       }
     fixes[name] = sum.map(s => s.map(v => Math.exp(v / (suns.length * 2))));
-    console.log(name, calibrate ? JSON.stringify(fixes[name].map(f => f.map(v => +v.toFixed(2)))) : '');
+    barkFixes[name] = trunk.map(s => s.map(v => levels ? Math.exp(v / levels) : 1));
+    const round = a => JSON.stringify(a.map(f => f.map(v => +v.toFixed(2))));
+    console.log(name, calibrate ? `leaves ${round(fixes[name])} bark ${round(barkFixes[name])}` : '');
   }
   if (calibrate) {
     const file = path.join(res, 'Trees3D', 'trees3d.bytes'), buf = fs.readFileSync(file);
@@ -52,8 +60,9 @@ const server = http.createServer((req, rs) => {
     for (const name of KINDS)
       for (let l = 0; l < 2; l++) {
         const nv = buf.readInt32LE(o), nb = buf.readInt32LE(o + 4), nl = buf.readInt32LE(o + 8);
-        if (fixes[name]) for (let c = 0; c < 3; c++) buf.writeFloatLE(Math.min(Math.max(buf.readFloatLE(o + 12 + c * 4) * fixes[name][l][c], 0.05), 3), o + 12 + c * 4);
-        o += 24 + nv * 4 * (3 + 3 + 2 + 3) + (nb + nl) * 4;
+        const fix = (at, f) => buf.writeFloatLE(Math.min(Math.max(buf.readFloatLE(at) * f, 0.05), 4), at);
+        if (fixes[name]) for (let c = 0; c < 3; c++) { fix(o + 12 + c * 4, fixes[name][l][c]); fix(o + 24 + c * 4, barkFixes[name][l][c]); }
+        o += 36 + nv * 4 * (3 + 3 + 2 + 3) + (nb + nl) * 4;
       }
     fs.writeFileSync(file, buf);
   }

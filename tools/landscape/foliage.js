@@ -13,8 +13,11 @@ export const GRASS_RINGS = [null, { spacing: 0.08, edges: [8, 25] }, { spacing: 
 const ACROSS = 16, THINNING = 0.3, SHRINK_FROM = 0.55;
 
 // Foliage.hlsl.
+// The frame the dither is on, 0 to 63, as Foliage.hlsl steps it so the game's upscaler blends the hand-over.
+export const ditherFrame = { value: 0 };
 export const ditherGlsl = `
-  float foliageNoise(vec2 p) { return fract(52.9829189 * fract(dot(floor(p), vec2(0.06711056, 0.00583715)))); }
+  uniform float ditherFrame;
+  float foliageNoise(vec2 p) { return fract(52.9829189 * fract(dot(floor(p) + 5.588238 * ditherFrame, vec2(0.06711056, 0.00583715)))); }
   void foliageFade(float share) {
     float n = foliageNoise(gl_FragCoord.xy);
     if ((share >= 0.0 ? share - n : n - (1.0 + share)) < 0.0) discard;
@@ -41,8 +44,8 @@ export function parseTrees3d(buf) {
   for (let k = 0; k < kinds; k++) {
     const row = [];
     for (let l = 0; l < lods; l++) {
-      const nv = i32(), nb = i32(), nl = i32(), colour = Array.from(f32(3));
-      row.push({ colour, P: f32(nv * 3), N: f32(nv * 3), U: f32(nv * 2), X: f32(nv * 3), B: ints(nb), L: ints(nl) });
+      const nv = i32(), nb = i32(), nl = i32(), colour = Array.from(f32(3)), barkColour = Array.from(f32(3));
+      row.push({ colour, barkColour, P: f32(nv * 3), N: f32(nv * 3), U: f32(nv * 2), X: f32(nv * 3), B: ints(nb), L: ints(nl) });
     }
     out.push(row);
   }
@@ -156,14 +159,16 @@ export function nearTrees(data, bark, leaves, trees, above, eye, setting, lights
       g.setAttribute('b', new THREE.InstancedBufferAttribute(new Float32Array(B), 4));
       g.setAttribute('tint', new THREE.InstancedBufferAttribute(new Float32Array(T), 3));
       g.instanceCount = list.length;
-      // The z flip turned the winding round; both sides are drawn, so it doesn't matter here.
-      const idx = [...m.B, ...m.L];
+      // The z flip turned the winding round: the bark's is turned back, so its front faces are lit as in Unity.
+      const idx = [];
+      for (let t = 0; t < m.B.length; t += 3) idx.push(m.B[t], m.B[t + 2], m.B[t + 1]);
+      idx.push(...m.L);
       g.setIndex(idx);
       g.addGroup(0, m.B.length, 0);
       g.addGroup(m.B.length, m.L.length, 1);
       const mat = (layers, isLeaves) => new THREE.RawShaderMaterial({
         glslVersion: THREE.GLSL3, vertexShader: treeVert, fragmentShader: treeFrag, side: THREE.DoubleSide,
-        uniforms: { layers: { value: layers }, leaves: { value: isLeaves ? 1 : 0 }, kind: { value: k }, colour: { value: new THREE.Vector3(...m.colour) }, wind: { value: windValue() }, ...lights },
+        uniforms: { layers: { value: layers }, leaves: { value: isLeaves ? 1 : 0 }, kind: { value: k }, colour: { value: new THREE.Vector3(...(isLeaves ? m.colour : m.barkColour)) }, wind: { value: windValue() }, ditherFrame, ...lights },
       });
       const mesh = new THREE.Mesh(g, [mat(bark, false), mat(leaves, true)]);
       mesh.frustumCulled = false;

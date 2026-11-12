@@ -27,8 +27,8 @@ function parse(buf) {
   for (let k = 0; k < kinds; k++) {
     const row = [];
     for (let l = 0; l < lods; l++) {
-      const nv = i32(), nb = i32(), nl = i32(), colour = Array.from(f32(3));
-      row.push({ colour, P: f32(nv * 3), N: f32(nv * 3), U: f32(nv * 2), X: f32(nv * 3), B: ints(nb), L: ints(nl) });
+      const nv = i32(), nb = i32(), nl = i32(), colour = Array.from(f32(3)), barkColour = Array.from(f32(3));
+      row.push({ colour, barkColour, P: f32(nv * 3), N: f32(nv * 3), U: f32(nv * 2), X: f32(nv * 3), B: ints(nb), L: ints(nl) });
     }
     out.push(row);
   }
@@ -49,6 +49,7 @@ const uniforms = () => ({
 
 function treeMesh(lod, barkArray, leafTex, tint0) {
   const tint = tint0.clone().multiply(new THREE.Vector3(...lod.colour));
+  const barkTint = tint0.clone().multiply(new THREE.Vector3(...lod.barkColour));
   // Back into three.js's frame: z turned round, and the winding with it.
   const P = Float32Array.from(lod.P), N = Float32Array.from(lod.N);
   for (let i = 2; i < P.length; i += 3) { P[i] = -P[i]; N[i] = -N[i]; }
@@ -67,7 +68,7 @@ function treeMesh(lod, barkArray, leafTex, tint0) {
   const vert = `
     attribute vec3 extra; varying vec2 vUv; varying vec3 vN; varying vec3 vX; varying vec3 vV;
     void main() { vUv = uv; vN = normal; vX = extra; vec4 w = modelMatrix * vec4(position, 1.0); vV = cameraPosition - w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`;
-  const bark = new THREE.ShaderMaterial({ uniforms: { ...uniforms(), layers: { value: barkArray }, tint: { value: tint } }, glslVersion: THREE.GLSL3, side: THREE.DoubleSide,
+  const bark = new THREE.ShaderMaterial({ uniforms: { ...uniforms(), layers: { value: barkArray }, tint: { value: barkTint } }, glslVersion: THREE.GLSL3, side: THREE.DoubleSide,
     vertexShader: vert.replace(/varying/g, 'out').replace('attribute', 'in'),
     fragmentShader: `precision highp sampler2DArray; uniform sampler2DArray layers; in vec2 vUv; in vec3 vN; in vec3 vX; in vec3 vV; out vec4 o; ${lightGlsl}
       uniform vec3 tint; void main() { vec3 c = pow(texture(layers, vec3(vUv, vX.x)).rgb, vec3(2.2)) * vX.y * tint; o = vec4(pow(light(c, normalize(vN)), vec3(1.0 / 2.2)), 1.0); }` });
@@ -148,17 +149,25 @@ window.render = async (kind, radius, centreAbove, tint, w, h, lift, distance) =>
   const ctx = c.getContext('2d', { willReadFrequently: true });
   ctx.drawImage(r.domElement, 0, 0);
   const px = ctx.getImageData(0, 0, w, h).data, bg = [px[0], px[1], px[2]];
-  const means = [0, 1, 2].map(() => [0, 0, 0, 0]);
+  const means = [0, 1, 2].map(() => [0, 0, 0, 0]), trunks = [0, 1, 2].map(() => [0, 0, 0, 0]);
+  const seen = (i) => Math.abs(px[i] - bg[0]) + Math.abs(px[i + 1] - bg[1]) + Math.abs(px[i + 2] - bg[2]) > 40;
+  const third = x => Math.min(2, Math.floor(x / (w / 3)));
+  // Each third's lowest and highest row with the tree in it: its trunk is the bottom eighth of that.
+  const top = [h, h, h], bottom = [0, 0, 0];
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++)
+      if (seen((y * w + x) * 4)) { const t = third(x); top[t] = Math.min(top[t], y); bottom[t] = Math.max(bottom[t], y); }
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4;
-      if (Math.abs(px[i] - bg[0]) + Math.abs(px[i + 1] - bg[1]) + Math.abs(px[i + 2] - bg[2]) <= 40) continue;
-      const m = means[Math.min(2, Math.floor(x / (w / 3)))];
-      for (let k = 0; k < 3; k++) m[k] += Math.pow(px[i + k] / 255, 2.2);
-      m[3]++;
+      if (!seen(i)) continue;
+      const t = third(x), ms = [means[t]];
+      if (y > bottom[t] - (bottom[t] - top[t]) * 0.125) ms.push(trunks[t]);
+      for (const m of ms) { for (let k = 0; k < 3; k++) m[k] += Math.pow(px[i + k] / 255, 2.2); m[3]++; }
     }
   r.dispose();
-  return { url, means: means.map(m => [m[0] / m[3], m[1] / m[3], m[2] / m[3], m[3]]) };
+  const avg = m => [m[0] / m[3], m[1] / m[3], m[2] / m[3], m[3]];
+  return { url, means: means.map(avg), trunks: trunks.map(avg) };
 };
 window.ready = true;
 </script></body></html>

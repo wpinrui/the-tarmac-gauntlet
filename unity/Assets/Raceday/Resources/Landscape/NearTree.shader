@@ -44,8 +44,9 @@ Shader "Hidden/TarmacGauntlet/NearTree"
         // Per draw, from a property block: the first instance's place in _Trees, and the leaves' layer (the kind).
         uint _Start;
         float _Kind;
-        // Per draw: what this level's colour is multiplied by, so that lit it matches its impostor (trees3d.bytes).
+        // Per draw: what this level's leaves and bark are multiplied by, so that lit they match the impostor (trees3d.bytes).
         float3 _Colour;
+        float3 _BarkColour;
 
         struct Attributes
         {
@@ -186,6 +187,15 @@ Shader "Hidden/TarmacGauntlet/NearTree"
                 return o;
             }
 
+            half3 Calibrated()
+            {
+                #if defined(_LEAVES)
+                    return _Colour;
+                #else
+                    return _BarkColour;
+                #endif
+            }
+
             half4 frag(Varyings i, FRONT_FACE_TYPE face : FRONT_FACE_SEMANTIC) : SV_Target
             {
                 FoliageFade(i.share, i.positionCS.xy);
@@ -199,7 +209,7 @@ Shader "Hidden/TarmacGauntlet/NearTree"
                     half4 c = SAMPLE_TEXTURE2D_ARRAY(_Bark, sampler_Bark, i.uv.xy, i.uv.z);
                     half3 n = normalize(IS_FRONT_VFACE(face, i.normalWS, -i.normalWS));
                 #endif
-                half3 col = ShadeLambert(i.positionWS, n, i.positionCS, i.fog, c.rgb * GammaScale(i.tint.rgb) * i.tint.a * _Colour);
+                half3 col = ShadeLambert(i.positionWS, n, i.positionCS, i.fog, c.rgb * GammaScale(i.tint.rgb) * i.tint.a * Calibrated());
                 return half4(col, 1);
             }
             ENDHLSL

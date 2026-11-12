@@ -206,7 +206,7 @@ window.build = async (look, hour) => {
     const colour = await loader.loadAsync(`/atlas/${KINDS[k]}_colour.png`), normals = await loader.loadAsync(`/atlas/${KINDS[k]}_normal.jpg`);
     for (const tx of [colour, normals]) { tx.flipY = true; tx.anisotropy = 8; }
     const mat = new THREE.ShaderMaterial({ vertexShader: vert, fragmentShader: frag, side: THREE.DoubleSide, uniforms: {
-      radius: { value: meta.radius }, centreAbove: { value: meta.centreAbove }, frames: { value: meta.frames }, nearAt, nearFade,
+      radius: { value: meta.radius }, centreAbove: { value: meta.centreAbove }, frames: { value: meta.frames }, nearAt, nearFade, ditherFrame: Foliage.ditherFrame,
       colour: { value: colour }, normals: { value: normals }, sun: { value: L }, sunColour: { value: new THREE.Vector3(sunColour.r, sunColour.g, sunColour.b).multiplyScalar(0.9) },
       sky: { value: new THREE.Vector3(sky.r, sky.g, sky.b).multiplyScalar(0.9) }, ground: { value: new THREE.Vector3(0.12, 0.12, 0.08) },
       fogColour: { value: new THREE.Vector3(fogColour.r, fogColour.g, fogColour.b) }, fogRange: { value: new THREE.Vector2(1400, 7000) } } });
@@ -246,8 +246,18 @@ window.shoot = async (p, q, fov, w, h, foliage = 0) => {
     window.scene.add(f);
     window.foliage = f;
   }
-  r.render(window.scene, cam);
-  return r.domElement.toDataURL('image/jpeg', 0.9);
+  if (!foliage) { r.render(window.scene, cam); return r.domElement.toDataURL('image/jpeg', 0.9); }
+  // As the game's upscaler shows it: the dither steps on each frame and the frames are averaged.
+  const acc = document.createElement('canvas'); acc.width = w; acc.height = h;
+  const ctx = acc.getContext('2d');
+  for (let i = 0; i < 16; i++) {
+    Foliage.ditherFrame.value = i;
+    r.render(window.scene, cam);
+    ctx.globalAlpha = 1 / (i + 1);
+    ctx.drawImage(r.domElement, 0, 0);
+  }
+  Foliage.ditherFrame.value = 0;
+  return acc.toDataURL('image/jpeg', 0.9);
 };
 window.ready = true;
 </script></body></html>

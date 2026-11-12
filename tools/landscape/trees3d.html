@@ -106,7 +106,7 @@ const tileFrag = `
 /**
  * spec: { url, node, leavesOnly, thicken, cube (LOD0's cube, m), keep (share of a cube's area in leaves to get a card),
  *         card (card width over the cube's), bark0, bark1 (bark triangles at each LOD), tile (px),
- *         tiers (a conifer: level cards along and across its branches, not turned out from the crown) }
+ *         tiers (a conifer: cards along, across and sloping down its branches, not turned out from the crown) }
  * Returns { lods: [{ positions, normals, uvs, extra, bark, leaves }], barkImages: { uri: dataURL }, atlas: dataURL, meta }.
  */
 window.build = async (spec) => {
@@ -306,10 +306,10 @@ window.build = async (spec) => {
   const img = ctx.getImageData(0, 0, S * 2, S * 2);
   const rand = rng(7);
   // A conifer's is more ragged still, and flattened, as a branch seen from beside is a thin spray.
-  const ragged = new Float32Array(64).map(() => spec.tiers ? 0.55 + 0.45 * rand() : 0.8 + 0.2 * rand());
+  const ragged = new Float32Array(64).map(() => spec.tiers ? 0.55 + 0.45 * rand() : 0.65 + 0.35 * rand());
   for (let y = 0; y < S * 2; y++)
     for (let x = 0; x < S * 2; x++) {
-      const tx = (x % S) / S * 2 - 1, ty = (y % S) / S * 2 / (spec.tiers ? 0.6 : 1) - 1 / (spec.tiers ? 0.6 : 1);
+      const tx = (x % S) / S * 2 - 1, ty = (y % S) / S * 2 / (spec.tiers ? 0.75 : 1) - 1 / (spec.tiers ? 0.75 : 1);
       const ang = Math.atan2(ty, tx), k = Math.floor((ang / (2 * Math.PI) + 0.5) * 64) % 64;
       if (Math.hypot(tx, ty) > ragged[k]) img.data[(y * S * 2 + x) * 4 + 3] = 0;
     }
@@ -326,22 +326,25 @@ window.build = async (spec) => {
     for (const s of cubes(size)) {
       const out_ = outward(s.mid);
       const n = s.n.clone().multiplyScalar(0.4).add(out_.clone().multiplyScalar(0.6)).normalize();
-      const planes = crossed ? 2 : 1;
+      const planes = spec.tiers ? 3 : crossed ? 2 : 1;
       for (let p = 0; p < planes; p++) {
         let face, t, bt, tile;
         if (spec.tiers) {
-          // A conifer's branch: two cards standing level, one across it and one along it. A card lying flat shows
-          // from below as a pale plate, so there is none.
-          const r = radial(s.mid);
-          face = p === 0 ? new THREE.Vector3().crossVectors(UP, r) : r;
-          bt = UP.clone();
-          t = new THREE.Vector3().crossVectors(bt, face).normalize();
+          // A conifer's branch, as three cards: one standing along it and drooping to its tip, one sloping down and out
+          // across it as the cone's own surface does, and one standing across it. No card lies flat, which from below
+          // shows as a pale plate. Each tile looks along a branch from beside it, the tip on its left.
+          const r = radial(s.mid), across = new THREE.Vector3().crossVectors(UP, r);
+          const droop = 0.25 + 0.25 * rand();
+          if (p === 0) { t = r.clone().addScaledVector(UP, -droop).normalize().negate(); bt = UP.clone().addScaledVector(r, droop).normalize(); }
+          else if (p === 1) { t = across; bt = r.clone().addScaledVector(UP, -1.2).normalize().negate(); }
+          else { t = across.clone().negate(); bt = UP.clone().addScaledVector(across, (rand() - 0.5) * 0.4).normalize(); }
           tile = Math.floor(rand() * 4);
         } else {
-          face = n.clone();
+          // Turned a little at random, so neighbouring cards don't line up into one flat plane.
+          face = n.clone().add(new THREE.Vector3(rand() - 0.5, rand() - 0.5, rand() - 0.5).multiplyScalar(0.8)).normalize();
           if (p === 1) {
             // The second card stands square to the first, through the same middle.
-            face = new THREE.Vector3(rand() - 0.5, rand() - 0.5, rand() - 0.5).cross(n).normalize();
+            face = new THREE.Vector3(rand() - 0.5, rand() - 0.5, rand() - 0.5).cross(face).normalize();
           }
           const spin = rand() * Math.PI * 2;
           const ref = Math.abs(face.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
@@ -352,9 +355,11 @@ window.build = async (spec) => {
         }
         const tx = tile % 2, ty = tile >> 1;
         const start = out.P.length / 3;
+        // Each card its own size, so the cards don't read as a regular pattern.
+        const half = w / 2 * (0.75 + 0.5 * rand());
         for (let k = 0; k < 4; k++) {
           const cx = k === 1 || k === 2 ? 1 : -1, cy = k >= 2 ? 1 : -1;
-          const q = s.mid.clone().addScaledVector(t, cx * w / 2).addScaledVector(bt, cy * w / 2);
+          const q = s.mid.clone().addScaledVector(t, cx * half).addScaledVector(bt, cy * half);
           out.P.push(q.x, q.y, q.z);
           // The crown's round shape alone; the game turns it a little towards the viewer, as the impostor bake's
           // leaf normals face the camera that baked them.

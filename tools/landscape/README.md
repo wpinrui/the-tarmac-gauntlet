@@ -59,4 +59,5 @@ views. `--compare-crop` instead counts the pixels where cutting the quads down c
     node preview.js <plan folder> <bake folder> <out folder>
 
 Renders each look from the cameras in `shots.json`, in a browser, with the same impostors. `--foliage 1` or `2`
-adds the grass and close trees at that setting; `--shots foliage-shots.json` uses cameras close to them.
+adds the grass and close trees at that setting; `--shots foliage-shots.json` uses cameras close to them. With foliage, each
+shot averages 16 frames of the hand-over dither, as the game's upscaler does.
