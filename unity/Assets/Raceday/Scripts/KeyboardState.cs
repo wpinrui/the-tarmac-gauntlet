@@ -1,11 +1,12 @@
 using System.Collections.Generic;
+using TarmacGauntlet.Simulation;
 using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
     /// Which keys are held, and which went down this frame. Reads IMGUI events so it works with
-    /// either of Unity's input systems.
+    /// either of Unity's input systems. While the race is paused (<see cref="RaceWeekend.Paused"/>) no key is held or pressed.
     /// </summary>
     public sealed class KeyboardState : MonoBehaviour
     {
@@ -14,13 +15,13 @@ namespace TarmacGauntlet.Raceday
         private readonly HashSet<KeyCode> downLast = new HashSet<KeyCode>();
         private int frame = -1;
 
-        public bool Held(KeyCode key) => held.Contains(key);
+        public bool Held(KeyCode key) => !RaceWeekend.Paused && held.Contains(key);
 
         /// <summary>True on the frame the key went down.</summary>
         public bool Pressed(KeyCode key)
         {
             Roll();
-            return downLast.Contains(key);
+            return !RaceWeekend.Paused && downLast.Contains(key);
         }
 
         private void Roll()

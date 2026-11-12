@@ -18,6 +18,9 @@ namespace TarmacGauntlet.Raceday
         /// <summary>True while every on-screen graphic is hidden, for looking at the scene.</summary>
         public static bool Clean;
 
+        /// <summary>True while the on-screen graphics are hidden: for a clean look, or under the pause menu.</summary>
+        public static bool Bare => Clean || RaceWeekend.Paused;
+
         public KeyboardState Keys;
         public RaceCameras Cameras;
         public RaceTower Tower;
@@ -60,6 +63,7 @@ namespace TarmacGauntlet.Raceday
                 page = Page.Main;
             }
             if (Director != null && Director.Finished) Speed = null;   // the race summary runs at normal speed
+            if (RaceWeekend.Paused) return;   // the pause menu holds the clock
             if (Speed is float s && Time.timeScale != s)
             {
                 Time.timeScale = s;
@@ -109,7 +113,7 @@ namespace TarmacGauntlet.Raceday
 
         private void OnGUI()
         {
-            if (!open) return;
+            if (!open || RaceWeekend.Paused) return;
             float scale = Screen.height / 1080f;
             int size = Mathf.RoundToInt(18 * scale);
             if (button == null)

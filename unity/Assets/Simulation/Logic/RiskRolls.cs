@@ -10,6 +10,8 @@ namespace TarmacGauntlet.Simulation
     {
         Mechanical,
         Crash,
+        /// <summary>The player's team took the car out of the race from the pause menu.</summary>
+        Withdrawn,
     }
 
     public sealed record LapRiskContext

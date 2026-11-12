@@ -154,6 +154,13 @@ namespace TarmacGauntlet.Raceday
             Cap = pilot != null && car.AiDriving ? pilot.SpeedCap : float.PositiveInfinity,
         };
 
+        /// <summary>Carries on a saved race: the car is on its lap <paramref name="laps"/> from the start.</summary>
+        public void Resume(int laps)
+        {
+            FirstLap = laps;
+            Laps = laps;
+        }
+
         /// <summary>Takes one lap off every car's count, at the green: the formation lap doesn't count.</summary>
         public static void StartRace()
         {

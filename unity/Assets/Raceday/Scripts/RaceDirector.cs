@@ -34,6 +34,14 @@ namespace TarmacGauntlet.Raceday
         public RaceTower Tower;
 
         public bool Finished { get; private set; }
+        /// <summary>True once the race is under way: from the green, or the first car out of the pit lane.</summary>
+        public bool Started => started;
+        /// <summary>Seconds since the green.</summary>
+        public float Elapsed => started ? Time.time - startTime : 0f;
+        /// <summary>Seconds since the race time ran out, or null while it hasn't.</summary>
+        public float? SinceTimeUp => timeUpAt >= 0f ? Time.time - timeUpAt : (float?)null;
+        /// <summary>Seconds since car <paramref name="i"/> last crossed the line.</summary>
+        public float SinceLine(int i) => started && crossed != null ? Time.time - crossed[i] : 0f;
 
         private CarController[] controllers;
         private int[] counted;
@@ -42,6 +50,22 @@ namespace TarmacGauntlet.Raceday
         private bool started;
         private float startTime;
         private float timeUpAt = -1f;
+        private RaceSave resume;
+
+        /// <summary>Carries on a saved race: its clocks pick up where the save left them.</summary>
+        public void Resume(RaceSave save) => resume = save;
+
+        private void OnEnable() => RaceWeekend.Withdrawing += Withdraw;
+        private void OnDisable() => RaceWeekend.Withdrawing -= Withdraw;
+
+        /// <summary>The player's car out of the race now, and the race settled from where every car is.</summary>
+        private void Withdraw()
+        {
+            if (Finished || Day == null) return;
+            for (int i = 0; i < Day.Cars.Count; i++)
+                if (Day.Cars[i].Car.Player) RetireNow(i, FailureType.Withdrawn);
+            Finish();
+        }
 
         private void Start()
         {
@@ -59,12 +83,14 @@ namespace TarmacGauntlet.Raceday
             if (!started)
             {
                 started = true;
-                startTime = Time.time;
+                startTime = Time.time - (resume?.Elapsed ?? 0f);
+                if (resume?.SinceTimeUp is float since) timeUpAt = Time.time - since;
                 for (int i = 0; i < Cars.Length; i++)
                 {
                     counted[i] = Cars[i].Laps;
-                    crossed[i] = Time.time;
+                    crossed[i] = Time.time - (resume != null && i < resume.Cars.Count ? resume.Cars[i].SinceLine : 0f);
                 }
+                resume = null;
             }
             bool timeUp = Tower.RaceTime >= RaceTower.RaceLength;
             if (timeUp && timeUpAt < 0f) timeUpAt = Time.time;

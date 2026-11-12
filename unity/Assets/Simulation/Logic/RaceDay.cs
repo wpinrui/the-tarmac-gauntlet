@@ -269,6 +269,63 @@ namespace TarmacGauntlet.Simulation
             FuelAdded += fuelAdded;
         }
 
+        /// <summary>The log as it stands, for a race save.</summary>
+        public CarRaceLogState Save() => new CarRaceLogState
+        {
+            Laps = Laps,
+            Condition = Condition,
+            TyreSets = TyreSets,
+            SpareParts = SpareParts,
+            Retired = Retired,
+            RetirementReason = RetirementReason,
+            LastLineTime = LastLineTime,
+            Flagged = Flagged,
+            FuelAdded = FuelAdded,
+            DriverIndex = DriverIndex,
+            NextDriverIndex = NextDriverIndex,
+            BestLap = BestLap,
+            FuelLeft = FuelLeft,
+            Fatigue = Fatigue,
+            Modes = Modes,
+            ActiveIssues = active.ToArray(),
+            Issues = issues.ToArray(),
+            PitStops = stops.ToArray(),
+            LapTimes = lapTimes.ToArray(),
+            Stints = stints.ToArray(),
+        };
+
+        /// <summary>Puts the log back as a race save had it.</summary>
+        public void Load(CarRaceLogState s)
+        {
+            Laps = s.Laps;
+            Condition = s.Condition;
+            TyreSets = s.TyreSets;
+            SpareParts = s.SpareParts;
+            Retired = s.Retired;
+            RetirementReason = s.RetirementReason;
+            LastLineTime = s.LastLineTime;
+            Flagged = s.Flagged;
+            FuelAdded = s.FuelAdded;
+            int last = Car.Lineup.Count - 1;
+            DriverIndex = Math.Max(0, Math.Min(last, s.DriverIndex));
+            NextDriverIndex = Math.Max(0, Math.Min(last, s.NextDriverIndex));
+            BestLap = s.BestLap;
+            FuelLeft = s.FuelLeft;
+            Fatigue = s.Fatigue;
+            Modes = s.Modes;
+            active.Clear();
+            active.AddRange(s.ActiveIssues);
+            issues.Clear();
+            issues.AddRange(s.Issues);
+            stops.Clear();
+            stops.AddRange(s.PitStops);
+            lapTimes.Clear();
+            lapTimes.AddRange(s.LapTimes);
+            if (s.Stints.Count == 0) return;
+            stints.Clear();
+            stints.AddRange(s.Stints);
+        }
+
         private void CloseStint() => stints[stints.Count - 1] = stints[stints.Count - 1] with { EndLap = Laps };
 
         private CarStats Debuffed(CarStats stats)
@@ -327,6 +384,24 @@ namespace TarmacGauntlet.Simulation
         /// <summary>The field in finishing order: most laps, then soonest across the line.</summary>
         public IReadOnlyList<CarRaceLog> Classify() =>
             Cars.OrderByDescending(c => c.Laps).ThenBy(c => c.LastLineTime).ThenBy(c => c.Index).ToArray();
+
+        /// <summary>The race as it stands, for a race save.</summary>
+        public RaceDayState Save() => new RaceDayState
+        {
+            Cars = Cars.Select(c => c.Save()).ToArray(),
+            FastestLap = FastestLap,
+            Positions = positions.ToArray(),
+        };
+
+        /// <summary>Puts the race back as a race save had it. The save's field must be this race's.</summary>
+        public void Load(RaceDayState s)
+        {
+            if (s.Cars.Count != Cars.Count) throw new ArgumentException("The save is of another field.", nameof(s));
+            for (int i = 0; i < Cars.Count; i++) Cars[i].Load(s.Cars[i]);
+            FastestLap = s.FastestLap;
+            positions.Clear();
+            positions.AddRange(s.Positions);
+        }
 
         /// <summary>Snapshots everyone's position, as the leader starts a new lap.</summary>
         private void RecordPositions()

@@ -33,6 +33,67 @@ namespace TarmacGauntlet.Career.Tests
             Assert.That(info.TeamColour, Is.EqualTo("#3aa0ff"));
         }
 
+        [Test]
+        public void ARaceSavedPartWayComesBackAndGoesAtTheFlag()
+        {
+            GameState game = GameSession.NewCareer(Options, Seeded(3));
+            game = GameSession.Apply(g => GameActions.EnterCar(GameActions.BuyCar(g, new CarInstance { Id = "car-p1", ModelId = "f-01", Condition = 90 }, 0, ""), "car-p1"));
+            RaceSetup setup = RaceWeekend.Begin(game);
+            var day = new RaceDay(setup, Seeded(4));
+            int me = setup.Grid.ToList().FindIndex(c => c.Player);
+            for (int lap = 1; lap <= 3; lap++)
+                for (int i = 0; i < day.Cars.Count; i++) day.CompleteLap(i, lap * 100.0 + i, 100, InstructionMode.Normal, false);
+            day.Cars[me].Pit(true);
+            day.Cars[me].PitDone(31.5, 40);
+            day.Cars[me].AddIssue(IssueTemplates.MechanicalIssues[0].Id);
+
+            var save = new RaceSave
+            {
+                Setup = setup,
+                Started = true,
+                RaceTime = 3000,
+                Elapsed = 300,
+                WeatherSeed = 77,
+                Day = day.Save(),
+                Cars = setup.Grid.Select((_, i) => new CarSave { Distance = 10 * i, Laps = 3, Fuel = 50, Position = new[] { 1f, 2f, 3f } }).ToArray(),
+            };
+            GameSession.SaveRace(save);
+            string id = GameSession.CareerId!;
+            GameSession.Close();
+            GameSession.Continue(id);
+
+            RaceSave back = GameSession.SavedRace()!;
+            Assert.That(back.Setup.Grid.Count, Is.EqualTo(setup.Grid.Count));
+            Assert.That(back.Setup.Game.Teams.OfType<PlayerTeam>().Count(), Is.EqualTo(1));
+            Assert.That(back.Cars[2].Distance, Is.EqualTo(20));
+            Assert.That(back.Setup.Grid[me].Model.BaseStats, Is.EqualTo(setup.Grid[me].Model.BaseStats));
+            Assert.That(back.Setup.Grid[me].Model.Id, Is.EqualTo(setup.Grid[me].Model.Id));
+            Assert.That(back.Setup.Grid[me].Lineup.Select(d => d.Stats), Is.EqualTo(setup.Grid[me].Lineup.Select(d => d.Stats)));
+            Assert.That(back.Setup.Grid[me].Car, Is.EqualTo(setup.Grid[me].Car));
+            var again = new RaceDay(back.Setup);
+            again.Load(back.Day);
+            CarRaceLog mine = again.Cars[me];
+            Assert.That(mine.Laps, Is.EqualTo(3));
+            Assert.That(mine.PitStops.Single().Seconds, Is.EqualTo(31.5));
+            Assert.That(mine.ActiveIssues.Count, Is.EqualTo(1));
+            Assert.That(again.PositionHistory.Count, Is.EqualTo(day.PositionHistory.Count));
+
+            mine.Retire(3000, FailureType.Withdrawn);
+            RaceWeekend.Finish(again);
+            Assert.That(GameSession.SavedRace(), Is.Null);
+            Assert.That(RaceWeekend.Summary!.Classification.Single(c => c.CarId == "car-p1").RetirementReason, Is.EqualTo(FailureType.Withdrawn));
+        }
+
+        [Test]
+        public void ARaceSaveThatNoLongerReadsIsThrownAway()
+        {
+            GameSession.NewCareer(Options, Seeded(3));
+            string folder = Path.Combine(root, GameSession.CareerId!);
+            File.WriteAllText(Path.Combine(folder, "race.json"), "{ not json");
+            Assert.That(GameSession.SavedRace(), Is.Null);
+            Assert.That(File.Exists(Path.Combine(folder, "race.json")), Is.False);
+        }
+
         [SetUp]
         public void SetUp()
         {
