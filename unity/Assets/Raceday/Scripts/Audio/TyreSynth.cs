@@ -3,7 +3,7 @@ using System;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// Synthesises what one car's tyres sound like on what they roll over, sample by sample: the squeal and scrub of a
+    /// Synthesises what one car's tyres sound like on what they roll over, sample by sample: the squeal of a
     /// slide on tarmac, the rumble of kerb ridges, gravel grinding, the swish and
     /// thump of grass, and a faint road roar. Every layer follows its inputs smoothly, so a slide grows into a squeal and
     /// a wheel dropping off the kerb fades its rumble rather than cutting it.
@@ -15,6 +15,8 @@ namespace TarmacGauntlet.Raceday
     {
         private const float RidgeSpacing = 0.75f;   // m between a kerb's ridges, on average
         private const int MaxGrains = 64;
+        /// <summary>A slide must pass this, 0 to 1, for the tyres to squeal.</summary>
+        private const float SquealFrom = 0.35f;
 
         /// <summary>How hard the tyres slide on tarmac or a kerb, 0 to 1, the hardest of the four (<see cref="CarController.Skid"/>).</summary>
         public float Slide;
@@ -24,20 +26,20 @@ namespace TarmacGauntlet.Raceday
         public float Kerb, Gravel, Grass;
         /// <summary>Share of the four wheels touching anything, 0 to 1.</summary>
         public float Grounded = 1f;
-        /// <summary>How wet the track is, 0 to 1. Water quiets a squeal to a hiss.</summary>
+        /// <summary>How wet the track is, 0 to 1. Water quiets a squeal.</summary>
         public float Wet;
 
         private readonly float fs;
-        private readonly float squealPitch, roarLevel;
-        private readonly float lp2500, lp6000, lp180, lp260, lp350, lpRoarSpan, lp600;
+        private readonly float squealPitch, roarLevel, holdSamples;
+        private readonly float lp2500, lpSqueal, lp180, lp260, lp350, lpRoarSpan, lp600;
         private uint seed;
 
         // Smoothed inputs.
         private float slide, speed, kerb, gravel, grass, grounded, wet;
 
-        // Squeal: three resonances over a wandering pitch, and the scrub under them.
-        private float drift, driftTarget, driftTimer, warble, warbleTarget, chirp;
-        private float r1Low, r1Band, r2Low, r2Band, r3Low, r3Band, scrubLow, scrubBand, squealLow;
+        // Squeal: three resonances over a wandering pitch.
+        private float held, drift, driftTarget, driftTimer, warble, warbleTarget, chirp;
+        private float r1Low, r1Band, r2Low, r2Band, r3Low, r3Band, squealLow;
 
         // Kerb: uneven hits from the front and rear tyres, each a thud and a rattle.
         private readonly float hitDecay;
@@ -61,9 +63,10 @@ namespace TarmacGauntlet.Raceday
             fs = sampleRate;
             seed = (uint)randomSeed * 2246822519u + 7u;
             float size = Clamp(tyreSize, 0f, 1f);
-            squealPitch = Lerp(1150f, 760f, size) * (0.95f + 0.1f * Uniform());
+            squealPitch = Lerp(920f, 635f, size) * (0.95f + 0.1f * Uniform());
             roarLevel = Lerp(0.8f, 1.2f, size);
-            lp6000 = LowPassStep(6000f);
+            lpSqueal = LowPassStep(3760f);
+            holdSamples = 0.14f * fs;   // seconds a slide is held before it squeals
             lp2500 = LowPassStep(2500f);
             hitDecay = 1f - 160f / fs;
             lp180 = LowPassStep(180f);
@@ -116,20 +119,19 @@ namespace TarmacGauntlet.Raceday
         private float Squeal(float pace)
         {
             float noise = Noise();
-            // Scrub: the hiss of rubber dragging, there from the first sign of a slide, under the tone.
-            float scrubOn = Clamp(slide * 3f, 0f, 1f) * (0.3f + 0.7f * pace);
-            float scrub = Band(noise, 1800f + 1400f * slide, 0.9f, ref scrubLow, ref scrubBand) * scrubOn * 0.35f;
-
-            // The tone itself only past a real slide. It wanders: the pitch drifts as the contact patch heats and
-            // stretches, and warbles as the rubber sticks and lets go.
-            float tone = Clamp((slide - 0.12f) / 0.5f, 0f, 1f);
-            if (tone <= 0f && chirp < 0.001f) return scrub * (1f - 0.5f * wet) * grounded;
+            // The tone itself only on a real, held slide: the anti-lock's scrub in a braking zone, a gearchange chirp
+            // or a tyre at the limit through a corner stays quiet, or every corner would squeal. It wanders: the
+            // pitch drifts as the contact patch heats and stretches, and warbles as the rubber sticks and lets go.
+            if (slide > SquealFrom) held = Math.Min(held + 1f, holdSamples * 2f);
+            else held = Math.Max(held - 2f, 0f);
+            float tone = Clamp((slide - SquealFrom) / 0.465f, 0f, 1f) * Clamp(held / holdSamples - 1f, 0f, 1f);
+            if (tone <= 0f && chirp < 0.001f) return 0f;
             if (--driftTimer <= 0f)
             {
                 driftTarget = Noise() * 0.09f;
                 driftTimer = fs * (0.08f + 0.25f * Uniform());
                 // Now and then the slide catches and the squeal chirps up for a moment.
-                if (Uniform() < 0.25f * tone) chirp = 0.6f + 0.4f * Uniform();
+                if (Uniform() < 0.16f * tone) chirp = 0.6f + 0.4f * Uniform();
             }
             drift += (driftTarget - drift) * (14f / fs);
             warbleTarget += (Noise() * 0.5f - warbleTarget) * (60f / fs);
@@ -137,14 +139,16 @@ namespace TarmacGauntlet.Raceday
             chirp *= 1f - 12f / fs;
 
             float pitch = squealPitch * (1f + drift + 0.05f * warble + 0.15f * chirp) * (0.94f + 0.08f * slide) * (0.92f + 0.1f * pace);
+            // Kept low and soft: the upper harmonics and a hard drive make it shrill.
             float r = Band(noise, pitch, 40f, ref r1Low, ref r1Band)
-                      + 0.55f * Band(noise, pitch * 2.02f, 35f, ref r2Low, ref r2Band)
-                      + 0.25f * Band(noise, pitch * 3.05f, 30f, ref r3Low, ref r3Band);
-            float shaped = (float)Math.Tanh(r * 0.12f * (1f + 2f * slide));
-            squealLow += (shaped - squealLow) * lp6000;
+                      + 0.375f * Band(noise, pitch * 2.02f, 35f, ref r2Low, ref r2Band)
+                      + 0.13f * Band(noise, pitch * 3.05f, 30f, ref r3Low, ref r3Band);
+            float shaped = (float)Math.Tanh(r * 0.092f * (1f + 1.3f * slide));
+            squealLow += (shaped - squealLow) * lpSqueal;
             float level = (tone * tone * (3f - 2f * tone) + 0.5f * chirp * tone) * (0.25f + 0.75f * Math.Min(1f, speed / 12f));
-            // On a wet track the tyres mostly hiss through the water instead.
-            return (0.32f * squealLow * level * (1f - 0.85f * wet) + scrub * (1f - 0.5f * wet)) * grounded;
+            // On a wet track the water mostly quiets it.
+            // No hiss of scrubbing rubber under it: real tyres barely make one you can hear.
+            return 0.21f * squealLow * level * (1f - 0.85f * wet) * grounded;
         }
 
         private float Kerbs(float pace)
