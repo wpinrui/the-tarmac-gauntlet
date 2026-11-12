@@ -74,8 +74,9 @@ namespace TarmacGauntlet.Visuals
         /// <summary>Behind the car on its heading, looking just ahead of it.</summary>
         public static readonly CameraPreset Chase = new CameraPreset("Chase", "settings.camera.chase", 60f, new Vector3(0f, 2.2f, -7f), -6.7f,
             new Vector2(-5f, 5f), new Vector2(0f, 10f), new Vector2(-20f, 5f));
-        public static readonly CameraPreset Bonnet = new CameraPreset("Bonnet", "settings.camera.bonnet", 70f, new Vector3(0f, 1.2f, 0.3f), 0f,
-            new Vector2(-2f, 2f), new Vector2(0f, 3f), new Vector2(-3f, 4f));
+        /// <summary>Moved from each car's own bonnet spot, measured from its model, so one setting suits every car.</summary>
+        public static readonly CameraPreset Bonnet = new CameraPreset("Bonnet", "settings.camera.bonnetspot", 70f, Vector3.zero, -3f,
+            new Vector2(-1f, 1f), new Vector2(-1f, 1f), new Vector2(-2f, 2f));
         public static readonly CameraPreset Bumper = new CameraPreset("Bumper", "settings.camera.bumper", 70f, new Vector3(0f, 0.4f, 2.45f), 0f,
             new Vector2(-2f, 2f), new Vector2(0f, 3f), new Vector2(-3f, 4f));
 
