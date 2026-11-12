@@ -1,4 +1,5 @@
 using System;
+using TarmacGauntlet.Rendering;
 using TarmacGauntlet.Simulation;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -99,14 +100,14 @@ namespace TarmacGauntlet.Raceday
             if (Game != null) RaceWeekend.Begin(Game);
             Time.timeScale = 1f;
             Clean = false;
-            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+            SceneLoader.Load(SceneManager.GetActiveScene().name);
         }
 
         private void Home()
         {
             Time.timeScale = 1f;
             Clean = false;
-            SceneManager.LoadScene(HubScene);
+            SceneLoader.Load(HubScene);
         }
 
         // ---------------------------------------------------------------- the menu
