@@ -5,7 +5,8 @@ namespace TarmacGauntlet.Raceday
     /// <summary>
     /// What the weather does to the sky's light (<see cref="SkyClock"/>): cloud spreads over the sky,
     /// greys it and takes the sun's direct light and its shadows; rain darkens the cloud base and
-    /// draws the haze in close. At night the floodlights' glow lifts the light, more under cloud.
+    /// draws the haze in close. Both bring the lights on earlier (<see cref="Lights"/>). Once
+    /// the floodlights are on their glow lifts the light, more under cloud.
     /// </summary>
     public static class WeatherSky
     {
@@ -33,8 +34,48 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Share of the sun's direct light that gets through the cloud.</summary>
         public static float Direct(WeatherState w) => Mathf.Clamp01(1f - 0.88f * Overcast(w.Cloud) - 0.1f * Heavy(w.Rain));
 
-        /// <summary>Greys and darkens the sky, its light and its clouds under this weather.</summary>
-        public static void Apply(ref SkyState s, WeatherState w)
+        /// <summary>
+        /// Degrees a full overcast, and a downpour on top, bring dusk forward for the lights: under a thick grey deck the
+        /// floodlights and headlamps come on around sunset, and in heavy rain from late afternoon.
+        /// </summary>
+        public const float CloudDusk = 9f, RainDusk = 5f;
+
+        /// <summary>
+        /// Race seconds the lights take to settle as the weather darkens, and as it brightens again: they come on within minutes
+        /// of the gloom and stay on through a passing gap in the cloud.
+        /// </summary>
+        public const float DuskDarkens = 600f, DuskClears = 2700f;
+
+        /// <summary>Degrees this weather brings dusk forward by for the lights: none in fair weather.</summary>
+        public static float Dusk(WeatherState w) => CloudDusk * Overcast(w.Cloud) + RainDusk * Heavy(w.Rain);
+
+        /// <summary>The weather's dusk for the lights (<see cref="Dusk"/>) eased this many race seconds on towards the weather now.</summary>
+        public static float Settle(float dusk, WeatherState w, float raceSeconds)
+        {
+            float target = Dusk(w);
+            float settle = target > dusk ? DuskDarkens : DuskClears;
+            return Mathf.Lerp(dusk, target, 1f - Mathf.Exp(-Mathf.Max(raceSeconds, 0f) / settle));
+        }
+
+        /// <summary>
+        /// How dark it is for the lights, 0 to 1 (<see cref="SkyState.Lights"/>): the clear sky's darkness with the sun this
+        /// many degrees of settled weather dusk lower (<see cref="Settle"/>).
+        /// </summary>
+        public static float Lights(float sunElevation, float dusk) => SkyClock.Dark(sunElevation - dusk);
+
+        /// <summary>How much brighter the sky must get under weather before lights it brought on go off again.</summary>
+        public const float Play = 0.15f;
+
+        /// <summary>
+        /// The lights' darkness kept from <paramref name="held"/> where it can: it rises with <paramref name="lights"/> at
+        /// once, but under weather falls only once the sky is <see cref="Play"/> brighter, so a sunrise under a shower never
+        /// switches them on and off again. Under a clear sky it is <paramref name="lights"/> exactly.
+        /// </summary>
+        public static float Hold(float held, float lights, float dusk) =>
+            Mathf.Clamp(held, lights, lights + Play * Mathf.Clamp01(dusk / 3f));
+
+        /// <summary>Greys and darkens the sky, its light and its clouds under this weather, with the lights' darkness under it (<see cref="Hold"/>).</summary>
+        public static void Apply(ref SkyState s, WeatherState w, float lights)
         {
             float o = Overcast(w.Cloud);
             float heavy = Heavy(w.Rain);
@@ -57,7 +98,8 @@ namespace TarmacGauntlet.Raceday
             s.Fog = Color.Lerp(s.Fog, baseGrey * 0.95f, Mathf.Max(o * 0.8f, heavy));
             // At night the circuit's floodlights light the haze and the underside of the cloud, so a
             // cloudy night is brighter than a clear one and the track never goes black.
-            float skyglow = s.Night * (NightGlow + CloudGlow * o);
+            s.Lights = lights;
+            float skyglow = s.Lights * (NightGlow + CloudGlow * o);
             s.AmbientSky += Floodlit * (skyglow * 1.5f);
             s.AmbientEquator += Floodlit * (skyglow * 1.3f);
             s.AmbientGround += Floodlit * (skyglow * 0.6f);

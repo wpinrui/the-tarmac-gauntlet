@@ -51,6 +51,19 @@ namespace TarmacGauntlet.Raceday
             CloudOffsetId = Shader.PropertyToID("_CloudOffset"), CoverId = Shader.PropertyToID("_Cover"), OvercastId = Shader.PropertyToID("_Overcast"),
             NightId = Shader.PropertyToID("_Night"), CloudScaleId = Shader.PropertyToID("_CloudScale");
 
+        /// <summary>
+        /// How far the circuit's lights are on, 0 to 1 (<see cref="SkyState.Lights"/>): follows the dusk and the weather, and
+        /// moves no faster than <see cref="LightsRate"/> a second so a sudden change of weather fades rather than flicks.
+        /// </summary>
+        public float Lights { get; private set; }
+        private const float LightsRate = 0.25f;
+        private bool lightsSet;
+        /// <summary>
+        /// The weather's settled dusk for the lights (<see cref="WeatherSky.Settle"/>), the race clock it was settled at and
+        /// the lights' darkness held under it (<see cref="WeatherSky.Hold"/>).
+        /// </summary>
+        private float dusk, duskAt, held;
+
         /// <summary>The hour of the day now, on the race clock.</summary>
         public float Hour => StartHour + (RaceSeconds != null ? RaceSeconds() : 0f) / 3600f;
 
@@ -113,7 +126,12 @@ namespace TarmacGauntlet.Raceday
             if (Weather != null)
             {
                 WeatherState w = Weather();
-                WeatherSky.Apply(ref s, w);
+                float now = RaceSeconds != null ? RaceSeconds() : 0f;
+                dusk = lightsSet ? WeatherSky.Settle(dusk, w, now - duskAt) : WeatherSky.Dusk(w);
+                duskAt = now;
+                float lights = WeatherSky.Lights(s.SunElevation, dusk);
+                held = lightsSet ? WeatherSky.Hold(held, lights, dusk) : lights;
+                WeatherSky.Apply(ref s, w, held);
                 cover = WeatherSky.Cover(w.Cloud);
                 overcast = WeatherSky.Overcast(w.Cloud);
                 haze = WeatherSky.Haze(haze, w);
@@ -122,6 +140,9 @@ namespace TarmacGauntlet.Raceday
                 rain = WeatherSky.Heavy(w.Rain);
                 cloud = w.Cloud + rain;
             }
+            // The first sky with its weather sets the lights outright; after that they ease towards it.
+            Lights = lightsSet ? Mathf.MoveTowards(Lights, s.Lights, LightsRate * Time.unscaledDeltaTime) : s.Lights;
+            lightsSet |= Weather != null;
             PostEffects.Current?.Set(SkyGrade.For(s, overcast, rain));
             lamp.shadowStrength = shadows;
             lamp.transform.rotation = Quaternion.LookRotation(-s.LightDir);
@@ -151,7 +172,7 @@ namespace TarmacGauntlet.Raceday
             sky.SetFloat(OvercastId, overcast);
             sky.SetFloat(NightId, s.Night);
 
-            probe.intensity = Mathf.Lerp(1f, NightShine, s.Night);
+            probe.intensity = Mathf.Lerp(1f, NightShine, Lights);
             if (float.IsNaN(reflected) || Mathf.Abs(hour - reflected) >= ReflectionStep || Mathf.Abs(cloud - reflectedCloud) >= ReflectionCloud)
             {
                 reflected = hour;

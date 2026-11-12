@@ -235,7 +235,7 @@ namespace TarmacGauntlet.Raceday
             rain.RaceSeconds = () => tower.RaceTime;
             rain.Materials = materials;
             rain.Cars = racing;
-            rain.Night = () => SkyClock.At(sky.Hour, SkyClock.Look).Night;
+            rain.Night = () => sky.Lights;
             sky.Weather = () => RaceWeather.Forced ?? weather.At(tower.RaceTime);
             trackside.Cars = racing;
             trackside.Racing = tower.Racing;

@@ -7,7 +7,8 @@ namespace TarmacGauntlet.Raceday
 {
     /// <summary>
     /// Switches the night lighting on as the sky darkens: the floodlights' lenses and pools, the stands' glow and every
-    /// car's lamps, all from the night amount of <see cref="SkyClock"/>. The ground is lit by the pools alone. Real
+    /// car's lamps, all from how dark the sky is for the lights (<see cref="TimeOfDay.Lights"/>), which
+    /// brings them on earlier under cloud and rain. The ground is lit by the pools alone. Real
     /// lights are kept for the cars near the camera, and light nothing but cars: as many as the settings allow, a third
     /// of them the headlamps of the cars nearest the camera and the rest at the floodlights nearest the camera's view. A light
     /// moving to another floodlight or car fades out first and back in there, so nothing pops. Two uplights light the
@@ -90,7 +91,7 @@ namespace TarmacGauntlet.Raceday
             if (Time.unscaledTime >= nextCheck)
             {
                 nextCheck = Time.unscaledTime + Check;
-                float now = SkyClock.At(Sky.Hour, SkyClock.Look).Night;
+                float now = Sky.Lights;
                 if (Mathf.Abs(now - night) >= 0.005f)
                 {
                     night = now;

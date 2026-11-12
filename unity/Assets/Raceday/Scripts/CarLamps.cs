@@ -234,7 +234,7 @@ namespace TarmacGauntlet.Raceday
             return m;
         }
 
-        /// <summary>Lights the headlamps, the tail lamps and the beams for a night amount from <see cref="SkyClock"/>.</summary>
+        /// <summary>Lights the headlamps, the tail lamps and the beams for a darkness from <see cref="TimeOfDay.Lights"/>.</summary>
         public void Night(float amount)
         {
             night = amount;
