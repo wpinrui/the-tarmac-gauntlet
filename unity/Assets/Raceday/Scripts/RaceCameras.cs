@@ -242,7 +242,7 @@ namespace TarmacGauntlet.Raceday
             CameraPreset preset = shown == View.Bonnet ? CameraPresets.Bonnet : shown == View.Bumper ? CameraPresets.Bumper : CameraPresets.Chase;
             CameraPresets.InUse = broadcast || view == View.Tv ? null : preset;
             cam.fieldOfView = preset.Fov;
-            Vector3 place = preset.Position;
+            Vector3 place = Place(preset, t);
             Quaternion tilt = Quaternion.Euler(-preset.Tilt, 0f, 0f);
             if (shown == View.Chase)
             {
@@ -268,12 +268,16 @@ namespace TarmacGauntlet.Raceday
             {
                 Vector3 flat = Vector3.ProjectOnPlane(t.forward, Vector3.up);
                 Quaternion ground = Quaternion.Euler(0f, Mathf.Atan2(flat.x, flat.z) * Mathf.Rad2Deg, 0f);
-                transform.SetPositionAndRotation(t.position + ground * preset.Position, ground * tilt);
+                transform.SetPositionAndRotation(t.position + ground * Place(preset, t), ground * tilt);
             }
-            else transform.SetPositionAndRotation(t.TransformPoint(preset.Position), t.rotation * tilt);
+            else transform.SetPositionAndRotation(t.TransformPoint(Place(preset, t)), t.rotation * tilt);
             chaseSettled = false;   // the chase view starts afresh once the race runs on
             shotHeld = false;
         }
+
+        /// <summary>A preset's place on the car: the bonnet camera's is moved from the car's own bonnet spot.</summary>
+        private static Vector3 Place(CameraPreset preset, Transform car) =>
+            preset == CameraPresets.Bonnet ? CarCameraSpots.Bonnet(car) + preset.Position : preset.Position;
 
         /// <summary>The car ridden with in the locked director's list, or -1.</summary>
         private int LockIndex()
