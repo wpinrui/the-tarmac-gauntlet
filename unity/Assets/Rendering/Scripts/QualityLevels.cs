@@ -9,11 +9,13 @@ namespace TarmacGauntlet.Rendering
     /// <summary>
     /// The game's quality levels, each its own pipeline asset in Resources/Quality. The asset sets the sun's shadows (cascades,
     /// map size, distance and bias), the other lights' shadow map, the render scale and the upscaler: Low and Medium draw at
-    /// 67% and 80% of the screen and STP upscales them, smoothing edges as it does; High and Ultra draw at full size. Medium
-    /// is the level for an Intel Arc B390 at 1920 x 1200 and 60 fps, Ultra for an RTX 4070 at 2560 x 1440 and 60 fps.
+    /// 67% and 80% of the screen and STP upscales them, smoothing edges as it does; High and Ultra draw at full size and STP
+    /// runs there as temporal anti-aliasing, so thin rails, fences and leaves hold still. Medium is the level for an Intel
+    /// Arc B390 at 1920 x 1200 and 60 fps, Ultra for an RTX 4070 at 2560 x 1440 and 60 fps.
     /// Low and Medium share a renderer; High and Ultra each have their own, with finer ambient occlusion at full resolution
-    /// that darkens the ambient light fully and the sunlight a little. Every game camera gets post-processing and SMAA,
-    /// which smooths the edges wherever STP does not run. The level is remembered between runs.
+    /// that darkens the ambient light fully and the sunlight a little. Every game camera gets post-processing and SMAA;
+    /// URP swaps the SMAA for STP wherever STP runs, so SMAA only smooths the edges on hardware that cannot run STP.
+    /// The level is remembered between runs.
     /// <para>
     /// Each renderer carries URP's Screen Space Shadows, drawn with the game's own shader (ScreenShadows.shader): soft
     /// penumbrae, cascades blended at their edges and contact shadows, as much of each as the level's
