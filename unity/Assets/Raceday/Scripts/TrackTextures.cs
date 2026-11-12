@@ -114,7 +114,9 @@ namespace TarmacGauntlet.Raceday
 
         /// <summary>
         /// Broad patches in red, about 0.5 with soft swings either way: lighter and darker laying of the tarmac, old
-        /// repairs, wear. Green is streaky noise the rubbered line is drawn through.
+        /// repairs, wear. Green is streaky noise the rubbered line is drawn through. Blue is where water stands first.
+        /// Alpha is polish, about 0.5: how worn smooth the surface is, read at a much larger scale than the rest so the
+        /// road's sheen swells and fades over hundreds of metres.
         /// </summary>
         public static Color[] Macro(int seed)
         {
@@ -130,7 +132,9 @@ namespace TarmacGauntlet.Raceday
                     float streak = Fbm(x, y, s, 32, 3, seed + 23);
                     // Where water stands first in a hollow: shallow dips in the surface, a few to the tile.
                     float dips = Fbm(x, y, s, 5, 3, seed + 37);
-                    px[y * s + x] = new Color(Mathf.Clamp01(0.5f + patch * 0.5f), Mathf.Clamp01(0.5f + streak * 0.6f), Mathf.Clamp01(0.5f + dips * 0.9f), 1f);
+                    float polish = Fbm(x, y, s, 3, 3, seed + 51);
+                    px[y * s + x] = new Color(Mathf.Clamp01(0.5f + patch * 0.5f), Mathf.Clamp01(0.5f + streak * 0.6f), Mathf.Clamp01(0.5f + dips * 0.9f),
+                        Mathf.Clamp01(0.5f + polish * 0.8f));
                 }
             return px;
         }
