@@ -249,7 +249,7 @@ namespace TarmacGauntlet.Raceday
         private static Vector3 At(Vector3 p, float y) => new Vector3(p.x, y, p.z);
 
         /// <summary>An upright block standing on <paramref name="bottom"/>: width along <paramref name="along"/>, depth along <paramref name="across"/>.</summary>
-        private static void Block(MeshKit kit, Vector3 bottom, float height, Vector3 along, Vector3 across, float width, float depth)
+        internal static void Block(MeshKit kit, Vector3 bottom, float height, Vector3 along, Vector3 across, float width, float depth)
         {
             Vector3 ax = along.normalized * (width / 2), az = Vector3.Cross(Vector3.up, along).normalized * (depth / 2);
             if (Vector3.Dot(az, across) < 0) az = -az;
@@ -257,7 +257,7 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>A square bar of the given thickness from a to b, or width by height across it.</summary>
-        private static void Beam(MeshKit kit, Vector3 a, Vector3 b, float thickness, float height = -1f)
+        internal static void Beam(MeshKit kit, Vector3 a, Vector3 b, float thickness, float height = -1f)
         {
             Vector3 dir = (b - a).normalized;
             Vector3 side = Mathf.Abs(dir.y) > 0.95f ? Vector3.Cross(dir, Vector3.forward).normalized : Vector3.Cross(Vector3.up, dir).normalized;
@@ -266,7 +266,7 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>A box from a to b with its cross-section spanned by half-axes u and v.</summary>
-        private static void Prism(MeshKit kit, Vector3 a, Vector3 b, Vector3 u, Vector3 v)
+        internal static void Prism(MeshKit kit, Vector3 a, Vector3 b, Vector3 u, Vector3 v)
         {
             Vector3 mid = (a + b) * 0.5f;
             Vector3[] A = { a - u - v, a + u - v, a + u + v, a - u + v };
@@ -281,7 +281,7 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>A sloping slab from its four top corners (back-left, back-right, front-left, front-right) and a thickness.</summary>
-        private static void Slab(MeshKit kit, Vector3 bl, Vector3 br, Vector3 fl, Vector3 fr, float thickness)
+        internal static void Slab(MeshKit kit, Vector3 bl, Vector3 br, Vector3 fl, Vector3 fr, float thickness)
         {
             Vector3 down = Vector3.down * thickness;
             Vector3 mid = (bl + br + fl + fr) * 0.25f + down * 0.5f;
@@ -294,7 +294,7 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>A flat quad facing <paramref name="normal"/> with its own UVs at bottom-left, bottom-right, top-left and top-right.</summary>
-        private static void Textured(MeshKit kit, Vector3 bl, Vector3 br, Vector3 tl, Vector3 tr, Vector2 ubl, Vector2 ubr, Vector2 utl, Vector2 utr, Vector3 normal)
+        internal static void Textured(MeshKit kit, Vector3 bl, Vector3 br, Vector3 tl, Vector3 tr, Vector2 ubl, Vector2 ubr, Vector2 utl, Vector2 utr, Vector3 normal)
         {
             bool front = Vector3.Dot(Vector3.Cross(br - bl, tl - bl), normal) > 0;
             // Unity draws a triangle's front where Cross(second - first, third - first) points.

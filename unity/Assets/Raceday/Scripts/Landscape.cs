@@ -18,13 +18,15 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Chunks switch to the far version below this share of the screen's height.</summary>
         private const float FarAt = 0.25f;
 
-        public static void Build(Circuit circuit, CircuitBuilder builder, IReadOnlyList<StandFootprint> stands, CircuitMaterials materials, LandscapeLook look)
+        /// <returns>The trees, for other scenery to keep out from under.</returns>
+        public static IReadOnlyList<TreeSpot> Build(Circuit circuit, CircuitBuilder builder, IReadOnlyList<StandFootprint> stands, CircuitMaterials materials, LandscapeLook look)
         {
             var root = new GameObject("Landscape");
             var plan = new LandscapePlan(circuit, builder.RunoffReach, look, stands);
             Fields(circuit, plan, materials);
             Trees(plan, root.transform);
             Hills(circuit, look, root.transform);
+            return plan.Trees;
         }
 
         // ---------------------------------------------------------------- ground
