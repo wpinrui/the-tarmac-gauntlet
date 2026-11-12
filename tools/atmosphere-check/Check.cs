@@ -166,12 +166,14 @@ public static class Check
             WeatherSky.Apply(ref s, w, WeatherSky.Lights(s.SunElevation, WeatherSky.Dusk(w)));
             float o = WeatherSky.Overcast(sc.cloud);
             float direct = s.LightIntensity;
+            PostEffects.Grade g = SkyGrade.For(s, o, WeatherSky.Heavy(sc.rain), 0f, SkyGrade.Patchy(sc.cloud, o));
             string C(Color c) => $"[{c.r:0.0000},{c.g:0.0000},{c.b:0.0000}]";
             string V(Vector3 v) => $"[{v.x:0.0000},{v.y:0.0000},{v.z:0.0000}]";
             json.Append($"{{\"name\":\"{sc.name}\",\"cloud\":{sc.cloud},\"overcast\":{o:0.0000},\"cover\":{CloudMap.CoverFor(sc.cloud):0.0000},")
                 .Append($"\"tiles\":{CloudMap.TilesFor(0.45f, o):0.00000000},\"sunDir\":{V(s.LightDir)},\"sun\":{C(s.LightColour * direct)},")
                 .Append($"\"zenith\":{C(s.Zenith)},\"horizon\":{C(s.Horizon)},\"haze\":{C(s.Fog)},\"glow\":{C(s.Glow)},")
                 .Append($"\"cloudLit\":{C(s.CloudLit)},\"cloudShade\":{C(s.CloudShade)},\"ground\":{C(s.AmbientGround)},")
+                .Append($"\"grade\":[{g.Exposure:0.000},{g.Contrast:0.00},{g.Saturation:0.00},{g.Temperature:0.00},{g.Tint:0.00}],\"elevation\":{s.SunElevation:0.00},")
                 .Append($"\"hazeDistance\":{WeatherSky.Haze(s.Haze, w):0.0}}}{(i + 1 < scenes.Length ? "," : "")}\n");
         }
         json.Append("]\n");

@@ -27,7 +27,7 @@ FRAMES = int(__import__("os").environ.get("FRAMES", 4))
 EXPOSURE = 0.45      # stops, PostEffects.ToneExposure
 NOISE_PERIOD = 1800.0
 EXTINCTION = 0.04    # per m at full density
-P = dict(cov0=0.35, covk=2.5, bigp=3600.0, midp=900.0, detp=300.0, top0=0.2, ero=0.35, fray=0.1, dens=3.0, ms1=0.3, ms2=0.1, amb=0.85, hazek=8.0, stepk=0.01, stepmin=40.0, stepmax=200.0, coarse=3.0, cut=0.06)
+P = dict(cov0=0.35, covk=2.5, bigp=3600.0, midp=900.0, detp=300.0, top0=0.2, ero=0.35, fray=0.1, dens=3.0, ms1=0.6, ms2=0.3, amb=0.5, hazek=8.0, stepk=0.01, stepmin=40.0, stepmax=200.0, coarse=3.0, cut=0.06, glare=1.0, deep=1.0, far0=4000.0, far1=16000.0)
 import os
 for _kv in os.environ.get('P', '').split(','):
     if '=' in _kv:
@@ -135,13 +135,22 @@ class Sky:
         # Coverage: soft, so the 3D noise draws each cloud's edge. A fair day leaves most of the sky clear.
         cov = saturate(P["cov0"] + (n - self.cover) * P["covk"]) * (1 - o) + o * 0.95
         q = np.stack([xi, yi, zi], -1)
-        big = self.noise(q / P["bigp"], 0)
+        # Far off, clouds merge into fewer, larger, flatter shapes: seen edge on, their small ones would only be grain.
+        far = smoothstep(P["far0"], P["far1"], np.hypot(xi - EYE[0], zi - EYE[2]))
+        big = self.noise(q / (P["bigp"] * (1 + 2.5 * far)[:, None]), 0)
+        hf = hi / (1 - 0.65 * far)
         # Fair-weather cumulus: a flat base, then narrowing to rounded tops.
-        prof = saturate(hi / 0.06) * (1.0 - smoothstep(P["top0"], 1.0, hi) * (1 - o * 0.6))
+        prof = saturate(hf / 0.06) * (1.0 - smoothstep(P["top0"], 1.0, hf) * (1 - o * 0.6)) * (hf < 1)
         shape = big * prof
         d = saturate((shape - (1.0 - cov)) / np.maximum(cov, 1e-3)) * cov
-        # Under an overcast the layer closes into one thick deck, its underside lumpy from the same noise.
-        d = np.maximum(d, o * prof * (0.25 + 0.5 * big))
+        if o > 0:
+            # Under an overcast the layer closes into one deck: its underside rolls up and down, it is thick in lumps
+            # and thin in patches the light comes through.
+            roll = self.noise(q / 2400.0, 1)
+            lump = smoothstep(0.1, 0.9, 0.6 * self.noise(q / 5000.0 + 0.37, 0) + 0.4 * self.noise(q / 2200.0 + 0.61, 1))
+            under = 0.04 + 0.22 * (1 - roll)
+            deck = saturate((hi - under) / 0.05) * (1 - smoothstep(0.45, 0.9, hi)) * (0.25 + 0.75 * lump) * 0.45
+            d = np.maximum(d * (1 - o), o * deck)
         if cheap:
             # The shape before the billows and detail eat into it: never less than the full density, so empty air
             # here is empty air there.
@@ -153,12 +162,15 @@ class Sky:
             hh = hi[live]
             billow = self.noise(ql / P["midp"], 0)
             dl = d[live]
-            dl = saturate((dl - (1 - billow) * P["ero"] * (0.4 + hh)) / (1 - (1 - billow) * P["ero"] * (0.4 + hh)))
+            fl = far[live]
+            ero = (1 - billow) * P["ero"] * (0.4 + hh) * (1 - 0.7 * fl) * (1 - 0.8 * o)
+            dl = saturate((dl - ero) / (1 - ero))
             fray = dl > 0
             if fray.any():
                 det = self.noise(ql[fray] / P["detp"], 1)
                 e = dl[fray]
-                dl[fray] = saturate((e - (1 - det) * P["fray"]) / (1 - (1 - det) * P["fray"]))
+                fr = (1 - det) * P["fray"] * (1 - fl[fray]) * (1 - 0.8 * o)
+                dl[fray] = saturate((e - fr) / (1 - fr))
             d[live] = dl
         # Thin wisps between the clouds read as grain from the ground; clear them.
         out[inside] = saturate((d - P["cut"]) / (1 - P["cut"]) * P["dens"])
@@ -195,7 +207,18 @@ def render(sky, frames=FRAMES):
     s = sky.s
     col = lambda k: np.array(s[k])
     zen, hor, haze, glow, sun_col = col("zenith"), col("horizon"), col("haze"), col("glow"), col("sun")
-    lit_col, shade_col = col("cloudLit"), col("cloudShade")
+    lit_col = col("cloudLit")
+    # Proposed sky palette for the volumetric sky (DEEP=0 draws the game's sky as it is): a deeper blue overhead, the haze
+    # a thin band in the sky's own colour.
+    deep = P["deep"] * (1 - sky.o)
+    zen = zen * (1 - deep * np.array([0.55, 0.4, 0.15]))
+    haze_band = 1 - 0.5 * deep
+    hor = hor * (1 - deep * np.array([0.22, 0.12, 0.03]))
+    # The low sun: warm orange-gold light on the clouds, dusky mauve shade, the sky warm towards it.
+    e = s["elevation"]
+    gold = deep * smoothstep(-2, 3, e) * (1 - smoothstep(6, 18, e))
+    lit_col = lit_col * (1 + gold * (np.array([1.15, 0.78, 0.45]) - 1))
+    mauve = 1 + gold * (np.array([0.95, 0.78, 0.9]) - 1)
     # Camera looking north, pitched up.
     py, px = np.mgrid[0:H, 0:W].astype(np.float64)
     t = math.tan(math.radians(FOV) / 2)
@@ -219,19 +242,21 @@ def render(sky, frames=FRAMES):
     towards = (np.einsum("ij,j->i", d[..., [0, 2]].reshape(-1, 2), sun[[0, 2]] / (np.linalg.norm(sun[[0, 2]]) + 1e-6)).reshape(H, W) * 0.5 + 0.5)
     band = np.exp(-np.maximum(dy, 0) * 6.5)
     bg = bg + glow * (towards ** 3 * band)[..., None]
-    hz = np.exp(-np.abs(dy) * 10.0)[..., None]
-    bg = bg + (haze - bg) * hz * 0.85
+    hz = np.exp(-np.abs(dy) * (10.0 + 14.0 * deep))[..., None]
+    bg = bg + (haze - bg) * hz * 0.85 * haze_band
+    bg = bg + glow * (gold * 0.8 * towards ** 4 * np.exp(-np.maximum(dy, 0) * 4.0))[..., None]
     scatter = ((1 - 0.8) ** 3 / (1 + 0.64 - 1.6 * cs) ** 1.5) * 0.55 + ((1 - 0.55) ** 3 / (1 + 0.3025 - 1.1 * cs) ** 1.5) * 0.05
     above = saturate(sun[1] * 20 + 1)
     bg = bg + sun_col / max(np.max(sun_col), 1e-3) * min(np.max(sun_col), 1.25) * (scatter * (0.55 + 0.45 * air[..., 0]) * above)[..., None]
     disc = (np.arccos(np.clip(cs, -1, 1)) < 0.0145) * above
-    bg = bg + sun_col * 4.0 * disc[..., None]
+    bg = bg + sun_col * 30.0 * (1 - sky.o) * disc[..., None]
     ground = np.array(s["ground"]) * 0.8
     bg = np.where((dy < 0)[..., None], ground + (haze - ground) * np.exp(dy * 40)[..., None] * 0.8, bg)
 
     # The march.
     climbing = dy > 0.01
     idx = np.nonzero(climbing.ravel())[0]
+    bg_idx = bg.reshape(-1, 3)[idx]
     dd = d.reshape(-1, 3)[idx]
     enter = np.maximum((sky.base - EYE[1]) / dd[:, 1], 0)
     leave = np.minimum((sky.base + sky.thick - EYE[1]) / dd[:, 1], np.minimum(enter + 15000.0, 30000.0))
@@ -243,8 +268,8 @@ def render(sky, frames=FRAMES):
     # edges silver.
     phase = [0.5 * hg(css, 0.8 * k) + 0.5 * hg(css, -0.3 * k) for k in (1.0, 0.5, 0.25)]
     # Light from the sky dome above, and from the sunlit ground below.
-    amb_hi = (zen + hor) * 0.5
-    amb_lo = np.array(s["ground"]) * sun_col * max(sun[1], 0.0) * 0.6 + amb_hi * 0.25
+    amb_hi = zen * 0.7 + hor * 0.3
+    amb_lo = amb_hi * 0.4 + np.array(s["ground"]) * sun_col * max(sun[1], 0.0) * 0.15
     adaptive = os.environ.get("MARCH", "adaptive") == "adaptive"
 
     def fine_step(t):
@@ -258,7 +283,8 @@ def render(sky, frames=FRAMES):
                   + P['ms2'] * np.exp(-od * 0.06) * phase[2][ai])
         powder = 1.0 - np.exp(-r * EXTINCTION * 200.0)
         direct = lit_col * (sunlit * (0.3 + 0.7 * powder))[:, None]
-        ambient = (amb_lo + (amb_hi - amb_lo) * h[:, None]) * P['amb']
+        # Thick cloud above shuts out the sky's light too: the undersides of thick cores darken.
+        ambient = (amb_lo + (amb_hi - amb_lo) * h[:, None]) * mauve * (P['amb'] * (0.3 + 0.7 * np.exp(-od * 0.08)))[:, None]
         radiance = direct + ambient
         through = np.exp(-r * EXTINCTION * dt)
         light[ai] += trans[ai, None] * radiance * (1 - through)[:, None]
@@ -324,7 +350,7 @@ def render(sky, frames=FRAMES):
                     clear[gone] = False
         # Far clouds sink into the haze: the air between is lit the haze's colour.
         fade = np.exp(-enter * 3.912 / (s["hazeDistance"] * P["hazek"]))
-        light = light * fade[:, None] + haze * ((1 - trans) * (1 - fade))[:, None]
+        light = light * fade[:, None] + bg_idx * ((1 - trans) * (1 - fade))[:, None]
         acc_l += light
         acc_t += trans
     acc_l /= frames
@@ -333,8 +359,23 @@ def render(sky, frames=FRAMES):
     img = bg.reshape(-1, 3).copy()
     img[idx] = img[idx] * acc_t[:, None] + acc_l
     img = img.reshape(H, W, 3)
-    # Tone map as PostEffects does: exposure, then the ACES curve, then to sRGB.
-    x = img * (2.0 ** EXPOSURE)
+    # The sun's glare, as SunRays draws it: only where the sun shows through.
+    ang = np.arccos(np.clip(cs, -1, 1))
+    see = np.ones(H * W)
+    see[idx] = acc_t
+    see = see.reshape(H, W)
+    img = img + sun_col * (above * see * (P["glare"] * np.exp(-ang / 0.03) + 0.25 * P["glare"] * np.exp(-ang / 0.15)))[..., None]
+    # Graded and tone mapped as PostEffects does: exposure, white balance, contrast in log space, saturation, then ACES.
+    g = s.get("grade", [0, 0, 0, 0, 0])
+    x = img * (2.0 ** (EXPOSURE + g[0]))
+    warm = g[3] / 100.0
+    x = x * np.array([1 + 0.3 * warm, 1 + 0.03 * g[4] / 100.0, 1 - 0.3 * warm])
+    logc = np.log10(5.555556 * np.maximum(x, 0) + 0.047996) * 0.244161 + 0.386036
+    mid = 0.4135884
+    logc = (logc - mid) * (1 + g[1] / 100.0) + mid
+    x = np.maximum((10 ** ((logc - 0.386036) / 0.244161) - 0.047996) / 5.555556, 0)
+    lum = x @ np.array([0.2126, 0.7152, 0.0722])
+    x = np.maximum(lum[..., None] + (x - lum[..., None]) * (1 + g[2] / 100.0), 0)
     x = np.clip((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0, 1)
     srgb = np.where(x <= 0.0031308, 12.92 * x, 1.055 * np.power(x, 1 / 2.4) - 0.055)
     # Cover of the sky more than 15 degrees up, where the clouds are not just the far field seen edge on.
