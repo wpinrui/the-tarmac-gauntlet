@@ -78,7 +78,7 @@ namespace TarmacGauntlet.Raceday
         private void Update()
         {
             if (Plan == null) return;
-            Now = Plan.At(RaceSeconds != null ? RaceSeconds() : 0f);
+            Now = RaceWeather.Forced ?? Plan.At(RaceSeconds != null ? RaceSeconds() : 0f);
             RaceWeather.Now = Now;
             ShowWet(Now.Water);
             Camera cam = Camera.main;
