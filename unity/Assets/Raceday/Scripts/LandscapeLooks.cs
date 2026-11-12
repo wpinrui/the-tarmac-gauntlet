@@ -45,6 +45,17 @@ namespace TarmacGauntlet.Raceday
             return new Color(col.r * (1f + 0.2f * dry), col.g * (1f + 0.06f * dry), col.b * (1f - 0.24f * dry)) * light;
         }
 
+        /// <summary>
+        /// <see cref="Field"/>, but mown grass left long, beyond where the mower stopped, goes most of the way to meadow.
+        /// </summary>
+        public static Color Grass(LandUse use, float x, float z, bool uncut)
+        {
+            Color col = Field(use, x, z);
+            if (use != LandUse.Mown || !uncut) return col;
+            Color m = Field(LandUse.Meadow, x, z);
+            return new Color(col.r + (m.r - col.r) * 0.6f, col.g + (m.g - col.g) * 0.6f, col.b + (m.b - col.b) * 0.6f);
+        }
+
         /// <summary>Leaf tint by kind of tree and hue (<see cref="TreeSpot.Hue"/>), multiplied over the baked colour.</summary>
         public static Color Leaves(TreeKind kind, float hue)
         {
