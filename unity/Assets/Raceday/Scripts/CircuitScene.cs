@@ -100,7 +100,7 @@ namespace TarmacGauntlet.Raceday
             parts.AddRange(stands.Build());
             foreach (CircuitPart part in parts) AddPart(track.transform, part);
             track.AddComponent<CrowdView>().Material = standMaterials.Crowd;
-            Landscape.Build(circuit, builder, materials, LandscapeLooks.Current);
+            Landscape.Build(circuit, builder, stands.Footprints, materials, LandscapeLooks.Current);
             Complex = new PitComplex(circuit, builder.GarageFloors);
             var pitMaterials = new PitMaterials();
             var buildings = new GameObject("Pit complex");

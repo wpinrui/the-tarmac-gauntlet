@@ -22,8 +22,8 @@ function sunDir(hour) {
 
 const vert = `
   uniform float radius, centreAbove, frames;
-  attribute vec4 a; attribute vec4 b;   // base.xyz, scale; squash, yaw, shade, -
-  varying vec2 vUv; varying vec3 vR; varying vec3 vU; varying vec3 vD; varying float vShade; varying float vFog;
+  attribute vec4 a; attribute vec4 b; attribute vec3 tint;   // base.xyz, scale; squash, yaw; leaf tint
+  varying vec2 vUv; varying vec3 vR; varying vec3 vU; varying vec3 vD; varying vec3 vTint; varying float vFog;
   vec3 rotY(vec3 v, float t) { float c = cos(t), s = sin(t); return vec3(c * v.x + s * v.z, v.y, -s * v.x + c * v.z); }
   void main() {
     float scale = a.w, squash = b.x, yaw = b.y;
@@ -42,14 +42,14 @@ const vert = `
     vec3 w = centre + rotY(off, yaw);
     vUv = (f + position.xy * 0.5 + 0.5) / frames;
     vR = rotY(R, yaw); vU = rotY(U, yaw); vD = rotY(D, yaw);
-    vShade = b.z;
+    vTint = tint;
     vec4 view = viewMatrix * vec4(w, 1.0);
     vFog = -view.z;
     gl_Position = projectionMatrix * view;
   }`;
 const frag = `
-  uniform sampler2D colour, normals; uniform vec3 sun, sunColour, sky, ground, fogColour, tint; uniform vec2 fogRange;
-  varying vec2 vUv; varying vec3 vR; varying vec3 vU; varying vec3 vD; varying float vShade; varying float vFog;
+  uniform sampler2D colour, normals; uniform vec3 sun, sunColour, sky, ground, fogColour; uniform vec2 fogRange;
+  varying vec2 vUv; varying vec3 vR; varying vec3 vU; varying vec3 vD; varying vec3 vTint; varying float vFog;
   void main() {
     vec4 c = texture2D(colour, vUv);
     // Unity keeps the leaves' coverage in the smaller mipmaps; three.js does not, so far trees would
@@ -59,7 +59,7 @@ const frag = `
     if (c.a * (1.0 + mip * 0.3) < 0.5) discard;
     vec3 t = texture2D(normals, vUv).xyz * 2.0 - 1.0;
     vec3 n = normalize(t.x * vR + t.y * vU + t.z * vD);
-    vec3 albedo = pow(c.rgb, vec3(2.2)) * tint * vShade;
+    vec3 albedo = pow(c.rgb, vec3(2.2)) * vTint;
     vec3 amb = mix(ground, sky, n.y * 0.5 + 0.5);
     vec3 lit = albedo * (amb + sunColour * (max(dot(n, sun), 0.0) * 0.8 + 0.2));
     float fog = clamp((vFog - fogRange.x) / (fogRange.y - fogRange.x), 0.0, 1.0);
@@ -79,29 +79,55 @@ window.build = async (look, hour) => {
   scene.background = fogColour.clone();
   scene.fog = new THREE.Fog(fogColour.clone(), 1400, 7000);
 
-  // Ground: heights, land use as vertex colour.
+  // Ground: heights, with the fields' colours and the mowing stripes as Ground.shader draws them.
   const heights = new Uint8Array(atob(t.heightsCm).split('').map(ch => ch.charCodeAt(0)));
   const H = (x, z) => t.baseHeight + (heights[2 * (z * t.countX + x)] | (heights[2 * (z * t.countX + x) + 1] << 8)) / 100;
-  const map = await bin(`/plan/${look}/map.bin`);
   const colours = plan.ground.map(c => lin(c).convertSRGBToLinear());
-  const pos = [], col = [], idx = [];
-  const step = 1;
-  const nx = t.countX, nz = t.countZ;
-  for (let z = 0; z < nz; z += step)
-    for (let x = 0; x < nx; x += step) {
-      pos.push(t.originX + x * t.spacing, H(x, z), -(t.originZ + z * t.spacing));
-      const m = map[(z * 2) * plan.mapX + x * 2];
-      const n = 0.88 + 0.24 * Math.random();
-      const cc = colours[m]; col.push(cc.r * n, cc.g * n, cc.b * n);
-    }
+  const fieldsRgb = await bin(`/plan/${look}/fields.bin`), fieldsTex = new Uint8Array(plan.mapX * plan.mapZ * 4);
+  for (let i = 0; i < plan.mapX * plan.mapZ; i++) fieldsTex.set([fieldsRgb[3 * i], fieldsRgb[3 * i + 1], fieldsRgb[3 * i + 2], 255], 4 * i);
+  const fields = new THREE.DataTexture(fieldsTex, plan.mapX, plan.mapZ);
+  const mowing = new THREE.DataTexture(new Float32Array((await bin(`/plan/${look}/mowing.bin`)).buffer), plan.mapX, plan.mapZ, THREE.RGBAFormat, THREE.FloatType);
+  fields.colorSpace = THREE.SRGBColorSpace;
+  for (const tx of [fields, mowing]) { tx.magFilter = THREE.LinearFilter; tx.minFilter = THREE.LinearFilter; tx.needsUpdate = true; }
+  const pos = [];
+  const nx = t.countX, nz = t.countZ, idx = [];
+  for (let z = 0; z < nz; z++) for (let x = 0; x < nx; x++) pos.push(t.originX + x * t.spacing, H(x, z), -(t.originZ + z * t.spacing));
   for (let z = 0; z < nz - 1; z++)
     for (let x = 0; x < nx - 1; x++) { const i = z * nx + x; idx.push(i, i + 1, i + nx, i + 1, i + nx + 1, i + nx); }
   const gg = new THREE.BufferGeometry();
   gg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  gg.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   gg.setIndex(idx); gg.computeVertexNormals();
-  const lambert = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
-  scene.add(new THREE.Mesh(gg, lambert));
+  const cell = t.spacing / 2;
+  const groundMat = new THREE.ShaderMaterial({ side: THREE.DoubleSide, extensions: { derivatives: true }, uniforms: {
+      fields: { value: fields }, mowing: { value: mowing }, stripes: { value: window.stripes === false ? 0 : 1 },
+      map: { value: new THREE.Vector4(t.originX - cell / 2, t.originZ - cell / 2, 1 / (plan.mapX * cell), 1 / (plan.mapZ * cell)) },
+      sun: { value: L }, sunColour: { value: new THREE.Vector3(sunColour.r, sunColour.g, sunColour.b) }, sky: { value: new THREE.Vector3(sky.r, sky.g, sky.b) },
+      groundAmb: { value: new THREE.Vector3(groundAmb.r, groundAmb.g, groundAmb.b) },
+      fogColour: { value: new THREE.Vector3(fogColour.r, fogColour.g, fogColour.b) }, fogRange: { value: new THREE.Vector2(1400, 7000) } },
+    vertexShader: `
+      varying vec3 vW; varying vec3 vN; varying float vFog;
+      void main() { vW = position; vN = normal; vec4 v = viewMatrix * vec4(position, 1.0); vFog = -v.z; gl_Position = projectionMatrix * v; }`,
+    fragmentShader: `
+      uniform sampler2D fields, mowing; uniform vec4 map; uniform float stripes; uniform vec3 sun, sunColour, sky, groundAmb, fogColour; uniform vec2 fogRange;
+      varying vec3 vW; varying vec3 vN; varying float vFog;
+      void main() {
+        vec2 xz = vec2(vW.x, -vW.z);   // back into Unity's frame
+        vec2 uv = (xz - map.xy) * map.zw;
+        vec3 albedo = texture2D(fields, uv).rgb;   // decoded from sRGB already
+        vec4 mow = texture2D(mowing, uv);
+        float d = mow.r / 5.0, across = fwidth(d);
+        float wave = clamp((abs(fract(d * 0.5) - 0.5) * 4.0 - 1.0) / max(across * 2.0, 0.08), -1.0, 1.0);
+        float fade = clamp(mow.g, 0.0, 1.0) * clamp(1.5 - across * 2.5, 0.0, 1.0);
+        vec2 along = mow.ba / max(length(mow.ba), 1e-3);
+        vec2 view = xz - vec2(cameraPosition.x, -cameraPosition.z);
+        float lean = dot(view, along) / max(length(view), 1e-3);
+        albedo *= 1.0 + stripes * 0.11 * wave * fade * (0.35 + 0.65 * lean);
+        vec3 n = normalize(vN);
+        vec3 lit = albedo / 3.14159 * (mix(groundAmb, sky, n.y * 0.5 + 0.5) * 2.4 + sunColour * 2.6 * max(dot(n, sun), 0.0));
+        float fog = clamp((vFog - fogRange.x) / (fogRange.y - fogRange.x), 0.0, 1.0);
+        gl_FragColor = vec4(pow(mix(lit, fogColour, fog), vec3(1.0 / 2.2)), 1.0);
+      }` });
+  scene.add(new THREE.Mesh(gg, groundMat));
 
   // Road: a ribbon a little above the ground.
   const cen = circuit.centre, w = circuit.width, nC = cen.length / 3;
@@ -142,11 +168,12 @@ window.build = async (look, hour) => {
   const loader = new THREE.TextureLoader();
   for (let k = 0; k < KINDS.length; k++) {
     const meta = await json(`/atlas/${KINDS[k]}.json`);
-    const A = [], B = [];
-    for (let i = 0; i < trees.length; i += 8) {
+    const A = [], B = [], T = [];
+    for (let i = 0; i < trees.length; i += 10) {
       if (trees[i + 6] !== k) continue;
       A.push(trees[i], trees[i + 1], -trees[i + 2], trees[i + 3]);
-      B.push(trees[i + 4], -trees[i + 5], trees[i + 7], 0);
+      B.push(trees[i + 4], -trees[i + 5], 0, 0);
+      T.push(trees[i + 7], trees[i + 8], trees[i + 9]);
     }
     if (!A.length) continue;
     const geo = new THREE.InstancedBufferGeometry();
@@ -154,16 +181,15 @@ window.build = async (look, hour) => {
     geo.setIndex([0, 1, 2, 0, 2, 3]);
     geo.setAttribute('a', new THREE.InstancedBufferAttribute(new Float32Array(A), 4));
     geo.setAttribute('b', new THREE.InstancedBufferAttribute(new Float32Array(B), 4));
+    geo.setAttribute('tint', new THREE.InstancedBufferAttribute(new Float32Array(T), 3));
     geo.instanceCount = A.length / 4;
     const colour = await loader.loadAsync(`/atlas/${KINDS[k]}_colour.png`), normals = await loader.loadAsync(`/atlas/${KINDS[k]}_normal.jpg`);
     for (const tx of [colour, normals]) { tx.flipY = true; tx.anisotropy = 8; }
-    const lc = plan.leaves[k];
     const mat = new THREE.ShaderMaterial({ vertexShader: vert, fragmentShader: frag, side: THREE.DoubleSide, uniforms: {
       radius: { value: meta.radius }, centreAbove: { value: meta.centreAbove }, frames: { value: meta.frames },
       colour: { value: colour }, normals: { value: normals }, sun: { value: L }, sunColour: { value: new THREE.Vector3(sunColour.r, sunColour.g, sunColour.b).multiplyScalar(0.9) },
       sky: { value: new THREE.Vector3(sky.r, sky.g, sky.b).multiplyScalar(0.9) }, ground: { value: new THREE.Vector3(0.12, 0.12, 0.08) },
-      fogColour: { value: new THREE.Vector3(fogColour.r, fogColour.g, fogColour.b) }, fogRange: { value: new THREE.Vector2(1400, 7000) },
-      tint: { value: new THREE.Vector3(lc[0], lc[1], lc[2]) } } });
+      fogColour: { value: new THREE.Vector3(fogColour.r, fogColour.g, fogColour.b) }, fogRange: { value: new THREE.Vector2(1400, 7000) } } });
     const mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false; scene.add(mesh);
   }
   window.scene = scene; window.circuit = circuit;
