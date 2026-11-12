@@ -1,6 +1,8 @@
 // A car's paint: a base coat under a clear coat, with metallic flakes in the base that glint in the sun. The clear coat
-// and the flakes are graphics options (CarLook), switched with the global keywords _TARMAC_CLEARCOAT and _TARMAC_FLAKE;
-// with both off the paint is lit as ShadePbr lights it. Include in place of TarmacLit.hlsl, after the keywords' pragmas.
+// and the flakes are graphics options (CarMaterials), switched with the global keywords _TARMAC_CLEARCOAT and
+// _TARMAC_FLAKE. Flakes show only close up, where each spans a few pixels; further off the paint is an even metallic
+// sheen. Highlights are filtered so curved panels never sparkle. Include in place of TarmacLit.hlsl, after the keywords'
+// pragmas.
 // A shader that always wants the clear coat defines _CLEARCOAT before including this.
 #ifndef TARMAC_CAR_PAINT_INCLUDED
 #define TARMAC_CAR_PAINT_INCLUDED
@@ -17,14 +19,18 @@
 #define CAR_COAT_SMOOTHNESS 0.94
 // Flaked paint is part metal.
 #define CAR_FLAKE_METALLIC 0.45
-// The smallest flake cell, metres. Further away the cells grow, so a glint stays about a pixel and never shimmers.
-#define CAR_FLAKE_CELL 0.003
-// How far a flake can lean from the panel, and how tight its glint is.
-#define CAR_FLAKE_TILT 0.35
-#define CAR_FLAKE_SHARPNESS 300.0
-#define CAR_FLAKE_GAIN 1.6
-// How much each flake lightens or darkens the base colour, seen close up.
-#define CAR_FLAKE_SPECKLE 0.06
+// A flake cell, metres.
+#define CAR_FLAKE_CELL 0.004
+// Flakes show only where a cell spans at least the first number of pixels, at full strength from the second. Smaller
+// than that they would alias into pixel noise, so the paint reads as an even metallic sheen instead.
+#define CAR_FLAKE_SHOW_FROM 2.0
+#define CAR_FLAKE_FULL_AT 4.0
+// How far a flake can lean from the panel, how tight its glint is, and how bright.
+#define CAR_FLAKE_TILT 0.3
+#define CAR_FLAKE_SHARPNESS 120.0
+#define CAR_FLAKE_GAIN 0.25
+// The most roughness a curved surface gains so its highlight can't break into sparkles between pixels.
+#define CAR_SPECULAR_AA_MAX 0.2
 
 float3 TarmacHash33(float3 p)
 {
@@ -33,12 +39,22 @@ float3 TarmacHash33(float3 p)
     return frac((p.xxy + p.yxx) * p.zyx);
 }
 
-// One flake per cell of the given size, leaning at random: how much of the half vector it catches.
-half FlakeGlint(float3 p, float cell, half3 n, half3 h)
+// One flake per cell, leaning at random: how much of the half vector it catches.
+half FlakeGlint(float3 p, half3 n, half3 h)
 {
-    float3 lean = TarmacHash33(floor(p / cell)) * 2 - 1;
+    float3 lean = TarmacHash33(floor(p / CAR_FLAKE_CELL)) * 2 - 1;
     half3 flake = normalize(n + lean * CAR_FLAKE_TILT);
     return pow(saturate(dot(flake, h)), CAR_FLAKE_SHARPNESS);
+}
+
+// A smoothness lowered where the normal turns fast across a pixel (Kaplanyan and Hoffman's specular antialiasing), so
+// a sharp highlight on a curved panel spreads over the pixel instead of flickering on and off.
+half FilteredSmoothness(half smoothness, half3 normalWS)
+{
+    float3 dx = ddx(normalWS), dy = ddy(normalWS);
+    float spread = min(0.5 * (dot(dx, dx) + dot(dy, dy)), CAR_SPECULAR_AA_MAX);
+    float roughness = (1 - smoothness) * (1 - smoothness);
+    return 1 - sqrt(sqrt(saturate(roughness * roughness + spread)));
 }
 
 // The paint lit and fogged. flakePos is a point on the car that moves with it, in metres: the flakes sit there.
@@ -55,30 +71,30 @@ half4 ShadeCarPaint(float3 positionWS, half3 normalWS, float4 positionCS, half f
     s.alpha = 1;
 
 #if defined(_TARMAC_FLAKE)
-    // Cells about a pixel and a half across, blended between powers of two as the distance changes.
-    float footprint = max(length(ddx(flakePos)), length(ddy(flakePos)));
-    float level = max(0, log2(footprint * 1.5 / CAR_FLAKE_CELL));
-    float whole = floor(level);
-    float cell = CAR_FLAKE_CELL * exp2(whole);
     s.metallic = max(s.metallic, CAR_FLAKE_METALLIC);
-    half speckle = (TarmacHash33(floor(flakePos / CAR_FLAKE_CELL)).x * 2 - 1) * CAR_FLAKE_SPECKLE * saturate(1 - level);
-    s.albedo *= 1 + speckle;
+    // How many pixels a flake cell spans.
+    float footprint = max(length(ddx(flakePos)), length(ddy(flakePos)));
+    float pixels = CAR_FLAKE_CELL / max(footprint, 1e-6);
+    half flakes = smoothstep(CAR_FLAKE_SHOW_FROM, CAR_FLAKE_FULL_AT, pixels);
 #endif
 
 #if defined(_CLEARCOAT)
     s.smoothness = min(s.smoothness, CAR_COAT_BASE_SMOOTHNESS);
     s.clearCoatMask = 1;
-    s.clearCoatSmoothness = CAR_COAT_SMOOTHNESS;
+    s.clearCoatSmoothness = FilteredSmoothness(CAR_COAT_SMOOTHNESS, d.normalWS);
 #endif
+    s.smoothness = FilteredSmoothness(s.smoothness, d.normalWS);
 
     half4 c = UniversalFragmentPBR(d, s);
 
 #if defined(_TARMAC_FLAKE)
-    Light sun = GetMainLight(d.shadowCoord, d.positionWS, d.shadowMask);
-    half3 h = SafeNormalize(sun.direction + d.viewDirectionWS);
-    half glint = lerp(FlakeGlint(flakePos, cell, d.normalWS, h), FlakeGlint(flakePos, cell * 2, d.normalWS, h), level - whole);
-    half lit = sun.distanceAttenuation * sun.shadowAttenuation * saturate(dot(d.normalWS, sun.direction));
-    c.rgb += sun.color * (lit * glint * CAR_FLAKE_GAIN) * lerp(half3(1, 1, 1), albedo, 0.4);
+    if (flakes > 0)
+    {
+        Light sun = GetMainLight(d.shadowCoord, d.positionWS, d.shadowMask);
+        half3 h = SafeNormalize(sun.direction + d.viewDirectionWS);
+        half lit = sun.distanceAttenuation * sun.shadowAttenuation * saturate(dot(d.normalWS, sun.direction));
+        c.rgb += sun.color * (lit * flakes * FlakeGlint(flakePos, d.normalWS, h) * CAR_FLAKE_GAIN) * lerp(half3(1, 1, 1), albedo, 0.5);
+    }
 #endif
 
     c.rgb = MixFog(c.rgb, d.fogCoord);

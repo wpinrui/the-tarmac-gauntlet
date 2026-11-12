@@ -1,6 +1,6 @@
 // Carbon fibre under a clear coat: a 2x2 twill weave of tows, each tow catching the light across its own direction,
-// laid on the part along whichever of its own axes the face points down most. Far off, where a tow is smaller than a
-// pixel, the weave fades to its average so it never shimmers. CarMaterials puts it on a car's "carbon" material.
+// laid on the part along whichever of its own axes the face points down most. Far off, where a tow is under two pixels
+// across, the weave fades to its average so it never shimmers. CarMaterials puts it on a car's "carbon" material.
 Shader "TarmacGauntlet/Carbon"
 {
     SubShader
@@ -72,9 +72,9 @@ Shader "TarmacGauntlet/Carbon"
                 bool alongU = frac((c.x + c.y) / 4) < 0.5;
                 float across = alongU ? f.y : f.x;
                 float crown = sin(across * PI);
-                // Fades out as a tow shrinks under a pixel.
+                // Shows only where a tow spans at least two pixels, at full strength from four: smaller, it would alias.
                 float footprint = max(length(ddx(t)), length(ddy(t)));
-                float weave = saturate(2 - footprint);
+                float weave = smoothstep(0.5, 0.25, footprint);
 
                 float3 leanAxis = alongU ? dv : du;
                 float3 bent = normalize(n + leanAxis * ((across - 0.5) * WEAVE_LEAN * weave));
