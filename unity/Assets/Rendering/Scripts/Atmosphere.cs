@@ -13,8 +13,6 @@ namespace TarmacGauntlet.Rendering
     {
         /// <summary>Height the cloud map lies at, m: the clouds' bases on a fair day, and where their shadows are cast from.</summary>
         public const float CloudBase = 1500f;
-        /// <summary>The volumetric clouds' 3D noise repeats every this many metres.</summary>
-        public const float NoisePeriod = 1800f;
         /// <summary>Most floodlight beams drawn in the fog at once.</summary>
         public const int MostBeams = 16;
 
@@ -27,6 +25,8 @@ namespace TarmacGauntlet.Rendering
             public Color Sun;
             /// <summary>The clouds' colours where the sun lights them and in their shade, as the sky shader draws them.</summary>
             public Color CloudLit, CloudShade;
+            /// <summary>The light inside the clouds that is not the sun's: from the sky at their tops, and at their bases.</summary>
+            public Color SkyLight, GroundLight;
             /// <summary>The haze's colour, and its density, per m.</summary>
             public Color Haze;
             public float HazeDensity;
@@ -38,7 +38,7 @@ namespace TarmacGauntlet.Rendering
             public float ShadowStrength;
             /// <summary>The cloud map's drift, tiles: xy the big layer, zw the small one.</summary>
             public Vector4 CloudOffset;
-            /// <summary>How far the wind has carried the clouds, m, east and north, wrapped at <see cref="NoisePeriod"/>.</summary>
+            /// <summary>How far the wind has carried the clouds, m, east and north, wrapped at <see cref="CloudLook.Repeat"/>.</summary>
             public Vector2 Drift;
             /// <summary>The low mist's density at the ground, per m, how fast it thins with height, m, and the ground's height, m.</summary>
             public float MistDensity, MistHeight, Ground;
@@ -57,7 +57,8 @@ namespace TarmacGauntlet.Rendering
             CloudLitId = Shader.PropertyToID("_TgCloudLit"), CloudShadeId = Shader.PropertyToID("_TgCloudShade"),
             HazeId = Shader.PropertyToID("_TgHaze"), MistId = Shader.PropertyToID("_TgMist"),
             BeamPosId = Shader.PropertyToID("_TgBeamPos"), BeamAimId = Shader.PropertyToID("_TgBeamAim"),
-            BeamsId = Shader.PropertyToID("_TgBeams");
+            BeamsId = Shader.PropertyToID("_TgBeams"), SkyLightId = Shader.PropertyToID("_TgSkyLight"),
+            GroundLightId = Shader.PropertyToID("_TgGroundLight");
 
         /// <summary>The sky now. Call it every frame the race sky is up.</summary>
         public static void Publish(in Sky s)
@@ -72,6 +73,8 @@ namespace TarmacGauntlet.Rendering
             Shader.SetGlobalColor(SunLightId, s.Sun);
             Shader.SetGlobalColor(CloudLitId, s.CloudLit);
             Shader.SetGlobalColor(CloudShadeId, s.CloudShade);
+            Shader.SetGlobalColor(SkyLightId, s.SkyLight);
+            Shader.SetGlobalColor(GroundLightId, s.GroundLight);
             Shader.SetGlobalVector(HazeId, new Vector4(s.Haze.r, s.Haze.g, s.Haze.b, s.HazeDensity));
             Shader.SetGlobalVector(MistId, new Vector4(s.MistDensity, Mathf.Max(s.MistHeight, 1f), s.Ground, 0f));
         }

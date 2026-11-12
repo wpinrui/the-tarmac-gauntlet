@@ -16,5 +16,7 @@
     <Compile Include="../../unity/Assets/Raceday/Scripts/WeatherSky.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/RaceWeather.cs" />
     <Compile Include="../../unity/Assets/Rendering/Scripts/CloudNoise.cs" />
+    <Compile Include="../../unity/Assets/Rendering/Scripts/CloudLook.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/SkyPalette.cs" />
   </ItemGroup>
 </Project>
