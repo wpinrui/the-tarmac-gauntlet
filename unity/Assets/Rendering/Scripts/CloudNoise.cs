@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using UnityEngine;
 
 namespace TarmacGauntlet.Rendering
@@ -5,21 +6,32 @@ namespace TarmacGauntlet.Rendering
     /// <summary>
     /// The volumetric clouds' 3D noise: a cube that wraps on every face, so it tiles through the sky without a seam. Red is
     /// the clouds' billows, cells of Worley noise softened with value noise; green is finer Worley cells that eat into their
-    /// edges. Made once, the first time the clouds are drawn.
+    /// edges. Worked out once, on another thread, from the first time it is asked for (<see cref="Prepare"/>): it takes about
+    /// a second.
     /// </summary>
     public static class CloudNoise
     {
         public const int Size = 64;
 
         private static Texture3D texture;
+        private static Task<byte[]> making;
 
-        /// <summary>The noise as a texture.</summary>
+        /// <summary>Starts working the noise out, if it is not already.</summary>
+        public static void Prepare()
+        {
+            if (texture == null && making == null) making = Task.Run(() => Field(Size));
+        }
+
+        /// <summary>The noise as a texture; null until it is worked out.</summary>
         public static Texture3D Texture
         {
             get
             {
                 if (texture != null) return texture;
-                byte[] field = Field(Size);
+                Prepare();
+                if (!making.IsCompleted) return null;
+                byte[] field = making.Result;
+                making = null;
                 var px = new Color32[Size * Size * Size];
                 for (int i = 0; i < px.Length; i++) px[i] = new Color32(field[i * 2], field[i * 2 + 1], 0, 255);
                 texture = new Texture3D(Size, Size, Size, TextureFormat.RGBA32, false)

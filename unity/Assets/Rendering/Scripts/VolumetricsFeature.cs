@@ -32,7 +32,8 @@ namespace TarmacGauntlet.Rendering
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
             Camera camera = renderingData.cameraData.camera;
-            bool clouds = GraphicsOptions.VolumetricClouds.On, fog = GraphicsOptions.VolumetricFog.On;
+            // The clouds wait for their noise, worked out the first time they are wanted.
+            bool clouds = GraphicsOptions.VolumetricClouds.On && CloudNoise.Texture != null, fog = GraphicsOptions.VolumetricFog.On;
             bool draw = Atmosphere.Present && (clouds || fog) && camera != null && renderingData.cameraData.cameraType == CameraType.Game
                 && camera.targetTexture == null && Materials();
             Shader.SetGlobalFloat(VolumetricCloudsId, draw && clouds ? 1f : 0f);
@@ -179,7 +180,8 @@ namespace TarmacGauntlet.Rendering
                     builder.SetRenderFunc(static (PassData d, RasterGraphContext context) =>
                     {
                         Apply(d);
-                        d.Material.SetTexture(NoiseId, CloudNoise.Texture);
+                        Texture3D noise = CloudNoise.Texture;
+                        if (noise != null) d.Material.SetTexture(NoiseId, noise);
                         Blitter.BlitTexture(context.cmd, new Vector4(1f, 1f, 0f, 0f), d.Material, March);
                     });
                 }

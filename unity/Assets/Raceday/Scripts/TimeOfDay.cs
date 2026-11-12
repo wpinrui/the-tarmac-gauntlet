@@ -95,7 +95,7 @@ namespace TarmacGauntlet.Raceday
             RenderSettings.sun = lamp;
 
             sky = new Material(Resources.Load<Shader>("Sky/Sky")) { name = "Sky" };
-            cloudNoise = CloudNoise();
+            cloudNoise = CloudTexture();
             sky.SetTexture("_CloudTex", cloudNoise);
             sky.SetFloat(CloudScaleId, CloudScale);
             ShowDetail(GraphicsOptions.SkyDetail);
@@ -117,6 +117,7 @@ namespace TarmacGauntlet.Raceday
             probe.hdr = false;
             probe.size = new Vector3(40000f, 8000f, 40000f);
             cloudShadows = new CloudShadows(lamp);
+            if (GraphicsOptions.VolumetricClouds.On) CloudNoise.Prepare();
             Apply();
         }
 
@@ -177,7 +178,7 @@ namespace TarmacGauntlet.Raceday
                 Small = smallCloud,
                 Size = CloudSize,
                 Tiles = CloudMap.TilesFor(CloudScale, overcast),
-                Cover = cover,
+                Cover = CloudMap.CoverFor(share),
                 Overcast = overcast,
                 Offset = clouds,
             };
@@ -227,7 +228,7 @@ namespace TarmacGauntlet.Raceday
                 HazeDensity = RenderSettings.fogDensity,
                 CloudTex = cloudNoise,
                 CloudTiles = map.Tiles,
-                Cover = cover,
+                Cover = map.Cover,
                 Overcast = overcast,
                 ShadowStrength = CloudMap.Strength(overcast),
                 CloudOffset = clouds,
@@ -251,7 +252,7 @@ namespace TarmacGauntlet.Raceday
         /// Tileable cloud noise: red is big soft masses, green finer detail. Each is a few octaves of
         /// value noise on a lattice that wraps, so the texture repeats without a seam.
         /// </summary>
-        private Texture2D CloudNoise()
+        private Texture2D CloudTexture()
         {
             const int size = CloudSize;
             var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { name = "Cloud noise", wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear };

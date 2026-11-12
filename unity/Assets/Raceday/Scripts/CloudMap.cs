@@ -4,9 +4,10 @@ namespace TarmacGauntlet.Raceday
 {
     /// <summary>
     /// Where the race's clouds are, laid flat over the world at <see cref="Base"/>: the sky shader's two layers of cloud
-    /// noise and its cover threshold, as the cloud shadows and the volumetric clouds draw them (CloudCover.hlsl, the same
-    /// sum on the GPU). Overhead the sky shader's painted clouds sit where the map puts them. Read on the CPU to tell
-    /// whether the sun shines on a spot, for the colour grade.
+    /// noise, as the cloud shadows and the volumetric clouds draw them (CloudCover.hlsl, the same sum on the GPU). Overhead
+    /// the sky shader's painted clouds sit where the map puts them. The map's threshold (<see cref="CoverFor"/>) puts as much
+    /// of the ground under cloud as the weather has of the sky, a little more than the painted sky shows overhead, where its
+    /// clouds crowd towards the horizon. Read on the CPU to tell whether the sun shines on a spot, for the colour grade.
     /// </summary>
     public struct CloudMap
     {
@@ -23,6 +24,9 @@ namespace TarmacGauntlet.Raceday
 
         /// <summary>The map's scale for the sky shader's cloud scale under this much overcast: the forms grow under cloud as they do in the sky.</summary>
         public static float TilesFor(float cloudScale, float overcast) => cloudScale * Mathf.Lerp(1f, 0.5f, overcast) / Base;
+
+        /// <summary>The map's cover threshold for this share of the sky under cloud: lower is more cloud.</summary>
+        public static float CoverFor(float cloud) => Mathf.Lerp(0.57f, 0.27f, cloud);
 
         /// <summary>Share of the sun's light a cloud's shadow takes: deep under fair weather cumulus, faint in an overcast deck that has taken the sun already.</summary>
         public static float Strength(float overcast) => 0.85f * (1f - 0.9f * overcast);
