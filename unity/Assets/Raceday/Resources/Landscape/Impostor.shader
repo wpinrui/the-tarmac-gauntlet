@@ -12,6 +12,9 @@
 // (Landscape.TreeMaterials): first depth alone (the "TreeDepth" pass, a cheap alpha test and nothing else), then the
 // lit pass with depth writes off, so the depth test runs before the shader and only the tree in front is lit.
 //
+// Near the race camera the trees are real meshes (NearTree.shader); each impostor fades in over them by its share
+// (Foliage.hlsl), every pass alike, so its shadow hands over too, and it is not drawn at all where the mesh stands whole.
+//
 // Per vertex: position is the foot of the trunk in world space; uv0 the quad corner (-1 to 1);
 // uv1 the quad's half size, the height of the tree's middle above its foot, its turn about the
 // vertical in radians and its kind; uv2.x a height squash for hedge bushes; colour half the leaf tint.
@@ -35,6 +38,7 @@ Shader "Hidden/TarmacGauntlet/Impostor"
         #pragma target 3.5
         #pragma require 2darray
         #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+        #include "Foliage.hlsl"
 
         TEXTURE2D_ARRAY(_Atlas);
         SAMPLER(sampler_Atlas);
@@ -123,20 +127,36 @@ Shader "Hidden/TarmacGauntlet/Impostor"
         {
             float4 positionCS : SV_POSITION;
             float3 atlas : TEXCOORD0;
+            float share : TEXCOORD1;
         };
+
+        // The quad's half size, none where the near 3D tree stands whole.
+        float Radius(Attributes v, float share)
+        {
+            return share > 0 ? v.uv1.x : 0;
+        }
+
+        // Where the impostor is fading in, it keeps the pixels its 3D tree leaves.
+        void Fade(float share, float2 pixel)
+        {
+            if (share < 1) FoliageFade(-share, pixel);
+        }
 
         DepthVaryings DepthVert(Attributes v)
         {
             float3 centre = Centre(v);
-            Corner c = Place(v, centre, _WorldSpaceCameraPos - centre, v.uv1.x);
+            float share = ImpostorShare(centre);
+            Corner c = Place(v, centre, _WorldSpaceCameraPos - centre, Radius(v, share));
             DepthVaryings o;
             o.positionCS = TransformWorldToHClip(c.positionWS);
             o.atlas = c.atlas;
+            o.share = share;
             return o;
         }
 
         half4 DepthFrag(DepthVaryings i) : SV_Target
         {
+            Fade(i.share, i.positionCS.xy);
             clip(SAMPLE_TEXTURE2D_ARRAY(_Atlas, sampler_Atlas, i.atlas.xy, i.atlas.z).a - _Cutoff);
             return 0;
         }
@@ -176,12 +196,14 @@ Shader "Hidden/TarmacGauntlet/Impostor"
                 half3 tangentWS : TEXCOORD3;
                 half4 color : COLOR;
                 half fog : TEXCOORD4;
+                float share : TEXCOORD5;
             };
 
             Varyings vert(Attributes v)
             {
                 float3 centre = Centre(v);
-                Corner c = Place(v, centre, _WorldSpaceCameraPos - centre, v.uv1.x);
+                float share = ImpostorShare(centre);
+                Corner c = Place(v, centre, _WorldSpaceCameraPos - centre, Radius(v, share));
                 Varyings o;
                 o.positionCS = TransformWorldToHClip(c.positionWS);
                 o.positionWS = c.positionWS;
@@ -190,11 +212,13 @@ Shader "Hidden/TarmacGauntlet/Impostor"
                 o.atlas = c.atlas;
                 o.color = v.color;
                 o.fog = ComputeFogFactor(o.positionCS.z);
+                o.share = share;
                 return o;
             }
 
             half4 frag(Varyings i) : SV_Target
             {
+                Fade(i.share, i.positionCS.xy);
                 half4 c = SAMPLE_TEXTURE2D_ARRAY(_Atlas, sampler_Atlas, i.atlas.xy, i.atlas.z);
                 clip(c.a - _Cutoff);
                 // The baked normals are in the image's axes: x right, y up, z towards the viewer. Flipping
@@ -220,11 +244,7 @@ Shader "Hidden/TarmacGauntlet/Impostor"
             #pragma multi_compile_vertex _ _CASTING_PUNCTUAL_LIGHT_SHADOW
             #include "Assets/Rendering/Shaders/TarmacLit.hlsl"
 
-            struct Varyings
-            {
-                float4 positionCS : SV_POSITION;
-                float3 atlas : TEXCOORD0;
-            };
+            typedef DepthVaryings Varyings;
 
             Varyings vert(Attributes v)
             {
@@ -232,7 +252,8 @@ Shader "Hidden/TarmacGauntlet/Impostor"
                 // The quad turns square to the sun, so its shadow is the tree's outline seen from the sun.
                 // Only trees near the camera cast a shadow: far out the shadow map is too coarse for a
                 // leafy outline and it breaks up into blotches and streaks.
-                float radius = v.uv1.x;
+                float share = ImpostorShare(centre);
+                float radius = Radius(v, share);
                 float far = distance(_WorldSpaceCameraPos, centre);
                 if (far > _ShadowReach) radius = 0;
                 else radius *= saturate((_ShadowReach - far) / 30);
@@ -240,11 +261,13 @@ Shader "Hidden/TarmacGauntlet/Impostor"
                 Varyings o;
                 o.positionCS = ShadowClipPosition(c.positionWS, c.normalWS);
                 o.atlas = c.atlas;
+                o.share = share;
                 return o;
             }
 
             half4 frag(Varyings i) : SV_Target
             {
+                Fade(i.share, i.positionCS.xy);
                 // A smaller mip for the outline: one shadow-map texel covers many leaves, and the
                 // softer outline casts a solid crown shadow rather than speckle.
                 clip(SAMPLE_TEXTURE2D_ARRAY_LOD(_Atlas, sampler_Atlas, i.atlas.xy, i.atlas.z, 3).a - _Cutoff);

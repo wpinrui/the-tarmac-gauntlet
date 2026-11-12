@@ -170,6 +170,14 @@ public static class Check
             }
         File.WriteAllBytes(Path.Combine(dir, "fields.bin"), fields);
         File.WriteAllBytes(Path.Combine(dir, "map.bin"), Array.ConvertAll(plan.Map, u => (byte)u));
+        // How tall the grass grows, as Landscape.Fields makes it for the blades: 255 = 1 m.
+        var growth = new byte[plan.Map.Length];
+        for (int i = 0; i < plan.Map.Length; i++)
+        {
+            plan.Mowing(i, out float fromRoad, out float reach, out _, out _, out _);
+            growth[i] = (byte)Math.Clamp(MathF.Round(255f * LandscapeLooks.GrassHeight(plan.Map[i], fromRoad > reach)), 0f, 255f);
+        }
+        File.WriteAllBytes(Path.Combine(dir, "growth.bin"), growth);
         File.WriteAllBytes(Path.Combine(dir, "ringmap.bin"), Array.ConvertAll(h.Map, u => (byte)u));
         using (var w = new BinaryWriter(File.Create(Path.Combine(dir, "ring.bin"))))
         {

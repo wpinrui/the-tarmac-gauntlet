@@ -1,14 +1,18 @@
 // Renders the looks tools/landscape/check wrote, from a few broadcast-style cameras.
-// Usage: node preview.js <check --out folder> <atlas folder> <out folder> [look ...]
+// Usage: node preview.js <check --out folder> <atlas folder> <out folder> [look ...] [--foliage 0|1|2] [--shots file.json]
 const http = require('http'), fs = require('fs'), path = require('path');
 const { chromium } = require('playwright');
-const [planDir, atlasDir, outDir, ...looks] = process.argv.slice(2);
+const args = process.argv.slice(2);
+const opt = (name, fallback) => { const i = args.indexOf(name); if (i < 0) return fallback; const v = args[i + 1]; args.splice(i, 2); return v; };
+const foliage = +opt('--foliage', 0), shotsFile = opt('--shots', null);
+const [planDir, atlasDir, outDir, ...looks] = args;
 const here = __dirname, root = path.resolve(here, '../..');
 const circuitPath = path.join(root, 'unity/Assets/Raceday/Resources/Tracks/circuit.json');
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg' };
+const types = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.bytes': 'application/octet-stream' };
 const server = http.createServer((req, res) => {
   const url = decodeURIComponent(req.url.split('?')[0]);
   const file = url === '/circuit.json' ? circuitPath : url.startsWith('/plan/') ? path.join(planDir, url.slice(6))
+    : url.startsWith('/trees3d/') ? path.join(root, 'unity/Assets/Raceday/Resources/Landscape/Trees3D', url.slice(9))
     : url.startsWith('/atlas/') ? path.join(atlasDir, url.slice(7)) : path.join(here, url);
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404); res.end(); return; }
@@ -25,10 +29,10 @@ const server = http.createServer((req, res) => {
     await page.goto(`http://127.0.0.1:${port}/preview.html`);
     await page.waitForFunction(() => window.ready);
     await page.evaluate(([l]) => window.build(l, 17.5), [look]);
-    const shots = JSON.parse(fs.readFileSync(path.join(here, 'shots.json'), 'utf8'));
+    const shots = JSON.parse(fs.readFileSync(shotsFile || path.join(here, 'shots.json'), 'utf8'));
     for (const s of shots) {
-      const data = await page.evaluate(s => window.shoot(s.p, s.q, s.fov, 1600, 900), s);
-      fs.writeFileSync(path.join(outDir, `${look}_${s.name}.jpg`), Buffer.from(data.split(',')[1], 'base64'));
+      const data = await page.evaluate(([s, f]) => window.shoot(s.p, s.q, s.fov, 1600, 900, f), [s, foliage]);
+      fs.writeFileSync(path.join(outDir, `${look}_${s.name}${foliage ? '_foliage' + foliage : ''}.jpg`), Buffer.from(data.split(',')[1], 'base64'));
       console.log(look, s.name);
     }
     await page.close();

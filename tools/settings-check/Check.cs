@@ -75,8 +75,10 @@ internal static class Check
         return failed == 0 ? 0 : 1;
     }
 
-    /// <summary>A row's value that differs from its default: the other one for a toggle, a set count otherwise.</summary>
-    private static int Changed(GraphicsRow row) => row.IsToggle ? 1 - row.Options[0].Default : RealLights;
+    /// <summary>A row's value that differs from its default: the other one for a toggle, a set count otherwise, or the
+    /// most a short count takes.</summary>
+    private static int Changed(GraphicsRow row) =>
+        row.IsToggle ? 1 - row.Options[0].Default : Math.Min(row.Most, RealLights);
 
     /// <summary>What a launch does before the first scene: the screen opens at its defaults and every boot hook runs.</summary>
     private static void Launch()
