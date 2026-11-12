@@ -94,6 +94,8 @@ namespace TarmacGauntlet.Raceday
             }
         }
 
+        private void OnDestroy() => HeatHazeFeature.HeadlampBeams = false;
+
         private Light Spot(string name, Color colour)
         {
             var go = new GameObject(name);
