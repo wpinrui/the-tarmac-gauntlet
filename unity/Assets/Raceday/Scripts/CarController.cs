@@ -22,7 +22,7 @@ namespace TarmacGauntlet.Raceday
         public KeyboardState Keys;
         public Circuit Circuit;
 
-        /// <summary>When false (free camera), the driving keys are ignored.</summary>
+        /// <summary>When false, the driving keys are ignored.</summary>
         public bool InputEnabled = true;
 
         /// <summary>Share of the normal drag, below 1 in another car's slipstream.</summary>

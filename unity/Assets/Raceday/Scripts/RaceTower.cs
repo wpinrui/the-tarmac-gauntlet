@@ -33,7 +33,7 @@ namespace TarmacGauntlet.Raceday
         public string[] Teams;
         public CarClass[] Classes;
         public Color[] Colours;
-        /// <summary>Index of the player's car in <see cref="Cars"/>.</summary>
+        /// <summary>Index in <see cref="Cars"/> of the car the tower is seen from: the car the cameras ride with.</summary>
         public int Player = -1;
         /// <summary>Length of the lap, m.</summary>
         public float Lap;
@@ -62,6 +62,8 @@ namespace TarmacGauntlet.Raceday
         private static readonly Color HeaderText = new Color(1f, 1f, 1f, 0.6f);
 
         private readonly List<Standings.Car> order = new List<Standings.Car>();
+        /// <summary>The cars in race order, leader first, as of this frame. Each one's Id indexes <see cref="Cars"/>.</summary>
+        public IReadOnlyList<Standings.Car> Order => order;
         private readonly List<Standings.Row> rows = new List<Standings.Row>();
         private readonly Dictionary<int, string> laps = new Dictionary<int, string>();
         private readonly Dictionary<string, string> fitted = new Dictionary<string, string>();
@@ -103,6 +105,7 @@ namespace TarmacGauntlet.Raceday
             {
                 if (Cars[i] == null) continue;
                 entries[i].Distance = Cars[i].Traffic.Distance;
+                entries[i].Player = i == Player;
                 order.Add(entries[i]);
             }
             Standings.Rank(order, Lap);
