@@ -17,7 +17,7 @@ namespace TarmacGauntlet.Simulation
         {
             // CLASS F: 20 teams
             new AiTeamEntry { Name = "Chennai Speed Co.", Descriptor = "three mates and a trailer", Nationality = "in", ModelId = "f-03", CarClass = CarClass.F },
-            new AiTeamEntry { Name = "Shed Speed Co.", Descriptor = "built in an actual garden shed", Nationality = "jp", ModelId = "f-02", CarClass = CarClass.F },
+            new AiTeamEntry { Name = "Shed Monozukuri Co.", Descriptor = "built in an actual garden shed", Nationality = "jp", ModelId = "f-02", CarClass = CarClass.F },
             new AiTeamEntry { Name = "Clutch & Pray", Descriptor = "optimistic underdogs", Nationality = "au", ModelId = "f-03", CarClass = CarClass.F },
             new AiTeamEntry { Name = "Spare Parts Racing", Descriptor = "the car is mostly replacement bits", Nationality = "in", ModelId = "f-04", CarClass = CarClass.F },
             new AiTeamEntry { Name = "Gravel Trap Racing", Descriptor = "frequent visitors to the run-off area", Nationality = "th", ModelId = "f-05", CarClass = CarClass.F },
