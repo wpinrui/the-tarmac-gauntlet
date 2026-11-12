@@ -330,12 +330,11 @@ namespace TarmacGauntlet.Raceday
             bool losing = speed > SpinSpeed && (slip > SpinSlip || Mathf.Abs(yawRate) > SpinYawRate);
             SinceLostControl = losing ? 0f : SinceLostControl + dt;
             bool spun = SinceLostControl < LostControlMemory && Mathf.Abs(Heading) > SpunAngle;
-            // T17 (Ivan): a gap in the traffic is wishful thinking. Under E1 and E2 a car rejoins at its safe
+            // T17 (Ivan): a gap in the traffic is wishful thinking. A car rejoins at its safe
             // angle whenever it is ready, and the cars on the line avoid it as a ghost (H12).
-            bool waits = !Experiments.Is(1) && !Experiments.Is(2);
-            GapClear = !waits || Clear(me, field, circuit.Lap);
+            GapClear = true;
             Coming = CarComing(me, field, circuit.Lap, half);
-            bool yielding = Yielding = waits && State == Stage.Rejoining && PastEdge > YieldFrom && PastEdge < NearEdge && !RoomToJoin(me, field, circuit.Lap, speed, half);
+            bool yielding = Yielding = false;
 
             switch (State)
             {
@@ -427,7 +426,6 @@ namespace TarmacGauntlet.Raceday
             Vector3 lt = line.Tangent[k];
             float lineAngle = Mathf.Atan2(Vector3.Dot(lt, circuit.Left[k]), Vector3.Dot(lt, circuit.Forward[k]));
             float fromLine = lateral - line.Lateral[k];
-            if (Experiments.Is(1))
             {
                 // H12: it heads for the alternative line, clear of the racing line on its own side, and keeps
                 // to it until back up to speed (Ivan). Where the line runs by that edge, it keeps to the edge.
@@ -458,7 +456,7 @@ namespace TarmacGauntlet.Raceday
             // alongside, so after a few seconds beside the track it stops waiting for them (Ivan: rejoin whenever ready).
             bool beside = PastEdge > 0f && Alongside(me, field, circuit.Lap, half);
             besideFor = beside ? besideFor + stepDt : 0f;
-            if (yielding || beside && !(Experiments.Is(1) && Ghost && besideFor > BesideWait)) want = 0f;
+            if (yielding || beside && !(Ghost && besideFor > BesideWait)) want = 0f;
             // Waiting for room, it closes in on the edge, still off the tarmac, so it has less grass to cross once there is room.
             if (yielding && PastEdge > YieldFrom + WaitBy)
                 want = -(lateral >= 0f ? 1f : -1f) * AimAngle * Mathf.Deg2Rad * Mathf.Clamp01((PastEdge - YieldFrom - WaitBy) / WaitBy);
@@ -538,7 +536,7 @@ namespace TarmacGauntlet.Raceday
                 if (Mathf.Abs(slide) > SlideLimit * Mathf.Deg2Rad) left = 0f;
                 c.Brake = Mathf.Min(c.Brake, left * RunoffBraking * grip / (spec.BrakeDecel * 9.81f));
                 // Getting straight back on without waiting, it floors it as far as the runoff's grip allows (Ivan).
-                c.Throttle *= Mathf.Max(left, 0.15f) * (Experiments.Is(1) || Experiments.Is(2) ? 1f : RunoffThrottle);
+                c.Throttle *= Mathf.Max(left, 0.15f) * 1f;
             }
             else
             {
