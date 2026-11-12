@@ -31,6 +31,8 @@ SCENE = json.load(open(sys.argv[1]))
 # Cycles units against Unity's: a white surface shows a Unity light's intensity where Cycles needs pi times that for a
 # sun and 4 pi squared for a point (checked by baking one plane under each).
 SUN_SCALE = math.pi
+# HqLightingView's flat ambient sky colour, the fill the live room is lit by.
+FLAT_SKY = [0.62, 0.65, 0.68]
 POINT_SCALE = 4 * math.pi ** 2
 
 
@@ -275,14 +277,29 @@ def bake_lightmap(sc, lit, glows, lamps, sun, points):
     for p in points: p.energy, p["e"] = 0, p.energy
     glow_strength(glows, 0)
     bounce = run(False)
-    # Then the lamps and the windows' daylight, whole.
+    # Then the lamps, whole.
     sun.energy = 0
     for p in points: p.energy = p["e"]
+    lamp = run(True)
+    # Then the daylight through the windows, whole.
+    for p in points: p.energy = 0
     glow_strength(glows, 1)
-    rest = run(True)
+    day = run(True)
     sun.energy = keep
+    for p in points: p.energy = p["e"]
     for ob in lit: ob.select_set(False)
-    return bounce + rest
+
+    # The live room is filled by a flat ambient light. The daylight takes its place, so it is scaled to leave the
+    # floor as bright on average as the flat fill and the live lamps leave it.
+    floor = next(np.array(p["uv2"]).reshape(-1, 2) for p in SCENE["parts"] if p["key"] == "floor")
+    (u0, v0), (u1, v1) = floor.min(0), floor.max(0)
+    area = (slice(int(v0 * H) + 1, int(v1 * H) - 1), slice(int(u0 * W) + 1, int(u1 * W) - 1))
+    fill = to_linear(FLAT_SKY).mean()
+    daylight = (fill + lamp[area].mean() - (bounce + lamp)[area].mean()) / max(day[area].mean(), 1e-6)
+    daylight = max(daylight, 1.0)
+    print(f"daylight x{daylight:.2f}")
+    glow_strength(glows, daylight)
+    return bounce + lamp + day * daylight
 
 
 def render_probe(sc, probe, lamps):
