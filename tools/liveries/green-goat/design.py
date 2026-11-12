@@ -82,14 +82,9 @@ def drips(line, z0, z1, rng, longest, skip=(), short=()):
                 body = [(cz + w / 2, y + 0.01), (cz + w / 2, y - n)]
                 body += [(cz + w / 2 * math.cos(math.pi * k / 10), y - n - w / 2 * math.sin(math.pi * k / 10)) for k in range(11)]
                 body += [(cz - w / 2, y - n), (cz - w / 2, y + 0.01)]
-                # Concave fillets where the drip leaves the pour, as a liquid's meniscus.
+                # A little neck where the drip leaves the pour.
                 polys.append(body)
-                f = min(w * 0.45, n * 0.6)
-                for s in (1, -1):
-                    c = cz + s * w / 2
-                    arc = [(c + s * f + s * f * math.cos(math.radians(a)), y - f + f * math.sin(math.radians(a)))
-                           for a in range(90, 181, 10)]
-                    polys.append([(c, y + 0.005), (c + s * f, y + 0.005), *arc])
+                polys.append([(cz + w * 0.85, y + 0.005), (cz, y - min(n, 0.06)), (cz - w * 0.85, y + 0.005)])
                 if n > 0.12 and rng.random() < 0.3:
                     polys.append(disc(cz, y - n - w * 1.2, w * 0.3, 12))
         z -= w + rng.uniform(0.03, 0.2)
@@ -314,9 +309,10 @@ def milk_riot(views):
     two thirds of the car. The nose and tail are all Overload."""
     lv = Livery(views, K)
     halftone(lv, G)
-    milk_sides(lv, door_cap=0.04, span=(RIOT_SPAN[0] - 0.2, RIOT_SPAN[1] + 0.2), ramp=0.45)
+    milk_sides(lv, door_cap=0.04)
     slashes(lv)
-    milk_top(lv, PK, span=RIOT_SPAN, bonnet=RIOT_BONNET[0])
+    milk_top(lv, PK)
+    milk_ends(lv)
     cartoon_number(lv)
     stickers(lv)
     logos_top(lv, "team", "overstim", 0.09, bolts=True, bonnet=RIOT_BONNET)
