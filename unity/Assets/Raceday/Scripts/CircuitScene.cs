@@ -142,6 +142,9 @@ namespace TarmacGauntlet.Raceday
             Lap("pit complex");
             yield return null;
             TimeOfDay sky = new GameObject("Sky").AddComponent<TimeOfDay>();
+            float ground = 0f;
+            foreach (Vector3 c in circuit.Centre) ground += c.y;
+            sky.Ground = circuit.Centre.Length > 0 ? ground / circuit.Centre.Length : 0f;
             PitComplexView view = buildings.AddComponent<PitComplexView>();
             view.Sky = sky;
             view.Materials = pitMaterials;

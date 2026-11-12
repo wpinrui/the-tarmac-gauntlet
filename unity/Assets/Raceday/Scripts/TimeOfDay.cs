@@ -14,7 +14,9 @@ namespace TarmacGauntlet.Raceday
     /// faster when the race runs faster and the wind blows. The weather (<see cref="WeatherSky"/>)
     /// spreads cloud over the sky, greys it and takes the sun's light and shadows. A sky-only
     /// reflection probe is redrawn as the sky changes, so shiny paint and a wet track reflect the sky
-    /// they are under. The Sky detail graphics option picks the sky shader's fuller path.
+    /// they are under. The Sky detail graphics option picks the sky shader's fuller path. The clouds' shadows drift over the
+    /// ground with them (<see cref="CloudShadows"/>), and the sky is published for the volumetric clouds, the mist and the
+    /// sun's rays (<see cref="Atmosphere"/>). The colour grade follows the sun breaking through onto the camera's spot.
     /// </summary>
     public sealed class TimeOfDay : MonoBehaviour
     {
@@ -25,6 +27,8 @@ namespace TarmacGauntlet.Raceday
         [NonSerialized] public Func<float> RaceSeconds;
         /// <summary>The weather now; the clear sky of the dry race until it is set.</summary>
         [NonSerialized] public Func<WeatherState> Weather;
+        /// <summary>Height of the circuit's ground, m: the mist lies on it.</summary>
+        [NonSerialized] public float Ground;
 
         /// <summary>Cloud drift, texture tiles a second, for the big and the small cloud layers.</summary>
         private static readonly Vector4 Wind = new Vector4(0.0035f, 0.0012f, 0.0052f, 0.0021f);
@@ -38,12 +42,27 @@ namespace TarmacGauntlet.Raceday
         /// them, the reflection too, so a wet track reflecting the glowing night sky would shine white.
         /// </summary>
         private const float NightShine = 0.2f;
+        /// <summary>
+        /// The low mist's density at the ground, per m: a trace on a clear afternoon, thick in the morning mist and the rain,
+        /// and a little damp at night for the floodlights' beams. And how fast it thins with height, m.
+        /// </summary>
+        private const float MistClear = 0.0004f, MistMorning = 0.003f, MistRain = 0.0025f, MistNight = 0.0008f, MistHeight = 40f, MistRises = 60f;
+        /// <summary>Real seconds the colour grade takes to follow the sun in and out of a cloud's shadow.</summary>
+        private const float ShadeEase = 0.8f;
 
         private Light lamp;
         private Material sky;
         private ReflectionProbe probe;
         private Vector4 clouds;
         private float reflected = float.NaN, reflectedCloud;
+        private const int CloudSize = 256;
+        private float[] bigCloud, smallCloud;
+        private Texture2D cloudNoise;
+        private CloudShadows cloudShadows;
+        /// <summary>How far the wind has carried the clouds, m, east and north, wrapped at the volumetric noise's period.</summary>
+        private Vector2 drift;
+        /// <summary>How deep in a cloud's shadow the camera's spot is, eased (<see cref="ShadeEase"/>); NaN until the first frame.</summary>
+        private float shade = float.NaN;
 
         private static readonly int ZenithId = Shader.PropertyToID("_Zenith"), HorizonId = Shader.PropertyToID("_Horizon"),
             GlowId = Shader.PropertyToID("_Glow"), GroundId = Shader.PropertyToID("_Ground"), SunColorId = Shader.PropertyToID("_SunColor"), HazeId = Shader.PropertyToID("_Haze"),
@@ -76,7 +95,8 @@ namespace TarmacGauntlet.Raceday
             RenderSettings.sun = lamp;
 
             sky = new Material(Resources.Load<Shader>("Sky/Sky")) { name = "Sky" };
-            sky.SetTexture("_CloudTex", CloudNoise());
+            cloudNoise = CloudTexture();
+            sky.SetTexture("_CloudTex", cloudNoise);
             sky.SetFloat(CloudScaleId, CloudScale);
             ShowDetail(GraphicsOptions.SkyDetail);
             GraphicsOptions.SkyDetail.Changed += ShowDetail;
@@ -96,12 +116,16 @@ namespace TarmacGauntlet.Raceday
             probe.resolution = 64;
             probe.hdr = false;
             probe.size = new Vector3(40000f, 8000f, 40000f);
+            cloudShadows = new CloudShadows(lamp);
+            if (GraphicsOptions.VolumetricClouds.On) CloudNoise.Prepare();
             Apply();
         }
 
         private void OnDestroy()
         {
             GraphicsOptions.SkyDetail.Changed -= ShowDetail;
+            Atmosphere.Clear();
+            cloudShadows?.Dispose();
         }
 
         /// <summary>Switches the sky shader's detailed path, and redraws the reflections with it.</summary>
@@ -114,8 +138,14 @@ namespace TarmacGauntlet.Raceday
 
         private void Update()
         {
-            clouds += Wind * (Time.deltaTime * (Weather != null ? Weather().Wind : 1f));
+            float o = Weather != null ? WeatherSky.Overcast(Weather().Cloud) : 0f;
+            Vector4 blown = Wind * (Time.deltaTime * (Weather != null ? Weather().Wind : 1f));
+            clouds += blown;
             for (int k = 0; k < 4; k++) clouds[k] = Mathf.Repeat(clouds[k], 1f);
+            // The map's clouds move the other way to its offset; the volumetric noise follows them.
+            float tiles = CloudMap.TilesFor(CloudScale, o);
+            drift.x = Mathf.Repeat(drift.x + blown.x / tiles, Atmosphere.NoisePeriod);
+            drift.y = Mathf.Repeat(drift.y + blown.y / tiles, Atmosphere.NoisePeriod);
             Apply();
         }
 
@@ -123,7 +153,7 @@ namespace TarmacGauntlet.Raceday
         {
             float hour = Hour;
             SkyState s = SkyClock.At(hour, SkyClock.Look);
-            float cover = SkyClock.Look.Cover, overcast = 0f, haze = s.Haze, shadows = 1f, cloud = 0f, rain = 0f;
+            float cover = SkyClock.Look.Cover, overcast = 0f, haze = s.Haze, shadows = 1f, cloud = 0f, rain = 0f, share = 0.3f;
             if (Weather != null)
             {
                 WeatherState w = Weather();
@@ -140,11 +170,26 @@ namespace TarmacGauntlet.Raceday
                 shadows = Mathf.Lerp(0.15f, 1f, WeatherSky.Direct(w));
                 rain = WeatherSky.Heavy(w.Rain);
                 cloud = w.Cloud + rain;
+                share = w.Cloud;
             }
+            var map = new CloudMap
+            {
+                Big = bigCloud,
+                Small = smallCloud,
+                Size = CloudSize,
+                Tiles = CloudMap.TilesFor(CloudScale, overcast),
+                Cover = CloudMap.CoverFor(share),
+                Overcast = overcast,
+                Offset = clouds,
+            };
+            Camera eye = Camera.main;
+            Vector3 spot = eye != null ? eye.transform.position : Vector3.zero;
+            float shadeNow = map.Shading(spot, s.LightDir) * Mathf.Clamp01(CloudMap.Strength(overcast) / 0.85f);
+            shade = float.IsNaN(shade) ? shadeNow : Mathf.Lerp(shade, shadeNow, 1f - Mathf.Exp(-Time.unscaledDeltaTime / ShadeEase));
             // The first sky with its weather sets the lights outright; after that they ease towards it.
             Lights = lightsSet ? Mathf.MoveTowards(Lights, s.Lights, LightsRate * Time.unscaledDeltaTime) : s.Lights;
             lightsSet |= Weather != null;
-            PostEffects.Current?.Set(SkyGrade.For(s, overcast, rain));
+            PostEffects.Current?.Set(SkyGrade.For(s, overcast, rain, shade, SkyGrade.Patchy(share, overcast)));
             lamp.shadowStrength = shadows;
             lamp.transform.rotation = Quaternion.LookRotation(-s.LightDir);
             lamp.color = s.LightColour;
@@ -172,6 +217,28 @@ namespace TarmacGauntlet.Raceday
             sky.SetFloat(OvercastId, overcast);
             sky.SetFloat(NightId, s.Night);
 
+            float misty = SkyClock.Misty(hour);
+            Atmosphere.Publish(new Atmosphere.Sky
+            {
+                SunDir = s.LightDir,
+                Sun = lamp.enabled ? s.LightColour * s.LightIntensity : Color.black,
+                CloudLit = s.CloudLit,
+                CloudShade = s.CloudShade,
+                Haze = s.Fog,
+                HazeDensity = RenderSettings.fogDensity,
+                CloudTex = cloudNoise,
+                CloudTiles = map.Tiles,
+                Cover = map.Cover,
+                Overcast = overcast,
+                ShadowStrength = CloudMap.Strength(overcast),
+                CloudOffset = clouds,
+                Drift = drift,
+                MistDensity = MistClear + MistMorning * misty + MistRain * rain + MistNight * Lights,
+                MistHeight = MistHeight + MistRises * misty,
+                Ground = Ground,
+            });
+            cloudShadows?.Draw(spot);
+
             probe.intensity = Mathf.Lerp(1f, NightShine, Lights);
             if (float.IsNaN(reflected) || Mathf.Abs(hour - reflected) >= ReflectionStep || Mathf.Abs(cloud - reflectedCloud) >= ReflectionCloud)
             {
@@ -185,12 +252,12 @@ namespace TarmacGauntlet.Raceday
         /// Tileable cloud noise: red is big soft masses, green finer detail. Each is a few octaves of
         /// value noise on a lattice that wraps, so the texture repeats without a seam.
         /// </summary>
-        private static Texture2D CloudNoise()
+        private Texture2D CloudTexture()
         {
-            const int size = 256;
+            const int size = CloudSize;
             var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { name = "Cloud noise", wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear };
             var px = new Color32[size * size];
-            float[] big = CloudField.Fbm(size, 4, 5, 11), small = CloudField.Fbm(size, 8, 4, 29);
+            float[] big = bigCloud = CloudField.Fbm(size, 4, 5, 11), small = smallCloud = CloudField.Fbm(size, 8, 4, 29);
             for (int i = 0; i < px.Length; i++)
                 px[i] = new Color32((byte)(big[i] * 255f), (byte)(small[i] * 255f), 0, 255);
             tex.SetPixels32(px);

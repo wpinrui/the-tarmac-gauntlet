@@ -1,5 +1,31 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!114 &6774565599225298650
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 048b01a89210493db29c593d3f94ac93, type: 3}
+  m_Name: VolumetricsFeature
+  m_EditorClassIdentifier: 
+  m_Active: 1
+--- !u!114 &3712934621380412868
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 56389409180e4335b017dab313d72562, type: 3}
+  m_Name: SunRaysFeature
+  m_EditorClassIdentifier: 
+  m_Active: 1
 --- !u!114 &4026915160695484962
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -100,7 +126,9 @@ MonoBehaviour:
   - {fileID: 2524744889942554477}
   - {fileID: 4026915160695484962}
   - {fileID: 6956496455370857739}
-  m_RendererFeatureMap: 256cfffae55a3375f589927b47fdb16b6d3782c919b2092322b2e3cd007ae2370bdda447ab708a60
+  - {fileID: 6774565599225298650}
+  - {fileID: 3712934621380412868}
+  m_RendererFeatureMap: 256cfffae55a3375f589927b47fdb16b6d3782c919b2092322b2e3cd007ae2370bdda447ab708a60dabe67f18417045ec405a1bd5dfe8633
   m_UseNativeRenderPass: 0
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   xrSystemData: {fileID: 11400000, guid: 60e1133243b97e347b653163a8c01b64, type: 2}
