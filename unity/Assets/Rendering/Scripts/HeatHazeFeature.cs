@@ -8,11 +8,11 @@ using UnityEngine.Rendering.Universal;
 namespace TarmacGauntlet.Rendering
 {
     /// <summary>
-    /// The race's heat haze. On a hot, sunny day (<see cref="Shimmer"/>) the air over far tarmac shimmers: once the scene and
-    /// its smoke are drawn and before the post effects, the frame is copied and redrawn with a rising wobble, strongest
-    /// where the view runs low along the ground into the distance. The cars' exhaust haze is drawn by its own particles,
-    /// which bend the scene behind them: while <see cref="ExhaustHaze"/> is set this asks for the copy of the scene they
-    /// read. Each follows its graphics option, and draws nothing at all with it off.
+    /// The race's heat haze. On a hot, sunny day (<see cref="Shimmer"/>) the air over far tarmac shimmers: once the post
+    /// effects and the temporal upscaler are done, the frame is copied and redrawn with a rising wobble, strongest where the
+    /// view runs low along the ground into the distance. Coming after the upscaler, the wobble is never smeared into its
+    /// history. The cars' exhaust haze is drawn by its own particles, which bend the scene behind them: while
+    /// <see cref="ExhaustHaze"/> is set this asks for the copy of the scene they read. Each follows its graphics option, and draws nothing at all with it off.
     /// </summary>
     public sealed class HeatHazeFeature : ScriptableRendererFeature
     {
@@ -32,7 +32,7 @@ namespace TarmacGauntlet.Rendering
 
         public override void Create()
         {
-            shimmer = new ShimmerPass { renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing };
+            shimmer = new ShimmerPass { renderPassEvent = RenderPassEvent.AfterRenderingPostProcessing };
             inputs = new InputPass { renderPassEvent = RenderPassEvent.BeforeRenderingTransparents };
         }
 
@@ -83,7 +83,8 @@ namespace TarmacGauntlet.Rendering
             /// <summary>How far the shimmer moves the scene at its strongest, pixels on a screen 1080 high.</summary>
             private const float Reach = 2.2f;
             private static readonly int StrengthId = Shader.PropertyToID("_ShimmerStrength"),
-                ParamsId = Shader.PropertyToID("_ShimmerParams"), DepthId = Shader.PropertyToID("_ShimmerDepth");
+                ParamsId = Shader.PropertyToID("_ShimmerParams"), DepthId = Shader.PropertyToID("_ShimmerDepth"),
+                InvViewProjId = Shader.PropertyToID("_ShimmerInvViewProj");
 
             public Material Material;
             public float Strength;
@@ -116,6 +117,10 @@ namespace TarmacGauntlet.Rendering
 
                 Material.SetFloat(StrengthId, Strength);
                 Material.SetVector(ParamsId, new Vector4(Near, Far, Reach, 0f));
+                // The camera's own, as the post effects may leave other matrices set.
+                var cameraData = frameData.Get<UniversalCameraData>();
+                Matrix4x4 viewProj = GL.GetGPUProjectionMatrix(cameraData.GetProjectionMatrix(), true) * cameraData.GetViewMatrix();
+                Material.SetMatrix(InvViewProjId, viewProj.inverse);
                 using (IRasterRenderGraphBuilder builder = renderGraph.AddRasterRenderPass("Tarmac shimmer", out PassData data, profilingSampler))
                 {
                     data.Source = copy;

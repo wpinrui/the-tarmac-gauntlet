@@ -4,6 +4,8 @@
 // hair, each coloured from the crowd palette and a little darker at its edges so it reads as rounded. Now and then a fan
 // throws their arms up and bounces for a few seconds. Lit by the sun with its shadows and the ambient light, fogged, and
 // glowing at night under the roofs' floodlights (_Glow). Two triangles a fan, so a full stand costs next to nothing.
+// The fans move with no transform of their own, so the stand always draws its motion vectors: each corner where it is
+// now against where it was last frame, turned to where the camera was then (CameraCuts, _TgPrevCameraPos).
 //
 // Per vertex: position is the card's corner as built, facing the track; normal the way to the track; uv0 packs the
 // corner and the fan's look (CrowdCard).
@@ -16,7 +18,7 @@ Shader "Hidden/TarmacGauntlet/Crowd"
     }
     SubShader
     {
-        Tags { "Queue" = "AlphaTest" "RenderType" = "TransparentCutout" "DisableBatching" = "True" "IgnoreProjector" = "True" "RenderPipeline" = "UniversalPipeline" }
+        Tags { "Queue" = "AlphaTest" "RenderType" = "TransparentCutout" "DisableBatching" = "True" "IgnoreProjector" = "True" "RenderPipeline" = "UniversalPipeline" "AlwaysRenderMotionVectors" = "true" }
         Cull Off
 
         HLSLINCLUDE
@@ -64,7 +66,8 @@ Shader "Hidden/TarmacGauntlet/Crowd"
             return frac(sin(dot(p, float2(12.9898, 78.233))) * 43758.5453);
         }
 
-        Card Unpack(Attributes v)
+        // The card at a time, s, turned to a camera at eye.
+        Card UnpackAt(Attributes v, float time, float3 eye)
         {
             float kx = floor(v.uv.x * 0.5 + 0.01), ky = floor(v.uv.y * 0.5 + 0.01);
             float cx = v.uv.x - 2.0 * kx, cy = v.uv.y - 2.0 * ky;
@@ -81,20 +84,20 @@ Shader "Hidden/TarmacGauntlet/Crowd"
 
             // Now and then, for a few seconds at a time, a fan throws their arms up and bounces.
             float phase = Hash(foot.xz);
-            float t = _Time.y / 4.0 + phase * 7.0;
+            float t = time / 4.0 + phase * 7.0;
             float epoch = floor(t);
             float cheer = step(0.9, Hash(foot.xz + epoch));
             float within = t - epoch;
             float raise = cheer * smoothstep(0.0, 0.08, within) * (1.0 - smoothstep(0.85, 1.0, within));
-            foot.y += raise * 0.04 * abs(sin((_Time.y + phase * 3.0) * 7.0));
+            foot.y += raise * 0.04 * abs(sin((time + phase * 3.0) * 7.0));
 
             // Turn towards the camera about the vertical, and lean back for a camera above.
-            float3 eye = _WorldSpaceCameraPos - foot;
-            float turn = clamp(atan2(dot(eye, right), dot(eye, n)), -MOST_TURN, MOST_TURN);
+            float3 toEye = eye - foot;
+            float turn = clamp(atan2(dot(toEye, right), dot(toEye, n)), -MOST_TURN, MOST_TURN);
             float3 f = n * cos(turn) + right * sin(turn);
             float3 r = cross(up, f);
-            float across = length(eye.xz);
-            float lean = clamp(atan2(eye.y - SEAT, max(across, 0.1)), 0.0, MOST_LEAN * 2.0) * 0.5;
+            float across = length(toEye.xz);
+            float lean = clamp(atan2(toEye.y - SEAT, max(across, 0.1)), 0.0, MOST_LEAN * 2.0) * 0.5;
             float3 u = up * cos(lean) - f * sin(lean);
 
             Card c;
@@ -105,6 +108,11 @@ Shader "Hidden/TarmacGauntlet/Crowd"
             c.tall = 0.56 + 0.1 * (height + 0.5) / HEIGHTS;
             c.raise = raise;
             return c;
+        }
+
+        Card Unpack(Attributes v)
+        {
+            return UnpackAt(v, _Time.y, _WorldSpaceCameraPos);
         }
 
         float3 Paint(float row, float column)
@@ -264,6 +272,53 @@ Shader "Hidden/TarmacGauntlet/Crowd"
                 float part, inside;
                 Clip(c, i.local, part, inside);
                 return 0;
+            }
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "MotionVectors"
+            Tags { "LightMode" = "MotionVectors" }
+            ColorMask RG
+
+            HLSLPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/MotionVectorsCommon.hlsl"
+
+            float4 _TgPrevCameraPos;
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float2 local : TEXCOORD0;
+                nointerpolation float2 shape : TEXCOORD1;
+                float4 nowCS : TEXCOORD2;
+                float4 beforeCS : TEXCOORD3;
+            };
+
+            Varyings vert(Attributes v)
+            {
+                Card c = Unpack(v);
+                Card b = UnpackAt(v, _Time.y - unity_DeltaTime.x, _TgPrevCameraPos.xyz);
+                Varyings o;
+                o.positionCS = TransformWorldToHClip(c.positionWS);
+                o.local = c.local;
+                o.shape = float2(c.tall, c.raise);
+                o.nowCS = mul(_NonJitteredViewProjMatrix, float4(c.positionWS, 1));
+                o.beforeCS = mul(_PrevViewProjMatrix, float4(b.positionWS, 1));
+                return o;
+            }
+
+            float4 frag(Varyings i) : SV_Target
+            {
+                Card c = (Card)0;
+                c.tall = i.shape.x;
+                c.raise = i.shape.y;
+                float part, inside;
+                Clip(c, i.local, part, inside);
+                return float4(CalcNdcMotionVectorFromCsPositions(i.nowCS, i.beforeCS), 0, 0);
             }
             ENDHLSL
         }
