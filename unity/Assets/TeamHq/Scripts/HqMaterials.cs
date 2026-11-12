@@ -13,6 +13,7 @@ namespace TarmacGauntlet.TeamHq
         public static Material For(string key)
         {
             if (key.StartsWith("photo")) return Photo(key);
+            if (key.StartsWith(HqGeometry.WearKey)) return Wear(key);
             switch (key)
             {
                 // Photo textures from Poly Haven (CC0), recoloured by tools/team-hq/props/make_textures.py.
@@ -61,6 +62,14 @@ namespace TarmacGauntlet.TeamHq
             if (nrm != null) Lit.NormalMap(m, nrm);
             var mask = Resources.Load<Texture2D>("Textures/" + key + "_s");
             if (mask != null) Lit.MetallicSmoothnessMap(m, mask);
+            return m;
+        }
+
+        /// <summary>Wear multiplied over the surface under it (Resources/Wear, drawn by tools/team-hq/props/make_wear.py).</summary>
+        private static Material Wear(string key)
+        {
+            var m = new Material(Resources.Load<Shader>("Wear/Grime")) { name = key, enableInstancing = true };
+            m.mainTexture = Resources.Load<Texture2D>("Wear/" + key.Substring(HqGeometry.WearKey.Length));
             return m;
         }
 

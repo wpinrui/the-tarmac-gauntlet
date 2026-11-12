@@ -1,5 +1,6 @@
 using System;
 using TarmacGauntlet.Rendering;
+using TarmacGauntlet.Visuals;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -12,7 +13,7 @@ namespace TarmacGauntlet.Raceday
     /// faster when the race runs faster and the wind blows. The weather (<see cref="WeatherSky"/>)
     /// spreads cloud over the sky, greys it and takes the sun's light and shadows. A sky-only
     /// reflection probe is redrawn as the sky changes, so shiny paint and a wet track reflect the sky
-    /// they are under.
+    /// they are under. The Sky detail graphics option picks the sky shader's fuller path.
     /// </summary>
     public sealed class TimeOfDay : MonoBehaviour
     {
@@ -44,7 +45,7 @@ namespace TarmacGauntlet.Raceday
         private float reflected = float.NaN, reflectedCloud;
 
         private static readonly int ZenithId = Shader.PropertyToID("_Zenith"), HorizonId = Shader.PropertyToID("_Horizon"),
-            GlowId = Shader.PropertyToID("_Glow"), GroundId = Shader.PropertyToID("_Ground"), SunColorId = Shader.PropertyToID("_SunColor"),
+            GlowId = Shader.PropertyToID("_Glow"), GroundId = Shader.PropertyToID("_Ground"), SunColorId = Shader.PropertyToID("_SunColor"), HazeId = Shader.PropertyToID("_Haze"),
             CloudLitId = Shader.PropertyToID("_CloudLit"), CloudShadeId = Shader.PropertyToID("_CloudShade"),
             SunDirId = Shader.PropertyToID("_SunDir"), MoonDirId = Shader.PropertyToID("_MoonDir"),
             CloudOffsetId = Shader.PropertyToID("_CloudOffset"), CoverId = Shader.PropertyToID("_Cover"), OvercastId = Shader.PropertyToID("_Overcast"),
@@ -63,6 +64,8 @@ namespace TarmacGauntlet.Raceday
             sky = new Material(Resources.Load<Shader>("Sky/Sky")) { name = "Sky" };
             sky.SetTexture("_CloudTex", CloudNoise());
             sky.SetFloat(CloudScaleId, CloudScale);
+            ShowDetail(GraphicsOptions.SkyDetail);
+            GraphicsOptions.SkyDetail.Changed += ShowDetail;
             RenderSettings.skybox = sky;
             RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.fog = true;
@@ -80,6 +83,19 @@ namespace TarmacGauntlet.Raceday
             probe.hdr = false;
             probe.size = new Vector3(40000f, 8000f, 40000f);
             Apply();
+        }
+
+        private void OnDestroy()
+        {
+            GraphicsOptions.SkyDetail.Changed -= ShowDetail;
+        }
+
+        /// <summary>Switches the sky shader's detailed path, and redraws the reflections with it.</summary>
+        private void ShowDetail(GraphicsOption option)
+        {
+            if (option.On) sky.EnableKeyword("_SKY_DETAIL");
+            else sky.DisableKeyword("_SKY_DETAIL");
+            reflected = float.NaN;
         }
 
         private void Update()
@@ -124,6 +140,7 @@ namespace TarmacGauntlet.Raceday
             sky.SetColor(HorizonId, s.Horizon);
             sky.SetColor(GlowId, s.Glow);
             sky.SetColor(GroundId, s.AmbientGround);
+            sky.SetColor(HazeId, s.Fog);
             sky.SetColor(SunColorId, s.SunElevation > -2f ? s.LightColour : Color.black);
             sky.SetColor(CloudLitId, s.CloudLit);
             sky.SetColor(CloudShadeId, s.CloudShade);

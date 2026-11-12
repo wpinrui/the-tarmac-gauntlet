@@ -1,3 +1,4 @@
+using TarmacGauntlet.Rendering;
 using TarmacGauntlet.Simulation;
 using UnityEngine;
 
@@ -12,7 +13,8 @@ namespace TarmacGauntlet.Raceday
     /// below every fight and your car. It cuts when the top story changes
     /// and the shot has run its least length, or when a shot runs its longest. Shots: a trackside camera
     /// ahead of the car that zooms as it comes, a pan from close beside the track, the helicopter, an
-    /// onboard, and the pit lane. <see cref="RaceCameras"/> hands it the camera in its TV view.
+    /// onboard, and the pit lane. <see cref="RaceCameras"/> hands it the camera in its TV view. Every shot but the onboard
+    /// focuses on its car, so the background blurs (<see cref="PostEffects.Focus"/>).
     /// </summary>
     public sealed class BroadcastDirector : MonoBehaviour
     {
@@ -284,6 +286,7 @@ namespace TarmacGauntlet.Raceday
                     break;
                 }
             }
+            if (shot != Shot.Onboard) PostEffects.Focus(cam, Vector3.Distance(cam.transform.position, target));
         }
 
         /// <summary>Turns the camera to the target, smoothly after the first frame of a shot.</summary>

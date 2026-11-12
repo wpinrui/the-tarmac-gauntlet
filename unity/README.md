@@ -32,10 +32,12 @@ loads. Materials made in code use URP Lit through `Assets/Rendering/Scripts/Lit.
 (`TarmacMotion.hlsl`) so the upscaler and the motion blur follow them. The menus' frosted glass is `GlassBlurFeature` on
 the renderer, beside URP's ambient occlusion at half resolution, after the opaque pass.
 
-Each scene's global volume carries `PostEffects`: the ACES tone curve and a colour grade, half resolution bloom, and motion
-blur from the camera's movement. The race grades for the time of day and the weather (`SkyGrade.cs`). A camera cut clears the
-upscaler's history and skips the blur for that frame. Colour grading, bloom, ambient occlusion and motion blur each have a
-row in the graphics settings (`GraphicsOptions.cs`). URP's point and spot lights fall off with the square of the distance;
+Each scene's global volume carries `PostEffects`: the ACES tone curve and a colour grade, half resolution bloom, motion
+blur from the camera's movement, and Gaussian depth of field for a camera that calls `PostEffects.Focus` that frame. The
+broadcast director does for every shot but the onboard; a replay camera should too. A driving view never does, so it is
+never blurred. The race grades for the time of day and the weather (`SkyGrade.cs`). A camera cut clears the
+upscaler's history and skips the blur for that frame. Colour grading, bloom, ambient occlusion, motion blur, depth of field,
+sky detail and the crowd each have a row in the graphics settings (`GraphicsOptions.cs`). URP's point and spot lights fall off with the square of the distance;
 `LightFalloff.Urp` turns an intensity set for the built-in pipeline into one as bright a third of the way out to its range.
 
 ## Running the simulation tests
@@ -174,6 +176,9 @@ line, so they follow the layout, and `Footprints` gives the ground they take for
 is solid. `StandLook` holds the stand shapes and colours Ivan picked. `bash tools/grandstands/run.sh [folder]` (needs the
 .NET 8 SDK) builds every stand shape and checks they stand clear of the track and the pits, nothing is buried, every
 stand is fenced, the crowd is modest and the meshes are cheap to draw. With a folder it writes the look preview there.
+Each fan is one card, two triangles (`CrowdCard`), that `Resources/Crowd/Crowd.shader` turns to the camera and draws a
+seated fan on, now and then with arms thrown up; the whole crowd is under 8,000 triangles. `CrowdView` hides it with its
+graphics option.
 
 ## Team HQ scene
 
@@ -198,6 +203,19 @@ into `Resources/Props` as `<id>.json`, `<id>_mesh.bytes` and its textures; `HqGe
 `HqProps.cs` builds them, so the scene needs no import packages. The viewer reads the same files.
 `tools/team-hq/props/props.json` holds each model's height, pose and simplification, and `props.txt` the list.
 `make_textures.py` turns Poly Haven photo textures into the building's surfaces in `Resources/Textures`.
+
+The room's light is baked (`HqLightingView.cs`). `bash tools/team-hq/bake/run.sh` (needs the .NET 8 SDK and Blender as a
+Python module, `pip install bpy`) bakes it with Cycles into `Resources/Lighting`: a lightmap holding the lamps, the daylight
+through the windows and every bounce, one reflection probe image per room (garage, office, trophy room), and the ambient
+light for whatever moves. The sun stays live for the cars' and crew's shadows, so only its bounce is baked. The lightmap
+layout is `HqLightmapLayout.cs`, run by both the bake and the game, and the lights and probes are in `HqLighting.cs`.
+Rebake after changing the building's lit parts, the props' places or the lights: until then the game lights the room
+live and logs that the bake is out of date. The Baked lighting and Baked reflections graphics options switch back to
+live lamps and one live probe.
+
+Wear (oil under the cars, tyre marks from the doors, grime along the walls, worn patches, scuffed paint) is quads laid
+just off the floor and walls in `HqGeometry.AddWear`, drawn by `Resources/Wear/Grime.shader`, which multiplies the
+surface under it. `tools/team-hq/props/make_wear.py` draws the textures. The Wear graphics option hides it.
 
 ## Menus and saving
 

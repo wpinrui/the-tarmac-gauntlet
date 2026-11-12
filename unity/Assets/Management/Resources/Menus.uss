@@ -67,6 +67,13 @@
 
 /* Lists: a head row over rows, both padded 12px so heads sit over their cells. Numbers align right, words left. */
 .list { flex-grow: 1; flex-shrink: 1; min-height: 0; }
+/* The menus run without Unity's default theme, so scroll views get its layout here: the viewport clips and fills the
+   view, and the content keeps its full height instead of squeezing its rows to fit. */
+.unity-scroll-view__content-viewport { flex-grow: 1; flex-shrink: 1; overflow: hidden; }
+.unity-scroll-view__content-container { flex-shrink: 0; }
+/* Likewise text fields: the text fills the box and sits in its middle. */
+.unity-base-text-field__input { justify-content: center; }
+.unity-base-text-field__input .unity-text-element { flex-grow: 1; -unity-text-align: middle-left; }
 .head-row { flex-direction: row; align-items: center; flex-shrink: 0; height: 28px; padding-left: 12px; padding-right: 12px; }
 .head { flex-shrink: 0; font-size: 13px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.42); -unity-text-align: middle-right; white-space: nowrap; }
 .head.sort:hover, .stat-head:hover .head { color: rgba(255, 255, 255, 0.75); }
@@ -247,7 +254,7 @@
 /* Popups: lists that open over everything, on the popup layer */
 .popup { position: absolute; padding: 6px; border-radius: 12px; background-color: rgba(24, 24, 26, 0.94); border-width: 1px; border-color: rgba(255, 255, 255, 0.14); }
 .popup-list { flex-shrink: 1; }
-.popup-item { height: 32px; padding-left: 12px; padding-right: 12px; border-radius: 8px; font-size: 14px; letter-spacing: 0.6px; color: rgba(255, 255, 255, 0.75); -unity-text-align: middle-left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.popup-item { height: 32px; flex-shrink: 0; padding-left: 12px; padding-right: 12px; border-radius: 8px; font-size: 14px; letter-spacing: 0.6px; color: rgba(255, 255, 255, 0.75); -unity-text-align: middle-left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .popup-item:hover, .popup-item.on { color: rgb(255, 255, 255); }
 .popup-item:hover { background-color: rgba(255, 255, 255, 0.1); }
 .popup-item.on { background-color: rgba(255, 255, 255, 0.2); }
@@ -291,8 +298,9 @@
 /* Settings */
 .settings { width: 560px; max-height: 92%; border-radius: 24px; padding: 16px; }
 .settings-scroll { flex-shrink: 1; min-height: 0; }
+.settings-group { flex-shrink: 0; }
 .settings-group.spaced { margin-top: 22px; }
-.setting { flex-direction: row; align-items: center; height: 44px; padding-left: 16px; padding-right: 6px; border-radius: 12px; }
+.setting { flex-direction: row; align-items: center; flex-shrink: 0; height: 44px; padding-left: 16px; padding-right: 6px; border-radius: 12px; }
 .setting:hover { background-color: rgba(255, 255, 255, 0.1); }
 .setting-label { flex-grow: 1; font-size: 14px; letter-spacing: 1.1px; color: rgba(255, 255, 255, 0.62); }
 .slider { width: 250px; flex-direction: row; align-items: center; padding-right: 10px; }
