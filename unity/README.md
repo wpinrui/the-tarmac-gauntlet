@@ -59,10 +59,12 @@ change lit as each is done, and the track map during helicopter shots, or always
 
 `T` opens live timing while the AI drives your car (`LiveTiming.cs`), with the race at 16x behind it: every
 car in race order by class, your car's onboard and the track map, its driver, fuel, tyres and condition with
-the laps each lasts on the engine map in use, the engine map, and the next stop. Pit Now calls the car in at the
+the laps each lasts on the engine map in use, the engine map, and the next stop. While you drive, the HUD shows
+the engine maps on their keys, `1`, `2` and `3`, with the one in use lit. Pit Now calls the car in at the
 next pit entry, and the stop puts in the litres and tyres asked for and the next driver picked (`PitOrders` in
 `Consumables.cs`). Left alone the car pits and chooses for itself, and each stop puts the orders back to a full
-tank and new tyres. The red button top right, or `T`, returns to the race.
+tank and new tyres. The red button top right, or `T`, returns to the race. Over the race the same corner has a
+button into live timing and, while a teammate drives, the skip, each showing its key.
 
 While a teammate drives, `N` or the button beside the red one skips to your next stint: the race runs at 32x until
 the stop that puts you in is over and the car is back on track, then hands you the wheel. `F` or `I` stops the

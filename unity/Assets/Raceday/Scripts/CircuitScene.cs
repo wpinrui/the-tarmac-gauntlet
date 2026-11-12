@@ -608,7 +608,10 @@ namespace TarmacGauntlet.Raceday
             {
                 string id = field[i];
                 tower.Classes[i] = System.Linq.Enumerable.First(TarmacGauntlet.Simulation.CarModels.All, m => m.Id == id).CarClass;
-                tower.Colours[i] = RaceTower.TeamColours[paint.Next(RaceTower.TeamColours.Length)];
+                // A team with a livery shows its base paint; the rest keep a random colour for now.
+                Color random = RaceTower.TeamColours[paint.Next(RaceTower.TeamColours.Length)];
+                string livery = CarArt.LiveryPath(teams[i]);
+                tower.Colours[i] = livery != null && CarLivery.BaseColour(livery) is Color own ? own : random;
             }
             tower.Player = player;
             tower.Lap = circuit.Lap;
