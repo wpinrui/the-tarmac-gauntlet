@@ -79,6 +79,36 @@ def join(shell, part):
     raise RuntimeError(f"joining {part.name} wrecked the body")
 
 
+def clear(target, others, d=0.0012):
+    """Cut target back to stand d off each of others, so parts that meet never overlap."""
+    cutters = [blend.inflate(o, d) for o in others]
+    for c in cutters:                  # the cut faces take the target's own material
+        c.data.materials.clear()
+        c.data.materials.append(target.data.materials[0])
+    cut(target, cutters)
+
+
+def clearances(shell):
+    """The hard top, the door glass and its sail stand just off each other and off the doors,
+    then the hard top and the diffuser join the body they sit on."""
+    get = lambda n: bpy.data.objects[n]
+    tops = [o for o in bpy.data.objects if o.name.startswith("hard_top")]
+    grow = parts.DOOR_GAP + 0.001
+    for sgn, s in ((1, "l"), (-1, "r")):
+        for ob in tops:
+            cut(ob, [parts.door_prism(sgn, grow, ob.data.materials[0].name)])
+    for top in tops:
+        clear(top, [get(n) for n in ("door_l_glass", "door_r_glass", "door_l_sail", "door_r_sail",
+                                     "door_l_mirror", "door_r_mirror", "rear_glass", "screen_trim")])
+    for s in "lr":
+        clear(get(f"door_{s}_sail"), [get(f"door_{s}_glass"), get(f"door_{s}_mirror")])
+    for top in tops:
+        join(shell, top)
+    fins = [o for o in bpy.data.objects if o.name.startswith("diffuser_fin")]
+    join(shell, blend.union_all([get("diffuser")] + fins, "diffuser"))     # the diffuser is bodywork
+    print("clearances cut, hard top joined")
+
+
 def build(game=False):
     blend.reset(MATERIALS)
     v, f = body.skin()
@@ -134,6 +164,7 @@ def build(game=False):
     for ob in [shell] + doors:
         blend.tidy(ob)
         blend.thin(ob, 0.55)
+    clearances(shell)
     out += parts.wheels()
     opts = parts.options(ref)
     if game:

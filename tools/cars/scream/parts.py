@@ -310,7 +310,7 @@ def front_parts(ref, cutters, out):
     b = mid.bounds
     for i, z in enumerate(np.linspace(b[1], b[3], 4)[1:3]):
         bar = box(b[0], z - 0.006, b[2], z + 0.006).intersection(mid.buffer(-0.004))
-        out += blend.lay(ref, f"intake_bar_{i}", bar, fr, -INTAKE_DEPTH + 0.01, -0.012, "dark_metal", 0.006, along_ray=True)
+        out += blend.lay(ref, f"intake_bar_{i}", bar, fr, -INTAKE_DEPTH + 0.0112, -0.012, "dark_metal", 0.006, along_ray=True)
     # fog lamps between the intakes, round as the reference has them
     _x, fy, fz, fr_ = R["fog"]
     for sgn, side in ((1, "l"), (-1, "r")):
@@ -325,7 +325,7 @@ def repeaters(ref, out):
     """The amber repeaters on the front wings."""
     g = soft(poly(R["repeater"]), 0.005)
     for sgn, side in ((1, "l"), (-1, "r")):
-        out += blend.lay(ref, f"repeater_{side}", g, side_fr(sgn), -0.001, 0.003, "amber", 0.005)
+        out += blend.lay(ref, f"repeater_{side}", g, side_fr(sgn), 0.0006, 0.0036, "amber", 0.005)
 
 
 # ---------------------------------------------------------------- side intakes
@@ -364,7 +364,7 @@ def deck_parts(ref, out):
         for i, y in enumerate(np.linspace(b[1], b[3], 7)[1:-1]):
             slat = box(b[0], y - 0.005, b[2], y + 0.005).intersection(q.buffer(-0.012))
             if not slat.is_empty:
-                out += blend.lay(ref, f"deck_slat_{side}{i}", biggest(slat), top_fr(), 0.003, 0.0075, "dark_metal", 0.006)
+                out += blend.lay(ref, f"deck_slat_{side}{i}", biggest(slat), top_fr(), 0.0038, 0.008, "dark_metal", 0.006)
 
 
 def flip_y(g):
@@ -373,7 +373,8 @@ def flip_y(g):
 
 
 # ---------------------------------------------------------------- shut lines
-DOOR_FRONT = [(0.70, 0.810), (0.785, 0.795), (0.808, 0.700)]   # the door's top front corner, cleaned
+DOOR_FRONT = [(0.70, 0.815), (0.738, 0.800), (0.800, 0.720), (0.808, 0.700)]   # the door's top front corner, cleaned:
+                                                     # it stops behind the A pillar's foot, which stands on the body
 
 
 def door_shape():
@@ -470,9 +471,7 @@ def prism_y(name, g, y0, y1, mat="interior"):
 
 def _door_top(grow, sgn=1):
     """The door top, straight through from the cockpit's edge outwards."""
-    o = door_outline()
-    lip = box(o.bounds[0], BELT - 0.01, DOOR_FRONT[0][0], BELT + 0.04)   # past the opening's floor: no sliver of body left above the door
-    g = biggest(o.union(lip).intersection(box(-5, DOOR_TOP, 5, 5)).buffer(grow, join_style=2))
+    g = biggest(door_side(0.04).intersection(box(-5, DOOR_TOP, 5, 5)).buffer(grow, join_style=2))
     return [prism_y("door_top", g, (COCKPIT_Y - 0.01 - grow) * sgn, 1.4 * sgn, mat="body")]
 
 
@@ -485,6 +484,19 @@ def door_hinge(sgn=1):
     z0, z1 = d.bounds[1], BELT
     y = max(body.y_at(xf - 0.01, z) for z in np.linspace(z0 + 0.02, BELT - 0.02, 20)) + 0.003
     return (xf, y * sgn, z0), (xf, y * sgn, z1), -DOOR_OPEN * sgn
+
+
+def door_side(up=0.0):
+    """The door seen from the side, its top flat at the belt back to the cabin's back and
+    forward to its front corner, so no sliver of body is left above it; up raises that top."""
+    o = door_outline()
+    return o.union(box(CABIN_BACK + 0.003, BELT - 0.01, 0.71, BELT + up))
+
+
+def door_prism(sgn, grow, mat):
+    """The door's side view, grown, as a solid across its side: what stands off the door."""
+    g = door_side().buffer(grow, join_style=2)
+    return prism_y("door_clear", g, 0.45 * sgn, 1.4 * sgn, mat=mat)
 
 
 def door(ref, shell, sgn=1):
@@ -646,7 +658,7 @@ def exhaust():
         x_end = min(_tail_x(y, z) for y, z in np.array(t.exterior.coords)) + 0.004
         hole = t.buffer(0.001)
         ring = ring_of(hole, 128)
-        rings = [np.column_stack([np.full(128, x), ring[:, 0], ring[:, 1]]) for x in (x_end - 0.05, x_end + TIP_LEN)]
+        rings = [np.column_stack([np.full(128, x), ring[:, 0], ring[:, 1]]) for x in (x_end - 0.05, x_end + TIP_LEN + 0.003)]
         v, f = geom.close_rings(rings)
         cut.append(blend.make(f"cut_exhaust_{side}", v, f, "trim"))
         outer = ring_of(t.buffer(-0.001), 96)
@@ -671,11 +683,11 @@ def rear_parts(ref, out):
     holes = unary_union([tip_shape(), flip(tip_shape())]).buffer(0.004)
     out += blend.lay(ref, "rear_panel", panel_shape().difference(holes), fr, 0.0015, 0.0035, "grille", 0.008, along_ray=True)
     d = diffuser_shape()
-    out += blend.lay(ref, "diffuser", d, fr, 0.0015, 0.0035, "grille", 0.008, along_ray=True)
+    out += blend.lay(ref, "diffuser", d, fr, 0.003, 0.005, "grille", 0.008)
     b = d.bounds
     for i, y in enumerate((-0.42, 0.0, 0.42)):
         fin = box(y - 0.007, b[1], y + 0.007, b[3] - 0.03).intersection(d.buffer(-0.006))
-        out += blend.lay(ref, f"diffuser_fin_{i}", fin, fr, 0.0034, 0.05, "grille", 0.006, along_ray=True)
+        out += blend.lay(ref, f"diffuser_fin_{i}", fin, fr, 0.0056, 0.05, "grille", 0.006)
 
 
 # ---------------------------------------------------------------- hard top
@@ -696,6 +708,8 @@ A_PILLAR = 0.035                # how far the A pillar runs back from the screen
 SAIL = (0.17, 0.48)             # the black sail in the glass's front lower corner: its length along
                                 # the door top, and its height up the pillar as a share
 SAIL_T = 0.002
+GLASS_LIFT = 0.0035             # the door glass and sail start this far above the door top
+GLASS_GAP = 0.002               # and stand this far off the pillars
 TOP_T = 0.025
 GLASS_T = 0.005
 REAR_WINDOW = (0.05, 0.03, 0.50)    # margins from the foot and the B pillar, half width as a share
@@ -803,6 +817,7 @@ PILLAR_CUT_Y = 0.45   # the pillar cut stays outboard of this half width
 def hard_top(trim):
     """The hard top in body colour, the door glass (it swings with the doors) and the rear
     window. trim is the laid screen trim."""
+    from scipy.optimize import brentq
     side, T = _trim_edges(trim)
     s1 = side[-1]                                              # the screen's top corner
     xb = DOOR_BACK
@@ -851,11 +866,17 @@ def hard_top(trim):
                        for x in xx] for t in np.linspace(0, 1, 12)])
 
     # the door glass, its front lower corner a black sail for the mirror to stand on
-    b0 = np.array([xb, SILL[0], SILL[1]])
-    G = _coons(lambda u: b0 + (p0 - b0) * u,
-               lambda u: edge(xb + (p1[0] - xb) * u),
-               lambda t: b0 + (edge(xb) - b0) * t, pil)
-    u0 = 1 - SAIL[0] / (p0[0] - xb)
+    zg = BELT + GLASS_LIFT
+    t0 = brentq(lambda t: pil(t)[2] - zg, 0.0, 1.0)
+    back = np.array([GLASS_GAP, 0.0, 0.0])
+    pil_g = lambda t: pil(t0 + (1 - t0) * t) - back         # a hair behind the A pillar
+    g0 = pil_g(0.0)
+    xg = xb + GLASS_GAP                                        # and ahead of the B pillar
+    b0 = np.array([xg, g0[1], zg])
+    G = _coons(lambda u: b0 + (g0 - b0) * u,
+               lambda u: edge(xg + (p1[0] - GLASS_GAP - xg) * u),
+               lambda t: b0 + (edge(xg) - b0) * t, pil_g)
+    u0 = 1 - SAIL[0] / (g0[0] - xg)
     t1 = SAIL[1]
     reach = lambda t: u0 + (1 - u0) * min(t / t1, 1.0)         # the glass's front edge, above the sail
     glass = np.array([[G(t, reach(t) * u) for u in np.linspace(0, 1, 60)] for t in np.linspace(0, 1, 30)])
@@ -864,8 +885,10 @@ def hard_top(trim):
     sail_out = sail + np.array([0.0, SAIL_T, 0.0])               # a hair proud of the glass
 
     mirror = lambda g: np.asarray(g) * [1, -1, 1]
-    obs = [_panel("hard_top", [cap, sweep, mirror(sweep), a_pillar, mirror(a_pillar)], TOP_T, "body", "interior",
-                  [lambda i, j: not window(i, j)] + [lambda i, j: True] * 4)]
+    obs = [_panel("hard_top", [cap], TOP_T, "body", "interior", [lambda i, j: not window(i, j)])]
+    for s_, f in (("l", lambda g: g), ("r", mirror)):        # each panel its own clean solid
+        obs.append(_panel(f"hard_top_sweep_{s_}", [f(sweep)], TOP_T, "body", "interior"))
+        obs.append(_panel(f"hard_top_pillar_{s_}", [f(a_pillar)], TOP_T, "body", "interior"))
     obs.append(_panel("rear_glass", [cap[i0:i1 + 1, j0:j1 + 1]], GLASS_T, "glass"))
     for sgn, side_ in ((1, "l"), (-1, "r")):
         f = (lambda g: g) if sgn > 0 else mirror
@@ -923,8 +946,8 @@ def _seat(yc, side):
         obs.append(_rbox(f"seat_bolster_{side}{k}", -0.20, 0.27, y - 0.045, y + 0.045, z0, zc + 0.07, r=0.035, mat="seat"))
         obs.append(_rbox(f"seat_wing_{side}{k}", -0.31, -0.20, y - 0.045, y + 0.045, zc, 0.80, r=0.035, lean=lean, mat="seat"))
     obs.append(_rbox(f"seat_back_{side}", -0.30, -0.21, yc - 0.15, yc + 0.15, zc, 0.78, r=0.03, lean=lean, mat="seat"))
-    obs.append(_rbox(f"seat_head_{side}", -0.37, -0.28, yc - 0.12, yc + 0.12, 0.83, 0.98, r=0.04, mat="seat"))
-    return obs
+    obs.append(_rbox(f"seat_head_{side}", -0.37, -0.28, yc - 0.12, yc + 0.12, 0.74, 0.98, r=0.04, mat="seat"))
+    return [blend.union_all(obs, f"seat_{side}")]
 
 
 def door_trim(ref):
@@ -939,9 +962,9 @@ def door_trim(ref):
     for sgn, side in ((1, "l"), (-1, "r")):
         fr = side_fr(sgn)
         out += blend.lay(ref, f"door_{side}_card", card, fr, -(w + 0.012), -(w - 0.004), "interior", 0.02)
-        out += blend.lay(ref, f"door_{side}_armrest", arm, fr, -(w + 0.075), -(w + 0.008), "seat", 0.01)
-        out += blend.lay(ref, f"door_{side}_pocket", pocket, fr, -(w + 0.045), -(w + 0.008), "interior", 0.01)
-        out += blend.lay(ref, f"door_{side}_lever", lever, fr, -(w + 0.030), -(w + 0.008), "chrome", 0.005)
+        out += blend.lay(ref, f"door_{side}_armrest", arm, fr, -(w + 0.075), -(w + 0.0128), "seat", 0.01)
+        out += blend.lay(ref, f"door_{side}_pocket", pocket, fr, -(w + 0.045), -(w + 0.0128), "interior", 0.01)
+        out += blend.lay(ref, f"door_{side}_lever", lever, fr, -(w + 0.030), -(w + 0.0128), "chrome", 0.005)
     return out
 
 
@@ -970,10 +993,9 @@ def interior():
     sw = blend.union_all(parts, "steering_wheel")
     rot = Vector((0, 1, 0)).rotation_difference(Vector(tuple(axis))).to_matrix().to_4x4()
     sw.data.transform(Matrix.Translation(tuple(hub)) @ rot)
-    obs.append(sw)
     col = 0.17
     v, f = geom.disc(tuple(hub + axis * (col / 2 + 0.02)), tuple(axis), 0.026, col, n=24)
-    obs.append(blend.make("steering_column", v, f, "interior"))
+    obs[1] = blend.union_all([obs[1], sw, blend.make("steering_column", v, f, "interior")], "dash")   # one solid
     # the mirror under the header
     xm = plane_x(body.z_top(R["screen"]["x_top"]) - 0.03) - 0.01
     zt = body.z_top(R["screen"]["x_top"]) - 0.05
