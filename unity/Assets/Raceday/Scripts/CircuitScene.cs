@@ -645,6 +645,7 @@ namespace TarmacGauntlet.Raceday
             views.Hud = cam.gameObject.AddComponent<DriveHud>();
             views.Hud.Car = cars[watched];
             cam.gameObject.AddComponent<FpsCounter>();
+            cam.gameObject.AddComponent<CarReflections>();
             return views;
         }
     }

@@ -14,6 +14,22 @@ The respray copies the material for that car, so other cars using the same model
 
 Models are exported amber (see `docs/car-modelling.md`). Leave out `paint` to keep it.
 
+## Finish
+
+The respray uses the `TarmacGauntlet/CarPaint` shader (`Raceday/Resources/CarPaint/`). It and the livery shader share `CarPaint.hlsl`: a clear coat over the base coat, and metallic flakes that glint in the sun. Each is a graphics option (Clearcoat paint, Metallic flake), switched live by global shader keywords.
+
+`CarMaterials.Dress` then finishes the model's other materials by name. Each finish keeps the model's own colour, is made once per model material, and is a graphics option that switches live.
+
+| Option | Materials | Finish |
+| --- | --- | --- |
+| Car glass | `glass`, `mirror_glass` | Tinted glossy glass; mirrors are polished metal |
+| Lamp lenses | `head_glass`, `tail_glass` | Clear glossy lenses that glow with the lamps behind (`LampMaterials`) |
+| Car trims | `carbon` | Twill carbon weave under a clear coat (`Carbon.shader`) |
+| | `tyre`, `trim`, `grille`, `housing` | Rubber and plastic |
+| | `chrome`, `name`, `reflector`, `rim`, `hub`, `dark_metal`, `engine_metal` | Metal |
+
+What the cars reflect comes from `CarReflections`, a probe at the watched car redrawn a face a frame without the cars (option Car reflections).
+
 ## Liveries
 
 A team with a livery wears it instead of the class paint. `CarBuilder.Spawn(modelId, circuit, keys, paint, team, raceNumber)` looks the team up in `CarArt.LiveryPath` and calls `CarLivery.Apply`; Raceday passes each grid car's team name and race number.

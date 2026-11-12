@@ -30,14 +30,12 @@ namespace TarmacGauntlet.Raceday
         private readonly struct BrakeSlot
         {
             public readonly Renderer Renderer;
-            public readonly Material[] Materials;
             public readonly int Index;
             public readonly Material Off, On;
 
-            public BrakeSlot(Renderer renderer, Material[] materials, int index, Material off, Material on)
+            public BrakeSlot(Renderer renderer, int index, Material off, Material on)
             {
                 Renderer = renderer;
-                Materials = materials;
                 Index = index;
                 Off = off;
                 On = on;
@@ -88,7 +86,7 @@ namespace TarmacGauntlet.Raceday
                         changed = true;
                     }
                     else if (name.StartsWith("lamp_brake"))
-                        brakes.Add(new BrakeSlot(r, mats, i, mats[i], shared.BrakeFor(mats[i])));
+                        brakes.Add(new BrakeSlot(r, i, mats[i], shared.BrakeFor(mats[i])));
                 }
                 if (changed) r.sharedMaterials = mats;
             }
@@ -101,7 +99,7 @@ namespace TarmacGauntlet.Raceday
             LampMaterials shared = LampMaterials.Shared;
             Lamp("Headlamps", shared.BoxFront, shared.BoxHead);
             Renderer rear = Lamp("Tail lamps", shared.BoxRear, shared.BoxTail);
-            brakes.Add(new BrakeSlot(rear, rear.sharedMaterials, 0, shared.BoxTail, shared.BoxBrake));
+            brakes.Add(new BrakeSlot(rear, 0, shared.BoxTail, shared.BoxBrake));
             Vector3 c = CarBuilder.BoxCentre, s = CarBuilder.BoxSize;
             Nose = new Vector3(0f, c.y + s.y * 0.2f, c.z + s.z * 0.5f);
         }
@@ -155,17 +153,20 @@ namespace TarmacGauntlet.Raceday
             bool on = car.Asleep ? (braking ? decel > BrakeOff : decel > BrakeOn) : car.Brake > 0.1f || car.Hold;
             if (on == braking) return;
             braking = on;
+            // The renderer's materials are read afresh: the car's other materials can change live (CarMaterials).
             foreach (BrakeSlot b in brakes)
             {
-                b.Materials[b.Index] = on ? b.On : b.Off;
-                b.Renderer.sharedMaterials = b.Materials;
+                Material[] mats = b.Renderer.sharedMaterials;
+                mats[b.Index] = on ? b.On : b.Off;
+                b.Renderer.sharedMaterials = mats;
             }
         }
     }
 
     /// <summary>
     /// The lamp materials every car shares, so the field's lamps draw together: glowing copies of each model's own lamp
-    /// materials, the stand-in boxes' lamps and the headlamp beam. <see cref="Night"/> lights them all at once.
+    /// materials, clear lenses over them, the stand-in boxes' lamps and the headlamp beam. <see cref="Night"/> lights them
+    /// all at once.
     /// </summary>
     public sealed class LampMaterials
     {
@@ -178,7 +179,8 @@ namespace TarmacGauntlet.Raceday
         public bool BeamsOn { get; private set; }
 
         private readonly Dictionary<Material, Material> heads = new Dictionary<Material, Material>(), tails = new Dictionary<Material, Material>(),
-            brakes = new Dictionary<Material, Material>();
+            brakes = new Dictionary<Material, Material>(), headLenses = new Dictionary<Material, Material>(),
+            tailLenses = new Dictionary<Material, Material>();
         private readonly Color headTint;
         private float night;
 
@@ -187,6 +189,8 @@ namespace TarmacGauntlet.Raceday
 
         /// <summary>The beam reaches from the nose to this far ahead, widening from the first width to the second, m.</summary>
         private const float BeamLength = 24f, BeamNear = 1.8f, BeamFar = 9f;
+        /// <summary>How much of its lamps' glow a lens shows, and how see-through a lens is when the model's own is opaque.</summary>
+        private const float LensGlow = 0.3f, LensAlpha = 0.25f, LensSmoothness = 0.98f;
 
         private LampMaterials()
         {
@@ -212,6 +216,24 @@ namespace TarmacGauntlet.Raceday
             return m;
         }
 
+        /// <summary>
+        /// A clear, glossy lens from a model's lamp glass (<see cref="CarMaterials"/>), in its own tint, that glows softly
+        /// with the head or tail lamps behind it. Made once and shared by every car with that model.
+        /// </summary>
+        public Material LensFor(Material source, bool tail)
+        {
+            Dictionary<Material, Material> lenses = tail ? tailLenses : headLenses;
+            if (lenses.TryGetValue(source, out Material m)) return m;
+            Color c = CarMaterials.ColourOf(source);
+            m = new Material(Lit.Shader) { name = source.name + " lens", enableInstancing = true };
+            m.SetColor(Lit.BaseColorId, new Color(c.r, c.g, c.b, c.a < 0.99f ? c.a : LensAlpha));
+            m.SetFloat(Lit.SmoothnessId, LensSmoothness);
+            Lit.Glass(m);
+            lenses[source] = Glowing(m);
+            Night(night);
+            return m;
+        }
+
         /// <summary>Lights the headlamps, the tail lamps and the beams for a night amount from <see cref="SkyClock"/>.</summary>
         public void Night(float amount)
         {
@@ -223,6 +245,8 @@ namespace TarmacGauntlet.Raceday
             BoxBrake.SetColor(EmissionId, NightLook.Red * NightLook.BrakeGlow);
             foreach (Material m in heads.Values) m.SetColor(EmissionId, head);
             foreach (Material m in tails.Values) m.SetColor(EmissionId, tail);
+            foreach (Material m in headLenses.Values) m.SetColor(EmissionId, head * LensGlow);
+            foreach (Material m in tailLenses.Values) m.SetColor(EmissionId, tail * LensGlow);
             Beam.SetVector(ColorId, FloodMaterials.Brightening(headTint, NightLook.BeamBrightening * amount));
             Beam.SetVector(LiftId, FloodMaterials.Lift(headTint, NightLook.BeamLift * amount));
             BeamsOn = amount > 0.02f;

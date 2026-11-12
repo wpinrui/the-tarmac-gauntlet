@@ -17,6 +17,24 @@ namespace TarmacGauntlet.Visuals
         /// <summary>Most real lights at night in the race: the rest of the night lighting is drawn glowing. Read at the start of a race.</summary>
         public static readonly GraphicsOption RealLights = Count("settings.reallights", "Real lights", 6, 24);
 
+        /// <summary>A clear coat over the cars' paint. Changes live.</summary>
+        public static readonly GraphicsOption Clearcoat = Toggle("settings.clearcoat", "Clearcoat paint", true);
+
+        /// <summary>Metallic flakes in the cars' paint that glint in the sun. Changes live.</summary>
+        public static readonly GraphicsOption PaintFlake = Toggle("settings.paintflake", "Metallic flake", true);
+
+        /// <summary>Tinted, glossy car windows and mirrors that show reflections. Changes live.</summary>
+        public static readonly GraphicsOption CarGlass = Toggle("settings.carglass", "Car glass", true);
+
+        /// <summary>Clear lamp lenses that glow with the lamps behind them. Changes live.</summary>
+        public static readonly GraphicsOption LampLenses = Toggle("settings.lamplenses", "Lamp lenses", true);
+
+        /// <summary>Carbon weave, rubber and metal on the cars' trim, wheels and tyres. Changes live.</summary>
+        public static readonly GraphicsOption CarTrims = Toggle("settings.cartrims", "Car trims", true);
+
+        /// <summary>The cars reflect the scene round them, refreshed every few frames. Changes live.</summary>
+        public static readonly GraphicsOption CarReflections = Toggle("settings.carreflections", "Car reflections", true);
+
         /// <summary>An option that is on or off.</summary>
         private static GraphicsOption Toggle(string key, string label, bool on) => Add(new GraphicsOption(key, label, on ? 1 : 0, 1));
 

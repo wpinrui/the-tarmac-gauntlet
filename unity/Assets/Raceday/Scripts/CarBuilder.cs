@@ -58,7 +58,7 @@ namespace TarmacGauntlet.Raceday
         /// Puts the model under the car and gives each wheel a pivot at its centre, so it can
         /// steer, spin and move with the suspension, and each opening door its hinge (CarDoors on
         /// the model). The team's livery goes on the body if it has one for this model; otherwise,
-        /// with a paint, the body is resprayed in it.
+        /// with a paint, the body is resprayed in it. The glass, lenses and trims get their finish (CarMaterials).
         /// Returns pivots front left, front right, rear left, rear right.
         /// </summary>
         private static Transform[] AttachModel(GameObject root, GameObject prefab, string modelPath, Color? paint, string team, int raceNumber)
@@ -67,7 +67,10 @@ namespace TarmacGauntlet.Raceday
             model.name = "Model";
             string livery = string.IsNullOrEmpty(team) ? null : CarArt.LiveryPath(team);
             bool painted = livery != null && CarLivery.Apply(model, modelPath, livery, raceNumber);
-            if (!painted && paint.HasValue) CarPaint.Respray(model, paint.Value);
+            // With no paint the model keeps its own colour, in the car paint all the same.
+            Color? spray = painted ? null : paint ?? CarPaint.ColourOf(model);
+            if (spray.HasValue) CarPaint.Respray(model, spray.Value);
+            CarMaterials.Dress(model);
             foreach (Collider c in model.GetComponentsInChildren<Collider>()) Object.Destroy(c);
             foreach (Transform t in model.GetComponentsInChildren<Transform>()) t.gameObject.layer = IgnoreRaycastLayer;
             CarDoors.Attach(model, modelPath);
