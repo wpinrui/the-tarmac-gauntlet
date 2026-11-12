@@ -17,6 +17,11 @@
 //   armco on posts           every armco run has its rails, through every bend, with a post at least every
 //                            4.5 m; rails, posts and catch fences stand behind the armco line, off every road and
 //                            runoff, and reach into the ground
+//   armco runs whole         no run shorter than 90 m, none within 30 m of the next on its side, and both
+//                            ends of every run turn away and bury their rails' top under the ground
+//   armco on flat ground     along every run the line climbs no more than 8% and its slope changes by no
+//                            more than 4.5% from one post's span to the next; the ground right behind the line
+//                            is within 5 cm under it and never reaches the rails' bottom
 //   catch fences             behind every tyre wall, clear of the grandstands' own fences and the gantry's feet
 //   cheap to draw            at most 120k triangles in all and 20k in any one mesh, armco included
 //   race control             SC behind the pace car, red then green lights at the start, green panels on
@@ -62,6 +67,8 @@ static class Check
         Gantry(f, built, track);
         var armco = new ArmcoBuilder(c, b.ArmcoRuns, footprints, f.GantryLeft, f.GantryRight);
         Armco(armco);
+        ArmcoWhole(armco);
+        ArmcoGrounded();
         CatchFences(armco, f);
         Budget(built, armco);
         Flags(f);
@@ -284,6 +291,71 @@ static class Check
         foreach (Vector3 foot in armco.Posts)
             if (foot.y - ArmcoBuilder.Footing > c.TerrainHeight(foot.x, foot.z) - 0.1f) { bad.Add($"post off the ground at {Where(foot)}"); break; }
         Report("armco on posts", bad, $"{b.ArmcoRuns.Count} runs, {length / 1000f:F1} km, {armco.Posts.Count} posts, {armco.Steel.Triangles.Count / 3} triangles");
+    }
+
+    static void ArmcoWhole(ArmcoBuilder armco)
+    {
+        var bad = new List<string>();
+        float shortest = float.MaxValue, closest = float.MaxValue;
+        foreach (ArmcoRun run in b.ArmcoRuns)
+        {
+            float len = 0f;
+            for (int i = 1; i < run.Line.Length; i++) len += Flat(run.Line[i] - run.Line[i - 1]);
+            shortest = Math.Min(shortest, len);
+            if (len < 90f) bad.Add($"{len:F0} m run at {Where(run.Line[0])}");
+            foreach (ArmcoRun other in b.ArmcoRuns)
+            {
+                if (other == run || other.Side != run.Side) continue;
+                float gap = Mathf.Repeat((other.Samples[0] - run.Samples[run.Samples.Length - 1]) * c.Step, c.Lap);
+                if (gap > c.Lap * 0.5f) continue;
+                closest = Math.Min(closest, gap);
+                if (gap < 30f) bad.Add($"runs {gap:F0} m apart at {Where(run.Line[run.Line.Length - 1])}");
+            }
+        }
+        if (armco.Ends.Count != 2 * b.ArmcoRuns.Count) bad.Add($"{armco.Ends.Count} ends for {b.ArmcoRuns.Count} runs");
+        foreach (Vector3[] end in armco.Ends)
+        {
+            Vector3 tip = end[end.Length - 1];
+            float over = tip.y - c.TerrainHeight(tip.x, tip.z);
+            if (over > -0.05f) bad.Add($"rail end {over:F2} m out of the ground at {Where(tip)}");
+            for (int i = 1; i < end.Length; i++)
+                if (end[i].y - c.TerrainHeight(end[i].x, end[i].z) > end[i - 1].y - c.TerrainHeight(end[i - 1].x, end[i - 1].z) + 0.02f)
+                { bad.Add($"rail end rising out of the ground at {Where(end[i])}"); break; }
+            if (Flat(end[end.Length - 1] - end[0]) < ArmcoBuilder.TerminalLength * 0.8f) bad.Add($"rail end too short at {Where(tip)}");
+        }
+        Report("armco runs whole", bad, $"{b.ArmcoRuns.Count} runs, shortest {shortest:F0} m, closest {(closest == float.MaxValue ? 0 : closest):F0} m apart, {armco.Ends.Count} buried ends");
+    }
+
+    static void ArmcoGrounded()
+    {
+        var bad = new List<string>();
+        float steepest = 0f, sharpest = 0f, deepest = 0f, highest = 0f;
+        foreach (ArmcoRun run in b.ArmcoRuns)
+        {
+            Vector3[] l = run.Line;
+            for (int i = 2; i + 2 < l.Length; i++)
+            {
+                float s1 = (l[i].y - l[i - 2].y) / Math.Max(0.1f, Flat(l[i] - l[i - 2]));
+                float s2 = (l[i + 2].y - l[i].y) / Math.Max(0.1f, Flat(l[i + 2] - l[i]));
+                steepest = Math.Max(steepest, Math.Abs(s1));
+                sharpest = Math.Max(sharpest, Math.Abs(s2 - s1));
+                if (Math.Abs(s1) > 0.08f) { bad.Add($"armco climbing {s1 * 100:F0}% at {Where(l[i])}"); break; }
+                if (Math.Abs(s2 - s1) > 0.045f) { bad.Add($"armco bending {Math.Abs(s2 - s1) * 100:F1}% at {Where(l[i])}"); break; }
+            }
+            for (int i = 0; i < l.Length; i++)
+            {
+                Vector3 back = l[i] - c.Centre[run.Samples[i]];
+                back.y = 0f;
+                back.Normalize();
+                Vector3 q = l[i] + back * (ArmcoBuilder.RailDepth + ArmcoBuilder.PostDepth);
+                float rise = c.TerrainHeight(q.x, q.z) - l[i].y;
+                deepest = Math.Max(deepest, rise);
+                highest = Math.Max(highest, -rise);
+                if (rise > ArmcoBuilder.RailBottom - 0.03f) { bad.Add($"ground {rise:F2} m up into the rails at {Where(l[i])}"); break; }
+                if (rise < -0.05f) { bad.Add($"rails {-rise:F2} m over the ground at {Where(l[i])}"); break; }
+            }
+        }
+        Report("armco on flat ground", bad, $"steepest {steepest * 100:F1}%, sharpest bend {sharpest * 100:F1}%, ground behind from {highest:F2} m under to {deepest:F2} m over the line");
     }
 
     static void CatchFences(ArmcoBuilder armco, TrackFurniture f)
