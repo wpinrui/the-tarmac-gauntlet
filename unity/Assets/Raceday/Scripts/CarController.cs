@@ -6,8 +6,8 @@ namespace TarmacGauntlet.Raceday
     /// <summary>
     /// A drivable car: raycast suspension, a simple tyre model with a friction circle, engine and
     /// gearbox, brakes with anti-lock, downforce and drag. Arrows steer, accelerate and brake,
-    /// A and Z shift up and down (and switch to manual), M toggles automatic and manual, H toggles steering help
-    /// and R puts the car back on track. 1, 2 and 3 pick the Conserve, Normal and Push engine maps.
+    /// A and Z shift up and down in manual, and R puts the car back on track. The gearbox and steering help come
+    /// from the settings menu (<see cref="DriveSettings"/>). 1, 2 and 3 pick the Conserve, Normal and Push engine maps.
     /// It burns fuel and wears its tyres through <see cref="Supplies"/>, and the pit lane limiter cuts its
     /// power above <see cref="SpeedLimit"/>.
     /// </summary>
@@ -22,7 +22,7 @@ namespace TarmacGauntlet.Raceday
         public KeyboardState Keys;
         public Circuit Circuit;
 
-        /// <summary>When false (free camera), the driving keys are ignored.</summary>
+        /// <summary>When false, the driving keys are ignored.</summary>
         public bool InputEnabled = true;
 
         /// <summary>Share of the normal drag, below 1 in another car's slipstream.</summary>
@@ -40,7 +40,7 @@ namespace TarmacGauntlet.Raceday
         public bool Limiting => !float.IsPositiveInfinity(SpeedLimit);
 
         public bool Automatic { get; private set; } = true;
-        public bool SteeringHelp { get; private set; } = true;
+        public bool SteeringHelp => DriveSettings.SteeringHelp;
         public bool Crashed { get; private set; }
         /// <summary>
         /// True while the car has no physics: far from the camera an AI car glides along its path and
@@ -76,10 +76,25 @@ namespace TarmacGauntlet.Raceday
             public Vector3 VisualRest;
             public float Compression, Spin;
             public bool Grounded;
+            /// <summary>Where the tyre last touched a paved surface, and how hard it slid there (0 when it gripped).</summary>
+            public Vector3 Contact, ContactNormal;
+            public float Skid;
         }
 
         /// <summary>Wheel i's visual pivot, at its centre: 0 front left, 1 front right, 2 rear left, 3 rear right. Null with none.</summary>
         public Transform WheelVisual(int i) => wheels[i]?.Visual;
+
+        /// <summary>
+        /// How hard wheel i is sliding or spinning on tarmac or a kerb, 0 to 1: 0 while it grips, in the air, off the
+        /// track or with the car off physics. With more than 0, where it touches and the surface's normal there.
+        /// </summary>
+        public float Skid(int i, out Vector3 contact, out Vector3 normal)
+        {
+            Wheel w = wheels[i];
+            contact = w != null ? w.Contact : Vector3.zero;
+            normal = w != null ? w.ContactNormal : Vector3.up;
+            return w == null || Asleep || !w.Grounded ? 0f : w.Skid;
+        }
 
         public void Setup(CarSpec spec, Transform[] wheelVisuals)
         {
@@ -124,6 +139,7 @@ namespace TarmacGauntlet.Raceday
         private void Update()
         {
             if (Spec == null || Keys == null || AiDriving || Asleep) return;
+            Automatic = DriveSettings.Automatic;
             bool on = InputEnabled && !Crashed;
             float left = on && Keys.Held(KeyCode.LeftArrow) ? 1f : 0f;
             float right = on && Keys.Held(KeyCode.RightArrow) ? 1f : 0f;
@@ -134,10 +150,8 @@ namespace TarmacGauntlet.Raceday
             if (InputEnabled)
             {
                 if (Keys.Pressed(KeyCode.R)) ResetToTrack();
-                if (Keys.Pressed(KeyCode.H)) SteeringHelp = !SteeringHelp;
-                if (Keys.Pressed(KeyCode.M)) Automatic = !Automatic;
-                if (Keys.Pressed(KeyCode.A)) Shift(+1);
-                if (Keys.Pressed(KeyCode.Z)) Shift(-1);
+                if (!Automatic && Keys.Pressed(KeyCode.A)) Shift(+1);
+                if (!Automatic && Keys.Pressed(KeyCode.Z)) Shift(-1);
                 if (Supplies != null)
                 {
                     if (Keys.Pressed(KeyCode.Alpha1)) Supplies.Map = EngineMap.Conserve;
@@ -171,7 +185,6 @@ namespace TarmacGauntlet.Raceday
 
         private void Shift(int direction)
         {
-            Automatic = false;
             int next = Mathf.Clamp(Gear + direction, 0, Spec.Gears.Length);
             if (next == 0 && Vector3.Dot(Velocity, transform.forward) > 1f) return;
             if (next != Gear) shiftTimer = ShiftTime;
@@ -291,6 +304,7 @@ namespace TarmacGauntlet.Raceday
             float previous = w.Compression;
             w.Grounded = Physics.Raycast(origin, -up, out RaycastHit hit, reach, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
             w.Compression = w.Grounded ? reach - hit.distance : 0f;
+            w.Skid = 0f;
 
             if (w.Grounded)
             {
@@ -327,6 +341,8 @@ namespace TarmacGauntlet.Raceday
                     // Peaks at PeakSlip and falls away gently past it.
                     float b = 2.64f / Spec.PeakSlip;
                     fy = -cap * Mathf.Sin(1.3f * Mathf.Atan(b * slip));
+                    // A tyre well past its peak slip angle is sliding, and leaves rubber behind.
+                    w.Skid = Mathf.Clamp01((Mathf.Abs(slip) - 1.3f * Spec.PeakSlip) / (1.5f * Spec.PeakSlip));
                 }
 
                 // Longitudinal: drive, brakes (holding the car still when nearly stopped), rolling resistance.
@@ -345,11 +361,16 @@ namespace TarmacGauntlet.Raceday
                 if (fx * fx + fy * fy > cap * cap)
                 {
                     if (braking && drive == 0f)
+                    {
                         fx = Mathf.Sign(fx) * Mathf.Sqrt(Mathf.Max(cap * cap - fy * fy, 0.09f * cap * cap));
+                        // Braking far past what the tyre holds: the anti-lock lets it scrub, faintly.
+                        if (Mathf.Abs(vLong) > 3f) w.Skid = Mathf.Max(w.Skid, 0.4f * Mathf.Clamp01(wheelBrake / cap - 1.3f));
+                    }
                     else if (Mathf.Abs(fx) > cap * 0.95f)
                     {
                         fx = Mathf.Sign(fx) * cap * 0.9f;
                         fy *= 0.6f;
+                        w.Skid = Mathf.Max(w.Skid, 0.85f);   // wheelspin
                     }
                     float total = Mathf.Sqrt(fx * fx + fy * fy);
                     if (total > cap)
@@ -359,6 +380,9 @@ namespace TarmacGauntlet.Raceday
                     }
                 }
                 body.AddForceAtPosition(forward * fx + side * fy, hit.point);
+                if (kind != SurfaceKind.Tarmac && kind != SurfaceKind.Kerb) w.Skid = 0f;
+                w.Contact = hit.point;
+                w.ContactNormal = n;
                 if (cap > 1f)
                 {
                     gripUsed += Mathf.Min((fx * fx + fy * fy) / (cap * cap), 1f);

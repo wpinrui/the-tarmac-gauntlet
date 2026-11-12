@@ -25,7 +25,7 @@ namespace TarmacGauntlet.Raceday
         public float Wear;
         /// <summary>Degrees the car faces right of along the track: a spun car.</summary>
         public float Turned;
-        /// <summary>The car the player takes in the debug menu when they drive.</summary>
+        /// <summary>The car the player would drive in the set-up.</summary>
         public bool Player;
         /// <summary>Stopped and turned across the track: it starts as a car that has just spun, a ghost getting back.</summary>
         public bool Spun => Speed == 0f && Math.Abs(Turned) >= Rejoin.SpunAngle;
@@ -48,14 +48,13 @@ namespace TarmacGauntlet.Raceday
 
     /// <summary>
     /// A short set-up that shows one rule of the AI racecraft spec at work: a few cars at a known spot
-    /// and speed. The test suite runs each one and scores it, and the raceday debug menu lets Ivan
-    /// place and watch it. The first car is the one the rule is about.
+    /// and speed. The test suite runs each one and scores it. The first car is the one the rule is about.
     /// </summary>
     public sealed class Situation
     {
         /// <summary>The spec line, e.g. "T2".</summary>
         public string Id;
-        /// <summary>What it shows, as the debug menu lists it.</summary>
+        /// <summary>What it shows, as the test suite names it.</summary>
         public string Title;
         /// <summary>Lap distance the cars are placed from, m.</summary>
         public float At;

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using TarmacGauntlet.Visuals;
 using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
@@ -106,15 +107,7 @@ namespace TarmacGauntlet.Raceday
 
         private static Vector3 ToVector(float[] v) => v != null && v.Length == 3 ? new Vector3(v[0], v[1], v[2]) : Vector3.zero;
 
-        private static string LoadJson(string modelPath)
-        {
-#if UNITY_EDITOR
-            string path = System.IO.Path.ChangeExtension(modelPath, ".doors.json");
-            var asset = UnityEditor.AssetDatabase.LoadAssetAtPath<TextAsset>(path);
-            return asset != null ? asset.text : null;
-#else
-            return null;
-#endif
-        }
+        private static string LoadJson(string modelPath) =>
+            ArtLibrary.Load<TextAsset>(System.IO.Path.ChangeExtension(modelPath, ".doors.json"))?.text;
     }
 }

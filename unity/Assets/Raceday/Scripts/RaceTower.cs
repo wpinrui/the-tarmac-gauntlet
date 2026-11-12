@@ -6,7 +6,8 @@ using UnityEngine;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// The TV timing tower in the top left corner. A tab on top counts down the race time left. Under
+    /// The TV timing tower in the top left corner. A tab on top counts down the race time left, and a
+    /// dimmer tab beside it shows the time of day. Under
     /// it, one row per car: position, a slash in the team's colour, team name, class badge and fake laps
     /// completed (<see cref="Standings"/>). Class leaders have their position on a red block, and the
     /// player's row is white. It shows every class leader and the four cars either side of the player,
@@ -32,7 +33,7 @@ namespace TarmacGauntlet.Raceday
         public string[] Teams;
         public CarClass[] Classes;
         public Color[] Colours;
-        /// <summary>Index of the player's car in <see cref="Cars"/>.</summary>
+        /// <summary>Index in <see cref="Cars"/> of the car the tower is seen from: the car the cameras ride with.</summary>
         public int Player = -1;
         /// <summary>Length of the lap, m.</summary>
         public float Lap;
@@ -61,6 +62,8 @@ namespace TarmacGauntlet.Raceday
         private static readonly Color HeaderText = new Color(1f, 1f, 1f, 0.6f);
 
         private readonly List<Standings.Car> order = new List<Standings.Car>();
+        /// <summary>The cars in race order, leader first, as of this frame. Each one's Id indexes <see cref="Cars"/>.</summary>
+        public IReadOnlyList<Standings.Car> Order => order;
         private readonly List<Standings.Row> rows = new List<Standings.Row>();
         private readonly Dictionary<int, string> laps = new Dictionary<int, string>();
         private readonly Dictionary<string, string> fitted = new Dictionary<string, string>();
@@ -68,8 +71,11 @@ namespace TarmacGauntlet.Raceday
         private float clock;
         /// <summary>Race seconds since the start, on the race clock.</summary>
         public float RaceTime => clock * TimeCompression;
+
+        /// <summary>Moves the race clock to this many race seconds from the start. For the debug menu.</summary>
+        public void SetRaceTime(float raceSeconds) => clock = Mathf.Max(0f, raceSeconds) / TimeCompression;
         private Font bold, semiBold;
-        private GUIStyle clockStyle, posStyle, teamStyle, badgeStyle, gapStyle, headerStyle;
+        private GUIStyle clockStyle, hourStyle, posStyle, teamStyle, badgeStyle, gapStyle, headerStyle;
         private int styledFor = -1;
         private Texture2D slash, lead;
         private string[] positions;
@@ -93,15 +99,17 @@ namespace TarmacGauntlet.Raceday
         private void Update()
         {
             if (entries == null) return;
-            if (Racing == null || Racing()) clock += Time.deltaTime;
+            bool racing = Racing == null || Racing();
+            if (racing) clock += Time.deltaTime;
             order.Clear();
             for (int i = 0; i < Cars.Length; i++)
             {
                 if (Cars[i] == null) continue;
                 entries[i].Distance = Cars[i].Traffic.Distance;
+                entries[i].Player = i == Player;
                 order.Add(entries[i]);
             }
-            Standings.Rank(order, Lap);
+            Standings.Rank(order, Lap, racing);
             Standings.Rows(order, Fit(), rows);
         }
 
@@ -113,6 +121,20 @@ namespace TarmacGauntlet.Raceday
             return Mathf.Max(1, Mathf.FloorToInt(room / RowHeight));
         }
 
+        /// <summary>The screen pixels the tower covers, or an empty rect while it isn't drawn.</summary>
+        public Rect Area
+        {
+            get
+            {
+                if (Hidden || rows.Count == 0) return Rect.zero;
+                float u = Unit();
+                int breaks = 0;
+                foreach (Standings.Row r in rows) if (r.BreakBefore) breaks++;
+                float height = TabHeight + 2f * BodyPad + HeaderHeight + rows.Count * RowHeight + breaks * BreakHeight;
+                return new Rect(Margin * u, Margin * u, Width * u, height * u);
+            }
+        }
+
         /// <summary>The whole tower is drawn at this share of the design's size.</summary>
         private const float Scale = 0.7f;
 
@@ -121,7 +143,7 @@ namespace TarmacGauntlet.Raceday
 
         private void OnGUI()
         {
-            if (Hidden || Event.current.type != EventType.Repaint || rows.Count == 0) return;
+            if (Hidden || DebugMenu.Bare || Event.current.type != EventType.Repaint || rows.Count == 0) return;
             float u = Unit();
             Style(u);
 
@@ -131,6 +153,10 @@ namespace TarmacGauntlet.Raceday
             var tab = new Rect(x, y, tabWidth, TabHeight * u);
             Fill(tab, TabColour, new Vector4(Radius * u, Radius * u, 0f, 0f));
             GUI.Label(tab, time, clockStyle);
+            string hour = TimeOfDayText;
+            var hourTab = new Rect(tab.xMax + BodyPad * u, y, hourStyle.CalcSize(new GUIContent(hour)).x + 2f * TabPad * u, TabHeight * u);
+            Fill(hourTab, TabColour, new Vector4(Radius * u, Radius * u, 0f, 0f));
+            Text(hourTab, hour, hourStyle, HeaderText);
             y = tab.yMax;
 
             int breaks = 0;
@@ -203,6 +229,17 @@ namespace TarmacGauntlet.Raceday
         /// <summary>The race time left, as the tab on top shows it.</summary>
         public string TimeLeft => Clock();
 
+        /// <summary>The local time of day on the race clock, in 12-hour notation, as the tab beside the countdown shows it.</summary>
+        public string TimeOfDayText
+        {
+            get
+            {
+                int m = Mathf.FloorToInt(TimeOfDay.StartHour * 60f + RaceTime / 60f) % (24 * 60);
+                int h = m / 60, h12 = h % 12 == 0 ? 12 : h % 12;
+                return $"{h12}:{m % 60:00} {(h < 12 ? "AM" : "PM")}";
+            }
+        }
+
         private string Clock()
         {
             float left = Mathf.Max(0f, RaceLength - clock * TimeCompression);
@@ -231,6 +268,7 @@ namespace TarmacGauntlet.Raceday
             styledFor = key;
             fitted.Clear();
             clockStyle = Make(bold, 1.3f * u, TextAnchor.MiddleCenter);
+            hourStyle = Make(semiBold, 1.3f * u, TextAnchor.MiddleCenter);
             posStyle = Make(semiBold, 1.05f * u, TextAnchor.MiddleRight);
             teamStyle = Make(bold, 0.98f * u, TextAnchor.MiddleLeft);
             badgeStyle = Make(bold, 0.9f * u, TextAnchor.MiddleCenter);
@@ -266,6 +304,27 @@ namespace TarmacGauntlet.Raceday
         {
             float d = Mathf.Sqrt((x - 0.5f) * (x - 0.5f) + (y - 0.5f) * (y - 0.5f));
             return (d > 0.34f && d < 0.48f) || (d > 0.1f && d < 0.18f);
+        });
+
+        /// <summary>A helmet side on, its visor cut out.</summary>
+        internal static Texture2D HelmetIcon() => Shape(1f, 1f, (x, y) =>
+        {
+            float d = Mathf.Sqrt((x - 0.5f) * (x - 0.5f) + (y - 0.42f) * (y - 0.42f));
+            bool shell = d < 0.44f && y > 0.12f;
+            bool visor = x > 0.46f && y > 0.36f && y < 0.56f;
+            return shell && !visor;
+        });
+
+        /// <summary>A spanner on the slant, its open jaw top right.</summary>
+        internal static Texture2D SpannerIcon() => Shape(1f, 1f, (x, y) =>
+        {
+            float along = (x + y) * 0.7071f, across = (y - x) * 0.7071f;
+            bool handle = Mathf.Abs(across) < 0.09f && along > 0.14f && along < 1.0f;
+            float hx = x - 0.7f, hy = y - 0.7f;
+            bool head = hx * hx + hy * hy < 0.23f * 0.23f;
+            float jx = x - 0.8f, jy = y - 0.8f;
+            bool jaw = jx * jx + jy * jy < 0.12f * 0.12f || (Mathf.Abs((jy - jx) * 0.7071f) < 0.08f && (jx + jy) > 0f);
+            return (handle || head) && !jaw;
         });
 
         /// <summary>A fuel pump with its hose.</summary>

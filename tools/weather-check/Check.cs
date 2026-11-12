@@ -117,8 +117,64 @@ public static class Check
         float slower = 100f * (1f / (float)Math.Sqrt(wetGrip) - 1f);
         Expect("a wet lap is about 10 to 15% slower", slower > 10f && slower < 16f, $"{slower:0.0}% at 1 mm");
 
+        Lights();
+
         Console.WriteLine(failed == 0 ? "all ok" : $"{failed} failed");
         return failed == 0 ? 0 : 1;
+    }
+
+    /// <summary>Checks the lights come on with the clear dusk, earlier under cloud and rain, and never flick on or off.</summary>
+    private static void Lights()
+    {
+        int raceMinutes = 24 * 60;
+        var elevation = new float[raceMinutes + 1];
+        for (int m = 0; m <= raceMinutes; m++) elevation[m] = SkyClock.At(Start + m / 60f, SkyClock.Look).SunElevation;
+        var clear = new WeatherState { Cloud = 0.3f, Wind = 1f };
+        float clearDiff = 0f;
+        for (int m = 0; m <= raceMinutes; m++)
+        {
+            SkyState s = SkyClock.At(Start + m / 60f, SkyClock.Look);
+            WeatherSky.Apply(ref s, clear, WeatherSky.Lights(s.SunElevation, WeatherSky.Dusk(clear)));
+            clearDiff = Math.Max(clearDiff, Math.Abs(s.Lights - s.Night));
+        }
+        Expect("fair weather keeps the clear dusk for the lights", clearDiff < 1e-6f, $"largest difference {clearDiff:0.000000}");
+
+        float On(float hour, float cloud, float rain) =>
+            WeatherSky.Lights(SkyClock.At(hour, SkyClock.Look).SunElevation, WeatherSky.Dusk(new WeatherState { Cloud = cloud, Rain = rain }));
+        float clearDusk = On(17.57f, 0f, 0f), greyDusk = On(17.57f, 1f, 0f), wetAfternoon = On(16.5f, 1f, 8f), wetNoon = On(12.3f, 1f, 30f), greyDay = On(15f, 1f, 0f);
+        Expect("under a full overcast the lights are on by 17:34", clearDusk < 0.01f && greyDusk > 0.12f, $"clear {clearDusk:0.00}, overcast {greyDusk:0.00}");
+        Expect("heavy rain brings them on by 16:30", wetAfternoon > 0.12f, $"{wetAfternoon:0.00}");
+        Expect("they stay off by day, even in a downpour at noon", wetNoon == 0f && greyDay == 0f, $"noon {wetNoon:0.00}, overcast 15:00 {greyDay:0.00}");
+
+        // How far the lights are on (NightLook.On) may rise and fall with the weather, but never off and back on within ten minutes.
+        const int Window = 10;
+        float maxStep = 0f, worstFlicker = 0f;
+        int worstSeed = 0, worstMinute = 0;
+        var on = new float[raceMinutes + 1];
+        for (int seed = 1; seed <= 400; seed++)
+        {
+            var plan = new WeatherPlan(seed, Start);
+            float dusk = WeatherSky.Dusk(plan.At(0f));
+            float prev = WeatherSky.Lights(elevation[0], dusk);
+            on[0] = SkyClock.Smooth(0f, 0.12f, prev);
+            for (int m = 1; m <= raceMinutes; m++)
+            {
+                dusk = WeatherSky.Settle(dusk, plan.At(m * 60f), 60f);
+                float now = WeatherSky.Hold(prev, WeatherSky.Lights(elevation[m], dusk), dusk);
+                maxStep = Math.Max(maxStep, Math.Abs(now - prev));
+                on[m] = SkyClock.Smooth(0f, 0.12f, now);
+                prev = now;
+            }
+            for (int m = 0; m + Window <= raceMinutes; m++)
+            {
+                float travel = 0f;
+                for (int k = m + 1; k <= m + Window; k++) travel += Math.Abs(on[k] - on[k - 1]);
+                float flicker = travel - Math.Abs(on[m + Window] - on[m]);
+                if (flicker > worstFlicker) { worstFlicker = flicker; worstSeed = seed; worstMinute = m; }
+            }
+        }
+        Expect("the lights fade over minutes, never in one jump", maxStep < 0.15f, $"largest change {maxStep:0.000} a race minute");
+        Expect("the lights never go off and back on within ten minutes", worstFlicker < 0.5f, $"most back and forth {worstFlicker:0.00} in ten minutes, race {worstSeed} at {worstMinute} min");
     }
 
     private static void Expect(string what, bool ok, string detail)

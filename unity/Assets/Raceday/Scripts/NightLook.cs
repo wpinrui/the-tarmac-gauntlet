@@ -27,7 +27,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>The stands' seats and crowd glow this much at night, lit by the roof floodlights.</summary>
         public const float StandGlow = 0.22f;
 
-        /// <summary>How far the floodlights and headlamps are on for a night amount from <see cref="SkyClock"/>: on from first dusk.</summary>
+        /// <summary>How far the floodlights and headlamps are on for a darkness from <see cref="TimeOfDay.Lights"/>: on from first dusk.</summary>
         public static float On(float night) => SkyClock.Smooth(0f, 0.12f, night);
     }
 }

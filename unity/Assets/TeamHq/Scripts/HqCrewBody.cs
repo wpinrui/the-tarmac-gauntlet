@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using TarmacGauntlet.Rendering;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -250,18 +251,14 @@ namespace TarmacGauntlet.TeamHq
             for (int m = 0; m < p.Length; m++)
             {
                 MatInfo mi = info.mats[m];
-                var mat = new Material(Shader.Find("Standard")) { name = Id + "/" + m + "/" + colour };
+                var mat = new Material(Lit.Shader) { name = Id + "/" + m + "/" + colour };
                 mat.color = new Color(mi.color[0], mi.color[1], mi.color[2], mi.color.Length > 3 ? mi.color[3] : 1).gamma;
                 string recoloured = colour > 0 && mi.colours != null && colour < mi.colours.Length ? mi.colours[colour] : "";
                 Texture2D map = string.IsNullOrEmpty(recoloured) ? maps[m] : Tex(recoloured);
                 if (map != null) mat.mainTexture = map;
-                if (normals[m] != null)
-                {
-                    mat.SetTexture("_BumpMap", normals[m]);
-                    mat.EnableKeyword("_NORMALMAP");
-                }
+                if (normals[m] != null) Lit.NormalMap(mat, normals[m]);
                 mat.SetFloat("_Metallic", mi.metal);
-                mat.SetFloat("_Glossiness", 1 - mi.rough);
+                mat.SetFloat("_Smoothness", 1 - mi.rough);
                 p[m] = mat;
             }
             return palettes[colour] = p;

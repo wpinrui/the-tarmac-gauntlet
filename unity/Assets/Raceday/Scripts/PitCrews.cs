@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TarmacGauntlet.Rendering;
 using TarmacGauntlet.Simulation;
 using TarmacGauntlet.TeamHq;
 using UnityEngine;
@@ -155,7 +156,7 @@ namespace TarmacGauntlet.Raceday
                 m.mainTexture = own[s].mainTexture;
                 if (own[s].HasProperty("_BumpMap")) m.SetTexture("_BumpMap", own[s].GetTexture("_BumpMap"));
                 m.SetTexture("_Mask", Resources.Load<Texture2D>(mask));
-                m.SetFloat("_Glossiness", own[s].GetFloat("_Glossiness"));
+                m.SetFloat("_Smoothness", own[s].GetFloat("_Smoothness"));
                 materials[s] = m;
                 parts.Add(s);
             }
@@ -335,7 +336,7 @@ namespace TarmacGauntlet.Raceday
                 CarRaceLog log = car.Supplies?.Log;
                 c.NewDriver = log != null && log.NextDriverIndex != log.DriverIndex;
                 // As the stop will: the tyres ordered and a set left, so the fresh tyres are fetched as the car comes in.
-                c.NewTyres = car.Supplies != null && car.Supplies.Orders.Tyres && car.Supplies.TyresLeft;
+                c.NewTyres = car.Supplies != null && (car.Supplies.Planner != null ? car.Supplies.Planner.Tyres : car.Supplies.TyresLeft);
             }
             return c;
         }

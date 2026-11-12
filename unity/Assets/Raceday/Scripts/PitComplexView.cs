@@ -61,7 +61,7 @@ namespace TarmacGauntlet.Raceday
         {
             if (Sky == null || Materials == null || Time.unscaledTime < nextCheck) return;
             nextCheck = Time.unscaledTime + SkyCheck;
-            float night = SkyClock.At(Sky.Hour, SkyClock.Look).Night;
+            float night = Sky.Lights;
             if (Mathf.Abs(night - lastNight) < 0.01f) return;
             lastNight = night;
             Materials.Night(night);

@@ -1,11 +1,14 @@
 using System.Collections.Generic;
+using TarmacGauntlet.Rendering;
+using TarmacGauntlet.Visuals;
 using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
     /// Switches the night lighting on as the sky darkens: the floodlights' lenses and pools, the stands' glow and every
-    /// car's lamps, all from the night amount of <see cref="SkyClock"/>. The ground is lit by the pools alone. Real
+    /// car's lamps, all from how dark the sky is for the lights (<see cref="TimeOfDay.Lights"/>), which
+    /// brings them on earlier under cloud and rain. The ground is lit by the pools alone. Real
     /// lights are kept for the cars near the camera, and light nothing but cars: as many as the settings allow, a third
     /// of them the headlamps of the cars nearest the camera and the rest at the floodlights nearest the camera's view. A light
     /// moving to another floodlight or car fades out first and back in there, so nothing pops. Two uplights light the
@@ -18,15 +21,8 @@ namespace TarmacGauntlet.Raceday
         public FloodMaterials Materials;
         public StandMaterials Stands;
 
-        /// <summary>
-        /// Where the settings menu keeps how many real lights to use (GameSettings.RealLights in Management, which this
-        /// assembly can't see), how many it allows, and how many there are before anyone sets it.
-        /// </summary>
-        public const string RealLightsKey = "settings.reallights";
-        public const int MostRealLights = 24, DefaultRealLights = 6;
-
         /// <summary>The real lights from the settings: a third of them headlamps, the rest at floodlights.</summary>
-        public static int RealLights => Mathf.Clamp(PlayerPrefs.GetInt(RealLightsKey, DefaultRealLights), 0, MostRealLights);
+        public static int RealLights => GraphicsOptions.RealLights.Value;
         /// <summary>Real seconds between looks at the sky and at where the camera is.</summary>
         private const float Check = 0.25f;
         /// <summary>A real light fades in or out over this long, real seconds.</summary>
@@ -95,7 +91,7 @@ namespace TarmacGauntlet.Raceday
             if (Time.unscaledTime >= nextCheck)
             {
                 nextCheck = Time.unscaledTime + Check;
-                float now = SkyClock.At(Sky.Hour, SkyClock.Look).Night;
+                float now = Sky.Lights;
                 if (Mathf.Abs(now - night) >= 0.005f)
                 {
                     night = now;
@@ -120,7 +116,7 @@ namespace TarmacGauntlet.Raceday
             foreach (Light l in uplights)
             {
                 bool near = cam != null && (cam.transform.position - l.transform.position).sqrMagnitude < UplightReach * UplightReach;
-                l.intensity = on * UplightIntensity;
+                l.intensity = LightFalloff.Urp(on * UplightIntensity, UplightRange);
                 bool lit = near && on > 0.001f;
                 if (l.enabled != lit) l.enabled = lit;
             }
@@ -203,7 +199,7 @@ namespace TarmacGauntlet.Raceday
                 if (s.Light.enabled) s.Light.enabled = false;
                 return;
             }
-            s.Light.intensity = full * s.Level;
+            s.Light.intensity = LightFalloff.Urp(full * s.Level, s.Light.range);
             if (!s.Light.enabled) s.Light.enabled = true;
         }
 

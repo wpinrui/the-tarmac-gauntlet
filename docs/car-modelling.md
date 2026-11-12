@@ -7,6 +7,7 @@ Smooth, recognisable lines come first. That often means simpler geometry.
 Tiny details are left out to keep geometry simple and safe from defects.
 There is no triangle budget.
 Otherwise follow the reference.
+The reference is for measurements only. Never chase its exact shapes: a simple smooth shape with small inaccuracies beats a close copy with broken geometry.
 
 ## Out of scope
 Liveries, sponsor decals and race numbers are not the modeller's job.
@@ -36,22 +37,19 @@ Overhangs stretch to the published length.
 Each row's height and width becomes a smooth curve (monotone cubic), so no outline is jagged.
 rows.py writes rows.json.
 
-### Measuring without perspective (optional)
+### Tracing without perspective
 A photo or a render with perspective puts near parts too big and far parts too small. Traced from one, the pillars, overhangs and glass lines land in the wrong places.
-When Ivan supplies a 3D model, measure it directly instead of tracing pictures of it:
-- Load it in Blender's Python module. Find the wheel centres from the tyre meshes and scale the model to the published wheelbase.
-- Slice the painted body meshes at stations a few centimetres apart along the car. Each slice gives that station's section.
-- Take each part's outline (glass, lamps, grille, shut lines, mirrors) from its own meshes, projected straight onto the matching view plane.
-- Write it all to rows.json as usual.
+When Ivan supplies a 3D model, render it orthographically from the side, front, rear and top on a plain background, and trace the rows off those renders like a drawing.
+Never take surfaces or outlines from its meshes. The model is only for checking measurements: wheelbase, overhangs, glass and belt heights.
 When there is no model, use orthographic drawings only, never perspective photos. Look up published measurements as well: overhangs, ground to roof, belt line, windscreen base and top, door length, glass heights. Check every traced row against them.
 
 ## 4. Build the body (body.py)
 body.py lofts the outer skin from rows.json, in pure numpy.
 Build space is metres: x forward from mid wheelbase, y left, z up from the ground.
 The skin splits into pieces: body, doors, bonnet, boot or engine cover, glass.
-Every door that opens is its own closed shell, cut from the body along its shut line, named `door_l` or `door_r`. The opening it leaves gets jamb faces in the interior material.
+Every door that opens is its own closed shell, cut from the body along its shut line, named `door_l` or `door_r`. The door's edges and the jambs of the opening it leaves are painted in `body`, like a real car.
 Every piece is a closed shell with thickness. Shut lines are V grooves.
-A bonnet shut line starts at the windscreen's lower corners. It runs forward along the panels it meets, such as the lamps and the wings, then across the nose. The bonnet reaches back to the windscreen, so its line has no rear edge.
+A bonnet shut line starts at the windscreen's base, inboard of its lower corners. It bends out to the bonnet's rear corners, then runs forward along the panels it meets, such as the lamps and the wings, then across the nose. The bonnet reaches back to the windscreen, so its line has no rear edge.
 Wheel arches step round at even angles.
 The bonnet crown narrows with the nose, so no beak forms at the centre.
 
@@ -66,7 +64,7 @@ Door mirrors get a separate recessed glass part.
 Every car is left-hand drive: the driver's seat and wheel sit on the left, because the pit lane is on the left. Both doors open, so the car stays symmetrical.
 Lay each window's glass, black band and cutter along that window's own normal, never along the car's axes. A shallow window projected from straight behind or above stretches its band.
 Rebuild each window outline from plain fits: one even curve for each long edge and a straight line for each side. A measured outline carries the reference's waves into the band.
-Every inner face uses an interior material.
+Every other inner face uses an interior material.
 Paint every car amber, whatever colour the reference car is.
 The paint material is named `body`, so the game can respray it.
 
@@ -84,12 +82,12 @@ Publish the viewer as an Artifact and show Ivan at once.
 Run no checks until Ivan confirms the direction.
 
 ## 8. Check, then fix
-After Ivan confirms the direction, check.py must find no open or inward shells, no floating parts, no intersecting pairs and no z-fighting.
+After Ivan confirms the direction, run check.py. It finds open or inward shells, floating parts, intersecting pairs and z-fighting.
 check.py also runs with every door open.
 Close-ups come before posting: the nose, the shut lines, the lamps.
 A pillar shut line runs down the pillar's middle, so each door shows the same width of black.
 Black window trim is one even band, with no jump at a shut line.
-Fix every hit, then show Ivan the fixed version. He must say ok before it goes in.
+Fix only the hits Ivan could see. Ignore hits hidden inside other parts or on options he did not pick. Then show Ivan the fixed version. He must say ok before it goes in.
 
 ## 9. Put it in the game
 Record Ivan's viewer picks in rows.py, then `export.py <dir> --game` writes only the picked options with Unity axes (forward +Z, up +Y, metres).
@@ -98,4 +96,6 @@ export.py writes each door's hinge axis and open angle, in Unity axes, to `<Name
 Every file and folder gets a committed `.meta` with its own random guid.
 The build scripts live in `tools/cars/<name>/`: rows.py, rows.json, body.py, parts.py, glyphs.py, glyphs.json, export.py, publish.py, check.py.
 Shared primitives live in `tools/cars/common/`: lofting, laying shapes on the body, grooves, booleans, lathing, export, the viewer, checks and glyph outlines. They hold no shapes, sizes, colours or part designs. Every visual decision is written fresh in the car's own scripts. Nothing visual carries over from another car.
+Register the car in `unity/Assets/Simulation/Data/CarArt.cs`: add its model id and OBJ path to `ById`. An unregistered car is drawn with its class's stand-in model, so it never appears in the game.
+Before merging, check that `ById` has the car's entry and that its path matches the exported OBJ.
 Merge to main so Ivan can test it in Unity.

@@ -7,6 +7,39 @@ assembly (`TarmacGauntlet.Simulation.asmdef`) with no UnityEngine references.
 
 Every new file and folder under `Assets/` needs a committed `.meta` file with its own random guid.
 
+## Building
+
+`Tarmac Gauntlet > Build` writes the Windows game to `unity/Builds/Windows`. `Tarmac Gauntlet > Build and Install` also
+copies it to `%LOCALAPPDATA%\Programs\The Tarmac Gauntlet`, replacing the last install, with Start menu and desktop
+shortcuts (`WindowsBuild.cs`).
+
+## Rendering
+
+The project renders with the Universal Render Pipeline. Each quality level has its own pipeline asset in
+`Assets/Rendering/Resources/Quality`, sharing `Renderer.asset`:
+
+| Level | Sun shadows | Render scale | Edges |
+| --- | --- | --- | --- |
+| Low | 1 cascade, 1024, 150 m | 67%, STP | STP |
+| Medium | 2 cascades, 2048, 250 m | 80%, STP | STP |
+| High | 4 cascades, 4096, 400 m | 100% | SMAA |
+
+Medium is the level for an Intel Arc B390 at 1920 x 1200 and 60 fps, and the default. `QualityLevels.cs` puts the chosen
+level's asset in place as the game starts and gives every game camera post-processing and SMAA. ProjectSettings is not
+committed, so `Assets/Rendering/Editor/UsePipeline.cs` puts the Medium asset in the graphics settings whenever the editor
+loads. Materials made in code use URP Lit through `Assets/Rendering/Scripts/Lit.cs`, and the game's own lit shaders share
+`Assets/Rendering/Shaders/TarmacLit.hlsl`; the ones that move (car paint and carbon, liveries, pit crews, pit kit) also draw motion vectors
+(`TarmacMotion.hlsl`) so the upscaler follows them. The menus' frosted glass is `GlassBlurFeature` on
+the renderer, beside URP's ambient occlusion at half resolution, after the opaque pass.
+
+Each scene's global volume carries `PostEffects`: the ACES tone curve and a colour grade, half resolution bloom, and
+Gaussian depth of field for a camera that calls `PostEffects.Focus` that frame. The
+broadcast director does for every shot but the onboard; a replay camera should too. A driving view never does, so it is
+never blurred. The race grades for the time of day and the weather (`SkyGrade.cs`). A camera cut clears the
+upscaler's history. There is no motion blur. Colour grading, bloom, ambient occlusion, depth of field,
+sky detail and the crowd each have a row in the graphics settings (`GraphicsOptions.cs`). URP's point and spot lights fall off with the square of the distance;
+`LightFalloff.Urp` turns an intensity set for the built-in pipeline into one as bright a third of the way out to its range.
+
 ## Running the simulation tests
 
 The same `.cs` files also build as a plain .NET library, so the tests run without Unity.
@@ -55,14 +88,16 @@ helicopter, onboard and pit lane shots. While you drive, the TV view is your onb
 
 The director's shots carry the broadcast graphics (`BroadcastGraphics.cs`): a battle strip with the gap in a
 fight, a driver strip the first time a car is on air in a stint, a pit timer with fuel, tyres and driver
-change lit as each is done, and the track map during helicopter shots. `M` toggles the map.
+change lit as each is done, and the track map during helicopter shots, or always with Track map on in the settings.
 
 `T` opens live timing while the AI drives your car (`LiveTiming.cs`), with the race at 16x behind it: every
 car in race order by class, your car's onboard and the track map, its driver, fuel, tyres and condition with
-the laps each lasts on the engine map in use, the engine map, and the next stop. Pit Now calls the car in at the
+the laps each lasts on the engine map in use, the engine map, and the next stop. While you drive, the HUD shows
+the engine maps on their keys, `1`, `2` and `3`, with the one in use lit. Pit Now calls the car in at the
 next pit entry, and the stop puts in the litres and tyres asked for and the next driver picked (`PitOrders` in
 `Consumables.cs`). Left alone the car pits and chooses for itself, and each stop puts the orders back to a full
-tank and new tyres. The red button top right, or `T`, returns to the race.
+tank and new tyres. The red button top right, or `T`, returns to the race. Over the race the same corner has a
+button into live timing and, while a teammate drives, the skip, each showing its key.
 
 While a teammate drives, `N` or the button beside the red one skips to your next stint: the race runs at 32x until
 the stop that puts you in is over and the car is back on track, then hands you the wheel. `F` or `I` stops the
@@ -86,9 +121,9 @@ cars out cleanly (`run.sh pitstart` for the same with a line per car). `StandInC
 it in step when those change.
 
 Driving: left and right arrows steer, up accelerates, down brakes (hold it at a standstill to
-reverse). `M` toggles automatic and manual; `A` and `Z` shift up and down and also switch to manual. The
-bottom right shows speed in km/h and the gear, blue in automatic and white in manual. `H`
-toggles steering help. Anti-lock brakes are always on. `R` puts the car back on track, which you
+reverse). The settings menu picks an automatic or manual gearbox; in manual `A` and `Z` shift up and down. The
+bottom right shows speed in km/h and the gear, blue in automatic and white in manual. Steering help
+is a setting too. Anti-lock brakes are always on. `R` puts the car back on track, which you
 need after a hard hit on a barrier. `C` cycles the chase, bonnet and bumper views, the free camera and the follow camera.
 
 The car's physics come from its game stats (`Raceday/Scripts/CarSpec.cs`): Power sets the engine,
@@ -141,6 +176,9 @@ line, so they follow the layout, and `Footprints` gives the ground they take for
 is solid. `StandLook` holds the stand shapes and colours Ivan picked. `bash tools/grandstands/run.sh [folder]` (needs the
 .NET 8 SDK) builds every stand shape and checks they stand clear of the track and the pits, nothing is buried, every
 stand is fenced, the crowd is modest and the meshes are cheap to draw. With a folder it writes the look preview there.
+Each fan is one card, two triangles (`CrowdCard`), that `Resources/Crowd/Crowd.shader` turns to the camera and draws a
+seated fan on, now and then with arms thrown up; the whole crowd is under 8,000 triangles. `CrowdView` hides it with its
+graphics option.
 
 ## Team HQ scene
 
@@ -166,6 +204,19 @@ into `Resources/Props` as `<id>.json`, `<id>_mesh.bytes` and its textures; `HqGe
 `tools/team-hq/props/props.json` holds each model's height, pose and simplification, and `props.txt` the list.
 `make_textures.py` turns Poly Haven photo textures into the building's surfaces in `Resources/Textures`.
 
+The room's light is baked (`HqLightingView.cs`). `bash tools/team-hq/bake/run.sh` (needs the .NET 8 SDK and Blender as a
+Python module, `pip install bpy`) bakes it with Cycles into `Resources/Lighting`: a lightmap holding the lamps, the daylight
+through the windows and every bounce, one reflection probe image per room (garage, office, trophy room), and the ambient
+light for whatever moves. The sun stays live for the cars' and crew's shadows, so only its bounce is baked. The lightmap
+layout is `HqLightmapLayout.cs`, run by both the bake and the game, and the lights and probes are in `HqLighting.cs`.
+Rebake after changing the building's lit parts, the props' places or the lights: until then the game lights the room
+live and logs that the bake is out of date. The Baked lighting and Baked reflections graphics options switch back to
+live lamps and one live probe.
+
+Wear (oil under the cars, tyre marks from the doors, grime along the walls, worn patches, scuffed paint) is quads laid
+just off the floor and walls in `HqGeometry.AddWear`, drawn by `Resources/Wear/Grime.shader`, which multiplies the
+surface under it. `tools/team-hq/props/make_wear.py` draws the textures. The Wear graphics option hides it.
+
 ## Menus and saving
 
 The management menus sit over the Team HQ scene (`Assets/Management`, approved in the viewer
@@ -190,6 +241,14 @@ only through `GameSession.Apply`, which autosaves in the background. Each career
 For now a new game deletes the other careers once it is saved. A finished race (`RaceWeekend.Finished`) is applied
 and saved by `GameSession` itself. Saves are JSON (Newtonsoft); raise `SaveJson.Version` and add a step to
 `SaveJson.Migrate` when the format changes.
+
+Escape in a race opens its pause menu (`RacePauseMenu.cs`): the race stops dead (`RaceWeekend.Paused`) under Resume,
+Save, Settings, Retire, Quit to main menu and Quit game. Save writes the race as it stands to `race.json` in the
+career's folder (`RaceSave`: the set-up, clocks, weather seed, every car's spot, lap, fuel, tyres and race log), and
+Continue on the main menu goes back into it. A car that was in the pit lane comes back on track beside its spot. Race
+saves are not migrated: one that no longer reads is deleted. The race save goes once the race is settled, or when
+the next race starts from the lineup. Retire takes the player's car out (`FailureType.Withdrawn`) and settles the race
+from where every car is.
 
 ```
 dotnet test unity/dotnet/TarmacGauntlet.Career.Tests

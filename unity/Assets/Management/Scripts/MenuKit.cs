@@ -36,6 +36,25 @@ namespace TarmacGauntlet.Management
 
         internal static string Num(int n) => n.ToString(CultureInfo.InvariantCulture);
 
+        // ------------------------------------------------------------------ menu items
+
+        /// <summary>A group of menu items. Every group after the first sits a gap below the one before.</summary>
+        internal static VisualElement MenuGroup(int index)
+        {
+            var group = new VisualElement();
+            group.AddToClassList("group");
+            if (index > 0) group.AddToClassList("spaced");
+            return group;
+        }
+
+        /// <summary>One item of a menu, in capitals.</summary>
+        internal static VisualElement MenuItem(string text, Action onClick)
+        {
+            Label item = Text(text.ToUpperInvariant(), "item");
+            item.RegisterCallback<ClickEvent>(_ => onClick());
+            return item;
+        }
+
         /// <summary>Whole dollars, such as $12,500 or -$800.</summary>
         internal static string Money(double amount)
         {
@@ -191,6 +210,14 @@ namespace TarmacGauntlet.Management
             chevron.Add(Icon(icon, "chevron-image"));
             chevron.RegisterCallback<ClickEvent>(_ => onClick());
             return chevron;
+        }
+
+        /// <summary>The back arrow at the top left of every panel.</summary>
+        internal static VisualElement BackButton(Action onClick)
+        {
+            VisualElement back = Chevron("arrow-left", onClick);
+            back.AddToClassList("back");
+            return back;
         }
 
         /// <summary>

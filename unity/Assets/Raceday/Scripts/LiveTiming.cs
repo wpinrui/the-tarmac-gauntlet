@@ -9,9 +9,10 @@ namespace TarmacGauntlet.Raceday
     /// it. Left: every car in race order, filtered by class, your row in white. Right: your car's
     /// onboard and the track map, then your car's driver, fuel, tyres, condition and the driver's fatigue,
     /// fuel and tyres with the laps they last on the engine map in use (the one that runs out first in amber), the engine map, and
-    /// the next stop: litres, tyres, next driver and Pit now (<see cref="PitOrders"/>). Left alone the
-    /// car still pits and chooses for itself. The red button top right, or T, returns to the race, and
-    /// the button beside it skips to your next stint, while a teammate drives.
+    /// the next stop: laps of fuel, tyres, repairs, next driver and Pit now (<see cref="PitOrders"/>), the same plan
+    /// as the pit panel's (<see cref="PitPanel"/>). Left alone the car still pits and the crew choose (<see cref="StopPlanner"/>).
+    /// The red button top right, or T, returns to the race, and the button beside it, or N, skips to your next stint,
+    /// while a teammate drives. Over the race, the same corner has the way in, and the skip, each with its key.
     /// Laid out on a 1920 by 1080 screen and scaled to the screen's height.
     /// </summary>
     public sealed class LiveTiming : MonoBehaviour
@@ -40,7 +41,7 @@ namespace TarmacGauntlet.Raceday
 
         public bool Open { get; private set; }
 
-        private const float FuelStep = 5f;
+        private static readonly RepairMode[] RepairChoices = { RepairMode.Crew, RepairMode.All, RepairMode.None };
         /// <summary>Where the timing columns start along a row, px on the 1920 layout.</summary>
         private const float ClassX = 560f, LapX = 676f, PitX = 740f;
         private const int PipWidth = 880, PipHeight = 496, MapWidth = 1040, MapHeight = 496;
@@ -115,7 +116,7 @@ namespace TarmacGauntlet.Raceday
                 entries[i].Distance = Cars[i].Traffic.Distance;
                 order.Add(entries[i]);
             }
-            Standings.Rank(order, Lap);
+            Standings.Rank(order, Lap, Tower == null || Tower.Racing == null || Tower.Racing());
             shown.Clear();
             foreach (Standings.Car c in order) if (filter == null || c.Class == filter) shown.Add(c);
         }
@@ -138,11 +139,16 @@ namespace TarmacGauntlet.Raceday
 
         private void OnGUI()
         {
-            if (!Open || entries == null || Supplies == null || Log == null) return;
+            if (DebugMenu.Bare || entries == null || Driver == null || Supplies == null || Log == null) return;
             k = Screen.height / 1080f;
             Style();
             bool paint = Event.current.type == EventType.Repaint;
             offset = (Screen.width / k - 1920f) / 2f;
+            if (!Open)
+            {
+                if (Driver.enabled) RaceButtons(paint);
+                return;
+            }
             if (paint) Fill(new Rect(0f, 0f, Screen.width, Screen.height), Ground, 0f);
 
             // Race time left, and the way back to the race.
@@ -153,29 +159,18 @@ namespace TarmacGauntlet.Raceday
                 Fill(clock, new Color(18f / 255f, 18f / 255f, 20f / 255f, 0.95f), 9f);
                 Label(clock, Tower != null ? Tower.TimeLeft : "", big, Color.white, TextAnchor.MiddleCenter);
             }
-            Rect live = R(1824f, 40f, 56f, 44f);
-            if (paint)
+            if (paint && Tower != null)
             {
-                Fill(live, Red, 9f);
-                Rect screen = new Rect(live.center.x - 12f * k, live.center.y - 8f * k, 24f * k, 17f * k);
-                GUI.DrawTexture(screen, Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, Color.white, Vector4.one * 2.2f * k, Vector4.one * 3f * k);
+                string hour = Tower.TimeOfDayText;
+                Rect day = new Rect(clock.xMax + 8f * k, clock.y, big.CalcSize(new GUIContent(hour)).x + 40f * k, clock.height);
+                Fill(day, new Color(18f / 255f, 18f / 255f, 20f / 255f, 0.95f), 9f);
+                Label(day, hour, big, new Color(1f, 1f, 1f, 0.6f), TextAnchor.MiddleCenter);
             }
-            if (Click(live)) Show(false);
-            if (CanSkip != null && CanSkip())
+            if (KeyButton(R(LiveX, 40f, KeyWidth, 44f), Red, ScreenIcon, "T", paint)) Show(false);
+            if (CanSkip != null && CanSkip() && KeyButton(R(SkipX, 40f, KeyWidth, 44f), new Color(1f, 1f, 1f, 0.1f), SkipIcon, "N", paint))
             {
-                Rect skip = R(1756f, 40f, 56f, 44f);
-                if (paint)
-                {
-                    Fill(skip, new Color(1f, 1f, 1f, 0.1f), 9f);
-                    float h = 18f * k, w = 13f * k;
-                    GUI.DrawTexture(new Rect(skip.center.x - w, skip.center.y - h / 2f, w, h), arrow, ScaleMode.StretchToFill, true, 0f, Color.white, 0f, 0f);
-                    GUI.DrawTexture(new Rect(skip.center.x, skip.center.y - h / 2f, w, h), arrow, ScaleMode.StretchToFill, true, 0f, Color.white, 0f, 0f);
-                }
-                if (Click(skip))
-                {
-                    Show(false);
-                    Skip?.Invoke();
-                }
+                Show(false);
+                Skip?.Invoke();
             }
 
             Timing(R(40f, 104f, 820f, 936f), paint);
@@ -355,7 +350,7 @@ namespace TarmacGauntlet.Raceday
 
         private static string Laps(float laps) => Mathf.FloorToInt(laps) + " LAPS";
 
-        /// <summary>The next stop: litres, tyres, next driver and Pit now.</summary>
+        /// <summary>The next stop: laps of fuel, tyres, repairs, next driver and Pit now. Each is the crew's call until set.</summary>
         private void Stop(Rect panel, bool paint)
         {
             if (paint) Fill(panel, Panel, 9f);
@@ -363,28 +358,38 @@ namespace TarmacGauntlet.Raceday
             PitOrders orders = s.Orders;
             float x = panel.x + 24f * k, w = panel.width - 48f * k, y = panel.y + 24f * k;
 
-            float room = Mathf.Max(s.Capacity - s.Fuel, 0f);
-            float litres = Mathf.Clamp(orders.Litres ?? room, 0f, room);
+            StopPlanner plan = s.Planner;
+            if (plan == null) return;
             if (paint) Label(new Rect(x, y, w, 44f * k), "FUEL", small, Dim, TextAnchor.MiddleLeft);
             var plus = new Rect(x + w - 44f * k, y, 44f * k, 44f * k);
-            var amount = new Rect(plus.x - 104f * k, y, 92f * k, 44f * k);
+            var amount = new Rect(plus.x - 124f * k, y, 112f * k, 44f * k);
             var minus = new Rect(amount.x - 56f * k, y, 44f * k, 44f * k);
             if (paint)
             {
                 Step(minus, "-");
                 Step(plus, "+");
-                Label(amount, "+" + Mathf.RoundToInt(litres) + " L", big, Color.white, TextAnchor.MiddleCenter);
+                Label(amount, plan.Full ? "FULL" : plan.Laps == 1 ? "1 LAP" : plan.Laps + " LAPS", big, Color.white, TextAnchor.MiddleCenter);
             }
-            if (Click(minus)) orders.Litres = Mathf.Max(0f, Mathf.Ceil(litres / FuelStep) * FuelStep - FuelStep);
-            if (Click(plus)) orders.Litres = Mathf.Min(room, Mathf.Floor(litres / FuelStep) * FuelStep + FuelStep);
+            if (Click(minus)) orders.Laps = Mathf.Max(1, plan.Laps - 1);
+            if (Click(plus)) orders.Laps = Mathf.Min(plan.FullLaps, plan.Laps + 1);
             y += 66f * k;
 
             bool sets = s.TyresLeft;
-            bool fresh = orders.Tyres && sets;
+            bool fresh = plan.Tyres;
             if (paint) Label(new Rect(x, y, w, 44f * k), "TYRES", small, Dim, TextAnchor.MiddleLeft);
             var tyres = new Rect(x + w - 140f * k, y, 140f * k, 44f * k);
             if (paint) Chip(tyres, fresh ? "NEW SET" : "KEEP", fresh, sets);
-            if (sets && Click(tyres)) orders.Tyres = !orders.Tyres;
+            if (sets && Click(tyres)) orders.Tyres = !fresh;
+            y += 66f * k;
+
+            if (paint) Label(new Rect(x, y, w, 44f * k), "REPAIRS", small, Dim, TextAnchor.MiddleLeft);
+            for (int i = 0; i < RepairChoices.Length; i++)
+            {
+                var chip = new Rect(x + w - (RepairChoices.Length - i) * 100f * k + 8f * k, y, 92f * k, 44f * k);
+                RepairMode m = RepairChoices[i];
+                if (paint) Chip(chip, m.ToString().ToUpperInvariant(), orders.Repairs == m, true);
+                if (Click(chip)) orders.Repairs = m;
+            }
             y += 66f * k;
 
             IReadOnlyList<RaceDriver> lineup = Log.Car.Lineup;
@@ -430,6 +435,60 @@ namespace TarmacGauntlet.Raceday
             string name = Game != null ? RaceWeekend.DriverName(id, Game) : id;
             int space = name.LastIndexOf(' ');
             return (space >= 0 ? name.Substring(space + 1) : name).ToUpperInvariant();
+        }
+
+        // ---------------------------------------------------------------- the key buttons
+
+        /// <summary>Where the top right buttons sit on the layout, and how wide each is with its key.</summary>
+        private const float LiveX = 1800f, SkipX = 1708f, KeyWidth = 80f;
+        private static readonly Color Glass = new Color(18f / 255f, 18f / 255f, 20f / 255f, 0.85f);
+
+        /// <summary>
+        /// Over the race while the AI drives your car: the way into live timing, and the skip to your stint while a
+        /// teammate drives, where the timing page has its own two buttons, each with its key.
+        /// </summary>
+        private void RaceButtons(bool paint)
+        {
+            if (RaceWeekend.Paused || RaceWeekend.Summary != null) return;   // under the pause menu, or the race is settled
+            if (KeyButton(R(LiveX, 40f, KeyWidth, 44f), Glass, TimingIcon, "T", paint)) Show(true);
+            if (CanSkip != null && CanSkip() && KeyButton(R(SkipX, 40f, KeyWidth, 44f), Glass, SkipIcon, "N", paint)) Skip?.Invoke();
+        }
+
+        /// <summary>A rounded button with its icon on the left and its key on the right. True when clicked.</summary>
+        private bool KeyButton(Rect r, Color background, System.Action<Rect> icon, string key, bool paint)
+        {
+            if (paint)
+            {
+                Fill(r, background, 9f);
+                icon(new Rect(r.x, r.y, r.height + 12f * k, r.height));
+                Rect cap = new Rect(r.xMax - 34f * k, r.center.y - 12f * k, 24f * k, 24f * k);
+                Fill(cap, new Color(1f, 1f, 1f, 0.16f), 5f);
+                Label(cap, key, small, Color.white, TextAnchor.MiddleCenter);
+            }
+            return Click(r);
+        }
+
+        /// <summary>A small screen: back to the race.</summary>
+        private void ScreenIcon(Rect at)
+        {
+            Rect screen = new Rect(at.center.x - 12f * k, at.center.y - 8f * k, 24f * k, 17f * k);
+            GUI.DrawTexture(screen, Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, Color.white, Vector4.one * 2.2f * k, Vector4.one * 3f * k);
+        }
+
+        /// <summary>Three timing rows: live timing.</summary>
+        private void TimingIcon(Rect at)
+        {
+            float w = 22f * k, h = 3f * k, gap = 4f * k;
+            for (int i = 0; i < 3; i++)
+                Fill(new Rect(at.center.x - w / 2f, at.center.y - 1.5f * h - gap + i * (h + gap), w, h), Color.white, 1.5f);
+        }
+
+        /// <summary>Two arrows: skip to your stint.</summary>
+        private void SkipIcon(Rect at)
+        {
+            float h = 18f * k, w = 13f * k;
+            GUI.DrawTexture(new Rect(at.center.x - w, at.center.y - h / 2f, w, h), arrow, ScaleMode.StretchToFill, true, 0f, Color.white, 0f, 0f);
+            GUI.DrawTexture(new Rect(at.center.x, at.center.y - h / 2f, w, h), arrow, ScaleMode.StretchToFill, true, 0f, Color.white, 0f, 0f);
         }
 
         private void Style()

@@ -9,60 +9,62 @@ Shader "Hidden/TarmacGauntlet/Drops"
     }
     SubShader
     {
-        Tags { "Queue" = "Transparent" "RenderType" = "Transparent" "IgnoreProjector" = "True" }
+        Tags { "Queue" = "Transparent" "RenderType" = "Transparent" "IgnoreProjector" = "True" "RenderPipeline" = "UniversalPipeline" }
         Blend SrcAlpha OneMinusSrcAlpha
         ZWrite Off
         Cull Off
 
         Pass
         {
-            CGPROGRAM
+            HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
-            #pragma multi_compile_fog
-            #include "UnityCG.cginc"
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Fog.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
-            float4 _Tint;
-            float _Shape;
+            CBUFFER_START(UnityPerMaterial)
+                float4 _Tint;
+                float _Shape;
+            CBUFFER_END
 
-            struct appdata
+            struct Attributes
             {
-                float4 vertex : POSITION;
+                float4 positionOS : POSITION;
                 float4 color : COLOR;
                 float2 uv : TEXCOORD0;
             };
 
-            struct v2f
+            struct Varyings
             {
-                float4 pos : SV_POSITION;
+                float4 positionCS : SV_POSITION;
                 float4 color : COLOR;
                 float2 uv : TEXCOORD0;
-                UNITY_FOG_COORDS(1)
+                float fog : TEXCOORD1;
             };
 
-            v2f vert(appdata v)
+            Varyings vert(Attributes v)
             {
-                v2f o;
-                o.pos = UnityObjectToClipPos(v.vertex);
+                Varyings o;
+                o.positionCS = TransformObjectToHClip(v.positionOS.xyz);
                 o.color = v.color * _Tint;
                 o.uv = v.uv;
-                UNITY_TRANSFER_FOG(o, o.pos);
+                o.fog = ComputeFogFactor(o.positionCS.z);
                 return o;
             }
 
-            fixed4 frag(v2f i) : SV_Target
+            half4 frag(Varyings i) : SV_Target
             {
                 float2 p = i.uv * 2.0 - 1.0;
                 // A stretched particle is already a thin quad along its fall: fade it to every edge.
                 float streak = saturate(1.0 - abs(p.x)) * saturate(1.0 - abs(p.y));
                 float r = saturate(1.0 - length(p));
                 float puff = r * r;
-                fixed4 col = i.color;
+                half4 col = i.color;
                 col.a *= lerp(streak, puff, _Shape);
-                UNITY_APPLY_FOG(unity_FogColor, col);
+                col.rgb = MixFog(col.rgb, i.fog);
                 return col;
             }
-            ENDCG
+            ENDHLSL
         }
     }
     Fallback Off

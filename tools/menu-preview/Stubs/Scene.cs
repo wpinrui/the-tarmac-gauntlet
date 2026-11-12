@@ -35,11 +35,28 @@ namespace TarmacGauntlet.TeamHq
     }
 }
 
-namespace TarmacGauntlet.Management
+namespace TarmacGauntlet.Rendering
 {
     [RequireComponent(typeof(Camera))]
     public sealed class GlassBackdrop : MonoBehaviour { }
 
+    /// <summary>The quality levels the settings menu steps through; the level is only remembered here.</summary>
+    public static class QualityLevels
+    {
+        public static readonly string[] Names = { "Low", "Medium", "High" };
+        public static int Level { get; set; } = 1;
+    }
+
+    /// <summary>Scene changes do nothing here: the menus only need to call them.</summary>
+    public static class SceneLoader
+    {
+        public static bool Loading => false;
+        public static void Load(string scene) { }
+    }
+}
+
+namespace TarmacGauntlet.Management
+{
     public sealed class MenuGlass
     {
         public MenuGlass(VisualElement root) { }

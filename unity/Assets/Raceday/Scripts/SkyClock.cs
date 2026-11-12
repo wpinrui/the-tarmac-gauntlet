@@ -34,6 +34,11 @@ namespace TarmacGauntlet.Raceday
         public Color CloudLit, CloudShade;
         /// <summary>0 by day, 1 when the stars are fully out.</summary>
         public float Night;
+        /// <summary>
+        /// How dark it is for the circuit's lights, 0 to 1, on the same scale as <see cref="Night"/>: the same under a
+        /// clear sky, earlier under cloud and rain (<see cref="WeatherSky.Lights"/>).
+        /// </summary>
+        public float Lights;
     }
 
     /// <summary>
@@ -120,10 +125,14 @@ namespace TarmacGauntlet.Raceday
             s.Fog = s.Horizon * 0.95f + s.Glow * 0.15f;
             s.CloudLit = s.LightColour * (s.LightIntensity * 0.75f) + s.AmbientSky * 0.55f + s.Glow * 0.6f;
             s.CloudShade = s.AmbientEquator * 0.9f + s.Glow * 0.2f;
-            s.Night = 1f - Smooth(-12f, -4f, e);
+            s.Night = Dark(e);
+            s.Lights = s.Night;
             Opaque(ref s);
             return s;
         }
+
+        /// <summary>How dark the sky is with the sun this many degrees up: 0 by day, 1 when the stars are fully out.</summary>
+        public static float Dark(float sunElevation) => 1f - Smooth(-12f, -4f, sunElevation);
 
         /// <summary>Deep orange at the horizon, warm white once the sun is high.</summary>
         private static Color SunColour(float e)

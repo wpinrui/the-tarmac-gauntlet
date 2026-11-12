@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using TarmacGauntlet.Career;
+using TarmacGauntlet.Rendering;
 using TarmacGauntlet.Simulation;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using UnityEngine.UIElements;
 using static TarmacGauntlet.Management.MenuKit;
 
@@ -170,7 +170,7 @@ namespace TarmacGauntlet.Management
             }
             GameSession.Flush();
             Time.timeScale = 1f;
-            SceneManager.LoadScene(HubScene);
+            SceneLoader.Load(HubScene);
         }
     }
 }

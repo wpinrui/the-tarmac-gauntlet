@@ -83,6 +83,15 @@ namespace TarmacGauntlet.Simulation
         public static double FatigueLapFactor(double pace, double fatigue) =>
             PaceModifier(EffectivePace(pace, fatigue)) / PaceModifier(pace);
 
+        /// <summary>The car's lap time before the driver, mode, tyres, fuel and variance: set by its Power and Handling.</summary>
+        public static double BaseLapTime(CarStats effectiveStats)
+        {
+            double speedScore =
+                effectiveStats.Power * PowerWeight + effectiveStats.Handling * HandlingWeight;
+            double speedFraction = Math.Max(0, Math.Min(1, speedScore / 100));
+            return FastestLapTime + (1 - speedFraction) * LapTimeSpread;
+        }
+
         /// <summary>
         /// Calculates a single lap time for a car (GDD §2).
         ///
@@ -120,10 +129,7 @@ namespace TarmacGauntlet.Simulation
             random ??= DefaultRandom.Next;
 
             // 1. Base lap time: higher combined speed score produces a shorter lap time.
-            double speedScore =
-                effectiveStats.Power * PowerWeight + effectiveStats.Handling * HandlingWeight;
-            double speedFraction = Math.Max(0, Math.Min(1, speedScore / 100));
-            double baseTime = FastestLapTime + (1 - speedFraction) * LapTimeSpread;
+            double baseTime = BaseLapTime(effectiveStats);
 
             // 2. Driver pace modifier: fatigue reduces the effective pace before applying.
             double paceMod = PaceModifier(EffectivePace(driverStats.Pace, driverFatigue));

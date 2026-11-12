@@ -88,7 +88,7 @@ namespace UnityEngine
         public RequireComponentAttribute(Type t) { }
     }
 
-    public enum RuntimeInitializeLoadType { AfterSceneLoad, BeforeSceneLoad }
+    public enum RuntimeInitializeLoadType { AfterSceneLoad, BeforeSceneLoad, SubsystemRegistration }
 
     [AttributeUsage(AttributeTargets.Method)]
     public sealed class RuntimeInitializeOnLoadMethodAttribute : Attribute
@@ -193,6 +193,7 @@ namespace UnityEngine
     {
         public static void Log(object o) => Console.Error.WriteLine(o);
         public static void LogWarning(object o) => Console.Error.WriteLine(o);
+        public static void LogError(object o) => Console.Error.WriteLine(o);
         public static void LogException(Exception e) => Console.Error.WriteLine(e);
     }
 
@@ -206,6 +207,7 @@ namespace UnityEngine
     public static class Time
     {
         public static float unscaledTime => 0;
+        public static float unscaledDeltaTime => 0;
         public static float timeScale { get; set; } = 1;
     }
 
@@ -346,6 +348,7 @@ namespace UnityEngine
         public static float Cos(float v) => (float)Math.Cos(v);
         public static float Lerp(float a, float b, float t) => a + (b - a) * Clamp01(t);
         public static float Max(float a, float b) => Math.Max(a, b);
+        public static float Floor(float v) => (float)Math.Floor(v);
         public static int Max(int a, int b) => Math.Max(a, b);
         public static float Max(params float[] v) => v.Max();
         public static float Min(float a, float b) => Math.Min(a, b);

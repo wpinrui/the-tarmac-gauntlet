@@ -29,7 +29,7 @@
 .year { font-size: 15px; letter-spacing: 0.9px; color: rgba(255, 255, 255, 0.62); margin-right: 18px; }
 .money { font-size: 21px; color: rgb(61, 220, 132); }
 
-/* Hub menu and icon strip */
+/* Hub menu: on the hub and beside every panel, the open screen's item lit */
 .menu { position: absolute; left: 32px; top: 112px; padding: 10px; }
 .layer.centre > .menu { position: relative; left: 0; top: 0; }
 .group.spaced { margin-top: 14px; }
@@ -39,15 +39,8 @@
 .hub-item { padding-left: 50px; }
 .item-icon { position: absolute; left: 16px; top: 10px; width: 20px; height: 20px; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.75); }
 .item:hover .item-icon, .item.on .item-icon { -unity-background-image-tint-color: rgb(255, 255, 255); }
-.strip { position: absolute; left: 32px; top: 112px; padding: 8px; }
-.strip .group.spaced { margin-top: 12px; }
-.icon { width: 52px; height: 46px; border-radius: 12px; align-items: center; justify-content: center; }
-.icon:hover { background-color: rgba(255, 255, 255, 0.1); }
-.icon.on { background-color: rgba(255, 255, 255, 0.2); }
-.icon-image { width: 22px; height: 22px; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.75); }
-.icon:hover .icon-image, .icon.on .icon-image { -unity-background-image-tint-color: rgb(255, 255, 255); }
-.item.dim, .icon.dim { opacity: 0.35; }
-.item.dim:hover, .icon.dim:hover { background-color: rgba(0, 0, 0, 0); }
+.item.dim { opacity: 0.35; }
+.item.dim:hover { background-color: rgba(0, 0, 0, 0); }
 
 /* The race car's tag in the garage */
 .tag { position: absolute; min-width: 250px; padding: 12px 16px; }
@@ -60,6 +53,7 @@
 /* Panels */
 .panel { position: absolute; right: 32px; top: 100px; bottom: 32px; width: 620px; border-radius: 24px; padding: 16px; }
 .panel-body { flex-grow: 1; }
+.back { flex-shrink: 0; margin-bottom: 8px; }
 .panel#crew, .panel#new-game { bottom: auto; }
 .panel#finances { bottom: auto; max-height: 768px; }
 .side { position: absolute; right: 668px; top: 100px; width: 460px; border-radius: 24px; padding: 20px; }
@@ -73,6 +67,13 @@
 
 /* Lists: a head row over rows, both padded 12px so heads sit over their cells. Numbers align right, words left. */
 .list { flex-grow: 1; flex-shrink: 1; min-height: 0; }
+/* The menus run without Unity's default theme, so scroll views get its layout here: the viewport clips and fills the
+   view, and the content keeps its full height instead of squeezing its rows to fit. */
+.unity-scroll-view__content-viewport { flex-grow: 1; flex-shrink: 1; overflow: hidden; }
+.unity-scroll-view__content-container { flex-shrink: 0; }
+/* Likewise text fields: the text fills the box and sits in its middle. */
+.unity-base-text-field__input { justify-content: center; }
+.unity-base-text-field__input .unity-text-element { flex-grow: 1; -unity-text-align: middle-left; }
 .head-row { flex-direction: row; align-items: center; flex-shrink: 0; height: 28px; padding-left: 12px; padding-right: 12px; }
 .head { flex-shrink: 0; font-size: 13px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.42); -unity-text-align: middle-right; white-space: nowrap; }
 .head.sort:hover, .stat-head:hover .head { color: rgba(255, 255, 255, 0.75); }
@@ -253,10 +254,22 @@
 /* Popups: lists that open over everything, on the popup layer */
 .popup { position: absolute; padding: 6px; border-radius: 12px; background-color: rgba(24, 24, 26, 0.94); border-width: 1px; border-color: rgba(255, 255, 255, 0.14); }
 .popup-list { flex-shrink: 1; }
-.popup-item { height: 32px; padding-left: 12px; padding-right: 12px; border-radius: 8px; font-size: 14px; letter-spacing: 0.6px; color: rgba(255, 255, 255, 0.75); -unity-text-align: middle-left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.popup-item { height: 32px; flex-shrink: 0; padding-left: 12px; padding-right: 12px; border-radius: 8px; font-size: 14px; letter-spacing: 0.6px; color: rgba(255, 255, 255, 0.75); -unity-text-align: middle-left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .popup-item:hover, .popup-item.on { color: rgb(255, 255, 255); }
 .popup-item:hover { background-color: rgba(255, 255, 255, 0.1); }
 .popup-item.on { background-color: rgba(255, 255, 255, 0.2); }
+
+/* Dropdowns: a value between a spacer and a down chevron, the size of a stepper, opening a popup list of every choice */
+.dropdown { flex-direction: row; align-items: center; flex-shrink: 0; border-radius: 10px; }
+.dropdown:hover, .dropdown.open { background-color: rgba(255, 255, 255, 0.1); }
+.dropdown-side { width: 36px; height: 36px; align-items: center; justify-content: center; }
+.dropdown-chevron { width: 18px; height: 18px; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.75); }
+.dropdown:hover .dropdown-chevron, .dropdown.open .dropdown-chevron { -unity-background-image-tint-color: rgb(255, 255, 255); }
+.dropdown-value { flex-grow: 1; font-size: 15px; letter-spacing: 0.6px; -unity-text-align: middle-center; }
+.settings-dropdown { width: 250px; }
+.dropdown-list { background-color: rgb(24, 24, 26); }
+.dropdown-list > .popup-list { min-height: 0; }
+.dropdown-list .popup-item { -unity-text-align: middle-center; }
 
 /* Tooltips: only on stats and skills */
 .tip { position: absolute; max-width: 260px; padding: 10px 14px; border-radius: 12px; font-size: 14px; white-space: normal; background-color: rgba(20, 20, 22, 0.92); border-width: 1px; border-color: rgba(255, 255, 255, 0.14); }
@@ -283,9 +296,11 @@
 .main-item .sub { font-size: 14px; color: rgba(255, 255, 255, 0.62); margin-top: 2px; }
 
 /* Settings */
-.settings { width: 560px; border-radius: 24px; padding: 16px; }
+.settings { width: 560px; max-height: 92%; border-radius: 24px; padding: 16px; }
+.settings-scroll { flex-shrink: 1; min-height: 0; }
+.settings-group { flex-shrink: 0; }
 .settings-group.spaced { margin-top: 22px; }
-.setting { flex-direction: row; align-items: center; height: 44px; padding-left: 16px; padding-right: 6px; border-radius: 12px; }
+.setting { flex-direction: row; align-items: center; flex-shrink: 0; height: 44px; padding-left: 16px; padding-right: 6px; border-radius: 12px; }
 .setting:hover { background-color: rgba(255, 255, 255, 0.1); }
 .setting-label { flex-grow: 1; font-size: 14px; letter-spacing: 1.1px; color: rgba(255, 255, 255, 0.62); }
 .slider { width: 250px; flex-direction: row; align-items: center; padding-right: 10px; }

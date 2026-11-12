@@ -1,3 +1,4 @@
+using TarmacGauntlet.Rendering;
 using TarmacGauntlet.Simulation;
 using UnityEngine;
 
@@ -5,12 +6,15 @@ namespace TarmacGauntlet.Raceday
 {
     /// <summary>
     /// The TV director: picks the story, then the shot. Once a second, on the real clock so cuts keep
-    /// a TV pace at any race speed, it scores every car. A car stopped off the track scores highest,
-    /// then a fight for a class lead, any close fight within a class, your car, a class leader's stop
-    /// or yours, a car rejoining from the runoff, and the leader. It cuts when the top story changes
+    /// a TV pace at any race speed, it scores every car. An off for your car or a car near the front of
+    /// its class scores highest, then a fight for a class lead, a fight for the podium, an off further
+    /// back, any close fight within a class, your car, a class leader's stop or yours, a car rejoining
+    /// from the runoff, and the leader. On the first lap offs are common, so one further back drops
+    /// below every fight and your car. It cuts when the top story changes
     /// and the shot has run its least length, or when a shot runs its longest. Shots: a trackside camera
     /// ahead of the car that zooms as it comes, a pan from close beside the track, the helicopter, an
-    /// onboard, and the pit lane. <see cref="RaceCameras"/> hands it the camera in its TV view.
+    /// onboard, and the pit lane. <see cref="RaceCameras"/> hands it the camera in its TV view. Every shot but the onboard
+    /// focuses on its car, so the background blurs (<see cref="PostEffects.Focus"/>).
     /// </summary>
     public sealed class BroadcastDirector : MonoBehaviour
     {
@@ -26,6 +30,10 @@ namespace TarmacGauntlet.Raceday
 
         /// <summary>A fight is two cars of a class this close, s.</summary>
         private const float BattleGap = 0.5f;
+        /// <summary>A fight for a class lead counts from this far apart, s.</summary>
+        private const float LeadBattleGap = 1f;
+        /// <summary>The front of a class is its top this many cars: their offs and fights matter most.</summary>
+        private const int Front = 3;
         /// <summary>A car slower than this off the track has stopped there, m/s.</summary>
         private const float StoppedSpeed = 3f;
         /// <summary>The story on air scores this much more, so the director doesn't flick between two.</summary>
@@ -88,15 +96,22 @@ namespace TarmacGauntlet.Raceday
             int leader = -1;
             float lead = float.MinValue;
             for (int i = 0; i < Cars.Length; i++)
+                if (Live(i) && Cars[i].Traffic.Distance > lead) (lead, leader) = (Cars[i].Traffic.Distance, i);
+            bool lapOne = leader >= 0 && Cars[leader].Laps <= 0;
+
+            for (int i = 0; i < Cars.Length; i++)
             {
                 if (!Live(i)) continue;
                 RaceCar c = Cars[i];
-                if (c.Traffic.Distance > lead) (lead, leader) = (c.Traffic.Distance, i);
                 AiRacer racer = Drivers[i] != null ? Drivers[i].Racer : null;
                 if (racer != null && racer.Rejoin.Busy)
                 {
                     bool stopped = Mathf.Abs(c.Traffic.Speed) < StoppedSpeed && !c.InPitLane;
-                    Offer(stopped ? Story.Crash : Story.Rejoin, i, -1, stopped ? 100f : 50f);
+                    bool key = i == Player || ClassPlace(i) <= Front;
+                    float score = stopped
+                        ? (key ? 100f : lapOne ? 30f : 75f)
+                        : (key ? 50f : lapOne ? 10f : 40f);
+                    Offer(stopped ? Story.Crash : Story.Rejoin, i, -1, score);
                 }
                 if (racer?.Pit != null && racer.Pit.State == PitPlan.Stage.Stopped && (i == Player || ClassLeader(i)))
                     Offer(Story.Stop, i, -1, 55f);
@@ -119,10 +134,13 @@ namespace TarmacGauntlet.Raceday
                 }
                 if (ahead < 0) continue;
                 float seconds = gap / Mathf.Max(b.Speed, 10f);
-                if (seconds > BattleGap) continue;
-                bool forLead = ClassLeader(ahead);
-                // Faster classes make the better story, and a closer fight the better one again.
-                float score = (forLead ? 90f : 70f) + (int)Classes[j] + 5f * (1f - seconds / BattleGap);
+                int place = ClassPlace(ahead);
+                bool forLead = place == 1;
+                float within = forLead ? LeadBattleGap : BattleGap;
+                if (seconds > within) continue;
+                // The nearer the front the better the story, faster classes better again, and a closer
+                // fight better still.
+                float score = (forLead ? 90f : place <= Front ? 80f : 70f) + (int)Classes[j] + 5f * (1f - seconds / within);
                 Offer(forLead ? Story.LeadBattle : Story.Battle, ahead, j, score);
             }
 
@@ -132,12 +150,16 @@ namespace TarmacGauntlet.Raceday
             else if (!changed) other = bestOther;
         }
 
-        private bool ClassLeader(int i)
+        private bool ClassLeader(int i) => ClassPlace(i) == 1;
+
+        /// <summary>Car i's place in its class on the road, from 1.</summary>
+        private int ClassPlace(int i)
         {
             float mine = Cars[i].Traffic.Distance;
+            int place = 1;
             for (int k = 0; k < Cars.Length; k++)
-                if (k != i && Live(k) && Classes[k] == Classes[i] && Cars[k].Traffic.Distance > mine) return false;
-            return true;
+                if (k != i && Live(k) && Classes[k] == Classes[i] && Cars[k].Traffic.Distance > mine) place++;
+            return place;
         }
 
         /// <summary>True once the shot on air has run its longest, or its car has gone past a trackside camera.</summary>
@@ -264,6 +286,7 @@ namespace TarmacGauntlet.Raceday
                     break;
                 }
             }
+            if (shot != Shot.Onboard) PostEffects.Focus(cam, Vector3.Distance(cam.transform.position, target));
         }
 
         /// <summary>Turns the camera to the target, smoothly after the first frame of a shot.</summary>

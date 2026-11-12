@@ -23,6 +23,7 @@
     <Compile Include="../../unity/Assets/Raceday/Scripts/RaceWeather.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/PitLane.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/PitPlan.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/StopPlanner.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/PitLaneStart.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/RollingStart.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/AiRacer.cs" />

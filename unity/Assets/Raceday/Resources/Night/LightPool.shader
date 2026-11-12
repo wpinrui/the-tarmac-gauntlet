@@ -2,6 +2,7 @@
 // already drawn under it, so the road, the lines and the grass keep their own colours: the first pass multiplies
 // the colour behind by 1 + _Color, the second adds a little _Lift so black ground still shows the light. Both
 // fade to nothing at the pool's edge, where its UVs reach 1, and into the fog with distance.
+// URP draws an object's SRPDefaultUnlit pass before its UniversalForward one, which keeps the two in order.
 Shader "Hidden/TarmacGauntlet/LightPool"
 {
     Properties
@@ -11,36 +12,39 @@ Shader "Hidden/TarmacGauntlet/LightPool"
     }
     SubShader
     {
-        Tags { "Queue" = "Transparent-10" "RenderType" = "Transparent" "IgnoreProjector" = "True" }
+        Tags { "Queue" = "Transparent-10" "RenderType" = "Transparent" "IgnoreProjector" = "True" "RenderPipeline" = "UniversalPipeline" }
         Cull Off ZWrite Off ZTest LEqual
         Offset -1, -1
 
-        CGINCLUDE
-        #include "UnityCG.cginc"
+        HLSLINCLUDE
+        #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
-        float4 _Color, _Lift;
+        CBUFFER_START(UnityPerMaterial)
+            float4 _Color;
+            float4 _Lift;
+        CBUFFER_END
 
-        struct appdata
+        struct Attributes
         {
-            float4 vertex : POSITION;
+            float4 positionOS : POSITION;
             float2 uv : TEXCOORD0;
             UNITY_VERTEX_INPUT_INSTANCE_ID
         };
 
-        struct v2f
+        struct Varyings
         {
-            float4 pos : SV_POSITION;
+            float4 positionCS : SV_POSITION;
             float2 uv : TEXCOORD0;
-            UNITY_FOG_COORDS(1)
+            float fog : TEXCOORD1;
         };
 
-        v2f vert(appdata v)
+        Varyings vert(Attributes v)
         {
-            v2f o;
             UNITY_SETUP_INSTANCE_ID(v);
-            o.pos = UnityObjectToClipPos(v.vertex);
+            Varyings o;
+            o.positionCS = TransformObjectToHClip(v.positionOS.xyz);
             o.uv = v.uv;
-            UNITY_TRANSFER_FOG(o, o.pos);
+            o.fog = ComputeFogFactor(o.positionCS.z);
             return o;
         }
 
@@ -49,42 +53,50 @@ Shader "Hidden/TarmacGauntlet/LightPool"
             float f = saturate(1.0 - dot(uv, uv));
             return f * f;
         }
-        ENDCG
+
+        // Into the fog the pool fades to nothing, not to the fog's colour.
+        float4 Fogged(float3 c, float fog)
+        {
+            return float4(MixFogColor(c, float3(0, 0, 0), fog), 0);
+        }
+        ENDHLSL
 
         Pass
         {
+            Name "Brighten"
+            Tags { "LightMode" = "SRPDefaultUnlit" }
             Blend DstColor One
-            CGPROGRAM
+
+            HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
-            #pragma multi_compile_fog
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Fog.hlsl"
             #pragma multi_compile_instancing
 
-            float4 frag(v2f i) : SV_Target
+            float4 frag(Varyings i) : SV_Target
             {
-                float4 c = float4(_Color.rgb * Falloff(i.uv), 0);
-                UNITY_APPLY_FOG_COLOR(i.fogCoord, c, float4(0, 0, 0, 0));
-                return c;
+                return Fogged(_Color.rgb * Falloff(i.uv), i.fog);
             }
-            ENDCG
+            ENDHLSL
         }
 
         Pass
         {
+            Name "Lift"
+            Tags { "LightMode" = "UniversalForward" }
             Blend One One
-            CGPROGRAM
+
+            HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
-            #pragma multi_compile_fog
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Fog.hlsl"
             #pragma multi_compile_instancing
 
-            float4 frag(v2f i) : SV_Target
+            float4 frag(Varyings i) : SV_Target
             {
-                float4 c = float4(_Lift.rgb * Falloff(i.uv), 0);
-                UNITY_APPLY_FOG_COLOR(i.fogCoord, c, float4(0, 0, 0, 0));
-                return c;
+                return Fogged(_Lift.rgb * Falloff(i.uv), i.fog);
             }
-            ENDCG
+            ENDHLSL
         }
     }
 }

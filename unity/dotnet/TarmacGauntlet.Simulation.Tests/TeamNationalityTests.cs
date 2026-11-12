@@ -14,12 +14,19 @@ namespace TarmacGauntlet.Simulation.Tests
         }
 
         [Test]
-        public void AiTeamsSpreadAcrossCountries()
+        public void EveryRosterTeamHasACountryCode()
+        {
+            Assert.That(AiTeamRoster.All.All(e => System.Text.RegularExpressions.Regex.IsMatch(e.Nationality, "^[a-z]{2}(-[a-z]{3})?$")), Is.True);
+        }
+
+        [Test]
+        public void AiTeamsUseTheirRosterNationality()
         {
             GameState game = GameInit.InitializeGame(new NewGameOptions { PlayerName = "Ann", TeamName = "Us", Nationality = "sg" }, new Random(1).NextDouble);
-            var codes = game.Teams.Where(t => t is not PlayerTeam).Select(TeamNationality.Of).ToArray();
-            Assert.That(codes.All(c => GameInit.Nationalities.Contains(c)), Is.True);
-            Assert.That(codes.Distinct().Count(), Is.GreaterThan(15));
+            BaseTeam feretti = game.Teams.Single(t => t.Name == "Scuderia Feretti");
+            Assert.That(TeamNationality.Of(feretti), Is.EqualTo("it"));
+            foreach (BaseTeam team in game.Teams.Where(t => t is not PlayerTeam))
+                Assert.That(TeamNationality.Of(team), Is.EqualTo(AiTeamRoster.All.Single(e => e.Name == team.Name).Nationality));
         }
 
         [Test]

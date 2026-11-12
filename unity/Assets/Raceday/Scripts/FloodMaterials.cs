@@ -1,3 +1,4 @@
+using TarmacGauntlet.Rendering;
 using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
@@ -28,7 +29,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Colour of the floodlights' light.</summary>
         public Color Tint => tint;
 
-        /// <summary>Lights the lenses and the pools for a night amount from <see cref="SkyClock"/>.</summary>
+        /// <summary>Lights the lenses and the pools for a darkness from <see cref="TimeOfDay.Lights"/>.</summary>
         public void Night(float night)
         {
             Lens.SetColor(EmissionId, tint * (NightLook.LensGlow * NightLook.On(night)));
@@ -59,8 +60,8 @@ namespace TarmacGauntlet.Raceday
 
         private static Material Standard(string name, Color colour, float smoothness, float metallic)
         {
-            var m = new Material(Shader.Find("Standard")) { name = name, enableInstancing = true, color = colour };
-            m.SetFloat("_Glossiness", smoothness);
+            var m = new Material(Lit.Shader) { name = name, enableInstancing = true, color = colour };
+            m.SetFloat("_Smoothness", smoothness);
             m.SetFloat("_Metallic", metallic);
             return m;
         }
