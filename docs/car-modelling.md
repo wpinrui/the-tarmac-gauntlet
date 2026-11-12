@@ -36,13 +36,10 @@ Overhangs stretch to the published length.
 Each row's height and width becomes a smooth curve (monotone cubic), so no outline is jagged.
 rows.py writes rows.json.
 
-### Measuring without perspective (optional)
+### Tracing without perspective
 A photo or a render with perspective puts near parts too big and far parts too small. Traced from one, the pillars, overhangs and glass lines land in the wrong places.
-When Ivan supplies a 3D model, measure it directly instead of tracing pictures of it:
-- Load it in Blender's Python module. Find the wheel centres from the tyre meshes and scale the model to the published wheelbase.
-- Slice the painted body meshes at stations a few centimetres apart along the car. Each slice gives that station's section.
-- Take each part's outline (glass, lamps, grille, shut lines, mirrors) from its own meshes, projected straight onto the matching view plane.
-- Write it all to rows.json as usual.
+When Ivan supplies a 3D model, render it orthographically from the side, front, rear and top on a plain background, and trace the rows off those renders like a drawing.
+Never take surfaces or outlines from its meshes. The model is only for checking measurements: wheelbase, overhangs, glass and belt heights.
 When there is no model, use orthographic drawings only, never perspective photos. Look up published measurements as well: overhangs, ground to roof, belt line, windscreen base and top, door length, glass heights. Check every traced row against them.
 
 ## 4. Build the body (body.py)
