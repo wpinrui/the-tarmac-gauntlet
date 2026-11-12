@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
+using TarmacGauntlet.Rendering;
 using TarmacGauntlet.Visuals;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
@@ -62,6 +63,7 @@ namespace TarmacGauntlet.Management.Editor
             string[] scenes = EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => s.path).ToArray();
             FillArtLibrary();
             IncludeRuntimeShaders();
+            FillLitVariants();
             if (Directory.Exists(BuildFolder)) Directory.Delete(BuildFolder, true);
             BuildReport report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
             {
@@ -109,15 +111,15 @@ namespace TarmacGauntlet.Management.Editor
         }
 
         /// <summary>
-        /// The game makes its materials and menu panels in code, so nothing in a scene references the Standard shader
-        /// or UI Toolkit's runtime shaders, and the build would leave them out. They go on the Always Included list.
+        /// The game makes its menu panels in code, so nothing in a scene references UI Toolkit's runtime shaders, and
+        /// the build would leave them out. They go on the Always Included list.
         /// </summary>
         private static void IncludeRuntimeShaders()
         {
             string[] prefixes = { "Hidden/UIE-", "Hidden/TextCore/", "TextMeshPro/" };
             Shader[] wanted = ShaderUtil.GetAllShaderInfo()
                 .Select(info => info.name)
-                .Where(name => name == "Standard" || prefixes.Any(prefix => name.StartsWith(prefix)) && !name.Contains("Editor"))
+                .Where(name => prefixes.Any(prefix => name.StartsWith(prefix)) && !name.Contains("Editor"))
                 .Select(Shader.Find)
                 .Where(shader => shader != null)
                 .ToArray();
@@ -130,6 +132,34 @@ namespace TarmacGauntlet.Management.Editor
                 list.GetArrayElementAtIndex(list.arraySize - 1).objectReferenceValue = shader;
             }
             if (settings.ApplyModifiedPropertiesWithoutUndo()) AssetDatabase.SaveAssets();
+        }
+
+        /// <summary>
+        /// The game makes its URP Lit materials in code, so the build only keeps the Lit variants some built material
+        /// uses. One material per mix of Lit.cs modes and emission, in a Resources folder, keeps every one the game
+        /// can ask for.
+        /// </summary>
+        private static void FillLitVariants()
+        {
+            string folder = LibraryFolder + "/LitVariants";
+            if (AssetDatabase.IsValidFolder(folder)) AssetDatabase.DeleteAsset(folder);
+            Directory.CreateDirectory(folder);
+            AssetDatabase.Refresh();
+            string[] surfaces = { "Opaque", "Cutout", "Fade", "Glass" };
+            for (int i = 0; i < surfaces.Length * 8; i++)
+            {
+                var m = new Material(Lit.Shader);
+                string surface = surfaces[i / 8];
+                if (surface == "Cutout") Lit.Cutout(m);
+                if (surface == "Fade") Lit.Fade(m);
+                if (surface == "Glass") Lit.Glass(m);
+                bool normal = (i & 1) != 0, metallic = (i & 2) != 0, emission = (i & 4) != 0;
+                if (normal) Lit.NormalMap(m, null);
+                if (metallic) Lit.MetallicSmoothnessMap(m, null);
+                if (emission) m.EnableKeyword("_EMISSION");
+                AssetDatabase.CreateAsset(m, $"{folder}/{surface}{(normal ? "Normal" : "")}{(metallic ? "Metallic" : "")}{(emission ? "Emission" : "")}.mat");
+            }
+            AssetDatabase.SaveAssets();
         }
 
         private static void Install()

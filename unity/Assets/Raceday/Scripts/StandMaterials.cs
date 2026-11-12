@@ -1,3 +1,4 @@
+using TarmacGauntlet.Rendering;
 using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
@@ -20,11 +21,7 @@ namespace TarmacGauntlet.Raceday
             FencePosts = Make("Catch fence posts", null, 0.5f, new Color(0.6f, 0.62f, 0.63f), 0.6f);
             FenceMesh = Make("Catch fence", Mesh(), 0.4f, new Color(0.62f, 0.64f, 0.64f), 0.5f);
             FenceMesh.mainTextureScale = new Vector2(4f, 4f);
-            FenceMesh.SetFloat("_Mode", 1f);
-            FenceMesh.SetFloat("_Cutoff", 0.5f);
-            FenceMesh.SetOverrideTag("RenderType", "TransparentCutout");
-            FenceMesh.EnableKeyword("_ALPHATEST_ON");
-            FenceMesh.renderQueue = (int)UnityEngine.Rendering.RenderQueue.AlphaTest;
+            Lit.Cutout(FenceMesh);
         }
 
         private static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
@@ -57,10 +54,10 @@ namespace TarmacGauntlet.Raceday
 
         private static Material Make(string name, Texture2D texture, float smoothness, Color? colour = null, float metallic = 0f)
         {
-            var m = new Material(Shader.Find("Standard")) { name = name, enableInstancing = true };
+            var m = new Material(Lit.Shader) { name = name, enableInstancing = true };
             m.color = colour ?? Color.white;
             if (texture != null) m.mainTexture = texture;
-            m.SetFloat("_Glossiness", smoothness);
+            m.SetFloat("_Smoothness", smoothness);
             m.SetFloat("_Metallic", metallic);
             return m;
         }

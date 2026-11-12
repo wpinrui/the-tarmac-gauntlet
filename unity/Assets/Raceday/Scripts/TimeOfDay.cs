@@ -1,4 +1,5 @@
 using System;
+using TarmacGauntlet.Rendering;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -66,7 +67,7 @@ namespace TarmacGauntlet.Raceday
             RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Linear;
-            QualitySettings.shadowDistance = 400f;
+            Shadows.Distance = 400f;
 
             var reflections = new GameObject("Sky reflections");
             reflections.transform.SetParent(transform, false);

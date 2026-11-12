@@ -21,3 +21,8 @@
 # Filled by the build menu just before each build
 /Assets/Visuals/Generated/
 /Assets/Visuals/Generated.meta
+
+# Made by URP the first time the editor loads; the graphics settings that point at them are in ProjectSettings, which
+# is not committed either. Assets/Rendering/Editor/UsePipeline.cs sets the pipeline itself.
+/[Aa]ssets/UniversalRenderPipelineGlobalSettings.asset*
+/[Aa]ssets/DefaultVolumeProfile.asset*

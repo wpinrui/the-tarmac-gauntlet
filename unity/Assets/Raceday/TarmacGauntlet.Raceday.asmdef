@@ -4,7 +4,8 @@
     "references": [
         "TarmacGauntlet.Simulation",
         "TarmacGauntlet.TeamHq",
-        "TarmacGauntlet.Visuals"
+        "TarmacGauntlet.Visuals",
+        "TarmacGauntlet.Rendering"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
