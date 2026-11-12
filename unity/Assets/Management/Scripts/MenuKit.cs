@@ -212,6 +212,14 @@ namespace TarmacGauntlet.Management
             return chevron;
         }
 
+        /// <summary>The back arrow at the top left of every panel.</summary>
+        internal static VisualElement BackButton(Action onClick)
+        {
+            VisualElement back = Chevron("arrow-left", onClick);
+            back.AddToClassList("back");
+            return back;
+        }
+
         /// <summary>
         /// A value between a back and an on chevron. A chevron hides where the value can't go further.
         /// <paramref name="step"/> gets -1 or +1.

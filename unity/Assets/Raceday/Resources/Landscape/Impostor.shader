@@ -20,22 +20,41 @@ Shader "Hidden/TarmacGauntlet/Impostor"
     }
     SubShader
     {
-        Tags { "Queue" = "AlphaTest" "RenderType" = "TransparentCutout" "DisableBatching" = "True" "IgnoreProjector" = "True" }
+        Tags { "Queue" = "AlphaTest" "RenderType" = "TransparentCutout" "DisableBatching" = "True" "IgnoreProjector" = "True" "RenderPipeline" = "UniversalPipeline" }
         Cull Off
 
-        CGPROGRAM
-        #pragma surface surf Lambert vertex:vert alphatest:_Cutoff addshadow nolightmap nodynlightmap nodirlightmap noforwardadd nometa
+        HLSLINCLUDE
         #pragma target 3.5
         #pragma require 2darray
+        #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
-        UNITY_DECLARE_TEX2DARRAY(_Atlas);
-        UNITY_DECLARE_TEX2DARRAY(_Normals);
-        float _Frames, _ShadowReach;
+        TEXTURE2D_ARRAY(_Atlas);
+        SAMPLER(sampler_Atlas);
+        TEXTURE2D_ARRAY(_Normals);
+        SAMPLER(sampler_Normals);
 
-        struct Input
+        CBUFFER_START(UnityPerMaterial)
+            float _Cutoff;
+            float _Frames;
+            float _ShadowReach;
+        CBUFFER_END
+
+        struct Attributes
         {
-            float3 atlas;   // uv in the atlas, layer
+            float4 positionOS : POSITION;
             float4 color : COLOR;
+            float4 uv0 : TEXCOORD0;
+            float4 uv1 : TEXCOORD1;
+            float4 uv2 : TEXCOORD2;
+        };
+
+        // One corner of a tree's quad, turned to face a view.
+        struct Corner
+        {
+            float3 positionWS;
+            float3 normalWS;
+            float3 tangentWS;
+            float3 atlas;   // uv in the atlas, layer
         };
 
         // Unity turns a point by t about +Y as x' = x cos t + z sin t, z' = -x sin t + z cos t.
@@ -49,34 +68,15 @@ Shader "Hidden/TarmacGauntlet/Impostor"
         // turned round, so a direction goes between the two by flipping z.
         float3 Flip(float3 v) { return float3(v.x, v.y, -v.z); }
 
-        void vert(inout appdata_full v, out Input o)
+        float3 Centre(Attributes v)
         {
-            UNITY_INITIALIZE_OUTPUT(Input, o);
-            float3 foot = mul(unity_ObjectToWorld, float4(v.vertex.xyz, 1)).xyz;
-            float radius = v.texcoord1.x, lift = v.texcoord1.y, yaw = v.texcoord1.z;
-            float squash = v.texcoord2.x;
-            float3 centre = foot + float3(0, lift, 0);
+            return TransformObjectToWorld(v.positionOS.xyz) + float3(0, v.uv1.y, 0);
+        }
 
-            float3 toEye;
-            #if defined(UNITY_PASS_SHADOWCASTER)
-                // This pass draws both the sun's shadow map and the camera's own depth. Face whichever
-                // view is drawing, read from its own matrices: an orthographic one is the shadow map,
-                // looking along the sun, and the quad must turn square to it so its shadow is the
-                // tree's outline seen from the sun; a perspective one is the camera, which must
-                // match what the camera sees.
-                if (UNITY_MATRIX_P[3][3] > 0.5)
-                {
-                    toEye = UNITY_MATRIX_V[2].xyz;   // the view's +z: back towards the light
-                    // Only trees near the camera cast a shadow: far out the shadow map is too coarse
-                    // for a leafy outline and it breaks up into blotches and streaks.
-                    float far = distance(_WorldSpaceCameraPos, centre);
-                    if (far > _ShadowReach) radius = 0;
-                    else radius *= saturate((_ShadowReach - far) / 30);
-                }
-                else toEye = UNITY_MATRIX_I_V._m03_m13_m23 - centre;
-            #else
-                toEye = _WorldSpaceCameraPos - centre;
-            #endif
+        // The corner of the quad for a tree seen along toEye (from the tree towards the view), radius across.
+        Corner Place(Attributes v, float3 centre, float3 toEye, float radius)
+        {
+            float yaw = v.uv1.z, squash = v.uv2.x;
 
             // Into the tree's own baked frame: undo its turn, then flip into three.js's frame.
             float3 local = Flip(Turn(toEye, -yaw));
@@ -91,32 +91,150 @@ Shader "Hidden/TarmacGauntlet/Impostor"
             float3 R = normalize(cross(up, D));
             float3 U = cross(D, R);
 
-            float3 offset = (v.texcoord.x * R + v.texcoord.y * U) * radius;
+            float3 offset = (v.uv0.x * R + v.uv0.y * U) * radius;
             // Back into Unity's frame and the tree's turn.
-            float3 rW = Turn(Flip(R), yaw), uW = Turn(Flip(U), yaw), dW = Turn(Flip(D), yaw);
             float3 world = Turn(Flip(offset), yaw);
             world.y *= squash;
-            v.vertex.xyz = mul(unity_WorldToObject, float4(centre + world, 1)).xyz;
-            // The baked normals are in the image's axes: x right, y up, z towards the viewer. Flipping
-            // z turned the frame inside out, so the binormal (normal x tangent) needs w = -1 to come out as up.
-            v.normal = mul((float3x3)unity_WorldToObject, dW);
-            v.tangent = float4(mul((float3x3)unity_WorldToObject, rW), -1);
-            o.atlas = float3((frame + v.texcoord.xy * 0.5 + 0.5) / _Frames, v.texcoord1.w);
+
+            Corner c;
+            c.positionWS = centre + world;
+            c.normalWS = Turn(Flip(D), yaw);
+            c.tangentWS = Turn(Flip(R), yaw);
+            c.atlas = float3((frame + v.uv0.xy * 0.5 + 0.5) / _Frames, v.uv1.w);
+            return c;
+        }
+        ENDHLSL
+
+        Pass
+        {
+            Name "ForwardLit"
+            Tags { "LightMode" = "UniversalForward" }
+
+            HLSLPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag
+            #include_with_pragmas "Assets/Rendering/Shaders/LitKeywords.hlsl"
+            #include "Assets/Rendering/Shaders/TarmacLit.hlsl"
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float3 atlas : TEXCOORD0;
+                float3 positionWS : TEXCOORD1;
+                half3 normalWS : TEXCOORD2;
+                half3 tangentWS : TEXCOORD3;
+                half4 color : COLOR;
+                half fog : TEXCOORD4;
+            };
+
+            Varyings vert(Attributes v)
+            {
+                float3 centre = Centre(v);
+                Corner c = Place(v, centre, _WorldSpaceCameraPos - centre, v.uv1.x);
+                Varyings o;
+                o.positionCS = TransformWorldToHClip(c.positionWS);
+                o.positionWS = c.positionWS;
+                o.normalWS = c.normalWS;
+                o.tangentWS = c.tangentWS;
+                o.atlas = c.atlas;
+                o.color = v.color;
+                o.fog = ComputeFogFactor(o.positionCS.z);
+                return o;
+            }
+
+            half4 frag(Varyings i) : SV_Target
+            {
+                half4 c = SAMPLE_TEXTURE2D_ARRAY(_Atlas, sampler_Atlas, i.atlas.xy, i.atlas.z);
+                clip(c.a - _Cutoff);
+                // The baked normals are in the image's axes: x right, y up, z towards the viewer. Flipping
+                // z turned the frame inside out, so the binormal (normal x tangent) takes w = -1 to come out as up.
+                half3 normalTS = normalize(SAMPLE_TEXTURE2D_ARRAY(_Normals, sampler_Normals, i.atlas.xy, i.atlas.z).xyz * 2 - 1);
+                half3 bitangent = -cross(i.normalWS, i.tangentWS);
+                half3 normalWS = TransformTangentToWorld(normalTS, half3x3(i.tangentWS, bitangent, i.normalWS));
+                half3 col = ShadeLambert(i.positionWS, normalWS, i.positionCS, i.fog, c.rgb * i.color.rgb);
+                return half4(col, 1);
+            }
+            ENDHLSL
         }
 
-        void surf(Input IN, inout SurfaceOutput o)
+        Pass
         {
-            #if defined(UNITY_PASS_SHADOWCASTER)
+            Name "ShadowCaster"
+            Tags { "LightMode" = "ShadowCaster" }
+            ZWrite On ZTest LEqual ColorMask 0
+
+            HLSLPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag
+            #pragma multi_compile_vertex _ _CASTING_PUNCTUAL_LIGHT_SHADOW
+            #include "Assets/Rendering/Shaders/TarmacLit.hlsl"
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float3 atlas : TEXCOORD0;
+            };
+
+            Varyings vert(Attributes v)
+            {
+                float3 centre = Centre(v);
+                // The quad turns square to the sun, so its shadow is the tree's outline seen from the sun.
+                // Only trees near the camera cast a shadow: far out the shadow map is too coarse for a
+                // leafy outline and it breaks up into blotches and streaks.
+                float radius = v.uv1.x;
+                float far = distance(_WorldSpaceCameraPos, centre);
+                if (far > _ShadowReach) radius = 0;
+                else radius *= saturate((_ShadowReach - far) / 30);
+                Corner c = Place(v, centre, _LightDirection, radius);
+                Varyings o;
+                o.positionCS = ShadowClipPosition(c.positionWS, c.normalWS);
+                o.atlas = c.atlas;
+                return o;
+            }
+
+            half4 frag(Varyings i) : SV_Target
+            {
                 // A smaller mip for the outline: one shadow-map texel covers many leaves, and the
                 // softer outline casts a solid crown shadow rather than speckle.
-                fixed4 c = UNITY_SAMPLE_TEX2DARRAY_LOD(_Atlas, IN.atlas, 3);
-            #else
-                fixed4 c = UNITY_SAMPLE_TEX2DARRAY(_Atlas, IN.atlas);
-            #endif
-            o.Albedo = c.rgb * IN.color.rgb;
-            o.Alpha = c.a;
-            o.Normal = normalize(UNITY_SAMPLE_TEX2DARRAY(_Normals, IN.atlas).xyz * 2 - 1);
+                clip(SAMPLE_TEXTURE2D_ARRAY_LOD(_Atlas, sampler_Atlas, i.atlas.xy, i.atlas.z, 3).a - _Cutoff);
+                return 0;
+            }
+            ENDHLSL
         }
-        ENDCG
+
+        Pass
+        {
+            Name "DepthOnly"
+            Tags { "LightMode" = "DepthOnly" }
+            ZWrite On ColorMask R
+
+            HLSLPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag
+            #include "Assets/Rendering/Shaders/TarmacLit.hlsl"
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float3 atlas : TEXCOORD0;
+            };
+
+            Varyings vert(Attributes v)
+            {
+                float3 centre = Centre(v);
+                Corner c = Place(v, centre, _WorldSpaceCameraPos - centre, v.uv1.x);
+                Varyings o;
+                o.positionCS = TransformWorldToHClip(c.positionWS);
+                o.atlas = c.atlas;
+                return o;
+            }
+
+            half4 frag(Varyings i) : SV_Target
+            {
+                clip(SAMPLE_TEXTURE2D_ARRAY(_Atlas, sampler_Atlas, i.atlas.xy, i.atlas.z).a - _Cutoff);
+                return 0;
+            }
+            ENDHLSL
+        }
     }
 }

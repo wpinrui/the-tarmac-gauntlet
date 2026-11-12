@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using TarmacGauntlet.Rendering;
 using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
@@ -45,7 +46,7 @@ namespace TarmacGauntlet.Raceday
         private readonly List<Wettable> surfaces = new List<Wettable>();
         private float shown = -1f;
         private static readonly int TintId = Shader.PropertyToID("_Tint"), ShapeId = Shader.PropertyToID("_Shape"),
-            GlossId = Shader.PropertyToID("_Glossiness");
+            GlossId = Shader.PropertyToID("_Smoothness");
 
         private void Start()
         {
@@ -62,6 +63,7 @@ namespace TarmacGauntlet.Raceday
                 // Tarmac darkens a lot and turns glossy; paint and kerbs a little; concrete and gravel
                 // darken; grass only goes a shade deeper.
                 Wet(Materials.Asphalt, 0.45f, 0.72f);
+                Wet(Materials.RoadEdge, 0.45f, 0.72f);
                 Wet(Materials.PitAsphalt, 0.45f, 0.7f);
                 Wet(Materials.White, 0.12f, 0.8f);
                 Wet(Materials.Yellow, 0.12f, 0.8f);

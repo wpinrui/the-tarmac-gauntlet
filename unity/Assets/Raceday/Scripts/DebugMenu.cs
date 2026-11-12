@@ -6,7 +6,7 @@ using UnityEngine.SceneManagement;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// The raceday debug menu, on Tab, in the editor and development builds only. It gets the race to any state
+    /// The raceday debug menu, on Tab, in the editor and in every build. It gets the race to any state
     /// in a click: the speed of the race, from paused to 64x; jumps of the race clock to dusk, night, dawn, the last
     /// hour and the flag, or the race finished and settled at once; weather held over the circuit, from dry to
     /// flooded; the watched car refuelled, on new tyres, fixed, given an issue, its driver fresh or spent, called

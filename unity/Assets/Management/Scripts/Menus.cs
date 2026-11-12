@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using TarmacGauntlet.Career;
+using TarmacGauntlet.Rendering;
 using TarmacGauntlet.Simulation;
 using TarmacGauntlet.TeamHq;
 using UnityEngine;
@@ -15,8 +16,9 @@ namespace TarmacGauntlet.Management
 {
     /// <summary>
     /// The management menus over the Team HQ building: the main menu, the hub with its top bar, car tag and Race
-    /// button, screens as one panel docked to the right with the menu collapsed to an icon strip, the Escape menu
-    /// and settings. Every screen change moves the camera to that screen's shot.
+    /// button, screens as one panel docked to the right with the hub menu kept beside it, the Escape menu and
+    /// settings. Every panel has a back arrow at its top left. Every screen change moves the camera to that
+    /// screen's shot.
     /// Screen panels fill their docked panel through <see cref="ScreenOpened"/>, such as <see cref="DriversPanel"/>.
     /// </summary>
     public sealed class Menus : MonoBehaviour
@@ -60,13 +62,13 @@ namespace TarmacGauntlet.Management
         private Font mainMedium, mainRegular;
         private readonly HashSet<VisualElement> shown = new HashSet<VisualElement>();
 
-        private VisualElement root, mainColumn, continueItem, gameLayer, top, hubMenu, strip, carTag, tagCondition, race, panel, panelBody;
+        private VisualElement root, mainColumn, continueItem, gameLayer, top, hubMenu, carTag, tagCondition, race, panel, panelBody;
         private VisualElement catcher, lineup, lineupBody;
         private Label tagClass;
         private VisualElement dimmer, pauseLayer, settingsLayer, settingsPanel, dialogLayer, dialog, dialogBody, dialogButtons, badge;
         private Label continueSub, teamName, year, money, tagName;
         private VisualElement tipLayer;
-        private readonly Dictionary<string, VisualElement> hubItems = new Dictionary<string, VisualElement>(), stripIcons = new Dictionary<string, VisualElement>();
+        private readonly Dictionary<string, VisualElement> hubItems = new Dictionary<string, VisualElement>();
 
         private Mode mode = Mode.Main;
         private string screen;
@@ -162,7 +164,7 @@ namespace TarmacGauntlet.Management
             mainColumn.Add(MainItem("Quit game", Quit));
             mainLayer.Add(mainColumn);
 
-            // The game: top bar, hub menu, icon strip, car tag, Race and the docked panel.
+            // The game: top bar, hub menu, car tag, Race and the docked panel.
             gameLayer = Layer();
             // Under everything in the game layer: a click on the scene closes the lineup.
             catcher = new VisualElement();
@@ -174,10 +176,9 @@ namespace TarmacGauntlet.Management
             gameLayer.Add(top);
 
             hubMenu = glass.Make("menu", "fade");
-            strip = glass.Make("strip", "fade");
             for (int g = 0; g < Groups.Length; g++)
             {
-                VisualElement items = MenuGroup(g), icons = MenuGroup(g);
+                VisualElement items = MenuGroup(g);
                 foreach ((string slug, string name) in Groups[g])
                 {
                     VisualElement item = Text(name.ToUpperInvariant(), "item");
@@ -186,18 +187,10 @@ namespace TarmacGauntlet.Management
                     item.RegisterCallback<ClickEvent>(_ => OpenScreen(slug));
                     hubItems[slug] = item;
                     items.Add(item);
-
-                    VisualElement icon = Box("icon");
-                    icon.Add(Icon(slug, "icon-image"));
-                    icon.RegisterCallback<ClickEvent>(_ => OpenScreen(slug));
-                    stripIcons[slug] = icon;
-                    icons.Add(icon);
                 }
                 hubMenu.Add(items);
-                strip.Add(icons);
             }
             gameLayer.Add(hubMenu);
-            gameLayer.Add(strip);
 
             carTag = glass.Make("tag", "fade");
             VisualElement tagTop = Box("tag-top");
@@ -216,6 +209,7 @@ namespace TarmacGauntlet.Management
             gameLayer.Add(race);
 
             panel = glass.Make("panel", "fade");
+            panel.Add(BackButton(CloseScreen));
             panelBody = new VisualElement();
             panelBody.AddToClassList("panel-body");
             panel.Add(panelBody);
@@ -223,6 +217,7 @@ namespace TarmacGauntlet.Management
 
             // The lineup: a small panel where the Race button was.
             lineup = glass.Make("lineup", "fade");
+            lineup.Add(BackButton(CloseScreen));
             lineupBody = new VisualElement();
             lineup.Add(lineupBody);
             gameLayer.Add(lineup);
@@ -266,7 +261,7 @@ namespace TarmacGauntlet.Management
             dialog.Add(dialogButtons);
             dialogLayer.Add(dialog);
 
-            foreach (VisualElement e in new[] { mainColumn, top, hubMenu, strip, carTag, race, panel, side, catcher, lineup, dimmer, pauseLayer, settingsLayer, dialogLayer })
+            foreach (VisualElement e in new[] { mainColumn, top, hubMenu, carTag, race, panel, side, catcher, lineup, dimmer, pauseLayer, settingsLayer, dialogLayer })
                 e.style.display = DisplayStyle.None;
 
             Popups = Layer();
@@ -332,10 +327,19 @@ namespace TarmacGauntlet.Management
         private static readonly float[] RimX = { 233.05f, 333.38f };
         private const float RollDelay = 0.35f, RollSeconds = 1.7f;
 
+        /// <summary>A frame counts for at most this long in the roll, s, so a slow first frame can't skip it.</summary>
+        private const float RollStep = 1 / 30f;
+
+        /// <summary>True once the car has rolled in this run: back on the main menu from a game it stays parked.</summary>
         private static bool rolledIn;
         private VisualElement car;
         private readonly List<VisualElement> rims = new List<VisualElement>();
-        private float rollStart = -1;
+        /// <summary>Seconds the main menu has shown, counted frame by frame; -1 until it shows.</summary>
+        private float rollTime = -1;
+
+        /// <summary>Every play in the editor is a launch, even with domain reload off, which keeps statics.</summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetRoll() => rolledIn = false;
 
         private VisualElement BuildWordmark()
         {
@@ -362,7 +366,9 @@ namespace TarmacGauntlet.Management
         {
             var e = new VisualElement { pickingMode = PickingMode.Ignore };
             e.AddToClassList("wordmark-layer");
-            e.style.backgroundImage = Resources.Load<Texture2D>("Wordmark/" + file);
+            var texture = Resources.Load<Texture2D>("Wordmark/" + file);
+            if (texture == null) Debug.LogError("Main menu wordmark: Resources/Wordmark/" + file + ".png did not load, so it won't show.");
+            e.style.backgroundImage = texture;
             e.style.left = left;
             e.style.top = top;
             e.style.width = width;
@@ -384,12 +390,13 @@ namespace TarmacGauntlet.Management
         private void RollWordmark()
         {
             if (rolledIn) return;
-            if (rollStart < 0)
+            if (rollTime < 0)
             {
                 if (!shown.Contains(mainColumn)) return;
-                rollStart = Time.unscaledTime + RollDelay;
+                rollTime = 0;
             }
-            float t = Mathf.Clamp01((Time.unscaledTime - rollStart) / RollSeconds);
+            else rollTime += Mathf.Min(Time.unscaledDeltaTime, RollStep);
+            float t = Mathf.Clamp01((rollTime - RollDelay) / RollSeconds);
             PlaceCar(CarStartLeft - (CarStartLeft - CarFinalLeft) * (1 - (1 - t) * (1 - t)));
             if (t >= 1) rolledIn = true;
         }
@@ -448,10 +455,14 @@ namespace TarmacGauntlet.Management
         /// <summary>Opens a hub screen, even one already open.</summary>
         internal void Open(string slug) => Go(Mode.Screen, slug);
 
-        /// <summary>Closes the open screen and goes back to the hub.</summary>
+        /// <summary>
+        /// Closes the open panel: a hub screen or the lineup back to the hub, the new game back to the main menu.
+        /// The back arrow and Escape both come here.
+        /// </summary>
         internal void CloseScreen()
         {
-            if (mode == Mode.Screen) Go(Mode.Hub);
+            if (mode == Mode.Screen || mode == Mode.Lineup) Go(Mode.Hub);
+            else if (mode == Mode.NewGame) Go(Mode.Main);
         }
 
         private void OpenScreen(string slug)
@@ -592,8 +603,7 @@ namespace TarmacGauntlet.Management
                 continueSub.text = string.IsNullOrEmpty(latest.TeamName) ? "Year " + latest.Year : latest.TeamName + ", year " + latest.Year;
             }
             Show(top, inGame);
-            Show(hubMenu, mode == Mode.Hub && !covered);
-            Show(strip, (mode == Mode.Screen || mode == Mode.Lineup) && !covered);
+            Show(hubMenu, (mode == Mode.Hub || mode == Mode.Screen || mode == Mode.Lineup) && !covered);
             Show(race, mode == Mode.Hub && !covered);
             Show(panel, (mode == Mode.Screen || mode == Mode.NewGame) && !covered);
             Show(lineup, mode == Mode.Lineup && !covered);
@@ -603,11 +613,9 @@ namespace TarmacGauntlet.Management
             Show(pauseLayer, overlay == Overlay.Pause);
             Show(settingsLayer, overlay == Overlay.Settings);
             Show(dialogLayer, overlay == Overlay.Dialog);
-            foreach (KeyValuePair<string, VisualElement> icon in stripIcons)
-                icon.Value.EnableInClassList("on", mode == Mode.Screen && icon.Key == screen);
-            bool noPaper = GameSession.State?.Newspaper == null;
-            hubItems[PaperSlug].EnableInClassList("dim", noPaper);
-            stripIcons[PaperSlug].EnableInClassList("dim", noPaper);
+            foreach (KeyValuePair<string, VisualElement> item in hubItems)
+                item.Value.EnableInClassList("on", mode == Mode.Screen && item.Key == screen);
+            hubItems[PaperSlug].EnableInClassList("dim", GameSession.State?.Newspaper == null);
             RenderTag();
         }
 
@@ -705,6 +713,11 @@ namespace TarmacGauntlet.Management
                 }
                 return;
             }
+            if (MenuDropdown.Key(ev.keyCode))
+            {
+                ev.Use();
+                return;
+            }
             switch (ev.keyCode)
             {
                 case KeyCode.Escape:
@@ -712,8 +725,7 @@ namespace TarmacGauntlet.Management
                     else if (overlay == Overlay.Settings) SetOverlay(settingsFrom);
                     else if (overlay == Overlay.Pause) SetOverlay(Overlay.None);
                     else if (mode == Mode.Paper) paper.Close();
-                    else if (mode == Mode.Screen || mode == Mode.Lineup) Go(Mode.Hub);
-                    else if (mode == Mode.NewGame) Go(Mode.Main);
+                    else if (mode == Mode.Screen || mode == Mode.Lineup || mode == Mode.NewGame) CloseScreen();
                     else if (mode == Mode.Hub) SetOverlay(Overlay.Pause);
                     break;
                 case KeyCode.Q when overlay == Overlay.None && (mode == Mode.Hub || mode == Mode.Screen):

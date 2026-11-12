@@ -13,7 +13,7 @@ namespace TarmacGauntlet.Raceday
     /// the race for the career and settles it at the flag. Start picks how the race starts: from the
     /// grid at once, behind the pace car, or from the pit lane, where the cars queue in the fast lane
     /// and leave three seconds apart, moving up to the pit exit line (<see cref="PitLaneStart"/>). The pit lane start fast forwards
-    /// until the car ahead of the player's is about to leave. In the editor and development builds Tab opens the debug menu (<see cref="DebugMenu"/>), whose race set-up (<see cref="DebugSettings"/>) picks the start, the weather, the start hour, the field and your car. You drive your own car from the green when you start the race, and Delete hands it to the AI and
+    /// until the car ahead of the player's is about to leave. Tab opens the debug menu (<see cref="DebugMenu"/>), whose race set-up (<see cref="DebugSettings"/>) picks the start, the weather, the start hour, the field and your car. You drive your own car from the green when you start the race, and Delete hands it to the AI and
     /// back. = rides with the car behind the one you watch and - with the car ahead. While you drive, P opens the plan for your next stop (<see cref="PitPanel"/>), and your box is marked once you are in the pit lane (<see cref="BoxMarker"/>). F steps
     /// the race through normal speed, 4x and 16x while the AI drives your car, and ends the pit lane
     /// start's fast forward. Cars away from the camera glide without physics (<see cref="PhysicsRange"/>).
@@ -83,12 +83,11 @@ namespace TarmacGauntlet.Raceday
             Time.fixedDeltaTime = 0.01f;
             RaceWeather.Now = WeatherState.Dry;
             RaceWeather.Forced = null;
-            bool testing = Debug.isDebugBuild;
             RaceSave resume = RaceWeekend.Resuming;
             if (resume != null && (RaceWeekend.Setup == null || resume.Cars.Count != resume.Setup.Grid.Count || resume.Day.Cars.Count != resume.Setup.Grid.Count))
                 resume = null;
-            TimeOfDay.StartHour = resume != null ? resume.StartHour : testing ? DebugSettings.StartHour : TimeOfDay.DefaultStartHour;
-            if (testing && DebugSettings.Start is StartMode chosen) start = chosen;
+            TimeOfDay.StartHour = resume != null ? resume.StartHour : DebugSettings.StartHour;
+            if (DebugSettings.Start is StartMode chosen) start = chosen;
             bool resumed = resume != null && resume.Started;
             if (resumed) start = StartMode.Grid;   // no start: the cars are put where they were
             circuit = new Circuit(CircuitData.Load());
@@ -124,10 +123,12 @@ namespace TarmacGauntlet.Raceday
 
             keys = new GameObject("Keyboard").AddComponent<KeyboardState>();
             var line = new RacingLine(circuit);
+            materials.LayRubber(circuit, line);
+            track.AddComponent<TrackDetail>().Materials = materials;
             var pits = new PitLane(circuit);
             bool career = RaceWeekend.Setup != null;
             RaceSetup setup = RaceWeekend.Setup ?? RaceWeekend.Begin(TestCareer());
-            if (testing && resume == null) setup = DebugActions.Field(setup, DebugSettings.Field, DebugSettings.Car);
+            if (resume == null) setup = DebugActions.Field(setup, DebugSettings.Field, DebugSettings.Car);
             day = new RaceDay(setup);
             if (resumed) day.Load(resume.Day);
             IReadOnlyList<GridCar> grid = setup.Grid;
@@ -193,6 +194,7 @@ namespace TarmacGauntlet.Raceday
             racingCars = racing;
             carControllers = cars;
             if (resumed) PlaceSaved(resume, cars, racing, drivers, pits);
+            new GameObject("Skid marks").AddComponent<SkidMarks>().Cars = cars;
             PhysicsRange range = new GameObject("Physics range").AddComponent<PhysicsRange>();
             range.Drivers = drivers;
             range.Player = ai.Car;
@@ -224,7 +226,7 @@ namespace TarmacGauntlet.Raceday
             // Every race rolls its own weather (WeatherPlan), played on the race clock.
             int seed = resume != null ? resume.WeatherSeed : weatherSeed != 0 ? weatherSeed : new System.Random().Next(1, int.MaxValue);
             weatherRoll = seed;
-            weatherKind = resume != null ? (WeatherKind?)resume.WeatherKind : testing ? DebugSettings.Weather : null;
+            weatherKind = resume != null ? (WeatherKind?)resume.WeatherKind : DebugSettings.Weather;
             var weather = new WeatherPlan(seed, TimeOfDay.StartHour, weatherKind);
             Debug.Log($"Weather {seed}: {weather.Kind}");
             WeatherView rain = sky.gameObject.AddComponent<WeatherView>();
@@ -295,15 +297,12 @@ namespace TarmacGauntlet.Raceday
             graphics.Circuit = circuit;
             graphics.Player = player;
             graphics.Tower = tower;
-            if (testing)
-            {
-                debug = new GameObject("Debug menu").AddComponent<DebugMenu>();
-                debug.Keys = keys;
-                debug.Cameras = views;
-                debug.Tower = tower;
-                debug.Director = director;
-                debug.Game = setup.Game;
-            }
+            debug = new GameObject("Debug menu").AddComponent<DebugMenu>();
+            debug.Keys = keys;
+            debug.Cameras = views;
+            debug.Tower = tower;
+            debug.Director = director;
+            debug.Game = setup.Game;
             if (start == StartMode.PitLane)
             {
                 var pitStart = (PitStart)starter;
@@ -645,6 +644,7 @@ namespace TarmacGauntlet.Raceday
             views.Hud = cam.gameObject.AddComponent<DriveHud>();
             views.Hud.Car = cars[watched];
             cam.gameObject.AddComponent<FpsCounter>();
+            cam.gameObject.AddComponent<CarReflections>();
             return views;
         }
     }

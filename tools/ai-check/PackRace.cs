@@ -188,6 +188,8 @@ static partial class Check
             race.GlideStepFor = x => Math.Abs(Gap(x.Distance - cam.Distance)) < 600f ? 0.05f : 0.2f;
         }
         double f = 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        long allocatedFrom = GC.GetTotalAllocatedBytes(true);
+        float timeFrom = race.Time;
         long lastThink = 0;
         double worst = 0, sum = 0, secWorst = 0, secSum = 0;
         int steps = 0, secSteps = 0;
@@ -208,6 +210,8 @@ static partial class Check
         }
         Console.WriteLine($"physics cars {Race.ThinkStepTicks * f / steps:0.00} ms per step, gliders {race.ThinkTicks * f / steps:0.00} ms per step");
         Console.WriteLine($"TOTAL AI mean {sum / steps:0.00} ms per 10 ms step, worst {worst:0.00} ms, {race.Racers.Count} cars");
+        // Garbage the game's collector has to clear, AI and the stand-in physics together: in a game frame it all adds up.
+        Console.WriteLine($"garbage {(GC.GetTotalAllocatedBytes(true) - allocatedFrom) / 1e6 / Math.Max(race.Time - timeFrom, 0.01f):0.0} MB per race second");
     }
 }
 

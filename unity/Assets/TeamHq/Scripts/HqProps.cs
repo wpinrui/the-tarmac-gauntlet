@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using TarmacGauntlet.Rendering;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -124,26 +125,17 @@ namespace TarmacGauntlet.TeamHq
         {
             string key = id + "/" + index;
             if (Materials.TryGetValue(key, out Material cached)) return cached;
-            var mat = new Material(Shader.Find("Standard")) { name = key };
+            var mat = new Material(Lit.Shader) { name = key };
             mat.color = new Color(m.color[0], m.color[1], m.color[2], m.color.Length > 3 ? m.color[3] : 1).gamma;
             Texture2D col = Tex(m.col), nrm = Tex(m.nrm), ms = Tex(m.ms);
             if (col != null) mat.mainTexture = col;
-            if (nrm != null)
-            {
-                mat.SetTexture("_BumpMap", nrm);
-                mat.EnableKeyword("_NORMALMAP");
-            }
-            if (ms != null)
-            {
-                // R metallic, A smoothness: Unity reads the pack's mask as it is; the factors scale it like glTF's.
-                mat.SetTexture("_MetallicGlossMap", ms);
-                mat.EnableKeyword("_METALLICGLOSSMAP");
-                mat.SetFloat("_GlossMapScale", 1);
-            }
+            if (nrm != null) Lit.NormalMap(mat, nrm);
+            // R metallic, A smoothness: Unity reads the pack's mask as it is; the factors scale it like glTF's.
+            if (ms != null) Lit.MetallicSmoothnessMap(mat, ms);
             else
             {
                 mat.SetFloat("_Metallic", m.metal);
-                mat.SetFloat("_Glossiness", 1 - m.rough);
+                mat.SetFloat("_Smoothness", 1 - m.rough);
             }
             if (m.cutout) HqMaterials.Cutout(mat);
             else if (m.blend) HqMaterials.Fade(mat);

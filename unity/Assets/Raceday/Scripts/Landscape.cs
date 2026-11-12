@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TarmacGauntlet.Rendering;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -57,7 +58,7 @@ namespace TarmacGauntlet.Raceday
             terrain.mainTextureScale = new Vector2(8f / w, 8f / h);
             terrain.mainTextureOffset = new Vector2((cell * 0.5f - g.originX) / w, (cell * 0.5f - g.originZ) / h);
             terrain.SetTexture("_Grain", Grain());
-            terrain.SetFloat("_Glossiness", 0.05f);
+            terrain.SetFloat("_Smoothness", 0.05f);
         }
 
         /// <summary>Grain about mid grey, so it darkens and lightens the field colour evenly.</summary>
@@ -220,8 +221,8 @@ namespace TarmacGauntlet.Raceday
                 { name = "Hills", wrapModeU = TextureWrapMode.Repeat, wrapModeV = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear, anisoLevel = 8 };
             map.SetPixels32(px);
             map.Apply(true, true);
-            var m = new Material(Shader.Find("Standard")) { name = "Hills", mainTexture = map };
-            m.SetFloat("_Glossiness", 0.02f);
+            var m = new Material(Lit.Shader) { name = "Hills", mainTexture = map };
+            m.SetFloat("_Smoothness", 0.02f);
 
             var go = new GameObject("Hills") { isStatic = true };
             go.transform.SetParent(root, false);

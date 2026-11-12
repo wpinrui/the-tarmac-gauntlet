@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using TarmacGauntlet.Visuals;
 using UnityEngine;
 using UnityEngine.UIElements;
 using static TarmacGauntlet.Management.MenuKit;
@@ -11,31 +12,47 @@ namespace TarmacGauntlet.Management
     /// <summary>The settings panel, the same from the main menu, the hub's Escape menu and the race's pause menu: graphics, race, then audio.</summary>
     internal static class SettingsView
     {
-        /// <summary>Fills the settings panel, emptying it first.</summary>
+        /// <summary>
+        /// Fills the settings panel, emptying it first. The groups scroll inside the panel, which is never taller than the
+        /// screen. The graphics group ends with a row for each of <see cref="GraphicsOptions.All"/>.
+        /// </summary>
         internal static void Fill(VisualElement settingsPanel)
         {
-            settingsPanel.Query<VisualElement>(className: "settings-group").ForEach(g => g.RemoveFromHierarchy());
+            MenuDropdown.Close();
+            settingsPanel.Query<VisualElement>(className: "settings-scroll").ForEach(g => g.RemoveFromHierarchy());
+            ScrollView scroll = Scroll("settings-scroll");
 
             VisualElement graphics = SettingsGroup(0);
             IReadOnlyList<Vector2Int> sizes = GameSettings.Resolutions;
             graphics.Add(Stepper("Display mode", GameSettings.DisplayModes.Select(m => m.Name).ToArray(), GameSettings.DisplayMode, i => GameSettings.DisplayMode = i));
-            graphics.Add(Stepper("Resolution", sizes.Select(r => r.x + " × " + r.y).ToArray(), sizes.ToList().IndexOf(GameSettings.Resolution), i => GameSettings.Resolution = sizes[i]));
+            VisualElement resolution = Setting("Resolution");
+            resolution.Add(MenuDropdown.Make(sizes.Select(r => r.x + " × " + r.y).ToArray(), sizes.ToList().IndexOf(GameSettings.Resolution), "settings-dropdown",
+                i => GameSettings.Resolution = sizes[i]));
+            graphics.Add(resolution);
             graphics.Add(Stepper("Quality", GameSettings.QualityNames, GameSettings.Quality, i => GameSettings.Quality = i));
             graphics.Add(Stepper("V-sync", new[] { "Off", "On" }, GameSettings.VSync ? 1 : 0, i => GameSettings.VSync = i == 1));
-            int most = GameSettings.MostRealLights;
-            graphics.Add(Slider("Real lights", GameSettings.RealLights / (float)most, v => GameSettings.RealLights = Mathf.RoundToInt(v * most),
-                v => Mathf.RoundToInt(v * most).ToString(CultureInfo.InvariantCulture)));
-            settingsPanel.Add(graphics);
+            foreach (GraphicsOption option in GraphicsOptions.All) graphics.Add(Option(option));
+            scroll.Add(graphics);
 
             VisualElement race = SettingsGroup(1);
             race.Add(Stepper("Gearbox", new[] { "Manual", "Automatic" }, GameSettings.Automatic ? 1 : 0, i => GameSettings.Automatic = i == 1));
             race.Add(Stepper("Steering help", new[] { "Off", "On" }, GameSettings.SteeringHelp ? 1 : 0, i => GameSettings.SteeringHelp = i == 1));
             race.Add(Stepper("Track map", new[] { "Off", "On" }, GameSettings.TrackMap ? 1 : 0, i => GameSettings.TrackMap = i == 1));
-            settingsPanel.Add(race);
+            scroll.Add(race);
 
             VisualElement audio = SettingsGroup(2);
             audio.Add(Slider("Volume", GameSettings.Volume, v => GameSettings.Volume = v));
-            settingsPanel.Add(audio);
+            scroll.Add(audio);
+            settingsPanel.Add(scroll);
+        }
+
+        /// <summary>An on/off option's row is a stepper, a count's a slider.</summary>
+        private static VisualElement Option(GraphicsOption option)
+        {
+            if (option.IsToggle) return Stepper(option.Label, new[] { "Off", "On" }, option.On ? 1 : 0, i => option.On = i == 1);
+            int most = option.Most;
+            return Slider(option.Label, option.Value / (float)most, v => option.Value = Mathf.RoundToInt(v * most),
+                v => Mathf.RoundToInt(v * most).ToString(CultureInfo.InvariantCulture));
         }
 
         private static VisualElement SettingsGroup(int index)
