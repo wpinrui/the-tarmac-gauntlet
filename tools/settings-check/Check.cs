@@ -36,7 +36,7 @@ internal static class Check
         if (args[0] == "first")
         {
             Expect("a fresh game starts on Medium", GameSettings.Quality, 1);
-            Expect("a fresh game starts with the music at 70%", GameSettings.Music, 0.7f);
+            Expect("a fresh game starts with the music at 85%", GameSettings.Music, 0.85f);
             Expect("a fresh game starts with every option at its default", GraphicsOptions.All.Count(o => o.Value != o.Default), 0);
             GameSettings.DisplayMode = Mode;
             GameSettings.Resolution = Size;
@@ -45,6 +45,8 @@ internal static class Check
             GameSettings.VSync = VSync;
             GameSettings.Volume = Volume;
             GameSettings.Music = Music;
+            for (int i = 2; i < GameSettings.Sliders.Length; i++) GameSettings.SetLevel(GameSettings.Sliders[i], SliderAt(i));
+            Expect("the master slider sets the listener's volume on its curve", AudioListener.volume, Volume * Volume);
             Application.Quit();
         }
         else
@@ -56,6 +58,10 @@ internal static class Check
             Expect("v-sync", GameSettings.VSync, VSync);
             Expect("volume", GameSettings.Volume, Volume);
             Expect("music", GameSettings.Music, Music);
+            for (int i = 2; i < GameSettings.Sliders.Length; i++) Expect(GameSettings.Sliders[i] + " slider", GameSettings.Level(GameSettings.Sliders[i]), SliderAt(i));
+            Expect("the listener comes back at the master slider's volume", AudioListener.volume, Volume * Volume);
+            Expect("the master and music keep the keys they were saved under before the mixer",
+                PlayerPrefs.GetFloat("settings.volume", -1) == Volume && PlayerPrefs.GetFloat("settings.music", -1) == Music, true);
             foreach (GraphicsRow row in GraphicsOptions.Rows)
             {
                 Expect(row.Label, row.Value, Changed(row));
@@ -74,6 +80,9 @@ internal static class Check
         Console.WriteLine(failed == 0 ? $"settings-check {args[0]}: all passed" : $"settings-check {args[0]}: {failed} FAILED");
         return failed == 0 ? 0 : 1;
     }
+
+    /// <summary>A volume slider's changed position, a different one for each.</summary>
+    private static float SliderAt(int i) => 0.1f * i;
 
     /// <summary>A row's value that differs from its default: the other one for a toggle, a set count otherwise, or the
     /// most a short count takes.</summary>
@@ -101,7 +110,7 @@ internal static class Check
     /// </summary>
     private static void ScanForOtherWriters(string assets)
     {
-        string[] allowed = { "GameSettings.cs", "SettingsView.cs", "GraphicsOption.cs", "GraphicsOptions.cs", "GraphicsRow.cs", "QualityLevels.cs" };
+        string[] allowed = { "GameSettings.cs", "SettingsView.cs", "GraphicsOption.cs", "GraphicsOptions.cs", "GraphicsRow.cs", "QualityLevels.cs", "CameraPresets.cs" };
         var writes = new Regex(@"ApplyQuality\s*\(|PlayerPrefs\.Delete|vSyncCount\s*=[^=]|fullScreenMode\s*=[^=]|SetResolution\s*\(|QualityLevels\.Level\s*=[^=]|AudioListener\.volume\s*=[^=]|GraphicsOptions\.\w+\.(Value|On)\s*=[^=]|GameSettings\.\w+\s*=[^=]|QualitySettings\.SetQualityLevel");
         foreach (string file in Directory.GetFiles(assets, "*.cs", SearchOption.AllDirectories))
         {

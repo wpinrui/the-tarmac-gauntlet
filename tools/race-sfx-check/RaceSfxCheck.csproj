@@ -12,6 +12,9 @@
     <Compile Include="Check.cs;Stubs.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/TrackSurface.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/SfxVoices.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/RaceVoices.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/AmbienceMix.cs" />
+    <Compile Include="../../unity/Assets/Audio/Scripts/Mix.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/Impacts.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/PitCues.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/RaceSfx.cs" />

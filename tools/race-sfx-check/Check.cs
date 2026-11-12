@@ -25,7 +25,7 @@ static class P {
     // ---- voice budgets
     Expect("the B390's Medium plays 6 one-shots and 3 held sounds", SfxVoices.OneShotsAt(1) == 6 && SfxVoices.LoopsAt(1) == 3);
     Expect("Low plays fewest, Ultra most", SfxVoices.OneShotsAt(0) < SfxVoices.OneShotsAt(3) && SfxVoices.LoopsAt(0) < SfxVoices.LoopsAt(3));
-    Expect("with the engines and tyres, Ultra stays inside Unity's 32 real voices", 10 + 8 + SfxVoices.OneShotsAt(3) + SfxVoices.LoopsAt(3) <= 32);
+    Expect("every level's race voices fit the one budget, with the music and UI's kept free", Enumerable.Range(0, 4).All(RaceVoices.Fits));
     Expect("full volume inside the near distance", SfxVoices.Heard(0.8f, 1f, 3f, 100f) == 0.8f);
     Expect("half at twice it", Math.Abs(SfxVoices.Heard(1f, 6f, 3f, 100f) - 0.5f) < 1e-6);
     Expect("silent past the far distance", SfxVoices.Heard(1f, 101f, 3f, 100f) == 0f);

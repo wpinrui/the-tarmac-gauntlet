@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using TarmacGauntlet.Audio;
 using TarmacGauntlet.Visuals;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -56,8 +57,8 @@ namespace TarmacGauntlet.Management
             scroll.Add(CameraGroup());
 
             VisualElement audio = SettingsGroup(3);
-            audio.Add(Slider("Volume", GameSettings.Volume, v => GameSettings.Volume = v));
-            audio.Add(Slider("Music", GameSettings.Music, v => GameSettings.Music = v));
+            foreach (VolumeSlider slider in GameSettings.Sliders)
+                audio.Add(Slider(SliderName(slider), GameSettings.Level(slider), v => GameSettings.SetLevel(slider, v)));
             scroll.Add(audio);
             settingsPanel.Add(scroll);
         }
@@ -102,6 +103,12 @@ namespace TarmacGauntlet.Management
             Draw();
             return group;
         }
+
+        private static string SliderName(VolumeSlider slider) => slider switch
+        {
+            VolumeSlider.Ui => "UI",
+            _ => slider.ToString(),
+        };
 
         /// <summary>An on/off row is a stepper, a count a slider.</summary>
         private static VisualElement Row(GraphicsRow row)

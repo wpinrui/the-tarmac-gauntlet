@@ -7,15 +7,13 @@ using TarmacGauntlet.Raceday;
 /// <summary>
 /// Renders the synthesised ambience through a set of moments: the wind standing in a breeze and in a gale, riding the
 /// bonnet down a straight and through a lap, the same lap from the chase and TV cameras, and a car's tyres on a damp,
-/// a wet and a flooded road. It checks the mix rules first: every quality level's ambience fits beside the engines and
-/// tyres inside Unity's 32 real voices, and the beds rise and fall the right way.
+/// a wet and a flooded road. It checks the mix rules first: every quality level's race voices fit the one budget
+/// (<see cref="RaceVoices"/>), and the beds rise and fall the right way.
 /// </summary>
 public static class Audition
 {
     private const int Rate = 44100;
     private const int Block = 512;   // samples between control updates, like the audio callback in Unity
-    private const int RealVoices = 32, EngineVoices = 10;
-    private static readonly int[] TyreVoices = { 2, 4, 6, 8 };
 
     private sealed class Moment
     {
@@ -101,11 +99,9 @@ public static class Audition
         for (int level = 0; level < AmbienceMix.Budgets.Length; level++)
         {
             AmbienceBudget b = AmbienceMix.Budget(level);
-            int total = b.Voices + EngineVoices + TyreVoices[level];
-            Console.WriteLine($"level {level}: ambience {b.Voices} voices, with engines and tyres {total} of {RealVoices}");
-            // High and Ultra may run past the real voices when every bed plays at once: Unity then virtualises the lowest
-            // priority first, the wet hiss and the far tyres.
-            if (level <= 1) Expect(total <= RealVoices, $"level {level} needs {total} voices");
+            int total = RaceVoices.Total(level);
+            Console.WriteLine($"level {level}: ambience {b.Voices} voices, every race voice {total} of {TarmacGauntlet.Audio.Mix.RealVoices}");
+            Expect(RaceVoices.Fits(level), $"level {level} needs {total} voices");
             if (level > 0) Expect(b.Voices >= AmbienceMix.Budget(level - 1).Voices, $"level {level} plays fewer voices than the level below");
         }
 
