@@ -162,9 +162,10 @@ namespace TarmacGauntlet.Raceday
             float burst = Noise() * frontHit + Noise() * rearHit;
             thudLow += (burst - thudLow) * lp180;
             thud2 += (thudLow - thud2) * lp180;
-            float rattle = Band(burst, 500f + 300f * pace, 0.7f, ref rattleLow, ref rattleBand);
+            // The rattle stays low and dull: bright noise here reads as static, not rumble.
+            float rattle = Band(burst, 220f + 80f * pace, 1.2f, ref rattleLow, ref rattleBand);
             float level = kerb * Clamp(speed / 6f, 0f, 1f) * (0.5f + 0.5f * pace);
-            return (6f * thud2 + 1.1f * rattle) * level;
+            return (8.5f * thud2 + 1.3f * rattle) * level;
         }
 
         /// <summary>Counts down to a tyre's next ridge and, on it, starts a hit of uneven strength.</summary>

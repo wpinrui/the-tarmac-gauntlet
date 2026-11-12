@@ -86,7 +86,6 @@ public static class Audition
             {
                 Speed = (float)(28 + 2 * t),
                 Kerb = t > 1 && t < 2.2 ? 0.5f : t > 2.9 && t < 3.6 ? 0.25f : 0f,
-                Slide = t > 1.2 && t < 2.4 ? 0.2f : 0f,
                 Throttle = t < 1.6 ? 0.4f : 1f,
             },
         };
