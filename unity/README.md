@@ -29,14 +29,14 @@ level's asset in place as the game starts and gives every game camera post-proce
 committed, so `Assets/Rendering/Editor/UsePipeline.cs` puts the Medium asset in the graphics settings whenever the editor
 loads. Materials made in code use URP Lit through `Assets/Rendering/Scripts/Lit.cs`, and the game's own lit shaders share
 `Assets/Rendering/Shaders/TarmacLit.hlsl`; the ones that move (car paint and carbon, liveries, pit crews, pit kit) also draw motion vectors
-(`TarmacMotion.hlsl`) so the upscaler and the motion blur follow them. The menus' frosted glass is `GlassBlurFeature` on
+(`TarmacMotion.hlsl`) so the upscaler follows them. The menus' frosted glass is `GlassBlurFeature` on
 the renderer, beside URP's ambient occlusion at half resolution, after the opaque pass.
 
-Each scene's global volume carries `PostEffects`: the ACES tone curve and a colour grade, half resolution bloom, motion
-blur from the camera's movement, and Gaussian depth of field for a camera that calls `PostEffects.Focus` that frame. The
+Each scene's global volume carries `PostEffects`: the ACES tone curve and a colour grade, half resolution bloom, and
+Gaussian depth of field for a camera that calls `PostEffects.Focus` that frame. The
 broadcast director does for every shot but the onboard; a replay camera should too. A driving view never does, so it is
 never blurred. The race grades for the time of day and the weather (`SkyGrade.cs`). A camera cut clears the
-upscaler's history and skips the blur for that frame. Colour grading, bloom, ambient occlusion, motion blur, depth of field,
+upscaler's history. There is no motion blur. Colour grading, bloom, ambient occlusion, depth of field,
 sky detail and the crowd each have a row in the graphics settings (`GraphicsOptions.cs`). URP's point and spot lights fall off with the square of the distance;
 `LightFalloff.Urp` turns an intensity set for the built-in pipeline into one as bright a third of the way out to its range.
 
