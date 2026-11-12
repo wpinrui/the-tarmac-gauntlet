@@ -108,6 +108,33 @@ namespace TarmacGauntlet.Raceday
                 Figures(i);
             }
             BuildDrivers(complex, spots, colours);
+            Prewarm();
+        }
+
+        /// <summary>
+        /// Fills the rig pools at build time, as many as can ever be live, so no rig is built mid-race the first time the
+        /// camera reaches the pits (frame drops as the formation lap ends).
+        /// </summary>
+        private void Prewarm()
+        {
+            int people = 0, drivers = 0;
+            for (int i = 0; i < crews.Length; i++)
+            {
+                if (crews[i] != null) people += crews[i].People.Length;
+                if (swaps[i] != null) drivers += 2;
+            }
+            for (int k = Mathf.Min(people, MaxLive); k > 0; k--)
+            {
+                Live l = NewRig();
+                l.Rig.Root.SetActive(false);
+                pool.Push(l);
+            }
+            for (int k = Mathf.Min(drivers, MaxLive); k > 0; k--)
+            {
+                LiveDriver l = NewDriverRig();
+                l.Rig.Root.SetActive(false);
+                driverPool.Push(l);
+            }
         }
 
         // ---------------------------------------------------------------- for the kit and the drivers

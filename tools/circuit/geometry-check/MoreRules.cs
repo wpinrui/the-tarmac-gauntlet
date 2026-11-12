@@ -129,6 +129,8 @@ static partial class Check
                 (float h, string part)? Beyond(float dist)
                 {
                     Vector3 q = p + outward * dist;
+                    // A wall or fence standing right there stops a car before it reaches whatever lies behind it.
+                    if (NearBarrier(q)) return null;
                     float best = float.NaN;
                     string other = null;
                     foreach (int id in Near(q.x, q.z))
