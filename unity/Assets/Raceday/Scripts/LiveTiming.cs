@@ -153,6 +153,13 @@ namespace TarmacGauntlet.Raceday
                 Fill(clock, new Color(18f / 255f, 18f / 255f, 20f / 255f, 0.95f), 9f);
                 Label(clock, Tower != null ? Tower.TimeLeft : "", big, Color.white, TextAnchor.MiddleCenter);
             }
+            if (paint && Tower != null)
+            {
+                string hour = Tower.TimeOfDayText;
+                Rect day = new Rect(clock.xMax + 8f * k, clock.y, big.CalcSize(new GUIContent(hour)).x + 40f * k, clock.height);
+                Fill(day, new Color(18f / 255f, 18f / 255f, 20f / 255f, 0.95f), 9f);
+                Label(day, hour, big, new Color(1f, 1f, 1f, 0.6f), TextAnchor.MiddleCenter);
+            }
             Rect live = R(1824f, 40f, 56f, 44f);
             if (paint)
             {
