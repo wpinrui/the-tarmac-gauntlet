@@ -19,6 +19,9 @@ Shader "Hidden/TarmacGauntlet/Volumetrics"
         ZTest Always ZWrite Off Cull Off
 
         HLSLINCLUDE
+        // The mist reads the sun's cascaded shadow map itself, whatever the frame's keywords: at High and Ultra the scene
+        // takes its shadows from the screen, which says nothing of the air in front of it.
+        #define _MAIN_LIGHT_SHADOWS_CASCADE
         #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
         #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
         #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
@@ -88,15 +91,10 @@ Shader "Hidden/TarmacGauntlet/Volumetrics"
             HLSLPROGRAM
             #pragma vertex Vert
             #pragma fragment Frag
-            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
 
             float SunShadow(float3 p)
             {
-            #if defined(_MAIN_LIGHT_SHADOWS) || defined(_MAIN_LIGHT_SHADOWS_CASCADE)
                 return MainLightRealtimeShadow(TransformWorldToShadowCoord(p));
-            #else
-                return 1.0;
-            #endif
             }
 
             float CloudShadow(float3 p)
