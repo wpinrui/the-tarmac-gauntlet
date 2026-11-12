@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TarmacGauntlet.Rendering;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -75,7 +76,7 @@ namespace TarmacGauntlet.TeamHq
             sun.shadows = LightShadows.Soft;
             sun.shadowStrength = 0.85f;
             sun.shadowNormalBias = 0.2f;
-            QualitySettings.shadowDistance = Mathf.Max(QualitySettings.shadowDistance, 60);
+            Shadows.Distance = Mathf.Max(Shadows.Distance, 60);
 
             RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = new Color(0.62f, 0.65f, 0.68f);

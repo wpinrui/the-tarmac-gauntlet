@@ -1,3 +1,4 @@
+using TarmacGauntlet.Rendering;
 using TarmacGauntlet.Simulation;
 using UnityEngine;
 
@@ -106,8 +107,8 @@ namespace TarmacGauntlet.Raceday
         /// <summary>A plain stand-in when the model is not available.</summary>
         private static Transform[] BuildBox(GameObject root, CarSpec spec, Color colour)
         {
-            var paint = new Material(Shader.Find("Standard")) { color = colour };
-            var rubber = new Material(Shader.Find("Standard")) { color = new Color(0.08f, 0.08f, 0.08f) };
+            var paint = new Material(Lit.Shader) { color = colour };
+            var rubber = new Material(Lit.Shader) { color = new Color(0.08f, 0.08f, 0.08f) };
             GameObject shell = Primitive(PrimitiveType.Cube, root.transform, paint);
             shell.transform.localPosition = BoxCentre;
             shell.transform.localScale = BoxSize;

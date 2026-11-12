@@ -1,3 +1,4 @@
+using TarmacGauntlet.Rendering;
 using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
@@ -29,10 +30,10 @@ namespace TarmacGauntlet.Raceday
 
         private static Material Make(string name, Texture2D texture, float smoothness, Color? colour = null, float metallic = 0f)
         {
-            var m = new Material(Shader.Find("Standard")) { name = name };
+            var m = new Material(Lit.Shader) { name = name };
             m.color = colour ?? Color.white;
             if (texture != null) m.mainTexture = texture;
-            m.SetFloat("_Glossiness", smoothness);
+            m.SetFloat("_Smoothness", smoothness);
             m.SetFloat("_Metallic", metallic);
             return m;
         }

@@ -9,21 +9,27 @@ Shader "Hidden/TarmacGauntlet/Sky"
     }
     SubShader
     {
-        Tags { "Queue" = "Background" "RenderType" = "Background" "PreviewType" = "Skybox" }
+        Tags { "Queue" = "Background" "RenderType" = "Background" "PreviewType" = "Skybox" "RenderPipeline" = "UniversalPipeline" }
         Cull Off ZWrite Off
 
         Pass
         {
-            CGPROGRAM
+            HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
-            #include "UnityCG.cginc"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
-            sampler2D _CloudTex;
+            TEXTURE2D(_CloudTex);
+            SAMPLER(sampler_CloudTex);
             float4 _Zenith, _Horizon, _Glow, _Ground, _SunColor, _CloudLit, _CloudShade;
             float4 _SunDir, _MoonDir;
             float4 _CloudOffset;   // xy the big layer, zw the small one
             float _Cover, _Night, _CloudScale, _Overcast;
+
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+            };
 
             struct v2f
             {
@@ -31,15 +37,15 @@ Shader "Hidden/TarmacGauntlet/Sky"
                 float3 dir : TEXCOORD0;
             };
 
-            v2f vert(appdata_base v)
+            v2f vert(Attributes v)
             {
                 v2f o;
-                o.pos = UnityObjectToClipPos(v.vertex);
-                o.dir = v.vertex.xyz;
+                o.pos = TransformObjectToHClip(v.positionOS.xyz);
+                o.dir = v.positionOS.xyz;
                 return o;
             }
 
-            float Hash(float3 p)
+            float StarHash(float3 p)
             {
                 p = frac(p * 0.3183099 + 0.1);
                 p *= 17.0;
@@ -49,11 +55,11 @@ Shader "Hidden/TarmacGauntlet/Sky"
             // o is how overcast the sky is: the small layer's detail fades towards the deck.
             float Density(float2 uv, float o)
             {
-                float small = lerp(tex2D(_CloudTex, uv * 2.3 + _CloudOffset.zw).g, 0.5, 0.7 * o);
-                return tex2D(_CloudTex, uv + _CloudOffset.xy).r * 0.7 + small * 0.3;
+                float small = lerp(SAMPLE_TEXTURE2D(_CloudTex, sampler_CloudTex, uv * 2.3 + _CloudOffset.zw).g, 0.5, 0.7 * o);
+                return SAMPLE_TEXTURE2D(_CloudTex, sampler_CloudTex, uv + _CloudOffset.xy).r * 0.7 + small * 0.3;
             }
 
-            fixed4 frag(v2f i) : SV_Target
+            half4 frag(v2f i) : SV_Target
             {
                 float3 d = normalize(i.dir);
                 float up = d.y;
@@ -73,7 +79,7 @@ Shader "Hidden/TarmacGauntlet/Sky"
                 float disc = smoothstep(0.99985, 0.99992, cs) * above;
 
                 float3 p = d * 500.0;
-                float star = step(0.9975, Hash(floor(p))) * saturate(1.0 - length(frac(p) - 0.5) * 2.2);
+                float star = step(0.9975, StarHash(floor(p))) * saturate(1.0 - length(frac(p) - 0.5) * 2.2);
                 star *= _Night * saturate(up * 4.0);
                 float moon = smoothstep(0.99990, 0.99994, dot(d, _MoonDir.xyz)) * saturate(_MoonDir.y * 20.0);
 
@@ -91,9 +97,9 @@ Shader "Hidden/TarmacGauntlet/Sky"
 
                 float3 col = sky + (_SunColor.rgb * 3.0 * disc + 0.9 * star + float3(0.85, 0.88, 0.95) * moon * _Night) * (1.0 - c);
                 col = lerp(col, cloud, c);
-                return fixed4(col, 1.0);
+                return half4(col, 1.0);
             }
-            ENDCG
+            ENDHLSL
         }
     }
     Fallback Off

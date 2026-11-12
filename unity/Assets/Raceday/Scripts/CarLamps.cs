@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TarmacGauntlet.Rendering;
 using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
@@ -248,8 +249,8 @@ namespace TarmacGauntlet.Raceday
 
         private static Material Standard(string name, Color colour, float smoothness)
         {
-            var m = new Material(Shader.Find("Standard")) { name = name, enableInstancing = true, color = colour };
-            m.SetFloat("_Glossiness", smoothness);
+            var m = new Material(Lit.Shader) { name = name, enableInstancing = true, color = colour };
+            m.SetFloat("_Smoothness", smoothness);
             return m;
         }
 

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TarmacGauntlet.Rendering;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -125,15 +126,15 @@ namespace TarmacGauntlet.Raceday
             paints[(int)KitPaint.Dark] = Make("Kit rubber", new Color(0.05f, 0.05f, 0.055f), 0.25f, 0f);
             paints[(int)KitPaint.Red] = Make("Kit red", new Color(0.78f, 0.06f, 0.05f), 0.45f, 0f);
             paints[(int)KitPaint.White] = Make("Kit white", new Color(0.92f, 0.92f, 0.9f), 0.4f, 0f);
-            var team = new Material(kitShader != null ? kitShader : Shader.Find("Standard")) { name = "Kit team colour", enableInstancing = true };
-            team.SetFloat("_Glossiness", 0.3f);
+            var team = new Material(kitShader != null ? kitShader : Lit.Shader) { name = "Kit team colour", enableInstancing = true };
+            team.SetFloat("_Smoothness", 0.3f);
             paints[(int)KitPaint.Team] = team;
         }
 
         private static Material Make(string name, Color colour, float smoothness, float metallic)
         {
-            var m = new Material(Shader.Find("Standard")) { name = name, enableInstancing = true, color = colour };
-            m.SetFloat("_Glossiness", smoothness);
+            var m = new Material(Lit.Shader) { name = name, enableInstancing = true, color = colour };
+            m.SetFloat("_Smoothness", smoothness);
             m.SetFloat("_Metallic", metallic);
             return m;
         }

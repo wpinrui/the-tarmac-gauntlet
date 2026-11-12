@@ -5,7 +5,8 @@
         "TarmacGauntlet.Simulation",
         "TarmacGauntlet.Career",
         "TarmacGauntlet.TeamHq",
-        "TarmacGauntlet.Visuals"
+        "TarmacGauntlet.Visuals",
+        "TarmacGauntlet.Rendering"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
