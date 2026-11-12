@@ -49,6 +49,22 @@ public static class Check
         Expect("moon lights the track in the middle of the night", midnight.LightDir.y > 0.2f && midnight.LightIntensity > 0.1f,
             $"{midnight.LightDir.y:0.00} {midnight.LightIntensity:0.00}");
         Expect("the next day wraps round", Math.Abs(SkyClock.At(39f, look).SunElevation - SkyClock.At(15f, look).SunElevation) < 1e-3f, "");
+        float hazeDawn = SkyClock.At(SkyClock.MistHour, look).Haze, hazeAfternoon = SkyClock.At(15f, look).Haze;
+        Expect("morning mist closes the haze in", hazeDawn < hazeAfternoon * 0.65f, $"{hazeDawn:0} m against {hazeAfternoon:0} m");
+        Expect("afternoon haze is the clear day's", Math.Abs(hazeAfternoon - look.Haze) < look.Haze * 0.01f, $"{hazeAfternoon:0} m");
+        float hazeStep = 0f;
+        for (int m = 0; m < 24 * 60; m++)
+            hazeStep = Math.Max(hazeStep, Math.Abs(SkyClock.At((m + 1) / 60f, look).Haze - SkyClock.At(m / 60f, look).Haze));
+        Expect("haze changes smoothly, minute to minute", hazeStep < look.Haze * 0.005f, $"{hazeStep:0.0} m");
+        float density = SkyClock.Density(look.Haze);
+        float seen(float metres) => (float)Math.Exp(-density * metres);
+        Expect("haze hides all but 2% at its distance", Math.Abs(seen(look.Haze) - 0.02f) < 1e-3f, $"{seen(look.Haze):0.000}");
+        Expect("far trees fade into the haze", seen(800f) < 0.7f && seen(800f) > 0.4f, $"{seen(800f):0.00} seen at 800 m");
+        Expect("the track close by stays clear", seen(60f) > 0.95f, $"{seen(60f):0.000} seen at 60 m");
+        SkyState noonSky = SkyClock.At(SkyClock.SolarNoon, look);
+        Expect("the day sky pales towards the horizon", Saturation(noonSky.Horizon) < Saturation(noonSky.Zenith) * 0.5f && noonSky.Horizon.grayscale > noonSky.Zenith.grayscale,
+            $"{Saturation(noonSky.Horizon):0.00} against {Saturation(noonSky.Zenith):0.00}");
+        Expect("the day zenith is a soft blue, not a deep one", Saturation(noonSky.Zenith) < 0.7f, $"{Saturation(noonSky.Zenith):0.00}");
         float[] noise = CloudField.Fbm(64, 4, 5, 11);
         float lo = 1f, hi = 0f, seam = 0f;
         foreach (float v in noise) { lo = Math.Min(lo, v); hi = Math.Max(hi, v); }
@@ -58,6 +74,12 @@ public static class Check
         Expect("cloud noise wraps without a seam", seam < 0.15f, $"{seam:0.000}");
         Console.WriteLine(failed == 0 ? "All sky checks pass" : $"{failed} sky checks FAIL");
         return failed == 0 ? 0 : 1;
+    }
+
+    private static float Saturation(Color c)
+    {
+        float hi = Math.Max(c.r, Math.Max(c.g, c.b)), lo = Math.Min(c.r, Math.Min(c.g, c.b));
+        return hi > 0f ? (hi - lo) / hi : 0f;
     }
 
     private static bool Ok(float v) => !float.IsNaN(v) && v >= 0f && v <= 2.5f;

@@ -1,4 +1,6 @@
+using System.Collections;
 using System.Collections.Generic;
+using TarmacGauntlet.Rendering;
 using TarmacGauntlet.Simulation;
 using UnityEngine;
 
@@ -78,8 +80,33 @@ namespace TarmacGauntlet.Raceday
         /// <summary>A model's paint, by its class.</summary>
         internal static Color PaintFor(string id) => ClassPaint[Mathf.Clamp(id[0] - 'a', 0, ClassPaint.Length - 1)];
 
+        /// <summary>Cars spawned a frame while the scene builds, so the loading screen keeps moving.</summary>
+        private const int CarsPerFrame = 3;
+        /// <summary>True once the scene is built and the race can run.</summary>
+        private bool built;
+        private readonly System.Diagnostics.Stopwatch buildWatch = new System.Diagnostics.Stopwatch();
+        private readonly List<(string Stage, long Ms)> buildTimes = new List<(string, long)>();
+
+        // The scene builds over several frames behind the loading screen (SceneLoader), which stays up until it is done.
         private void Awake()
         {
+            SceneLoader.Hold();
+            StartCoroutine(Build());
+        }
+
+        /// <summary>Notes how long a stage of the build took, adding to the stage's time if it ran before.</summary>
+        private void Lap(string stage)
+        {
+            long ms = buildWatch.ElapsedMilliseconds;
+            buildWatch.Restart();
+            int at = buildTimes.FindIndex(t => t.Stage == stage);
+            if (at >= 0) buildTimes[at] = (stage, buildTimes[at].Ms + ms);
+            else buildTimes.Add((stage, ms));
+        }
+
+        private IEnumerator Build()
+        {
+            buildWatch.Start();
             Time.fixedDeltaTime = 0.01f;
             RaceWeather.Now = WeatherState.Dry;
             RaceWeather.Forced = null;
@@ -95,17 +122,25 @@ namespace TarmacGauntlet.Raceday
             var materials = new CircuitMaterials();
             var builder = new CircuitBuilder(circuit, materials);
             List<CircuitPart> parts = builder.Build();
+            Lap("circuit");
+            yield return null;
             var standMaterials = new StandMaterials(StandLook.Colours);
             var stands = new Grandstands(circuit, builder, standMaterials, StandLook.Main, StandLook.Corners);
             parts.AddRange(stands.Build());
             foreach (CircuitPart part in parts) AddPart(track.transform, part);
             track.AddComponent<CrowdView>().Material = standMaterials.Crowd;
-            Landscape.Build(circuit, builder, materials, LandscapeLooks.Current);
+            Lap("grandstands");
+            yield return null;
+            Landscape.Build(circuit, builder, stands.Footprints, materials, LandscapeLooks.Current);
+            Lap("landscape");
+            yield return null;
             Complex = new PitComplex(circuit, builder.GarageFloors);
             var pitMaterials = new PitMaterials();
             var buildings = new GameObject("Pit complex");
             foreach (CircuitPart part in new PitComplexBuilder(Complex, pitMaterials).Build())
                 AddPart(buildings.transform, part);
+            Lap("pit complex");
+            yield return null;
             TimeOfDay sky = new GameObject("Sky").AddComponent<TimeOfDay>();
             PitComplexView view = buildings.AddComponent<PitComplexView>();
             view.Sky = sky;
@@ -115,6 +150,8 @@ namespace TarmacGauntlet.Raceday
             foreach (Transform child in track.transform)
                 if (child.name == "Armco" && child.TryGetComponent(out Renderer drawn)) plainArmco.Add(drawn);
             trackside.SetPlainArmco(plainArmco.ToArray());
+            Lap("trackside");
+            yield return null;
             var floodMaterials = new FloodMaterials();
             var floods = new Floodlights(circuit, Complex, stands.RoofLamps, builder.PitWallRuns, parts, GantrySpan.Of(circuit, trackside.Placed));
             var lit = new GameObject("Floodlights");
@@ -125,11 +162,15 @@ namespace TarmacGauntlet.Raceday
             night.Layout = floods;
             night.Materials = floodMaterials;
             night.Stands = standMaterials;
+            Lap("floodlights");
+            yield return null;
 
             keys = new GameObject("Keyboard").AddComponent<KeyboardState>();
             var line = new RacingLine(circuit);
             materials.LayRubber(circuit, line);
             track.AddComponent<TrackDetail>().Materials = materials;
+            Lap("racing line");
+            yield return null;
             var pits = new PitLane(circuit);
             bool career = RaceWeekend.Setup != null;
             RaceSetup setup = RaceWeekend.Setup ?? RaceWeekend.Begin(TestCareer());
@@ -151,6 +192,7 @@ namespace TarmacGauntlet.Raceday
             Starter starter = start == StartMode.Rolling ? new GameObject("Race start").AddComponent<RaceStart>()
                 : start == StartMode.PitLane ? new GameObject("Pit lane start").AddComponent<PitStart>()
                 : (Starter)null;
+            if (starter != null) starter.enabled = false;   // its start waits for the whole field
             for (int i = 0; i < field.Length; i++)
             {
                 bool mine = i == player;
@@ -194,7 +236,18 @@ namespace TarmacGauntlet.Raceday
                 cars[i] = car;
                 racing[i] = race;
                 drivers[i] = driver;
+                // Built cars wait switched off, out of the physics, until the whole field is on the grid.
+                car.gameObject.SetActive(false);
+                if ((i + 1) % CarsPerFrame == 0 && i + 1 < field.Length)
+                {
+                    Lap("cars");
+                    yield return null;
+                }
             }
+            // The rest is wired up in this frame, so the start and the cars all start together on the next.
+            if (starter != null) starter.enabled = true;
+            foreach (CarController car in cars) car.gameObject.SetActive(true);
+            Lap("cars");
             playerIndex = player;
             racingCars = racing;
             carControllers = cars;
@@ -321,20 +374,31 @@ namespace TarmacGauntlet.Raceday
                 handedOver = true;   // the save says who drives
                 if (resume.PlayerDriving && player >= 0) ai.enabled = false;
             }
-            if (start != StartMode.Rolling) return;
-
-            // The pace car waits ahead of pole, in pole's column.
-            CarController paceCar = CarBuilder.Spawn(PaceCarModel, circuit, null, new Color(0.95f, 0.95f, 0.95f));
-            paceCar.name = "Pace car";
-            paceCar.PlaceAt(circuit.IndexOf(circuit.Data.grid.slots[0].d + 40f), RollingStart.ColumnOf(0));
-            var rolling = (RaceStart)starter;
-            rolling.Grid = racing;
-            rolling.PaceCar = paceCar;
-            rolling.Pits = pits;
+            if (start == StartMode.Rolling)
+            {
+                // The pace car waits ahead of pole, in pole's column.
+                CarController paceCar = CarBuilder.Spawn(PaceCarModel, circuit, null, new Color(0.95f, 0.95f, 0.95f));
+                paceCar.name = "Pace car";
+                paceCar.PlaceAt(circuit.IndexOf(circuit.Data.grid.slots[0].d + 40f), RollingStart.ColumnOf(0));
+                var rolling = (RaceStart)starter;
+                rolling.Grid = racing;
+                rolling.PaceCar = paceCar;
+                rolling.Pits = pits;
+            }
+            Lap("race");
+            built = true;
+            SceneLoader.Release();
+            var report = new System.Text.StringBuilder("Raceday built in ");
+            long total = 0;
+            foreach ((string Stage, long Ms) t in buildTimes) total += t.Ms;
+            report.Append(total).Append(" ms:");
+            foreach ((string Stage, long Ms) t in buildTimes) report.Append(' ').Append(t.Stage).Append(' ').Append(t.Ms).Append(" ms,");
+            Debug.Log(report.ToString().TrimEnd(','));
         }
 
         private void OnDestroy()
         {
+            if (!built) SceneLoader.Release();
             RaceWeekend.Snapshot = null;
         }
 
@@ -509,7 +573,7 @@ namespace TarmacGauntlet.Raceday
 
         private void Update()
         {
-            if (keys == null || ai == null) return;
+            if (!built || keys == null || ai == null) return;
             if (RaceWeekend.Paused) return;   // the pause menu holds the clock
             if (director.Finished) return;   // the race summary is up, at normal speed
             if (keys.Pressed(KeyCode.Delete))

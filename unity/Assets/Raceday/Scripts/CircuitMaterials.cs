@@ -6,8 +6,8 @@ namespace TarmacGauntlet.Raceday
 {
     /// <summary>
     /// Materials for the circuit, made in code so the scene needs no asset files. The paved surfaces (road, its edges,
-    /// pit lane, kerbs) use the track shader with textures from <see cref="TrackTextures"/>; their tarmac detail,
-    /// rubbered line and kerb wear follow the graphics options through <see cref="ShowOptions"/>, and
+    /// pit lane, kerbs) use the track shader with textures from <see cref="TrackTextures"/>; their tarmac detail and
+    /// repairs, rubbered line and rubber marks, and kerb wear follow the graphics options through <see cref="ShowOptions"/>, and
     /// <see cref="WeatherView"/> wets them through <see cref="ShowWet"/>.
     /// </summary>
     public sealed class CircuitMaterials
@@ -19,8 +19,9 @@ namespace TarmacGauntlet.Raceday
             BumpScaleId = Shader.PropertyToID("_BumpScale"), MacroId = Shader.PropertyToID("_Macro"),
             MacroStrengthId = Shader.PropertyToID("_MacroStrength"), LineId = Shader.PropertyToID("_Line"),
             LineLengthId = Shader.PropertyToID("_LineLength"), UvMetresId = Shader.PropertyToID("_UvMetres"),
+            RepairsId = Shader.PropertyToID("_Repairs"), RepairAmountId = Shader.PropertyToID("_RepairAmount"), MarksId = Shader.PropertyToID("_Marks"),
             PoolsId = Shader.PropertyToID("_Pools"), PorosityId = Shader.PropertyToID("_Porosity"), PuddlesId = Shader.PropertyToID("_Puddles");
-        private const string DetailKeyword = "_TRACK_DETAIL", RubberKeyword = "_TRACK_RUBBER", WetKeyword = "_TRACK_WET";
+        private const string DetailKeyword = "_TRACK_DETAIL", RubberKeyword = "_TRACK_RUBBER", WetKeyword = "_TRACK_WET", StripesKeyword = "_GROUND_STRIPES";
 
         private readonly Texture2D kerbClean, kerbWorn, kerbCleanNormals, kerbWornNormals;
         private bool lineLaid, wet;
@@ -32,13 +33,21 @@ namespace TarmacGauntlet.Raceday
         {
             Shader track = Resources.Load<Shader>("TrackSurface/Track");
             TrackTextures.Tarmac tarmac = TrackTextures.MakeTarmac(1);
-            Texture2D normals = Texture("Tarmac normals", TrackTextures.TarmacNormals(tarmac, 1.6f), TrackTextures.TarmacSize, TrackTextures.TarmacSize, true);
+            Texture2D normals = Texture("Tarmac normals", TrackTextures.TarmacNormals(tarmac, 1.2f), TrackTextures.TarmacSize, TrackTextures.TarmacSize, true);
             Texture2D macro = Texture("Tarmac patches", TrackTextures.Macro(8), TrackTextures.MacroSize, TrackTextures.MacroSize, true);
-            Texture2D road = Texture("Asphalt", TrackTextures.TarmacColour(tarmac, new Color(0.17f, 0.17f, 0.18f), 0.9f), TrackTextures.TarmacSize, TrackTextures.TarmacSize, false);
-            Texture2D pit = Texture("Pit asphalt", TrackTextures.TarmacColour(tarmac, new Color(0.21f, 0.21f, 0.22f), 0.7f), TrackTextures.TarmacSize, TrackTextures.TarmacSize, false);
+            Texture2D road = Texture("Asphalt", TrackTextures.TarmacColour(tarmac, new Color(0.17f, 0.17f, 0.18f), 0.5f), TrackTextures.TarmacSize, TrackTextures.TarmacSize, false);
+            Texture2D pit = Texture("Pit asphalt", TrackTextures.TarmacColour(tarmac, new Color(0.21f, 0.21f, 0.22f), 0.4f), TrackTextures.TarmacSize, TrackTextures.TarmacSize, false);
+            Texture2D repairs = Texture("Tarmac repairs", TrackTextures.Repairs(12), TrackTextures.RepairsAcross, TrackTextures.RepairsAlong, true);
             Asphalt = Track(track, "Asphalt", road, normals, macro, 0.25f, 0.35f, 1f);
             RoadEdge = Track(track, "Road edge", road, normals, macro, 0.25f, 0.35f, 1f);
             PitAsphalt = Track(track, "Pit asphalt", pit, normals, macro, 0.2f, 0.25f, 0.9f);
+            Asphalt.SetTexture(RepairsId, repairs);
+            Asphalt.SetFloat(RepairAmountId, 1f);
+            PitAsphalt.SetTexture(RepairsId, repairs);
+            PitAsphalt.SetFloat(RepairAmountId, 0.6f);
+            Texture2D marks = Texture("Rubber marks", TrackTextures.Marks(14), TrackTextures.MarksAcross, TrackTextures.MarksAlong, true);
+            marks.wrapModeU = TextureWrapMode.Clamp;
+            Asphalt.SetTexture(MarksId, marks);
             kerbClean = Texture("Kerb", TrackTextures.Kerb(false, 9), TrackTextures.KerbAcross, TrackTextures.KerbAlong, false);
             kerbWorn = Texture("Worn kerb", TrackTextures.Kerb(true, 9), TrackTextures.KerbAcross, TrackTextures.KerbAlong, false);
             kerbCleanNormals = Texture("Kerb normals", TrackTextures.KerbNormals(false, 9), TrackTextures.KerbAcross, TrackTextures.KerbAlong, true);
@@ -101,7 +110,7 @@ namespace TarmacGauntlet.Raceday
             ShowOptions();
         }
 
-        /// <summary>Sets the paved surfaces to the graphics options as they stand.</summary>
+        /// <summary>Sets the paved surfaces and the mown grass to the graphics options as they stand.</summary>
         public void ShowOptions()
         {
             bool detail = GraphicsOptions.TarmacDetail.On;
@@ -114,6 +123,9 @@ namespace TarmacGauntlet.Raceday
             bool worn = GraphicsOptions.KerbWear.On;
             Kerb.SetTexture(MainTexId, worn ? kerbWorn : kerbClean);
             Kerb.SetTexture(BumpMapId, worn ? kerbWornNormals : kerbCleanNormals);
+            bool stripes = GraphicsOptions.Mowing.On;
+            foreach (Material m in new[] { Terrain, Grass, Verge })
+                if (stripes) m.EnableKeyword(StripesKeyword); else m.DisableKeyword(StripesKeyword);
         }
 
         /// <summary>

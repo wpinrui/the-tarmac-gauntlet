@@ -10,8 +10,9 @@ baked from the nearest of 8 x 8 directions (`Resources/Landscape/Impostor.shader
 
     bash tools/landscape/check/run.sh
 
-Lays out every look with the game's own code and checks nothing stands within 35 m behind the armco
-or in the paddock. Needs the .NET 8 SDK.
+Lays out every look with the game's own code and checks nothing stands within 15 m behind the armco
+or in the paddock, and that the few trees within 35 m stand clear of grandstands and the inside of
+tight bends. Needs the .NET 8 SDK.
 
 ## Baking the trees again
 

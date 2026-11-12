@@ -46,6 +46,13 @@ namespace TarmacGauntlet.Rendering
         public static readonly string[] Names = { "Low", "Medium", "High" };
         public static int Level { get; set; } = 1;
     }
+
+    /// <summary>Scene changes do nothing here: the menus only need to call them.</summary>
+    public static class SceneLoader
+    {
+        public static bool Loading => false;
+        public static void Load(string scene) { }
+    }
 }
 
 namespace TarmacGauntlet.Management
