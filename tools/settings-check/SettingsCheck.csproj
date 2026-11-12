@@ -11,6 +11,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Check.cs;Stubs.cs" />
+    <Compile Include="../../unity/Assets/Audio/Scripts/Mix.cs" />
     <Compile Include="../../unity/Assets/Visuals/GraphicsOption.cs" />
     <Compile Include="../../unity/Assets/Visuals/GraphicsOptions.cs" />
     <Compile Include="../../unity/Assets/Visuals/GraphicsRow.cs" />

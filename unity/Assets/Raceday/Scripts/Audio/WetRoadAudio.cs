@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TarmacGauntlet.Audio;
 using TarmacGauntlet.Rendering;
 using UnityEngine;
 
@@ -13,6 +14,8 @@ namespace TarmacGauntlet.Raceday
     public sealed class WetRoadAudio : MonoBehaviour
     {
         private const float Range = 120f;
+        /// <summary>The hiss's level in the tyres' group: from the loudness pass, its loudest moments 8 dB under an engine's.</summary>
+        private const float Level = 0.3f;
 
         private static readonly List<WetRoadAudio> all = new List<WetRoadAudio>();
         private static int rankedFrame = -1;
@@ -52,7 +55,6 @@ namespace TarmacGauntlet.Raceday
             s.rolloffMode = AudioRolloffMode.Logarithmic;
             s.minDistance = 5f;
             s.maxDistance = Range;
-            s.volume = 0.55f;
             s.priority = 100;   // below the tyres when Unity runs short of voices
             w.source = s;
             return w;
@@ -71,6 +73,7 @@ namespace TarmacGauntlet.Raceday
             if (synth == null) return;
             if (rankedFrame != Time.frameCount) Rank();
             if (!playing) return;
+            source.volume = Level * Mix.Gain(SoundGroup.Tyres);
             int grounded = 0;
             for (int i = 0; i < 4; i++) if (car.Ground(i, out _)) grounded++;
             WeatherState weather = RaceWeather.Now;

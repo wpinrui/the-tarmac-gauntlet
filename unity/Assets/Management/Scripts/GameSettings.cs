@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TarmacGauntlet.Audio;
 using TarmacGauntlet.Rendering;
 using UnityEngine;
 
@@ -12,7 +13,7 @@ namespace TarmacGauntlet.Management
     /// </summary>
     public static class GameSettings
     {
-        private const string VolumeKey = "settings.volume", MusicKey = "settings.music", VSyncKey = "settings.vsync", DisplayModeKey = "settings.displaymode",
+        private const string VSyncKey = "settings.vsync", DisplayModeKey = "settings.displaymode",
             WidthKey = "settings.width", HeightKey = "settings.height";
 
         public static readonly (FullScreenMode Mode, string Name)[] DisplayModes =
@@ -31,7 +32,8 @@ namespace TarmacGauntlet.Management
         private static void Load()
         {
             if (PlayerPrefs.HasKey(VSyncKey)) QualitySettings.vSyncCount = PlayerPrefs.GetInt(VSyncKey) != 0 ? 1 : 0;
-            AudioListener.volume = PlayerPrefs.GetFloat(VolumeKey, 1);
+            foreach (VolumeSlider slider in Sliders) Mix.SetPosition(slider, PlayerPrefs.GetFloat(Key(slider), Mix.Default(slider)));
+            AudioListener.volume = Mix.Master;
 
             FullScreenMode mode = PlayerPrefs.HasKey(DisplayModeKey)
                 ? DisplayModes[Mathf.Clamp(PlayerPrefs.GetInt(DisplayModeKey), 0, DisplayModes.Length - 1)].Mode
@@ -136,27 +138,46 @@ namespace TarmacGauntlet.Management
             PlayerPrefs.Save();
         }
 
-        /// <summary>0 to 1.</summary>
-        public static float Volume
+        /// <summary>
+        /// The volume sliders, in the order the settings show them: master, then one for each part of the mix (tyres go
+        /// with the engines, as the car). The master and music keep the keys they had before the mixer.
+        /// </summary>
+        public static readonly VolumeSlider[] Sliders =
+            { VolumeSlider.Master, VolumeSlider.Music, VolumeSlider.Cars, VolumeSlider.Effects, VolumeSlider.Ambience, VolumeSlider.Ui };
+
+        private static string Key(VolumeSlider slider) => slider switch
         {
-            get => AudioListener.volume;
-            set
-            {
-                AudioListener.volume = Mathf.Clamp01(value);
-                PlayerPrefs.SetFloat(VolumeKey, AudioListener.volume);
-                PlayerPrefs.Save();
-            }
+            VolumeSlider.Master => "settings.volume",
+            VolumeSlider.Music => "settings.music",
+            VolumeSlider.Cars => "settings.cars",
+            VolumeSlider.Effects => "settings.effects",
+            VolumeSlider.Ambience => "settings.ambience",
+            _ => "settings.ui",
+        };
+
+        /// <summary>A volume slider's position, 0 to 1. The <see cref="Mix"/> turns it into a gain.</summary>
+        public static float Level(VolumeSlider slider) => Mix.Position(slider);
+
+        public static void SetLevel(VolumeSlider slider, float value)
+        {
+            Mix.SetPosition(slider, value);
+            if (slider == VolumeSlider.Master) AudioListener.volume = Mix.Master;
+            PlayerPrefs.SetFloat(Key(slider), Mix.Position(slider));
+            PlayerPrefs.Save();
         }
 
-        /// <summary>The menu music's level, 0 to 1, under <see cref="Volume"/> (<see cref="MenuMusic"/>).</summary>
+        /// <summary>The master volume's slider, 0 to 1.</summary>
+        public static float Volume
+        {
+            get => Level(VolumeSlider.Master);
+            set => SetLevel(VolumeSlider.Master, value);
+        }
+
+        /// <summary>The menu music's slider, 0 to 1, under <see cref="Volume"/> (<see cref="MenuMusic"/>).</summary>
         public static float Music
         {
-            get => PlayerPrefs.GetFloat(MusicKey, 0.7f);
-            set
-            {
-                PlayerPrefs.SetFloat(MusicKey, Mathf.Clamp01(value));
-                PlayerPrefs.Save();
-            }
+            get => Level(VolumeSlider.Music);
+            set => SetLevel(VolumeSlider.Music, value);
         }
     }
 }

@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using TarmacGauntlet.Audio;
+using TarmacGauntlet.Rendering;
 using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
@@ -6,16 +8,19 @@ namespace TarmacGauntlet.Raceday
     /// <summary>
     /// A car's engine sound: its <see cref="EngineSound"/> synthesised live by an <see cref="EngineSynth"/>.
     /// The source plays a clip of constant ones and the synth multiplies it in <see cref="OnAudioFilterRead"/>,
-    /// so Unity still places the sound in 3D and fades it with distance. Only the cars nearest the listener play.
+    /// so Unity still places the sound in 3D and fades it with distance. Only the cars nearest the listener play, as many
+    /// as the quality level's <see cref="RaceVoices"/>, in the engines' group of the <see cref="Mix"/>. The nearest moving car
+    /// tells the mix how close it is, so the crowd and PA dip under it.
     /// </summary>
     [RequireComponent(typeof(CarController))]
     public sealed class EngineAudio : MonoBehaviour
     {
-        private const int Voices = 10;
         private const float Range = 350f;
 
         private static readonly List<EngineAudio> all = new List<EngineAudio>();
         private static int rankedFrame = -1;
+        private static float levelRead = float.NegativeInfinity;
+        private static int voices = RaceVoices.EnginesAt(1);
         private static AudioClip ones;
         private static AudioListener listener;
 
@@ -67,6 +72,7 @@ namespace TarmacGauntlet.Raceday
             if (synth == null) return;
             if (rankedFrame != Time.frameCount) Rank();
             if (!playing) return;
+            source.volume = Mix.Gain(SoundGroup.Engines);
 
             CarSpec spec = car.Spec;
             int gear = Mathf.Max(car.Gear, 1);
@@ -86,10 +92,16 @@ namespace TarmacGauntlet.Raceday
             synth.Speed = Mathf.Abs(car.Speed);
         }
 
-        /// <summary>Once a frame: the nearest cars within range play, and the rest go quiet.</summary>
+        /// <summary>Once a frame: the nearest cars within range play, and the rest go quiet. The nearest tells the mix
+        /// how close it is.</summary>
         private static void Rank()
         {
             rankedFrame = Time.frameCount;
+            if (Time.unscaledTime - levelRead > 1f)
+            {
+                levelRead = Time.unscaledTime;
+                voices = RaceVoices.EnginesAt(QualityLevels.Level);
+            }
             if (listener == null) listener = FindFirstObjectByType<AudioListener>();
             if (listener == null) return;
             Vector3 ear = listener.transform.position;
@@ -97,7 +109,9 @@ namespace TarmacGauntlet.Raceday
             for (int i = 0; i < all.Count; i++)
             {
                 EngineAudio e = all[i];
-                bool on = i < Voices && (e.transform.position - ear).sqrMagnitude < Range * Range;
+                float sq = (e.transform.position - ear).sqrMagnitude;
+                bool on = i < voices && sq < Range * Range;
+                if (i == 0 && on) Mix.Engine(Mix.Closeness(Mathf.Sqrt(sq), Mathf.Abs(e.car.Speed)));
                 if (on == e.playing) continue;
                 e.playing = on;
                 if (on) e.source.Play();

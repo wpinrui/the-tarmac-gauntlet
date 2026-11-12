@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using TarmacGauntlet.Audio;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -10,7 +11,7 @@ namespace TarmacGauntlet.Management
     /// sounds for every pressable element (<see cref="MenuSoundRules"/>); screens ask for the rest by name with
     /// <see cref="Play"/>, such as Race or a camera glide. Cues asked for in one frame play together at the end of it,
     /// the strongest per layer. One player lives across scenes, so Go rings on through the loading screen, and it plays
-    /// through the race's pause, which pauses every other sound. Its level is the master volume.
+    /// over the race's pause, past the listener's muffle. It plays in the UI's group of the <see cref="Mix"/>.
     /// </summary>
     public sealed class MenuSounds : MonoBehaviour
     {
@@ -50,6 +51,7 @@ namespace TarmacGauntlet.Management
             if (s.lastSlider >= 0 && now - s.lastSlider < MenuSoundRules.SliderGapSeconds) return;
             s.lastSlider = now;
             if (!s.clips.TryGetValue(UiCue.Slider, out AudioClip clip)) return;
+            s.slider.volume = Mix.Gain(SoundGroup.Ui);
             s.slider.pitch = MenuSoundRules.SliderPitch(value01);
             s.slider.PlayOneShot(clip);
         }
@@ -79,6 +81,7 @@ namespace TarmacGauntlet.Management
             s.playOnAwake = false;
             s.spatialBlend = 0;
             s.ignoreListenerPause = true;
+            s.bypassListenerEffects = true;
             return s;
         }
 
@@ -108,6 +111,7 @@ namespace TarmacGauntlet.Management
 
         private void LateUpdate()
         {
+            source.volume = Mix.Gain(SoundGroup.Ui);
             foreach (UiCue cue in queue.Take())
                 if (clips.TryGetValue(cue, out AudioClip clip)) source.PlayOneShot(clip);
         }

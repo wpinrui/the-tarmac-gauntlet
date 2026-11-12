@@ -15,7 +15,7 @@ namespace UnityEngine {
     public T AddComponent<T>() where T : Component, new() { var c = new T { gameObject = this }; if (c is MonoBehaviour m) Live.Add(m); c.GetType().GetMethod("Awake", System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Instance)?.Invoke(c, null); return c; }
   }
   public class AudioSource : Behaviour {
-    public bool playOnAwake, loop; public float spatialBlend, volume; public AudioClip clip; public bool isPlaying; public List<AudioClip> Played = new List<AudioClip>();
+    public bool playOnAwake, loop, bypassListenerEffects; public float spatialBlend, volume; public AudioClip clip; public bool isPlaying; public List<AudioClip> Played = new List<AudioClip>();
     public void Play() { isPlaying = true; Played.Add(clip); } public void Stop() { isPlaying = false; }
   }
   public static class Resources { public static AudioClip[] Clips; public static T[] LoadAll<T>(string p) where T : Object => (T[])(object)Clips; }
