@@ -19,6 +19,7 @@
     <Compile Include="../../unity/Assets/Raceday/Scripts/PitComplex.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/Furniture/TrackFurniture.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/Furniture/FurnitureBuilder.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Furniture/ArmcoBuilder.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/Furniture/RaceFlags.cs" />
   </ItemGroup>
 </Project>

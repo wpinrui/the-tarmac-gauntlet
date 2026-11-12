@@ -60,7 +60,7 @@ namespace TarmacGauntlet.Raceday
             Grass = Make("Grass", Noise(new Color(0.23f, 0.41f, 0.15f), 0.08f, 4), 0.05f);
             Gravel = Make("Gravel", Noise(new Color(0.63f, 0.58f, 0.48f), 0.12f, 5), 0.1f);
             Armco = Make("Armco", null, 0.6f, new Color(0.72f, 0.74f, 0.76f), 0.7f);
-            Tyres = Make("Tyre wall", null, 0.3f, new Color(0.06f, 0.06f, 0.07f));
+            Tyres = Make("Tyre wall", TyreWall(), 0.3f);
             Concrete = Make("Concrete", Noise(new Color(0.74f, 0.73f, 0.7f), 0.03f, 6), 0.15f);
             Hatch = Make("Red and white hatching", Stripes(new Color(0.8f, 0.1f, 0.1f), new Color(0.93f, 0.93f, 0.91f), true), 0.35f);
             Terrain = Make("Terrain", Noise(new Color(0.2f, 0.35f, 0.13f), 0.1f, 7), 0.05f);
@@ -191,6 +191,40 @@ namespace TarmacGauntlet.Raceday
                 float v = (float)(rng.NextDouble() - 0.5) * 2f * amount;
                 px[i] = new Color(Mathf.Clamp01(baseColour.r + v), Mathf.Clamp01(baseColour.g + v), Mathf.Clamp01(baseColour.b + v), 1);
             }
+            tex.SetPixels(px);
+            tex.Apply(true);
+            return tex;
+        }
+
+        /// <summary>
+        /// Stacked tyres seen from the side, as <see cref="CircuitBuilder"/> lays the tyre walls' faces: across the
+        /// texture runs down the stack from its top, one tile its whole height, and along it two tyres side by side.
+        /// Each tyre's tread darkens towards its rounded shoulders and into the gap between neighbours. The top course
+        /// is painted red and white by turns so the wall reads from across the gravel; below ground it is plain rubber.
+        /// </summary>
+        private static Texture2D TyreWall()
+        {
+            const int across = 96, along = 64;   // texels down the stack, texels along two tyres
+            const float course = 0.25f;          // one tyre's tread width, m
+            float height = CircuitBuilder.TyreTop + CircuitBuilder.TyreFoot;
+            var tex = new Texture2D(across, along, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear, anisoLevel = 8 };
+            var px = new Color[across * along];
+            Color rubber = new Color(0.07f, 0.07f, 0.075f), red = new Color(0.72f, 0.1f, 0.08f), white = new Color(0.86f, 0.86f, 0.84f);
+            var rng = new System.Random(15);
+            for (int y = 0; y < along; y++)
+                for (int x = 0; x < across; x++)
+                {
+                    float down = (x + 0.5f) / across * height;               // m below the top of the stack
+                    float a = (y + 0.5f) / along * 2f;                        // tyres along, 0 to 2
+                    int tyre = Mathf.FloorToInt(a);
+                    float round = Mathf.Sqrt(Mathf.Max(0f, 1f - Mathf.Pow((a - tyre) * 2f - 1f, 2f)));   // 1 at a tyre's front, 0 where two meet
+                    float inCourse = Mathf.Repeat(down, course) / course;
+                    float shoulder = Mathf.Sqrt(Mathf.Max(0f, 1f - Mathf.Pow(inCourse * 2f - 1f, 4f)));
+                    Color c = down >= CircuitBuilder.TyreTop ? rubber : down < course ? (tyre == 0 ? red : white) : rubber;
+                    float shade = down >= CircuitBuilder.TyreTop ? 1f : Mathf.Lerp(0.25f, 1f, round) * Mathf.Lerp(0.45f, 1f, shoulder);
+                    shade *= 1f + (float)(rng.NextDouble() - 0.5) * 0.12f;
+                    px[y * across + x] = new Color(c.r * shade, c.g * shade, c.b * shade, 1f);
+                }
             tex.SetPixels(px);
             tex.Apply(true);
             return tex;

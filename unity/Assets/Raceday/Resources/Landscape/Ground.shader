@@ -3,9 +3,9 @@
 // track where the grass is mown. All are made in code (Landscape.cs) and read by world position, so
 // the runoff and the ground beyond it match.
 //
-// The mowing map holds, per map point: the distance beyond the nearest road edge, m, wandering a
-// little as a mower's lines do; how plainly the stripes show, 0 where the grass is not mown; and
-// the way that road runs across the ground. Each stripe is mown the opposite way
+// The mowing map holds, per map point: the distance beyond the nearest road edge, m; how far out
+// from the road the grass is mown, m, 0 where none is; and the way that road runs across the
+// ground, as long as the stripes are fresh (LandscapePlan.Mowing). Each stripe is mown the opposite way
 // to the next, so its grass leans along the road one way or the other: a stripe whose grass leans
 // away from the viewer looks lighter, one leaning towards them darker, and the stripes swap, fainter,
 // as the view turns round.
@@ -18,8 +18,8 @@ Shader "Hidden/TarmacGauntlet/Ground"
         _Grain ("Grain", 2D) = "gray" {}
         _Mowing ("Mowing", 2D) = "black" {}
         _Map ("Map's corner and 1 / size, world xz", Vector) = (0, 0, 1, 1)
-        _StripeWidth ("Stripe width, m", Float) = 5
-        _StripeContrast ("Stripe contrast", Range(0, 0.5)) = 0.11
+        _StripeWidth ("Stripe width, m (LandscapePlan.StripeWidth)", Float) = 5
+        _StripeContrast ("Stripe contrast", Range(0, 0.5)) = 0.15
         _Smoothness ("Smoothness", Range(0, 1)) = 0.05
     }
     SubShader
@@ -96,14 +96,15 @@ Shader "Hidden/TarmacGauntlet/Ground"
                 half3 albedo = fields * grain * 2 * _BaseColor.rgb;
                 #if defined(_GROUND_STRIPES)
                     half4 mow = SAMPLE_TEXTURE2D(_Mowing, sampler_Mowing, uv);
-                    // The grain roughens the stripes' edges a little, as a mower's never are clean.
-                    float d = (mow.r + (grain - 0.5) * 1.5) / _StripeWidth;
+                    // The grain roughens the stripes' edges a touch, as cut grass is never quite clean.
+                    float d = (mow.r + (grain - 0.5) * 0.3) / _StripeWidth;
                     float across = fwidth(d);
                     // A square wave, +1 on one stripe and -1 on the next, its edges softened over about a pixel.
                     float wave = clamp((abs(frac(d * 0.5) - 0.5) * 4 - 1) / max(across * 2, 0.08), -1, 1);
-                    // Gone where the stripes would be narrower than a couple of pixels, faint where the mowing was careless, none off the mown grass.
-                    half fade = saturate(mow.g) * saturate(1.5 - across * 2.5);
-                    half2 along = mow.ba / max(length(mow.ba), 1e-3);
+                    // Gone where the stripes would be narrower than a couple of pixels, and past the mower's last pass.
+                    half fresh = length(mow.ba);
+                    half fade = fresh * saturate(1.5 - across * 2.5) * saturate((mow.g - mow.r) / max(fwidth(mow.r), 0.05) + 0.5);
+                    half2 along = mow.ba / max(fresh, 1e-3);
                     float2 view = i.positionWS.xz - _WorldSpaceCameraPos.xz;
                     half lean = dot(view, along) / max(length(view), 1e-3);
                     albedo *= 1 + _StripeContrast * wave * fade * (0.35 + 0.65 * lean);
