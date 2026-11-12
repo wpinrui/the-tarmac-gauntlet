@@ -294,7 +294,7 @@ namespace TarmacGauntlet.Raceday
             float x = minX + (i % MapX) * cell, z = minZ + (i / MapX) * cell;
             // Nearly straight: the passes drift a little either way over tens of metres, as a mower steered by eye does.
             fromRoad = Mathf.Max(road[i], 0f) * (1f + 0.05f * (Noise(x / 200f, z / 200f, 166) - 0.5f))
-                + 1.6f * (Noise(x / 60f, z / 60f, 162) - 0.5f);
+                + 2.6f * (Noise(x / 60f, z / 60f, 162) - 0.5f);
             reach = fresh = alongX = alongZ = 0f;
             if (k < 0 || Map[i] != LandUse.Mown) return;
             // Left is level and square to the road, so the road runs along (left.z, -left.x).
