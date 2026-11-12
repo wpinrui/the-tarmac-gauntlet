@@ -96,4 +96,6 @@ export.py writes each door's hinge axis and open angle, in Unity axes, to `<Name
 Every file and folder gets a committed `.meta` with its own random guid.
 The build scripts live in `tools/cars/<name>/`: rows.py, rows.json, body.py, parts.py, glyphs.py, glyphs.json, export.py, publish.py, check.py.
 Shared primitives live in `tools/cars/common/`: lofting, laying shapes on the body, grooves, booleans, lathing, export, the viewer, checks and glyph outlines. They hold no shapes, sizes, colours or part designs. Every visual decision is written fresh in the car's own scripts. Nothing visual carries over from another car.
+Register the car in `unity/Assets/Simulation/Data/CarArt.cs`: add its model id and OBJ path to `ById`. An unregistered car is drawn with its class's stand-in model, so it never appears in the game.
+Before merging, check that `ById` has the car's entry and that its path matches the exported OBJ.
 Merge to main so Ivan can test it in Unity.
