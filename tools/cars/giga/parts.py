@@ -1,4 +1,4 @@
-"""The Giga's parts: lamps, grilles, running lamps, vents, splitter, diffuser, exhausts, glass,
+"""The Giga's parts: lamps, grilles, running lamps, splitter, diffuser, exhausts, glass,
 shut lines, doors, mirrors, skirts, rear wing, interior, wheels, badge and name. Every shape and
 size here is the Giga's own, from rows.json, kept plain and smooth. Runs inside Blender's Python
 module, called by export.py."""
@@ -139,7 +139,10 @@ def headlamps(ref, cutters, out):
         b = shp.bounds
         cz = b[1] + 0.034
         cups = [Point(b[2] - 0.05, cz + 0.004).buffer(0.032, 48), Point(b[2] - 0.12, cz).buffer(0.03, 48)]
+        inner = shp.buffer(-0.005)
+        cups = [c.intersection(inner) for c in cups]
         strip = shp.intersection(box(b[0], b[1], b[2], b[1] + 0.012)).buffer(-0.003, join_style=1)
+        strip = strip.difference(unary_union(cups).buffer(0.004))
         strip = max(getattr(strip, "geoms", [strip]), key=lambda g: g.area)
         g = (lambda q: q) if sgn > 0 else flip
         cutters += blend.lay(ref, f"cut_head_{side}", g(shp), fr, -0.05, 0.006, "housing", 0.006, along_ray=True)
@@ -199,19 +202,12 @@ def front_parts(ref, cutters, out):
         g = (lambda q: q) if sgn > 0 else flip
         cutters += blend.lay(ref, f"cut_drl_{side}", g(drl), fr, -0.03, 0.006, "housing", 0.004, along_ray=True)
         out += blend.lay(ref, f"drl_back_{side}", g(drl.buffer(-0.001)), fr, -0.029, -0.025, "housing", 0.004, along_ray=True)
-        out += blend.lay(ref, f"lamp_head_drl_{side}", g(drl.buffer(-0.004)), fr, -0.0245, -0.02, "lamp_head", 0.003,
+        out += blend.lay(ref, f"lamp_head_drl_{side}", g(drl.buffer(-0.004)), fr, -0.023, -0.019, "lamp_head", 0.003,
                          along_ray=True)
-    b = max(s["w"] for s in body.ST)
+    b = R["splitter_w"]
     zb = min(s["zb"] for s in body.ST if s["x"] > NOSE - 0.3)
-    lip = box(-b, zb + 0.012, b, R["splitter"])
+    lip = soft(box(-b, zb + 0.012, b, R["splitter"]), 0.01)
     out += blend.lay(ref, "splitter", lip.difference(mouth.buffer(0.004)), fr, -0.003, 0.004, "trim", 0.012)
-
-
-def gills(ref, out):
-    """The black vent on each front wing behind the arch: a short bar over a long slanted slot."""
-    g = soft(poly(R["gill"]), 0.004)
-    for sgn, side in ((1, "l"), (-1, "r")):
-        out += blend.lay(ref, f"gill_{side}", g, side_fr(sgn), -0.001, 0.004, "trim", 0.005)
 
 
 def skirts(ref, out):
@@ -229,7 +225,7 @@ def rear_parts(ref, out):
     val = half_shape(R["valance"], 0.008)
     out += blend.lay(ref, "valance", val, fr, -0.003, 0.004, "trim", 0.012)
     u, z0, z1 = R["rain"]
-    out += blend.lay(ref, "lamp_rain", soft(box(-u, z0, u, z1), 0.004), fr, 0.0045, 0.0085, "lamp_rain", 0.004,
+    out += blend.lay(ref, "lamp_rain", soft(box(-u, z0, u, z1), 0.004), fr, 0.0065, 0.0105, "lamp_rain", 0.004,
                      along_ray=True)
     out += exhausts(ref)
 
@@ -242,7 +238,7 @@ def exhausts(ref):
             y = w * sgn
             hit, _n = blend.cast(ref, rear_fr(), y, z + 0.8 * r)
             xs = (hit[0] if hit is not None else R["exhaust_x"]) - 0.025     # just out past the bumper above
-            prof = [(r - 0.005, -0.14), (r, -0.14), (r, 0.01), (r - 0.005, 0.01)]
+            prof = [(r - 0.005, -0.30)] + [(r, t) for t in np.linspace(-0.30, 0.01, 63)] + [(r - 0.005, 0.01)]     # rings all along, so the check sees where it meets the body
             v, f = geom.lathe(prof, 48, axis="z")
             v = np.column_stack([xs - v[:, 2], y + v[:, 0], z + v[:, 1]])
             obs.append(blend.make(f"exhaust_{side}{i}", v, [q[::-1] for q in f], "exhaust"))
@@ -452,7 +448,9 @@ def grooves(ref):
 
 # ---------------------------------------------------------------- doors
 DOOR_DEPTH = 0.05     # below the cabin floor the door takes the sill this deep
-DOOR_WALL = 0.08      # above it, the whole wall: the cabin is hollow behind it
+DOOR_WALL = 0.24      # above it, the whole wall up to the belt, deep enough to reach the cabin's
+                      # hollow, so the shoulder over the door goes with the door and leaves no sliver
+FRAME_DEPTH = 0.08    # the window frame above the belt, shallow so it never takes the roof's edge
 DOOR_GAP = 0.0015     # half the gap round the door, inside the shut line's groove
 DOOR_OPEN = 62.0      # degrees the door swings out
 FLOOR = 0.20
@@ -488,8 +486,10 @@ def door(ref, shell, obs, sgn=1):
     glass, card and mirror go with it."""
     side = "l" if sgn > 0 else "r"
     o = door_outline()
+    lower = Polygon(door_path()).buffer(0)
     regions = [(o.intersection(box(-5, -1, 5, FLOOR + 0.03)), DOOR_DEPTH),
-               (o.intersection(box(-5, FLOOR + 0.02, 5, 5)), DOOR_WALL)]
+               (lower.intersection(box(-5, FLOOR + 0.02, 5, 5)), DOOR_WALL),
+               (o.difference(lower.buffer(-0.01)).intersection(box(-5, FLOOR + 0.02, 5, 5)), FRAME_DEPTH)]
     trim = [ob for ob in obs if ob.name == f"window_trim_{side}"]
     roles = {f"side_glass_{side}": "glass", f"side_glass_{side}_1": "glass",
              f"mirror_{side}": "mirror", f"mirror_glass_{side}": "mirror_glass", f"door_card_{side}": "card"}
@@ -553,7 +553,7 @@ def arches():
     for x, wd, out in _axles():
         yc = out - wd / 2
         for sgn in (1, -1):
-            v, f = geom.disc((x, (yc + 0.12) * sgn, W["r"]), (0, 1, 0), W["arch_r"], 0.50, n=96)
+            v, f = geom.disc((x, (yc + 0.10) * sgn, W["r"]), (0, 1, 0), W["arch_r"], 0.60, n=96)
             cut.append(blend.make("arch", v, f, "interior"))
             v, f = geom.disc((x, (yc + 0.10) * sgn, W["r"]), (0, 1, 0), W["arch_r"] + 0.03, 0.62, n=96)
             tubs.append(blend.make("tub", v, f, "interior"))
@@ -634,7 +634,8 @@ def steering():
     obs = [rim] + [blend.make("spoke", *p, "interior") for p in parts]
     v, f = geom.disc((0, 0, 0), (0, 1, 0), 0.055, 0.05, n=32)
     obs.append(blend.make("boss", v, f, "interior"))
-    v, f = geom.disc((0, -0.17, 0), (0, 1, 0), 0.026, 0.30, n=24)
+    prof = [(0.018, -0.50)] + [(0.026, t) for t in np.linspace(-0.50, -0.02, 49)] + [(0.018, -0.02)]   # the column runs into the dash
+    v, f = geom.lathe(prof, 24, axis="y")
     obs.append(blend.make("column", v, f, "interior"))
     wheel = blend.union_all(obs, "steering")
     wheel.data.transform(Matrix.Translation(STEER) @ Matrix.Rotation(np.radians(STEER_TILT), 4, "Y")
@@ -651,9 +652,9 @@ def interior():
                  n=10, gap=0.045)]
     bc = b_shut()
     for sgn, side in ((1, "l"), (-1, "r")):
-        clip = lambda x, s=sgn: (box(0.3, FLOOR + 0.06, 1.2, belt(x) - 0.02) if s > 0 else box(-1.2, FLOOR + 0.06, -0.3, belt(x) - 0.02)).intersection(
-            body.inside(x, 0.035 + 0.008)).difference(body.inside(x, 0.035 + 0.026))
-        obs.append(_loft(f"door_card_{side}", bc + 0.04, R["front_door"][1][0] - 0.12, clip, n=10))   # clear of the dash as it swings
+        clip = lambda x, s=sgn: (box(0.3, FLOOR + 0.06, 1.2, belt(x) - 0.08) if s > 0 else box(-1.2, FLOOR + 0.06, -0.3, belt(x) - 0.08)).intersection(
+            body.inside(x, 0.035 + 0.002)).difference(body.inside(x, 0.035 + 0.020))
+        obs.append(_loft(f"door_card_{side}", bc + 0.04, 0.42, clip, n=10))   # clear of the dash as it swings
         yc = 0.38 * sgn
         obs.append(_rbox(f"seat_base_{side}", -0.58, -0.10, yc - 0.23, yc + 0.23, FLOOR + 0.002, FLOOR + 0.15))
         obs.append(_rbox(f"seat_back_{side}", -0.72, -0.60, yc - 0.22, yc + 0.22, FLOOR + 0.151, FLOOR + 0.66, lean=0.26))
@@ -777,17 +778,23 @@ def _flat(ref, g, size, fr, a, b, up, name, d0, d1, mat, step=0.004):
     return blend.lay(ref, name, sscale(g, size, size, origin=(0, 0)), pf, d0, d1, mat, step)
 
 
+BADGE_RIM = 0.07      # the chrome outline round every badge, in badge heights
+
+
 def badge(ref, style, size, fr, a, b, up, name):
-    """A dark base the badge's shape under each colour, every layer a little apart so no faces touch."""
+    """A chrome outline round a dark base in the badge's shape, each colour on top, every layer a
+    little apart so no faces touch."""
     outline, pieces = badge_chrome() if style == "chrome" else badge_colour()
-    objs = _flat(ref, outline, size, fr, a, b, up, name + "_base", 0.0012, 0.0030, "badge_black", 0.002)
+    objs = _flat(ref, outline.buffer(BADGE_RIM, join_style=1), size, fr, a, b, up, name + "_rim", 0.0010, 0.0022,
+                 "chrome", 0.002)
+    objs += _flat(ref, outline, size, fr, a, b, up, name + "_base", 0.0032, 0.0038, "badge_black", 0.002)
     for i, (g, m) in enumerate(pieces):
         if m == "badge_black":
             continue
         g = g.buffer(-0.3 * 0.001 / size)
         if g.is_empty:
             continue
-        objs += _flat(ref, g, size, fr, a, b, up, f"{name}_{i}", 0.0036, 0.0046, m, 0.002)
+        objs += _flat(ref, g, size, fr, a, b, up, f"{name}_{i}", 0.0048, 0.0058, m, 0.002)
     return objs
 
 
@@ -802,25 +809,25 @@ def options(ref):
         for i, ob in enumerate(objs):
             ob.name = f"opt_{group}_{n}_{i}"
             out.append(ob)
-    bar_z = (max(p[1] for p in R["grille"]) + min(p[1] for p in R["grille_up"])) / 2
+    up_z = (max(p[1] for p in R["grille_up"]) + min(p[1] for p in R["grille_up"])) / 2
     bonnet_x = max(p[0] for p in R["bonnet"]) - 0.12
     L = R["lid"]
     lid_z = L["z0"] + 0.05
     panel_z = (L["z0"] + max(p[1] for p in R["valance"])) / 2
     for k, style in ((0, "chrome"), (1, "colour")):
-        # front: on the bar between the grilles (the reference's spot), or on the bonnet's nose
-        add("frontbadge", 1 + k, badge(ref, style, 0.048, front_fr(), 0, bar_z, up, "fb"))
+        # front: on the upper grille's middle, bridging it (the reference's spot), or on the bonnet's nose
+        add("frontbadge", 1 + k, badge(ref, style, 0.054, front_fr(), 0, up_z, up, "fb"))
         add("frontbadge", 3 + k, badge(ref, style, 0.06, top_fr(), bonnet_x, 0, fwd, "fb"))
         # rear: on the lid's foot in the middle (the reference's spot), or lower on the tail panel
         add("rearbadge", 1 + k, badge(ref, style, 0.055, rear_fr(), 0, lid_z, up, "rb"))
         add("rearbadge", 3 + k, badge(ref, style, 0.07, rear_fr(), 0, panel_z, up, "rb"))
     cap = 0.026
-    # name: on the tail right of the middle under the lid (the reference's spot), or on both wings
-    # just above the vents
+    # name: on the tail right of the middle under the lid (the reference's spot), or on both front
+    # wings behind the arches
     add("name", 1, _flat(ref, nm, cap, rear_fr(), -L["w_low"] * 0.75, L["z0"] - 0.04, up, "nm", 0.0012, 0.0025, "chrome"))
     q = []
     g = np.array(R["gill"])
-    gx, gz = float(g[:2, 0].mean()), float(g[:, 1].max()) + 0.03
+    gx, gz = float(g[:2, 0].mean()), float(g[:, 1].max())
     for sgn in (1, -1):
         q += _flat(ref, nm, cap, side_fr(sgn), gx, gz, up, "nm", 0.0012, 0.0025, "chrome")
     add("name", 2, q)

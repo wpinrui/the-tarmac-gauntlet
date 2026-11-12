@@ -206,15 +206,17 @@ GRILLE_SLATS = [18.6, 16.0, 13.4]
 # The daytime running lamp in the bumper's corner: a slim slot.
 DRL = [(24.0, 15.4), (25.0, 15.9), (28.0, 16.5), (30.5, 16.65), (30.6, 16.1), (28.0, 15.4), (25.0, 15.0)]
 SPLITTER = 10.3                                   # top of the black lip across the nose
+SPLITTER_W = 32.0                                 # its half width, clear of the front arches
 
 # ---------------------------------------------------------------- rear (rear render, left half)
 TAIL_RINGS = [(25.4, 33.15, 3.6), (17.75, 32.4, 2.9)]     # two round lamps each side: centre and radius
 # The boot lid's outline on the tail: straight across above the inner lamps, then up their
 # inboard side to the deck, where it runs forward to the rear glass.
 LID = {"w": 20.2, "z0": 33.3, "z_side": 36.2, "w_low": 15.0}
-# The black lower bumper and diffuser, its top edge stepping down at the corners.
-VALANCE = [(0.0, 17.0), (15.0, 16.8), (20.0, 17.15), (28.0, 17.1), (31.0, 16.6), (32.6, 15.4), (33.2, 13.0),
-           (33.3, 8.0), (32.8, 7.0), (0.0, 7.0)]
+# The black lower bumper and diffuser, its top edge stepping down at the corners. Its foot stays
+# above the tail's underside, so no ray runs on under the car into the rear wheels.
+VALANCE = [(0.0, 17.0), (15.0, 16.8), (20.0, 17.15), (28.0, 17.1), (31.0, 16.6), (32.4, 15.4), (32.8, 13.0),
+           (32.4, 11.0), (31.4, 10.4), (0.0, 10.4)]
 EXHAUSTS = [(26.1, 13.4, 2.25), (21.1, 13.25, 2.25)]      # four round tips: two each side
 EXHAUST_END = 116.4                                        # where the tips end (side render)
 RAIN = (4.5, 11.25, 12.0)                                   # rain light: half width, bottom, top
@@ -255,6 +257,7 @@ data = {
     "grille_slats": [Z(z) for z in GRILLE_SLATS],
     "drl": end(DRL),
     "splitter": Z(SPLITTER),
+    "splitter_w": H(SPLITTER_W),
     "tail_rings": [[H(u), Z(z), H(r)] for u, z, r in TAIL_RINGS],
     "lid": {"w": H(LID["w"]), "z0": Z(LID["z0"]), "z_side": Z(LID["z_side"]), "w_low": H(LID["w_low"]),
             "x_glass": X(REAR_GLASS["y_base_mid"])},
@@ -268,7 +271,7 @@ data = {
     "skirt": Z(SKIRT),
     "wing": {"x_front": X(WING["y0"]), "x_back": X(WING["y1"]), "z0": Z(WING["z0"]), "z1": Z(WING["z1"]),
              "span": H(WING["span"]), "post_w": H(WING["post_w"])},
-    "picks": {"frontbadge": 1, "rearbadge": 1, "name": 1, "wing": 1},
+    "picks": {"frontbadge": 2, "rearbadge": 2, "name": 1, "wing": 1},     # Ivan's picks, 2026-11-12
 }
 # belt line z(x) in build space, sampled for parts to interpolate
 _ys = np.linspace(0.0, 75.0, 31)

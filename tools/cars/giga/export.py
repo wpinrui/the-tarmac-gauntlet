@@ -77,7 +77,6 @@ def build(game=False):
     parts.front_parts(ref, cutters, out)
     parts.glass_parts(ref, cutters, out)
     parts.rear_parts(ref, out)
-    parts.gills(ref, out)
     parts.skirts(ref, out)
     print("laid", len(out), "parts,", len(cutters), "cutters")
 

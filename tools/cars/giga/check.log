@@ -1,0 +1,81 @@
+OBJ import of 'ToraGiga.obj' took 786.66 ms
+OBJ import of 'ToraGiga.obj' took 739.60 ms
+floating: door_l_card
+floating: door_r_card
+floating: exhaust_l0
+floating: exhaust_l1
+floating: exhaust_r0
+floating: exhaust_r1
+floating: steering
+intersecting: body x door_l
+intersecting: body x door_r
+intersecting: body x exhaust_in_l0
+intersecting: body x exhaust_in_l1
+intersecting: body x exhaust_in_r0
+intersecting: body x exhaust_in_r1
+intersecting: body x exhaust_l0
+intersecting: body x exhaust_l1
+intersecting: body x exhaust_r0
+intersecting: body x exhaust_r1
+intersecting: body x firewall
+intersecting: body x skirt_l
+intersecting: body x skirt_r
+intersecting: body x splitter
+intersecting: body x valance
+intersecting: body x wing
+intersecting: body x wing_post_l
+intersecting: body x wing_post_r
+intersecting: dash x steering
+intersecting: door_l x door_l_mirror
+intersecting: door_r x door_r_mirror
+intersecting: exhaust_in_l0 x exhaust_l0
+intersecting: exhaust_in_l0 x valance
+intersecting: exhaust_in_l1 x exhaust_l1
+intersecting: exhaust_in_l1 x valance
+intersecting: exhaust_in_r0 x exhaust_r0
+intersecting: exhaust_in_r0 x valance
+intersecting: exhaust_in_r1 x exhaust_r1
+intersecting: exhaust_in_r1 x valance
+intersecting: exhaust_l0 x valance
+intersecting: exhaust_l1 x valance
+intersecting: exhaust_r0 x valance
+intersecting: exhaust_r1 x valance
+intersecting: lamp_rain x valance
+z-fighting: body x door_l (3 faces)
+door open, floating: exhaust_l0
+door open, floating: exhaust_l1
+door open, floating: exhaust_r0
+door open, floating: exhaust_r1
+door open, floating: steering
+door open, intersecting: body x exhaust_in_l0
+door open, intersecting: body x exhaust_in_l1
+door open, intersecting: body x exhaust_in_r0
+door open, intersecting: body x exhaust_in_r1
+door open, intersecting: body x exhaust_l0
+door open, intersecting: body x exhaust_l1
+door open, intersecting: body x exhaust_r0
+door open, intersecting: body x exhaust_r1
+door open, intersecting: body x firewall
+door open, intersecting: body x skirt_l
+door open, intersecting: body x skirt_r
+door open, intersecting: body x splitter
+door open, intersecting: body x valance
+door open, intersecting: body x wing
+door open, intersecting: body x wing_post_l
+door open, intersecting: body x wing_post_r
+door open, intersecting: dash x steering
+door open, intersecting: door_l x door_l_mirror
+door open, intersecting: door_r x door_r_mirror
+door open, intersecting: exhaust_in_l0 x exhaust_l0
+door open, intersecting: exhaust_in_l0 x valance
+door open, intersecting: exhaust_in_l1 x exhaust_l1
+door open, intersecting: exhaust_in_l1 x valance
+door open, intersecting: exhaust_in_r0 x exhaust_r0
+door open, intersecting: exhaust_in_r0 x valance
+door open, intersecting: exhaust_in_r1 x exhaust_r1
+door open, intersecting: exhaust_in_r1 x valance
+door open, intersecting: exhaust_l0 x valance
+door open, intersecting: exhaust_l1 x valance
+door open, intersecting: exhaust_r0 x valance
+door open, intersecting: exhaust_r1 x valance
+door open, intersecting: lamp_rain x valance
