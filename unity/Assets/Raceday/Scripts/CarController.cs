@@ -76,10 +76,25 @@ namespace TarmacGauntlet.Raceday
             public Vector3 VisualRest;
             public float Compression, Spin;
             public bool Grounded;
+            /// <summary>Where the tyre last touched a paved surface, and how hard it slid there (0 when it gripped).</summary>
+            public Vector3 Contact, ContactNormal;
+            public float Skid;
         }
 
         /// <summary>Wheel i's visual pivot, at its centre: 0 front left, 1 front right, 2 rear left, 3 rear right. Null with none.</summary>
         public Transform WheelVisual(int i) => wheels[i]?.Visual;
+
+        /// <summary>
+        /// How hard wheel i is sliding or spinning on tarmac or a kerb, 0 to 1: 0 while it grips, in the air, off the
+        /// track or with the car off physics. With more than 0, where it touches and the surface's normal there.
+        /// </summary>
+        public float Skid(int i, out Vector3 contact, out Vector3 normal)
+        {
+            Wheel w = wheels[i];
+            contact = w != null ? w.Contact : Vector3.zero;
+            normal = w != null ? w.ContactNormal : Vector3.up;
+            return w == null || Asleep || !w.Grounded ? 0f : w.Skid;
+        }
 
         public void Setup(CarSpec spec, Transform[] wheelVisuals)
         {
@@ -289,6 +304,7 @@ namespace TarmacGauntlet.Raceday
             float previous = w.Compression;
             w.Grounded = Physics.Raycast(origin, -up, out RaycastHit hit, reach, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
             w.Compression = w.Grounded ? reach - hit.distance : 0f;
+            w.Skid = 0f;
 
             if (w.Grounded)
             {
@@ -325,6 +341,8 @@ namespace TarmacGauntlet.Raceday
                     // Peaks at PeakSlip and falls away gently past it.
                     float b = 2.64f / Spec.PeakSlip;
                     fy = -cap * Mathf.Sin(1.3f * Mathf.Atan(b * slip));
+                    // A tyre well past its peak slip angle is sliding, and leaves rubber behind.
+                    w.Skid = Mathf.Clamp01((Mathf.Abs(slip) - 1.3f * Spec.PeakSlip) / (1.5f * Spec.PeakSlip));
                 }
 
                 // Longitudinal: drive, brakes (holding the car still when nearly stopped), rolling resistance.
@@ -343,11 +361,16 @@ namespace TarmacGauntlet.Raceday
                 if (fx * fx + fy * fy > cap * cap)
                 {
                     if (braking && drive == 0f)
+                    {
                         fx = Mathf.Sign(fx) * Mathf.Sqrt(Mathf.Max(cap * cap - fy * fy, 0.09f * cap * cap));
+                        // Braking far past what the tyre holds: the anti-lock lets it scrub, faintly.
+                        if (Mathf.Abs(vLong) > 3f) w.Skid = Mathf.Max(w.Skid, 0.4f * Mathf.Clamp01(wheelBrake / cap - 1.3f));
+                    }
                     else if (Mathf.Abs(fx) > cap * 0.95f)
                     {
                         fx = Mathf.Sign(fx) * cap * 0.9f;
                         fy *= 0.6f;
+                        w.Skid = Mathf.Max(w.Skid, 0.85f);   // wheelspin
                     }
                     float total = Mathf.Sqrt(fx * fx + fy * fy);
                     if (total > cap)
@@ -357,6 +380,9 @@ namespace TarmacGauntlet.Raceday
                     }
                 }
                 body.AddForceAtPosition(forward * fx + side * fy, hit.point);
+                if (kind != SurfaceKind.Tarmac && kind != SurfaceKind.Kerb) w.Skid = 0f;
+                w.Contact = hit.point;
+                w.ContactNormal = n;
                 if (cap > 1f)
                 {
                     gripUsed += Mathf.Min((fx * fx + fy * fy) / (cap * cap), 1f);

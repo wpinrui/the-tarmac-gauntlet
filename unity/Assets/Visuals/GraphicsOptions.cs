@@ -47,6 +47,18 @@ namespace TarmacGauntlet.Visuals
         /// <summary>A blur along the camera's own movement.</summary>
         public static readonly GraphicsOption MotionBlur = Toggle("settings.motionblur", "Motion blur", true);
 
+        /// <summary>Grain and bumps in the tarmac and kerbs, and broad patches across the tarmac.</summary>
+        public static readonly GraphicsOption TarmacDetail = Toggle("settings.tarmacdetail", "Tarmac detail", true);
+
+        /// <summary>A darker band of rubber laid down along the racing line.</summary>
+        public static readonly GraphicsOption RubberedLine = Toggle("settings.rubberedline", "Rubbered line", true);
+
+        /// <summary>Rubber, chips and dust on the kerbs.</summary>
+        public static readonly GraphicsOption KerbWear = Toggle("settings.kerbwear", "Kerb wear", true);
+
+        /// <summary>Marks a sliding or spinning tyre leaves on the track during the race.</summary>
+        public static readonly GraphicsOption SkidMarks = Toggle("settings.skidmarks", "Skid marks", true);
+
         /// <summary>An option that is on or off.</summary>
         private static GraphicsOption Toggle(string key, string label, bool on) => Add(new GraphicsOption(key, label, on ? 1 : 0, 1));
 

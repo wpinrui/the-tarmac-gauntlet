@@ -402,7 +402,27 @@ namespace TarmacGauntlet.Raceday
                 }
                 skirts.Strip(side, 4f, 4f, true);
             }
-            Emit("Road edges", skirts, m?.Asphalt);
+            Emit("Road edges", skirts, m?.RoadEdge);
+        }
+
+        /// <summary>
+        /// How far along the road's surface each track sample lies, once more back at the start: the road's uv along
+        /// it, in metres, as <see cref="MeshKit.Strip"/> measures it between the middles of the road's rows.
+        /// </summary>
+        public static float[] RoadAlong(Circuit c)
+        {
+            int n = c.Count;
+            var along = new float[n + 1];
+            Vector3 last = Vector3.zero;
+            for (int k = 0; k <= n; k++)
+            {
+                int i = c.Wrap(k);
+                float h = c.HalfWidth(i);
+                Vector3 mid = (c.Surface(i, h) + c.Surface(i, -h)) * 0.5f;
+                if (k > 0) along[k] = along[k - 1] + Vector3.Distance(mid, last);
+                last = mid;
+            }
+            return along;
         }
 
         private void EdgeLines()
@@ -452,7 +472,8 @@ namespace TarmacGauntlet.Raceday
                 Vector3 outer = Point(k, sign * (e + KerbWidth), 0.05f, true);   // 5 cm proud of the verge it sits on
                 rows.Add(sign > 0 ? new[] { outer, inner } : new[] { inner, outer });
             }
-            kit.Strip(rows, KerbWidth, KerbStripe * 2f);
+            // u runs from the road's edge out, on either side, so wear lies along the edge the tyres ride over.
+            kit.Strip(rows, KerbWidth, KerbStripe * 2f, flipAcross: sign > 0);
         }
 
         // ---------------------------------------------------------------- runoff and barriers
