@@ -170,10 +170,10 @@ def cockpit_cutters():
         rings.append(np.column_stack([np.full(96, x), ring_of(orient(g, 1), 96)]))
     v, f = geom.close_rings(rings)
     room = blend.make("cockpit_room", v, f, "interior")
-    top = 2.0
+    top = 1.3
     sec = Polygon([(CABIN_BACK, BELT), (plane_x(BELT), BELT), (plane_x(top), top), (CABIN_BACK, top)])
     loop = ring_of(orient(sec, 1), 48)
-    rings = [np.column_stack([loop[:, 0], np.full(48, y), loop[:, 1]]) for y in (1.4, -1.4)]
+    rings = [np.column_stack([loop[:, 0], np.full(48, y), loop[:, 1]]) for y in (-1.4, 1.4)]
     v, f = geom.close_rings(rings)
     return [room, blend.make("cockpit_opening", v, f, "interior")]
 
