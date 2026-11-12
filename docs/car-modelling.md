@@ -60,6 +60,7 @@ Trace every headlight and tail light outline closely from the reference. Never a
 Lamp interiors are our own, not copied from the real car.
 Lamp parts and materials are named so the game can light them: `lamp_head`, `lamp_tail`, `lamp_brake`, `lamp_rain`.
 Parts that swing with a door start with its name: `door_l_glass`, `door_l_card`, `door_l_mirror`.
+Every part of a wheel is named `wheel_<part>_<corner>` with corners `fl`, `fr`, `rl`, `rr`, and every corner has a `wheel_tyre_<corner>`, so the game can spin and blur them. `tools/wheel-check/run.sh` checks this.
 The interior gets a firewall, a dash meeting it, seats, door cards and a mirror.
 Door mirrors get a separate recessed glass part.
 Every car is left-hand drive: the driver's seat and wheel sit on the left, because the pit lane is on the left. Both doors open, so the car stays symmetrical.
