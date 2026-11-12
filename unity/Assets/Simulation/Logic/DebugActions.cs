@@ -79,6 +79,53 @@ namespace TarmacGauntlet.Simulation
         public static GameState EndYear(GameState game, Func<double>? random = null) =>
             Season.AdvanceYear(game with { Phase = GamePhase.PostRace }, random);
 
+        /// <summary>The career moved on to <paramref name="year"/>, a year at a time, each ended without a race.</summary>
+        public static GameState ToYear(GameState game, int year, Func<double>? random = null)
+        {
+            while (game.CurrentYear < year) game = EndYear(game, random);
+            return game;
+        }
+
+        /// <summary>
+        /// A team built up for testing: the cheapest car of the class, entered; the fastest free agents hired; crew,
+        /// stock, money and every skill at the levels given.
+        /// </summary>
+        public static GameState Equip(GameState game, CarClass carClass, int drivers, int crew, double money, int skills)
+        {
+            CarModel model = CarModels.All.Where(m => m.CarClass == carClass).OrderBy(m => m.Price).First();
+            game = GiveCar(game, model.Id);
+            foreach ((Driver d, DriverStats _) in FreeAgents(game).Take(drivers).ToArray()) game = Hire(game, d.Id);
+            game = AddSpares(AddTyres(SetCrew(game, crew), 12), 12);
+            game = SetMoney(game, money);
+            return WithPlayer(game, p => p with { Skills = new PlayerSkills { Driver = skills, Engineer = skills, Business = skills } });
+        }
+
+        /// <summary>
+        /// The race's field cut down for testing: the player's car and the cars nearest the front, <paramref name="size"/>
+        /// in all, in grid order, or the whole field for 0. With <paramref name="modelId"/> the player's car is that model,
+        /// for this race only.
+        /// </summary>
+        public static RaceSetup Field(RaceSetup setup, int size, string? modelId)
+        {
+            IReadOnlyList<GridCar> grid = setup.Grid;
+            CarModel? model = modelId != null ? CarModels.All.FirstOrDefault(m => m.Id == modelId) : null;
+            if (model != null)
+                grid = grid.Select(g =>
+                {
+                    if (!g.Player) return g;
+                    CarInstance car = g.Car with { ModelId = model.Id };
+                    return g with { Car = car, Model = model, StartingFuel = EffectiveStats.CalculateEffectiveStats(car, model).FuelCapacity };
+                }).ToArray();
+            if (size > 0 && size < grid.Count)
+            {
+                GridCar? me = grid.FirstOrDefault(g => g.Player);
+                var kept = new HashSet<GridCar>(grid.Where(g => !g.Player).Take(me != null ? size - 1 : size));
+                if (me != null) kept.Add(me);
+                grid = grid.Where(kept.Contains).ToArray();
+            }
+            return setup with { Grid = grid };
+        }
+
         /// <summary>
         /// Runs this year's race in an instant: the field finishes in grid order, a few laps apart, with no issues or
         /// failures, and the player's car finishes in <paramref name="place"/> (1 for a win), or retires at half
