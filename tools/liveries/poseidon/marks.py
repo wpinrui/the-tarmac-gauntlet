@@ -132,6 +132,7 @@ if __name__ == "__main__":
     words("name-alfa", "alfa", "POSEIDON", FOAM, 0.02, (TEAL_D, 4))
     words("name-ops", "ops", "POSEIDON", TEAL_D, 0.02)
     words("sub-pink", "barlow", "FISHING SUPPLIES", PINK, 0.12)
+    words("sub-foam", "barlow", "FISHING SUPPLIES", FOAM, 0.12)
     words("sub-pinkd", "barlow", "FISHING SUPPLIES", "#c4166a", 0.12)
     words("rods", "alfa", "RODS  REELS  BAIT", FOAM, 0.04)
     words("hooked", "ops", "HOOKED ON SPEED", TEAL_D, 0.03)
