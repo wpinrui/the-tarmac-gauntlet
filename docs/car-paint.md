@@ -28,7 +28,18 @@ The respray uses the `TarmacGauntlet/CarPaint` shader (`Raceday/Resources/CarPai
 | | `tyre`, `trim`, `grille`, `housing` | Rubber and plastic |
 | | `chrome`, `name`, `reflector`, `rim`, `hub`, `dark_metal`, `engine_metal` | Metal |
 
-What the cars reflect comes from `CarReflections`, a probe at the watched car redrawn a face a frame without the cars (option Car reflections).
+What the cars reflect comes from `CarReflections` (option Car reflections). Every probe is HDR, so lit lenses stay bright in the paint.
+
+| Quality | Shared probe at the watched car, without the cars | Own probe for the cars nearest the camera, with the other cars |
+| --- | --- | --- |
+| Low | 64 px | none |
+| Medium | 128 px | none |
+| High | 128 px | 3 cars, 512 px, 2 faces a frame |
+| Ultra | 256 px | 5 cars, 512 px, 3 faces a frame |
+
+A car's own probe sits in the car and hides the car's body while it draws. Until it is drawn at a newly picked car, that car shows the shared probe.
+
+The clear coat reflects more than URP's own clear coat: `CarCoatSheen` adds 0.1 straight on, rising by 0.4 towards a glancing angle. `CarCoatEnvWeight` is the coat's whole weight on what it reflects; anything that swaps that reflection (screen-space reflections) uses it. At night (`_TarmacCarGlint`, set from the circuit's lights) whatever the coat reflects brighter than 1.2 is boosted, so floodlights and pit lights streak across the paint.
 
 ## Liveries
 
