@@ -13,6 +13,14 @@ Every new file and folder under `Assets/` needs a committed `.meta` file with it
 copies it to `%LOCALAPPDATA%\Programs\The Tarmac Gauntlet`, replacing the last install, with Start menu and desktop
 shortcuts (`WindowsBuild.cs`).
 
+## Rendering
+
+The project renders with the Universal Render Pipeline. `Assets/Rendering/Settings/Pipeline.asset` and its
+`Renderer.asset` hold the settings; ProjectSettings is not committed, so `Assets/Rendering/Editor/UsePipeline.cs` puts the
+pipeline in the graphics settings whenever the editor loads. Materials made in code use URP Lit through
+`Assets/Rendering/Scripts/Lit.cs`, and the game's own lit shaders share `Assets/Rendering/Shaders/TarmacLit.hlsl`. The
+menus' frosted glass is `GlassBlurFeature` on the renderer. Each scene has a global post-processing volume, switched off.
+
 ## Running the simulation tests
 
 The same `.cs` files also build as a plain .NET library, so the tests run without Unity.

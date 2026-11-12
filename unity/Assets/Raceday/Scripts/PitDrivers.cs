@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TarmacGauntlet.Rendering;
 using TarmacGauntlet.TeamHq;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -23,7 +24,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Height of the hips on a racing car's seat, m above the ground.</summary>
         private const float SeatHips = 0.36f;
         private static readonly Color SuitWhite = new Color(0.93f, 0.93f, 0.92f, 1f), SuitBlack = new Color(0.1f, 0.105f, 0.115f, 1f);
-        private static readonly int ColourId = Shader.PropertyToID("_Color");
+        private static readonly int ColourId = Lit.BaseColorId;
 
         private enum DriverPose { Standing, Walking, Seated }
 
@@ -88,14 +89,14 @@ namespace TarmacGauntlet.Raceday
         private void DriverLooks()
         {
             helmetMesh = Helmet();
-            var shell = new Material(Shader.Find("Standard")) { name = "Helmet shell", enableInstancing = true };
-            shell.SetFloat("_Glossiness", 0.82f);
+            var shell = new Material(Lit.Shader) { name = "Helmet shell", enableInstancing = true };
+            shell.SetFloat("_Smoothness", 0.82f);
             shell.SetFloat("_Metallic", 0.05f);
-            var visor = new Material(Shader.Find("Standard")) { name = "Helmet visor", color = new Color(0.03f, 0.035f, 0.045f), enableInstancing = true };
-            visor.SetFloat("_Glossiness", 0.95f);
+            var visor = new Material(Lit.Shader) { name = "Helmet visor", color = new Color(0.03f, 0.035f, 0.045f), enableInstancing = true };
+            visor.SetFloat("_Smoothness", 0.95f);
             visor.SetFloat("_Metallic", 0.6f);
-            var lip = new Material(Shader.Find("Standard")) { name = "Helmet lip", color = new Color(0.06f, 0.06f, 0.065f), enableInstancing = true };
-            lip.SetFloat("_Glossiness", 0.15f);
+            var lip = new Material(Lit.Shader) { name = "Helmet lip", color = new Color(0.06f, 0.06f, 0.065f), enableInstancing = true };
+            lip.SetFloat("_Smoothness", 0.15f);
             helmetMaterials = new[] { shell, visor, lip };
             driverMaterials = new Material[materials.Length + 3];
             materials.CopyTo(driverMaterials, 0);

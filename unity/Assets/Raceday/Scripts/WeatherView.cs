@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using TarmacGauntlet.Rendering;
 using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
@@ -45,7 +46,7 @@ namespace TarmacGauntlet.Raceday
         private readonly List<Wettable> surfaces = new List<Wettable>();
         private float shown = -1f;
         private static readonly int TintId = Shader.PropertyToID("_Tint"), ShapeId = Shader.PropertyToID("_Shape"),
-            GlossId = Shader.PropertyToID("_Glossiness");
+            GlossId = Shader.PropertyToID("_Smoothness");
 
         private void Start()
         {

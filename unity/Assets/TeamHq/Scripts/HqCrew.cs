@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using TarmacGauntlet.Rendering;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -491,8 +492,8 @@ namespace TarmacGauntlet.TeamHq
             mugMesh.SetNormals(n);
             mugMesh.SetTriangles(t, 0);
             mugMesh.RecalculateBounds();
-            mugMaterial = new Material(Shader.Find("Standard")) { name = "mug", color = new Color(0.949f, 0.937f, 0.910f) };
-            mugMaterial.SetFloat("_Glossiness", 0.65f);
+            mugMaterial = new Material(Lit.Shader) { name = "mug", color = new Color(0.949f, 0.937f, 0.910f) };
+            mugMaterial.SetFloat("_Smoothness", 0.65f);
         }
 
         /// <summary>Adds a triangle wound so its front faces along its vertex normals (clockwise in Unity).</summary>

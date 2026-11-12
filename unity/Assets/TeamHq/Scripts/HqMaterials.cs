@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TarmacGauntlet.Rendering;
 using UnityEngine;
 
 namespace TarmacGauntlet.TeamHq
@@ -57,18 +58,9 @@ namespace TarmacGauntlet.TeamHq
             var col = Resources.Load<Texture2D>("Textures/" + key + "_c");
             Material m = Make(key, Color.white, 1, 0, col);
             var nrm = Resources.Load<Texture2D>("Textures/" + key + "_n");
-            if (nrm != null)
-            {
-                m.SetTexture("_BumpMap", nrm);
-                m.EnableKeyword("_NORMALMAP");
-            }
+            if (nrm != null) Lit.NormalMap(m, nrm);
             var mask = Resources.Load<Texture2D>("Textures/" + key + "_s");
-            if (mask != null)
-            {
-                m.SetTexture("_MetallicGlossMap", mask);
-                m.SetFloat("_GlossMapScale", 1);
-                m.EnableKeyword("_METALLICGLOSSMAP");
-            }
+            if (mask != null) Lit.MetallicSmoothnessMap(m, mask);
             return m;
         }
 
@@ -96,33 +88,19 @@ namespace TarmacGauntlet.TeamHq
             return m;
         }
 
-        /// <summary>The Standard shader in its cutout mode, for leaves and other alpha-tested textures.</summary>
-        public static void Cutout(Material m)
-        {
-            m.SetFloat("_Mode", 1);
-            m.SetFloat("_Cutoff", 0.5f);
-            m.EnableKeyword("_ALPHATEST_ON");
-            m.renderQueue = (int)UnityEngine.Rendering.RenderQueue.AlphaTest;
-        }
+        /// <summary>Alpha tested, for leaves and other cut-out textures.</summary>
+        public static void Cutout(Material m) => Lit.Cutout(m);
 
-        /// <summary>The Standard shader in its fade mode: alpha blended, no depth writes.</summary>
-        public static void Fade(Material m)
-        {
-            m.SetFloat("_Mode", 2);
-            m.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-            m.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-            m.SetInt("_ZWrite", 0);
-            m.EnableKeyword("_ALPHABLEND_ON");
-            m.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
-        }
+        /// <summary>Alpha blended, no depth writes.</summary>
+        public static void Fade(Material m) => Lit.Fade(m);
 
         private static Color Hex(int rgb) => new Color(((rgb >> 16) & 255) / 255f, ((rgb >> 8) & 255) / 255f, (rgb & 255) / 255f);
 
         private static Material Make(string name, Color colour, float smoothness, float metallic = 0, Texture2D texture = null)
         {
-            var m = new Material(Shader.Find("Standard")) { name = name, color = colour };
+            var m = new Material(Lit.Shader) { name = name, color = colour };
             if (texture != null) m.mainTexture = texture;
-            m.SetFloat("_Glossiness", smoothness);
+            m.SetFloat("_Smoothness", smoothness);
             m.SetFloat("_Metallic", metallic);
             return m;
         }
@@ -136,18 +114,11 @@ namespace TarmacGauntlet.TeamHq
             return m;
         }
 
-        /// <summary>The Standard shader in its transparent mode.</summary>
+        /// <summary>See-through, with its reflections at full strength.</summary>
         private static Material Glass(string name)
         {
             Material m = Make(name, new Color(0.81f, 0.89f, 0.93f, 0.14f), 0.95f, 0.1f);
-            m.SetFloat("_Mode", 3);
-            m.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.One);
-            m.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-            m.SetInt("_ZWrite", 0);
-            m.DisableKeyword("_ALPHATEST_ON");
-            m.DisableKeyword("_ALPHABLEND_ON");
-            m.EnableKeyword("_ALPHAPREMULTIPLY_ON");
-            m.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+            Lit.Glass(m);
             return m;
         }
     }

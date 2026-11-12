@@ -1,3 +1,4 @@
+using TarmacGauntlet.Rendering;
 using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
@@ -43,7 +44,7 @@ namespace TarmacGauntlet.Raceday
             var renderer = frame.AddComponent<MeshRenderer>();
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             renderer.receiveShadows = false;
-            material = new Material(Shader.Find("Standard")) { name = "Your box", color = Amber };
+            material = new Material(Lit.Shader) { name = "Your box", color = Amber };
             material.EnableKeyword("_EMISSION");
             material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
             material.SetColor("_EmissionColor", Amber * 1.5f);

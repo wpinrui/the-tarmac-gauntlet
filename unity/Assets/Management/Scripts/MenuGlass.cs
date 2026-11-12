@@ -1,66 +1,10 @@
 using System.Collections.Generic;
+using TarmacGauntlet.Rendering;
 using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace TarmacGauntlet.Management
 {
-    /// <summary>
-    /// Sits on the menu camera and keeps a blurred, more colourful copy of the scene for the glass panels:
-    /// CSS blur(26px) saturate(150%) on the 1600 x 900 reference screen.
-    /// </summary>
-    [RequireComponent(typeof(Camera))]
-    public sealed class GlassBackdrop : MonoBehaviour
-    {
-        private const float BlurReferencePx = 26, ReferenceHeight = 900, Saturation = 1.5f;
-
-        /// <summary>The blurred scene at a quarter of the screen's size; null until the first frame.</summary>
-        public static RenderTexture Texture { get; private set; }
-
-        private Material material;
-
-        private void OnRenderImage(RenderTexture src, RenderTexture dst)
-        {
-            Graphics.Blit(src, dst);
-            if (material == null)
-            {
-                Shader shader = Resources.Load<Shader>("MenuGlassBlur");
-                if (shader == null) return;
-                material = new Material(shader) { hideFlags = HideFlags.HideAndDontSave };
-            }
-
-            int w = Mathf.Max(1, src.width / 4), h = Mathf.Max(1, src.height / 4);
-            if (Texture == null || Texture.width != w || Texture.height != h)
-            {
-                if (Texture != null) Texture.Release();
-                Texture = new RenderTexture(w, h, 0, RenderTextureFormat.ARGB32) { name = "Menu glass", filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
-                Texture.Create();
-            }
-
-            RenderTexture half = RenderTexture.GetTemporary(Mathf.Max(1, src.width / 2), Mathf.Max(1, src.height / 2), 0, Texture.format);
-            RenderTexture quarter = RenderTexture.GetTemporary(w, h, 0, Texture.format);
-            RenderTexture across = RenderTexture.GetTemporary(w, h, 0, Texture.format);
-            Graphics.Blit(src, half, material, 0);
-            Graphics.Blit(half, quarter, material, 0);
-            material.SetFloat("_Sigma", Mathf.Min(16, BlurReferencePx * src.height / ReferenceHeight / 4));
-            material.SetFloat("_Saturation", Saturation);
-            Graphics.Blit(quarter, across, material, 1);
-            Graphics.Blit(across, Texture, material, 2);
-            RenderTexture.ReleaseTemporary(half);
-            RenderTexture.ReleaseTemporary(quarter);
-            RenderTexture.ReleaseTemporary(across);
-        }
-
-        private void OnDestroy()
-        {
-            if (material != null) Destroy(material);
-            if (Texture != null)
-            {
-                Texture.Release();
-                Texture = null;
-            }
-        }
-    }
-
     /// <summary>
     /// Makes frosted glass panels: the blurred scene behind them, a near-black tint at 66% under a 140 degree white sheen from 8% to 0%, a 1px edge
     /// and a soft drop shadow. <see cref="Refresh"/> keeps every panel's slice of the blurred scene lined up each frame.
