@@ -30,6 +30,7 @@ namespace TarmacGauntlet.Raceday
         private readonly float[] fireAt, cylinderGain;
         private readonly int[] bankOf, headerDelay;
         private readonly int cylinders;
+        private readonly float intakeStep, breathStep, topStep, gateStep;
 
         private float rpm, load;
         private double cycles, cycleBase;
@@ -50,7 +51,7 @@ namespace TarmacGauntlet.Raceday
         private readonly float[] pipeDamp = new float[2];
 
         private float low1, low2, dcIn, dcOut, popLow, envelope;
-        private float intakeLow, intakeBand, mechLow, hissLow, hissBand, bovLow;
+        private float intakeGate, breathLow, topLow1, topLow2, intakeLp1, intakeLp2, intakeLow, intakeBand, mechLow, hissLow, hissBand, bovLow;
         private double whinePhase, turboPhase, motorPhase;
         private float boost, blowOff, overrun, lastLoad, idleBlend;
         private bool blowOffArmed;
@@ -81,6 +82,10 @@ namespace TarmacGauntlet.Raceday
             }
             rpm = s.IdleRpm;
             Rpm = s.IdleRpm;
+            intakeStep = LowPassStep(1800f);
+            breathStep = LowPassStep(1500f);
+            topStep = LowPassStep(6500f);
+            gateStep = LowPassStep(400f);
         }
 
         /// <summary>A gear change: the ignition cuts for a moment.</summary>
@@ -117,13 +122,16 @@ namespace TarmacGauntlet.Raceday
 
                 // Pulses travel down their headers into the bank pipes.
                 float in0 = 0f, in1 = 0f, pop = 0f;
+                // The breath in each pulse is dull noise: white noise here hisses through the open muffler of a loud car.
+                breathLow += (Noise() - breathLow) * breathStep;
+                float breath = 3f * breathLow;
                 for (int i = 0; i < pulseCount; i++)
                 {
                     ref Pulse p = ref pulses[i];
                     if (p.Wait > 0) { p.Wait--; continue; }
                     float x = (p.Pos + 0.5f) / p.Length;
                     float shape = (float)Math.Sin(Math.PI * Math.Pow(x, p.Skew));
-                    float v = p.Amp * shape * shape * (1f - p.Breath + p.Breath * Noise());
+                    float v = p.Amp * shape * shape * (1f - p.Breath + p.Breath * breath);
                     if (p.Bank == 2) pop += v;
                     else if (p.Bank == 1) in1 += v;
                     else in0 += v;
@@ -146,7 +154,15 @@ namespace TarmacGauntlet.Raceday
 
                 // Induction roar: band-passed noise in time with the firings.
                 float intakeHz = s.IntakePitch * (0.7f + 1.6f * rev);
-                float intake = Band(Noise(), intakeHz, 2.5f, ref intakeLow, ref intakeBand)
+                float roar = Band(Noise(), intakeHz, 2.5f, ref intakeLow, ref intakeBand);
+                // Kept below the hiss band: the band pass alone lets enough through above it to hiss once saturated.
+                intakeLp1 += (roar - intakeLp1) * intakeStep;
+                intakeLp2 += (intakeLp1 - intakeLp2) * intakeStep;
+                // It rides on each firing rather than running on between them, so it reads as part of the note and not
+                // as a steady hiss that only stops when the throttle lifts.
+                float firing = Clamp(Math.Abs(raw) / (1.5f * envelope + 1e-4f), 0f, 1f);
+                intakeGate += (firing - intakeGate) * gateStep;
+                float intake = 1.1f * intakeLp2 * intakeGate
                                * s.IntakeLevel * (0.03f + (float)Math.Pow(load, 1.3)) * Math.Min(1f, envelope * 4f);
 
                 // Valvetrain: short ticks of high-passed noise, two per firing, as loud as the engine is working.
@@ -158,6 +174,10 @@ namespace TarmacGauntlet.Raceday
 
                 float engine = s.Drive * (body + intake + mech) * 0.9f;
                 float shaped = (float)Math.Tanh(engine) / (float)Math.Sqrt(s.Drive) + 0.6f * popLow;
+                // Saturating noise spreads it into a hiss far above the engine's note, so the top is rolled off after.
+                topLow1 += (shaped - topLow1) * topStep;
+                topLow2 += (topLow1 - topLow2) * topStep;
+                shaped = topLow2;
 
                 // Straight-cut gears whine with road speed.
                 whinePhase += speed * s.GearWhinePitch / fs;
