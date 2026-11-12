@@ -32,6 +32,15 @@ loads. Materials made in code use URP Lit through `Assets/Rendering/Scripts/Lit.
 (`TarmacMotion.hlsl`) so the upscaler follows them. The menus' frosted glass is `GlassBlurFeature` on
 the renderer, beside URP's ambient occlusion at half resolution, after the opaque pass.
 
+`ScreenReflectionsFeature` on the renderer adds screen-space reflections before the transparent pass. A shader opts in
+with a `TarmacReflect` pass (`TarmacReflect.hlsl`) that draws its normal, roughness, environment weight and probe
+reflection over itself: the track (`TrackSurface.hlsl`, shared with its forward pass) and the cars' clear coat
+(`CarPaintReflect.hlsl`). Each such pixel traces its reflection through the depth buffer, a pixel a step up to a step
+count set by the quality level, and the hit swaps out the probe's reflection as far as it is trusted. Off screen, past
+80 m, or with the option off, the probes stay. Its row is on at High and above. The track shades with
+`ShadeDielectric`, which adds the full GGX Fresnel URP's fit leaves out, so the road shines towards a low sun or a
+floodlight, and its smoothness varies along the lap from a polish map in the patches texture's alpha.
+
 Each scene's global volume carries `PostEffects`: the ACES tone curve and a colour grade, half resolution bloom, and
 Gaussian depth of field for a camera that calls `PostEffects.Focus` that frame. The
 broadcast director does for every shot but the onboard; a replay camera should too. A driving view never does, so it is

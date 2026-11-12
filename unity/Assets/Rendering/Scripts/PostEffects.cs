@@ -134,6 +134,9 @@ namespace TarmacGauntlet.Rendering
                 && ((now.position - before.position).sqrMagnitude > CutMove * CutMove || Quaternion.Angle(now.rotation, before.rotation) > CutTurn);
             seen[camera] = now;
             if (cut) camera.GetUniversalAdditionalCameraData().resetHistory = true;
+            // Ultra filters the bloom's upsampling bicubically, so the glow round small lights stays round.
+            bool fine = QualityLevels.Level >= 3;
+            if (bloom.highQualityFiltering.value != fine) bloom.highQualityFiltering.Override(fine);
             Depth(camera);
             if (seen.Count > 8) Forget();
         }

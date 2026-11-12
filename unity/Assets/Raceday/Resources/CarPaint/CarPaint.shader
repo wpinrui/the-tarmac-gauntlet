@@ -70,6 +70,23 @@ Shader "TarmacGauntlet/CarPaint"
             ENDHLSL
         }
 
+        // The clear coat's view for the screen-space reflections (CarPaintReflect.hlsl).
+        Pass
+        {
+            Name "TarmacReflect"
+            Tags { "LightMode" = "TarmacReflect" }
+            ZWrite Off ZTest LEqual Offset -1, -1
+
+            HLSLPROGRAM
+            #pragma target 3.5
+            #pragma vertex CarReflectVertex
+            #pragma fragment CarReflectFragment
+            #pragma multi_compile_fragment _ _TARMAC_CLEARCOAT
+            #include_with_pragmas "Assets/Rendering/Shaders/LitKeywords.hlsl"
+            #include "Assets/Raceday/Resources/CarPaint/CarPaintReflect.hlsl"
+            ENDHLSL
+        }
+
         Pass
         {
             Name "ShadowCaster"

@@ -285,14 +285,16 @@ namespace TarmacGauntlet.Raceday
         /// <summary>
         /// The mowing at a map point: how far it is beyond the nearest road edge, m; how far out from the road the grass
         /// is mown there, m, 0 where none is; how fresh the stripes are, 0.5 to 1; and which way that stretch of road
-        /// runs, across the ground. Stripes run straight along the road, a pass at a time. Some stretches are mown a few
+        /// runs, across the ground. Stripes run nearly straight along the road, a pass at a time. Some stretches are mown a few
         /// passes out and left long beyond, others all the way, and some were mown longer ago, so their stripes are faint.
         /// </summary>
         public void Mowing(int i, out float fromRoad, out float reach, out float fresh, out float alongX, out float alongZ)
         {
             int k = roadAt[i];
             float x = minX + (i % MapX) * cell, z = minZ + (i / MapX) * cell;
-            fromRoad = Mathf.Max(road[i], 0f);
+            // Nearly straight: the passes drift a little either way over tens of metres, as a mower steered by eye does.
+            fromRoad = Mathf.Max(road[i], 0f) * (1f + 0.05f * (Noise(x / 200f, z / 200f, 166) - 0.5f))
+                + 2.6f * (Noise(x / 60f, z / 60f, 162) - 0.5f);
             reach = fresh = alongX = alongZ = 0f;
             if (k < 0 || Map[i] != LandUse.Mown) return;
             // Left is level and square to the road, so the road runs along (left.z, -left.x).
