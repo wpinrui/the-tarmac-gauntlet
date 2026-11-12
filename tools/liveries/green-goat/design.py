@@ -325,15 +325,13 @@ def milk_riot(views):
     side_mark_at(lv, "more", 1.5, 0.7, 0.065, 12)
     side_mark_at(lv, "flex", 1.2, 0.27, 0.15, -20)
     side_mark_at(lv, "bottle", -1.62, 0.6, 0.2, 16)
-    for x, side in ((0.72, 1), (-0.72, -1)):
-        rot = 0 if side < 0 else 180
-        lv.mark("top", MARKS / "milk-sticker.svg", (x * 0.95, 0, 0.95), 0.11, rotate=rot - 18 * side)
-        lv.mark("top", MARKS / "limit-sticker.svg", (x * 0.9, 0, -0.95), 0.09, rotate=rot + 22 * side)
-        lv.mark("top", MARKS / "flex.svg", (x * 1.05, 0, 0.05), 0.14, rotate=rot + 30 * side)
-    lv.mark("top", MARKS / "more.svg", (0.05, 0, -0.36), 0.06, rotate=-90 + 14)
-    lv.mark("top", MARKS / "limit-sticker.svg", (-0.05, 0, -1.63), 0.1, rotate=90 - 12)
-    lv.mark("top", MARKS / "bottle.svg", (0.45, 0, -1.68), 0.2, rotate=120)
-    lv.mark("top", MARKS / "bottle.svg", (-0.5, 0, 2.0), 0.18, rotate=-60)
+    # Top: a different decal in each spot, drawn from the whole pool.
+    for name, x, z, h, rot in (("milk-sticker", -0.6, 1.05, 0.14, 20), ("bolt", 0.62, 1.1, 0.36, 200),
+                               ("flex", 0.42, 1.95, 0.26, -30), ("goat-sticker", -0.45, 1.98, 0.26, -75),
+                               ("bubble", 0.0, -0.33, 0.15, -96), ("drop", 0.36, 0.28, 0.15, -60),
+                               ("limit-sticker", 0.62, -1.1, 0.08, 92), ("flex", -0.62, -1.1, 0.2, 70),
+                               ("bottle", 0.0, -1.66, 0.24, 95)):
+        lv.mark("top", MARKS / f"{name}.svg", (x, 0, z), h, rotate=rot)
     lv.mark("front", MARKS / "flex.svg", (0.68, 0.36, 0), 0.12, rotate=-15)
     lv.mark("rear", MARKS / "bottle.svg", (-0.7, 0.4, 0), 0.16, rotate=14)
     return lv
