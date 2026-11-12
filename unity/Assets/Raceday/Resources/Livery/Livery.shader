@@ -2,7 +2,8 @@
 // right, top, front, rear) and baked into one atlas by tools/liveries/common/bake.js. Each paint
 // face takes the view it faces most, blended where views meet; faces pointing down, and side
 // faces turned in towards the middle, keep the base colour. The race number is drawn into the
-// livery's number boxes from the Digits atlas: the livery's own, or the shared one.
+// livery's number boxes from the Digits atlas: the livery's own, or the shared one. The paint has the clear coat and
+// metallic flakes of CarPaint.hlsl.
 // Keep in step with the projection in tools/liveries/common/viewer.py. See docs/car-paint.md.
 Shader "TarmacGauntlet/Livery"
 {
@@ -38,8 +39,10 @@ Shader "TarmacGauntlet/Livery"
             #pragma target 3.5
             #pragma vertex vert
             #pragma fragment frag
+            #pragma multi_compile_fragment _ _TARMAC_CLEARCOAT
+            #pragma multi_compile_fragment _ _TARMAC_FLAKE
             #include_with_pragmas "Assets/Rendering/Shaders/LitKeywords.hlsl"
-            #include "Assets/Rendering/Shaders/TarmacLit.hlsl"
+            #include "Assets/Raceday/Resources/CarPaint/CarPaint.hlsl"
 
             // Not in a UnityPerMaterial buffer: every part sets its own _ToCar, so the parts are drawn one by one anyway.
             TEXTURE2D(_Atlas);
@@ -166,7 +169,7 @@ Shader "TarmacGauntlet/Livery"
                 half3 col = side * wSide + Number(uvTop, Tap(uvTop)) * wTop + _Base.rgb * wBottom
                     + Number(uvFront, Tap(uvFront)) * wFront + Number(uvRear, Tap(uvRear)) * wRear;
                 half3 albedo = col / max(wSide + wTop + wBottom + wFront + wRear, 1e-4);
-                return ShadePbr(i.positionWS, i.normalWS, i.positionCS, i.fog, albedo, _Metallic, _Smoothness);
+                return ShadeCarPaint(i.positionWS, i.normalWS, i.positionCS, i.fog, albedo, _Metallic, _Smoothness, p);
             }
             ENDHLSL
         }
@@ -195,6 +198,20 @@ Shader "TarmacGauntlet/Livery"
             #pragma vertex TarmacDepthVertex
             #pragma fragment TarmacNullFragment
             #include "Assets/Rendering/Shaders/TarmacLit.hlsl"
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "MotionVectors"
+            Tags { "LightMode" = "MotionVectors" }
+            ColorMask RG
+
+            HLSLPROGRAM
+            #pragma target 3.5
+            #pragma vertex TarmacMotionVertex
+            #pragma fragment TarmacMotionFragment
+            #include "Assets/Rendering/Shaders/TarmacMotion.hlsl"
             ENDHLSL
         }
     }

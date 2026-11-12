@@ -1,7 +1,10 @@
 {
     "name": "TarmacGauntlet.Management.Editor",
     "rootNamespace": "TarmacGauntlet.Management.Editor",
-    "references": [],
+    "references": [
+        "TarmacGauntlet.Visuals",
+        "TarmacGauntlet.Rendering"
+    ],
     "includePlatforms": [
         "Editor"
     ],
