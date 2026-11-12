@@ -2,7 +2,7 @@
 // right, top, front, rear) and baked into one atlas by tools/liveries/common/bake.js. Each paint
 // face takes the view it faces most, blended where views meet; faces pointing down, and side
 // faces turned in towards the middle, keep the base colour. The race number is drawn into the
-// livery's number boxes from the Digits atlas.
+// livery's number boxes from the Digits atlas: the livery's own, or the shared one.
 // Keep in step with the projection in tools/liveries/common/viewer.py. See docs/car-paint.md.
 Shader "TarmacGauntlet/Livery"
 {
@@ -43,7 +43,9 @@ Shader "TarmacGauntlet/Livery"
 
         // Up to four number boxes: centre and height in atlas uv, then the turn in radians.
         float4 _NumBox[4];
+        // Each box's ink, and the colour of the digits' outline where the digits have one.
         float4 _NumInk[4];
+        float4 _NumEdge[4];
         // Each box's width in atlas uv: a number too wide for its box is drawn smaller to fit.
         float4 _NumWidth;
         float _NumBoxes;
@@ -106,8 +108,9 @@ Shader "TarmacGauntlet/Livery"
                 float inside = step(abs(l.y), 0.5) * step(0, x) * step(x, width) * step(i + 0.5, _NumBoxes) * step(0.5, count);
                 // Gradients of the unbroken position, so the jump between digit cells keeps a sharp mip.
                 float2 flow = float2(x / _DigitAdvance * _DigitCell.z, -l.y * _DigitHeight);
-                float cover = tex2Dgrad(_Digits, float2(g.x, 1 - g.y), ddx(flow), ddy(flow)).a * inside;
-                art = lerp(art, _NumInk[i].rgb, cover);
+                // Digits are white, with any outline black: the face takes the ink, the outline the edge.
+                fixed4 t = tex2Dgrad(_Digits, float2(g.x, 1 - g.y), ddx(flow), ddy(flow));
+                art = lerp(art, lerp(_NumEdge[i].rgb, _NumInk[i].rgb, t.r), t.a * inside);
             }
             return art;
         }

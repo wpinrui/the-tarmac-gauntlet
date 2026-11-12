@@ -78,11 +78,15 @@ class Livery:
             self.mark(view, svg_path, self._side(view, z, y), height, ink)
 
 
-    def number(self, view, centre, w, h, ink, rotate=0):
+    def number(self, view, centre, w, h, ink, rotate=0, edge=None):
         """Where the game draws the race number: a box w by h metres, upright in the drawing
-        unless rotated (degrees, clockwise)."""
+        unless rotated (degrees, clockwise). edge colours the digits' outline, for a livery
+        baked with its own outlined digits (digits.js --edge)."""
         u, v = self.uv(view, centre)
-        self.numbers.append({"view": view, "u": round(u, 4), "v": round(v, 4), "w": w, "h": h, "ink": ink, "rotate": rotate})
+        box = {"view": view, "u": round(u, 4), "v": round(v, 4), "w": w, "h": h, "ink": ink, "rotate": rotate}
+        if edge:
+            box["edge"] = edge
+        self.numbers.append(box)
 
     # --- helpers for art that repeats across views ----------------------------------------
     def side_poly(self, zy, fill):
@@ -93,9 +97,9 @@ class Livery:
         for view in ("left", "right"):
             self.text(view, s, self._side(view, z, y), height, fill, spacing=spacing, font=font)
 
-    def side_number(self, z, y, w, h, ink):
+    def side_number(self, z, y, w, h, ink, edge=None):
         for view in ("left", "right"):
-            self.number(view, self._side(view, z, y), w, h, ink)
+            self.number(view, self._side(view, z, y), w, h, ink, edge=edge)
 
     def band_x(self, x0, x1, fill, views=("top", "front", "rear"), z=(-9, 9), y=(-9, 9)):
         """A band between two widths, nose to tail over the chosen views."""
