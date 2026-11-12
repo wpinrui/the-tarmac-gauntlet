@@ -91,6 +91,14 @@ def cut(x, a, b=None, pre=0.012, fade=0.004, tail=-42):
     return y
 
 
+def snap(y, lead=0.0015):
+    """Starts a one-shot right at its attack, so it sounds the instant the game plays it: lead s before the first
+    sample at a tenth of its peak, faded in over a millisecond."""
+    i = max(int(np.argmax(np.abs(y) > 0.1 * np.abs(y).max())) - int(lead * SR), 0)
+    y = y[i:].copy(); f = int(0.001 * SR); y[:f] *= np.linspace(0, 1, f)
+    return y
+
+
 def filt(x, cut_hz, hp=False, order=2):
     n = len(x); pad = int(0.05 * SR)
     X = np.fft.rfft(np.concatenate([x, np.zeros(pad)])); f = np.fft.rfftfreq(n + pad, 1 / SR) + 1e-9
@@ -309,10 +317,14 @@ def demos(b):
     return {'demo-pit-stop': peak(stop, -1), 'demo-crash': peak(crash, -1)}
 
 
+LOOPS = ('fuel-flow', 'scrape')
+
+
 def main():
     fetch()
     banks = build()
     for bank, takes in banks.items():
+        if bank not in LOOPS: takes = banks[bank] = [snap(t) for t in takes]
         d = os.path.join(GAME, bank)
         for f in (os.listdir(d) if os.path.isdir(d) else []):
             if f.endswith('.ogg') or f.endswith('.ogg.meta'): os.remove(os.path.join(d, f))
