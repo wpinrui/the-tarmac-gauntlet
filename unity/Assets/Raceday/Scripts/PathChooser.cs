@@ -238,6 +238,20 @@ namespace TarmacGauntlet.Raceday
             public bool BrokeBehind;
             /// <summary>Where the path goes, as race distance and metres left of the track centre.</summary>
             public readonly Vector2[] Path = new Vector2[Steps / DrawEvery + 1];
+
+            /// <summary>Back to a path just made, so the plan can use it again.</summary>
+            internal void Reset()
+            {
+                Wave = 0;
+                Of = null;
+                Shift = Delay = Lat = SoonOff = Score = Gain = Risk = Stuck = Below = Unplaced = EndOff = 0f;
+                Pedal = Pedal.Go;
+                Stay = Owe = Fixed = Escaped = EndsCaught = EndsBehind = Follow = BrokeBehind = false;
+                Rejected = null;
+                FollowFirst = BrokeBy = -1;
+                BrokeAt = 0;
+                System.Array.Clear(Path, 0, Path.Length);
+            }
         }
 
         public readonly List<Candidate> Candidates = new List<Candidate>();
@@ -288,6 +302,31 @@ namespace TarmacGauntlet.Raceday
         private float fixedLat;
         private readonly List<float> fixedLats = new List<float>();
         private readonly List<Candidate> baseCands = new List<Candidate>(), laterCands = new List<Candidate>();
+        /// <summary>
+        /// The paths are kept and used again rather than made new for every plan: made new, ten plans a second for every car
+        /// made megabytes of garbage a second, and the collector stopped the game to clear it every couple of seconds.
+        /// Two sets take turns, so the last plan's paths, <see cref="Chosen"/> among them, stay whole while the next is made.
+        /// </summary>
+        private readonly List<Candidate>[] pools = { new List<Candidate>(), new List<Candidate>() };
+        private int pool, pooled;
+        /// <summary>What the paths driven on worker threads share, set before each batch, so the batch needs no new closure.</summary>
+        private List<Candidate> simCands;
+        private AiPilot simPilot;
+        private TrafficCar simMe;
+        private int simAhead, simNextTurn;
+        private float simMargin, simBrakes, simRiskWeight, simPassCost, simFreeSpeed;
+        private System.Action<int> simulateOne;
+        private System.Comparison<int> fartherFirst;
+
+        /// <summary>A path from this plan's set, as if just made.</summary>
+        private Candidate Take()
+        {
+            List<Candidate> set = pools[pool];
+            if (pooled == set.Count) set.Add(new Candidate());
+            Candidate c = set[pooled++];
+            c.Reset();
+            return c;
+        }
         /// <summary>Paths driven on worker threads; 0 drives every path on the calling thread, for comparing.</summary>
         private static readonly bool ParallelPaths = Knob("PARALLEL", 1f) > 0f;
 
@@ -303,8 +342,24 @@ namespace TarmacGauntlet.Raceday
                 foreach (Candidate cand in cands) Simulate(pilot, me, cand, ahead, nextTurn, margin, brakes, riskWeight, passCost, freeSpeed);
                 return;
             }
-            System.Threading.Tasks.Parallel.For(0, cands.Count, i => Simulate(pilot, me, cands[i], ahead, nextTurn, margin, brakes, riskWeight, passCost, freeSpeed));
+            simCands = cands;
+            simPilot = pilot;
+            simMe = me;
+            simAhead = ahead;
+            simNextTurn = nextTurn;
+            simMargin = margin;
+            simBrakes = brakes;
+            simRiskWeight = riskWeight;
+            simPassCost = passCost;
+            simFreeSpeed = freeSpeed;
+            if (simulateOne == null) simulateOne = SimulateOne;
+            System.Threading.Tasks.Parallel.For(0, cands.Count, simulateOne);
+            simCands = null;
+            simPilot = null;
         }
+
+        private void SimulateOne(int i) =>
+            Simulate(simPilot, simMe, simCands[i], simAhead, simNextTurn, simMargin, simBrakes, simRiskWeight, simPassCost, simFreeSpeed);
 
         /// <summary>Picks a path if it is time to, and returns whether it did.</summary>
         public bool Plan(AiPilot pilot, TrafficCar me, IReadOnlyList<TrafficCar> field, float dt)
@@ -331,6 +386,8 @@ namespace TarmacGauntlet.Raceday
 
         private void Choose(AiPilot pilot, TrafficCar me, IReadOnlyList<TrafficCar> field)
         {
+            pool ^= 1;
+            pooled = 0;
             RacingLine line = pilot.Line;
             Circuit c = line.Circuit;
             float lap = c.Lap;
@@ -456,9 +513,13 @@ namespace TarmacGauntlet.Raceday
             for (int s = owedNear ? -3 : -2; s < shifts.Length; s++)
                 for (int p = 0; p < pedals; p++)
                 {
-                    // -2 stays where it is across the track, -1 holds where it was heading.
-                    var cand = new Candidate { Shift = s == -3 ? 0f : s == -2 ? myOffset : s < 0 ? Target : shifts[s], Stay = s == -2, Owe = s == -3, Pedal = pilot.Gliding && p == 1 ? Pedal.Brake : (Pedal)p };
                     if (s == -1 && Mathf.Abs(Target - shifts[0]) < 0.01f) continue;   // holding is heading for the line
+                    // -2 stays where it is across the track, -1 holds where it was heading.
+                    Candidate cand = Take();
+                    cand.Shift = s == -3 ? 0f : s == -2 ? myOffset : s < 0 ? Target : shifts[s];
+                    cand.Stay = s == -2;
+                    cand.Owe = s == -3;
+                    cand.Pedal = pilot.Gliding && p == 1 ? Pedal.Brake : (Pedal)p;
                     bool away = !cand.Stay && Mathf.Abs(cand.Shift) > Mathf.Abs(myOffset) + 0.3f;
                     // A defensive move goes off the line towards the attacker's side: moving away from it leaves room.
                     bool blocks = away && Mathf.Sign(cand.Shift - myOffset) == Mathf.Sign(attackerLateral - me.Lateral);
@@ -475,7 +536,11 @@ namespace TarmacGauntlet.Raceday
             if (FollowPaths && (FollowLapOne || !lapOne) && ahead >= 0 && !pilot.Gliding && FreeStretch(pilot))
                 for (int s = 0; s < shifts.Length; s++)
                 {
-                    var cand = new Candidate { Shift = shifts[s], Pedal = Pedal.Lift, Follow = true, Wave = -4 };
+                    Candidate cand = Take();
+                    cand.Shift = shifts[s];
+                    cand.Pedal = Pedal.Lift;
+                    cand.Follow = true;
+                    cand.Wave = -4;
                     bool away = Mathf.Abs(cand.Shift) > Mathf.Abs(myOffset) + 0.3f;
                     if (lapped && !zone && Mathf.Abs(cand.Shift) < 1.5f) cand.Rejected = "H9";
                     else if (lapped && !zone && Mathf.Sign(cand.Shift) == Mathf.Sign(lappingLateral - line.Lateral[pilot.Index]) && Mathf.Abs(lappingLateral - line.Lateral[pilot.Index]) > 1f) cand.Rejected = "H9";
@@ -496,7 +561,11 @@ namespace TarmacGauntlet.Raceday
                 if (NoWait && pilot.HeldBy > 0.5f) continue;
                 foreach (float wait in Delays)
                 {
-                    var later = new Candidate { Shift = cand.Shift, Pedal = Pedal.Go, Delay = wait, Of = cand };
+                    Candidate later = Take();
+                    later.Shift = cand.Shift;
+                    later.Pedal = Pedal.Go;
+                    later.Delay = wait;
+                    later.Of = cand;
                     if (lapped && !zone && Mathf.Abs(later.Shift) < 1.5f) later.Rejected = "H9";
                     else later.Rejected = cand.Rejected;
                     laterCands.Add(later);
@@ -529,7 +598,11 @@ namespace TarmacGauntlet.Raceday
                     bool dup = false;
                     for (int q = 0; q < i; q++) if (Mathf.Abs(fixedLats[q] - fl) < 0.5f) dup = true;
                     if (dup) continue;
-                    var fixedCand = new Candidate { Fixed = true, Lat = fl, Shift = fl - lineHere, Pedal = Pedal.Go };
+                    Candidate fixedCand = Take();
+                    fixedCand.Fixed = true;
+                    fixedCand.Lat = fl;
+                    fixedCand.Shift = fl - lineHere;
+                    fixedCand.Pedal = Pedal.Go;
                     if (fastBehind && Mathf.Abs(fixedCand.Shift) > Mathf.Abs(myOffset) + 0.3f && (!CloseLeave || float.IsPositiveInfinity(closeDepth) || Mathf.Sign(fixedCand.Shift - myOffset) == Mathf.Sign(fastLateral - me.Lateral))) fixedCand.Rejected = "H6";
                     laterCands.Add(fixedCand);
                 }
@@ -1073,7 +1146,8 @@ namespace TarmacGauntlet.Raceday
                 ov[j, 0] = others[j].Speed;
                 order.Add(j);
             }
-            order.Sort((a, b) => others[b].Distance.CompareTo(others[a].Distance));
+            if (fartherFirst == null) fartherFirst = (a, b) => others[b].Distance.CompareTo(others[a].Distance);
+            order.Sort(fartherFirst);
             for (int s = 1; s <= Steps; s++)
             {
                 float t = s * Tick;
