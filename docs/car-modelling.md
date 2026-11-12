@@ -7,6 +7,7 @@ Smooth, recognisable lines come first. That often means simpler geometry.
 Tiny details are left out to keep geometry simple and safe from defects.
 There is no triangle budget.
 Otherwise follow the reference.
+The reference is for measurements only. Never chase its exact shapes: a simple smooth shape with small inaccuracies beats a close copy with broken geometry.
 
 ## Out of scope
 Liveries, sponsor decals and race numbers are not the modeller's job.
@@ -24,6 +25,7 @@ Ask every placement or visual choice (badge, name and the like) inside the viewe
 ## 2. Reference
 Ivan provides the photos: a four-view drawing (side, front, rear, top) and detail photos.
 Look up the published wheelbase, length, width and tyre size yourself.
+Before building, check the reference against those sizes and the body style asked for, such as a roadster when the car needs a hard top. If it is out of proportion or the wrong body, tell Ivan and ask for a better reference.
 Renders and measurements of a 3D model or scan he supplies replace the drawing.
 Reference images stay out of the repo.
 
@@ -77,16 +79,16 @@ No real brand or sponsor graphics.
 ## 7. Show Ivan the direction first
 export.py builds the pieces with Blender's Python module (`pip install bpy`) and exports OBJ and MTL. It prints the triangle count for information only.
 publish.py writes the orbitable viewer with a wireframe toggle and a toggle for each lamp group.
-Publish the viewer as an Artifact and show Ivan at once.
+Before publishing, render close-ups of the nose, the pillars, the mirrors, the shut lines and the open doors, and fix what looks wrong.
+Publish the viewer as an Artifact and show Ivan.
 Run no checks until Ivan confirms the direction.
 
 ## 8. Check, then fix
-After Ivan confirms the direction, check.py must find no open or inward shells, no floating parts, no intersecting pairs and no z-fighting.
+After Ivan confirms the direction, run check.py. It finds open or inward shells, floating parts, intersecting pairs and z-fighting.
 check.py also runs with every door open.
-Close-ups come before posting: the nose, the shut lines, the lamps.
 A pillar shut line runs down the pillar's middle, so each door shows the same width of black.
 Black window trim is one even band, with no jump at a shut line.
-Fix every hit, then show Ivan the fixed version. He must say ok before it goes in.
+Fix only the hits Ivan could see. Ignore hits hidden inside other parts or on options he did not pick. Then show Ivan the fixed version. He must say ok before it goes in.
 
 ## 9. Put it in the game
 Record Ivan's viewer picks in rows.py, then `export.py <dir> --game` writes only the picked options with Unity axes (forward +Z, up +Y, metres).
