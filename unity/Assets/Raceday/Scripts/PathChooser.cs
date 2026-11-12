@@ -4,7 +4,7 @@ using UnityEngine;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// Path choosing, experiment E1 of the racecraft spec. A few times a second of race time the car
+    /// Path choosing, the racecraft spec's AI (E1, now v2). A few times a second of race time the car
     /// tries a handful of paths for the next few seconds: hold where it is going, move to one of
     /// several places either side of its racing line, and for each go, lift or brake. It predicts the
     /// cars near it along each path, throws out every path that breaks a hard limit, and takes the
@@ -15,8 +15,6 @@ namespace TarmacGauntlet.Raceday
     /// </summary>
     public sealed class PathChooser
     {
-        public const int Experiment = 1;
-
         private const int Steps = 30;
         private const float Tick = 0.1f;               // Steps * Tick: the 3 s looked ahead
         private const int DrawEvery = 3;
@@ -76,10 +74,17 @@ namespace TarmacGauntlet.Raceday
         /// <summary>H15: on the free stretch, places across the whole track this far apart, m; 0 for only beside each car ahead.</summary>
         private static readonly float Grid = Knob("GRID", 0.5f);
         /// <summary>H15: on the free stretch, never off the throttle while a flat-out route is open (Ivan).</summary>
-        private static readonly bool FlatFirst = Knob("H15", 1f) > 0f;
+        private static readonly bool FlatFirst = Knob("H15", 1f) > 0f, FlatFollow = Knob("H15F", 1f) > 0f;
+        private static readonly bool FollowWhere = Knob("FOLLOWNOW", 1f) > 0f;
+        private static readonly bool SideBuffer = Knob("SIDEBUF", 0f) > 0f;
+        /// <summary>Against changing its mind on the free stretch, per metre of change: with paths at every width, near-equal ones would weave it (T3).</summary>
+        private static readonly float FreeHyst = Knob("FREEHYST", 0.05f);
+        /// <summary>H15: flat out in the lane up to a car it would catch before the corner is a dead end: a route round it goes first.</summary>
+        private static readonly bool CaughtFirst = Knob("H15C", 0f) > 0f;
         /// <summary>H15, H1: on the free stretch, the room past a car ahead beyond the car's own width, m; below 0, the driver's own passing margin.</summary>
         private static readonly float GapWidth = Knob("GAPWIDTH", -1f);
         private static readonly bool AvoidGhosts = Knob("AVOIDGHOSTS", 1f) > 0f;
+        private static readonly bool GhostPast = Knob("GHOSTPAST", 1f) > 0f;
         /// <summary>H12: a recovering ghost keeps off the racing line, on its own side of it, until it is back up to speed (Ivan).</summary>
         private static readonly float AltLine = Knob("ALTLINE", 5f), AltClear = Knob("ALTCLEAR", CarW + RoomMargin + 1f);
         /// <summary>H12: a stopped car ahead caps the speed, braking to the yellow flag's share by <see cref="YellowReach"/> before it.</summary>
@@ -116,11 +121,13 @@ namespace TarmacGauntlet.Raceday
         /// </summary>
         private static readonly float HeldCost = Knob("HELDCOST", 1f);
         /// <summary>Whether, behind a car on the free stretch, each lane is also tried flat out following only what is ahead in it.</summary>
-        private static readonly bool FollowPaths = Knob("FOLLOW", 0f) > 0f, FollowLapOne = Knob("FOLLOW1", 1f) > 0f;
+        private static readonly bool FollowPaths = Knob("FOLLOW", 1f) > 0f, FollowLapOne = Knob("FOLLOW1", 1f) > 0f;
         /// <summary>Deceleration, m/s², braking plans to open a short gap with.</summary>
         /// <summary>Inside the margin behind a car, how much closer a path may not get, m.</summary>
-        private static readonly float TouchClose = Knob("TOUCH", 1f);
-        private static readonly bool TouchLapOne = Knob("TOUCH1", 0f) > 0f;
+        private static readonly float TouchClose = Knob("TOUCH", 0.3f);
+        private static readonly bool TouchLapOne = Knob("TOUCH1", 1f) > 0f;
+        /// <summary>A car following at its gap, or a little behind it, counts as inside it: it may pull out from there, m.</summary>
+        private static readonly float TouchSlack = Knob("TOUCHSLACK", 3f);
         private float touchNow;
         private static readonly float BrakeOpen = Knob("BOPEN", 12f), BesideBrake = Knob("BESIDE", 2f), BesideDrop = Knob("BDROP", 6f);
         /// <summary>The slowest car alongside this plan, m/s.</summary>
@@ -134,6 +141,8 @@ namespace TarmacGauntlet.Raceday
         private float myBrakes = 10f;
         /// <summary>T3: seconds ahead within which a car ahead is followed as if it may brake at its hardest.</summary>
         private static readonly float HardAhead = Knob("HARDAHEAD", 2f);
+        private static readonly float PredGap = Knob("PREDGAP", 0.4f), PredBrake = Knob("PREDBRAKE", 0.5f), PredWhere = Knob("PREDWHERE", 0f);
+        private bool predQueue;
         private float diveSpeed;
         /// <summary>T20: how far under the outside car's speed a car diving at it brakes to, m/s.</summary>
         /// <summary>How far ahead the outside car must be, as a share of a car length, before the inside car has no claim: its nose short of the other's middle.</summary>
@@ -328,6 +337,8 @@ namespace TarmacGauntlet.Raceday
             float here = Mathf.Repeat(me.Distance, lap);
             lapLength = lap;
             Gather(c, me, field);
+            predQueue = PredGap > 0f && (PredWhere == 0f || PredWhere == 1f && me.Distance < lap || PredWhere == 2f && !FreeStretch(pilot)
+                || PredWhere == 3f && (me.Distance < lap || !FreeStretch(pilot)));
             Predict(c, me, NextTurn(c, here));
 
             // What the cars around ask of this one, from where they are now.
@@ -378,7 +389,7 @@ namespace TarmacGauntlet.Raceday
             // From the corner's exit to the next braking zone the racing line is only the default (Ivan):
             // nothing holds the car to a path it chose, so it takes the open side the moment that is better.
             bool free = FreeStretch(pilot);
-            float offLine = free ? FreeOff * OffLine : OffLine, hyst = free ? 0f : Hysteresis;
+            float offLine = free ? FreeOff * OffLine : OffLine, hyst = free ? FreeHyst : Hysteresis;
             headway = HeadZone >= 0f && (lapOne || zone || Road(NextCornerStart(c, here) - here, lap) < HeadNear * mySpeed) ? HeadZone : Headway;
             int nextTurn = NextTurn(c, here);
             float myOffset = me.Lateral - line.Lateral[pilot.Index];
@@ -580,11 +591,11 @@ namespace TarmacGauntlet.Raceday
             // H15: on the free stretch, lifting is only for when no route is open flat out, at any width: a flat path
             // that ends sitting behind a car it would catch before the corner is no route round it. Moving out at the
             // speed it follows at, then flat once clear, is such a route: out first, then throttle (Ivan).
-            if (FlatFirst && best != null && best.Pedal != Pedal.Go && !braking && !pilot.Gliding && FreeStretch(pilot))
+            if (FlatFirst && best != null && (best.Pedal != Pedal.Go || CaughtFirst && best.EndsCaught) && !braking && !pilot.Gliding && FreeStretch(pilot))
             {
                 Candidate flat = null;
                 foreach (Candidate k in Candidates)
-                    if (k.Rejected == null && !k.Escaped && (k.Pedal == Pedal.Go && !k.EndsCaught || k.Follow && !k.EndsBehind) && (flat == null || k.Score > flat.Score)) flat = k;
+                    if (k.Rejected == null && !k.Escaped && (k.Pedal == Pedal.Go && !k.EndsCaught || FlatFollow && k.Follow && !k.EndsBehind) && (flat == null || k.Score > flat.Score)) flat = k;
                 if (flat != null) best = flat;
             }
             // T1: off the braking zone, flat out moving away from a car that cuts across beats lifting behind it (Ivan).
@@ -640,7 +651,20 @@ namespace TarmacGauntlet.Raceday
                 fixedOn = true;
                 fixedLat = Mathf.Clamp(line.Lateral[pilot.Index] + pilot.Offset, -holdEdge, holdEdge);
             }
-            Cap = best.Follow ? (best.FollowFirst < 0 ? float.PositiveInfinity : CapAt(Pedal.Lift, best.FollowFirst, 0, mySpeed, me.Distance, margin)) : CapAt(best.Pedal, ahead, 0, mySpeed, me.Distance, margin);
+            int followNow = best.FollowFirst;
+            if (best.Follow && FollowWhere)
+            {
+                // Out first, then throttle: it follows whatever is still in its way from where the car is now, not
+                // where its plan has it a step on, as the car lags its pilot (Ivan).
+                float clearNow = (FreeStretch(pilot) && GapWidth >= 0f ? CarW + GapWidth : Clear(margin)) - 0.5f * CarW + 0.1f, near = float.PositiveInfinity;
+                followNow = -1;
+                for (int j = 0; j < others.Count; j++)
+                {
+                    float gj = Road(od[j, 0] - me.Distance, lap);
+                    if (gj > 0f && gj < near && Mathf.Abs(ol[j, 0] - me.Lateral) < clearNow + reach[j]) { near = gj; followNow = j; }
+                }
+            }
+            Cap = best.Follow ? (followNow < 0 ? float.PositiveInfinity : CapAt(Pedal.Lift, followNow, 0, mySpeed, me.Distance, margin)) : CapAt(best.Pedal, ahead, 0, mySpeed, me.Distance, margin);
             if (YellowCap)
                 for (int j = 0; j < others.Count; j++)
                 {
@@ -859,7 +883,9 @@ namespace TarmacGauntlet.Raceday
                     float from = Road(od[j, 0] - me.Distance, lap);
                     // Nose to tail the margin grows with speed: room for the car ahead to brake harder than expected.
                     float buffer = margin + headway * v;
-                    bool touching = from > -0.3f * CarL && from < CarL + margin + headway * me.Speed && start < need;
+                    // Off its tail, with no overlap across, a car ahead braking hard is no danger: only the margin is kept, not the headway.
+                    if (SideBuffer && apart > CarW + 0.5f && apart >= Mathf.Abs(ol[j, 0] - me.Lateral) - 0.05f) buffer = margin;
+                    bool touching = from > -0.3f * CarL && from < CarL + margin + headway * me.Speed + (touchNow > 0f ? TouchSlack : 0f) && start < need;
                     // A car coming from behind is its own to miss: this car only must not move across into it.
                     bool behind = from < -0.3f * CarL;
                     bool into = !behind || apart < Mathf.Abs(ol[j, s] - me.Lateral) - 0.05f;
@@ -1010,7 +1036,9 @@ namespace TarmacGauntlet.Raceday
                 if (o.Id == me.Id) continue;
                 // A ghost is left out, unless it is stopped on the track: then it is an obstacle.
                 bool still = o.Ghost && !me.Ghost && Mathf.Abs(o.Speed) < StoppedSpeed
-                    && Mathf.Abs(o.Lateral) < c.HalfWidth(c.IndexOf(Mathf.Repeat(o.Distance, lap)));
+                    && Mathf.Abs(o.Lateral) < c.HalfWidth(c.IndexOf(Mathf.Repeat(o.Distance, lap)))
+                    // Two ghosts pass through each other: one stopped is crawled past, not waited behind for ever.
+                    || GhostPast && o.Ghost && me.Ghost && Mathf.Abs(o.Speed) < StoppedSpeed;
                 // A ghost getting back into the race is a car to plan round too, once near the track: the
                 // ghosting is only the safety net (Ivan, T17).
                 // T17: seen from when it heads back towards the track, not only once it is near it (Ivan).
@@ -1094,6 +1122,14 @@ namespace TarmacGauntlet.Raceday
                         {
                             v = Mathf.Min(v, ov[f, s]);
                             d = Mathf.Min(d, od[j, s - 1] + v * Tick);
+                        }
+                        // A queue: it keeps its own gap to the car ahead of it, slowing for it as its brakes allow,
+                        // instead of running at its line's speed until it touches (the first-corner chain).
+                        else if (predQueue && g > -0.5f * CarL && g < 80f && Mathf.Abs(ol[f, s] - lat) < CarW)
+                        {
+                            float room = g - CarL - 1f - PredGap * ov[f, s];
+                            float vf = ov[f, s], vmax = Mathf.Sqrt(Mathf.Max(vf * vf + 2f * Mathf.Max(o.Braking, 5f) * PredBrake * Mathf.Max(room, 0f), 0f));
+                            if (vmax < v) { v = vmax; d = Mathf.Min(d, od[j, s - 1] + v * Tick); }
                         }
                     }
                     od[j, s] = d;

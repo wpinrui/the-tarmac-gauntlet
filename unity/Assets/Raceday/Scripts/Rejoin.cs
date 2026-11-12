@@ -121,6 +121,8 @@ namespace TarmacGauntlet.Raceday
         public const float RunoffGrip = 0.5f;
         /// <summary>A car leaving the runoff waits while a car coming couldn't brake to its speed in the room, with this many seconds to spare.</summary>
         public const float YieldSeconds = 1f;
+        /// <summary>Longest a ghost runs beside the track for cars alongside before it heads back regardless, s.</summary>
+        public const float BesideWait = 4f;
         /// <summary>The braking assumed of the car coming, m/s²: well inside what any car can do.</summary>
         public const float YieldBraking = 6f;
         /// <summary>A car within this far ahead or behind is alongside: no joining beside it, metres.</summary>
@@ -200,6 +202,7 @@ namespace TarmacGauntlet.Raceday
         private bool turnOff;      // the turn started off the tarmac, so keeps to the runoff's bounds
         private float push;        // extra throttle built up while the car can't get going, 0 to 1
         private float blockedFor;  // seconds at full push without moving
+        private float besideFor;   // seconds run beside the track for a car alongside
         private int blocks;        // times blocked running, since it last got going
         private float stepDt, lastSpeed, prevSpeed;   // speeds this step and the one before, m/s
 
@@ -208,7 +211,7 @@ namespace TarmacGauntlet.Raceday
         {
             State = Stage.Racing;
             reverse = switching = legChosen = false;
-            push = blockedFor = 0f;
+            push = blockedFor = besideFor = 0f;
             blocks = 0;
             SinceLostControl = float.PositiveInfinity;
             trackIndex = -1;
@@ -327,12 +330,11 @@ namespace TarmacGauntlet.Raceday
             bool losing = speed > SpinSpeed && (slip > SpinSlip || Mathf.Abs(yawRate) > SpinYawRate);
             SinceLostControl = losing ? 0f : SinceLostControl + dt;
             bool spun = SinceLostControl < LostControlMemory && Mathf.Abs(Heading) > SpunAngle;
-            // T17 (Ivan): a gap in the traffic is wishful thinking. Under E1 and E2 a car rejoins at its safe
+            // T17 (Ivan): a gap in the traffic is wishful thinking. A car rejoins at its safe
             // angle whenever it is ready, and the cars on the line avoid it as a ghost (H12).
-            bool waits = !Experiments.Is(1) && !Experiments.Is(2);
-            GapClear = !waits || Clear(me, field, circuit.Lap);
+            GapClear = true;
             Coming = CarComing(me, field, circuit.Lap, half);
-            bool yielding = Yielding = waits && State == Stage.Rejoining && PastEdge > YieldFrom && PastEdge < NearEdge && !RoomToJoin(me, field, circuit.Lap, speed, half);
+            bool yielding = Yielding = false;
 
             switch (State)
             {
@@ -406,6 +408,7 @@ namespace TarmacGauntlet.Raceday
             State = stage;
             Cause = cause;
             reverse = switching = legChosen = false;
+            besideFor = 0f;
         }
 
         private static AiPilot.Controls Brakes() => new AiPilot.Controls { Brake = 1f };
@@ -423,7 +426,6 @@ namespace TarmacGauntlet.Raceday
             Vector3 lt = line.Tangent[k];
             float lineAngle = Mathf.Atan2(Vector3.Dot(lt, circuit.Left[k]), Vector3.Dot(lt, circuit.Forward[k]));
             float fromLine = lateral - line.Lateral[k];
-            if (Experiments.Is(1))
             {
                 // H12: it heads for the alternative line, clear of the racing line on its own side, and keeps
                 // to it until back up to speed (Ivan). Where the line runs by that edge, it keeps to the edge.
@@ -450,7 +452,11 @@ namespace TarmacGauntlet.Raceday
             // Traffic coming: stay off the tarmac, running alongside it off the throttle, until there is room.
             if (yielding) c.Throttle = 0f;
             // Off the tarmac with a car alongside, it runs parallel until the car is by.
-            if (yielding || (PastEdge > 0f && Alongside(me, field, circuit.Lap, half))) want = 0f;
+            // T17: a ghost passes through the cars on the line, which avoid it anyway: in a full field there is always one
+            // alongside, so after a few seconds beside the track it stops waiting for them (Ivan: rejoin whenever ready).
+            bool beside = PastEdge > 0f && Alongside(me, field, circuit.Lap, half);
+            besideFor = beside ? besideFor + stepDt : 0f;
+            if (yielding || beside && !(Ghost && besideFor > BesideWait)) want = 0f;
             // Waiting for room, it closes in on the edge, still off the tarmac, so it has less grass to cross once there is room.
             if (yielding && PastEdge > YieldFrom + WaitBy)
                 want = -(lateral >= 0f ? 1f : -1f) * AimAngle * Mathf.Deg2Rad * Mathf.Clamp01((PastEdge - YieldFrom - WaitBy) / WaitBy);
@@ -530,7 +536,7 @@ namespace TarmacGauntlet.Raceday
                 if (Mathf.Abs(slide) > SlideLimit * Mathf.Deg2Rad) left = 0f;
                 c.Brake = Mathf.Min(c.Brake, left * RunoffBraking * grip / (spec.BrakeDecel * 9.81f));
                 // Getting straight back on without waiting, it floors it as far as the runoff's grip allows (Ivan).
-                c.Throttle *= Mathf.Max(left, 0.15f) * (Experiments.Is(1) || Experiments.Is(2) ? 1f : RunoffThrottle);
+                c.Throttle *= Mathf.Max(left, 0.15f) * 1f;
             }
             else
             {

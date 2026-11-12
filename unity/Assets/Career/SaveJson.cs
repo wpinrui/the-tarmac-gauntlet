@@ -41,6 +41,12 @@ namespace TarmacGauntlet.Career
             return WithRaceNumbers(game);
         }
 
+        /// <summary>A race saved part way. Race saves are not migrated: an old one that no longer reads is thrown away.</summary>
+        public static string SerializeRace(RaceSave race) => JsonConvert.SerializeObject(race, Settings);
+
+        public static RaceSave DeserializeRace(string json) =>
+            JsonConvert.DeserializeObject<RaceSave>(json, Settings) ?? throw new InvalidOperationException("The race save is empty.");
+
         /// <summary>Saves made before race numbers existed get this season's numbers on load.</summary>
         private static GameState WithRaceNumbers(GameState game) =>
             game.Teams.All(t => t.RaceNumber > 0)

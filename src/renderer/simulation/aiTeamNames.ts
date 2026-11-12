@@ -41,10 +41,10 @@ export const AI_TEAM_ROSTER: AiTeamEntry[] = [
   // -----------------------------------------------------------------------
   // CLASS E — 20 teams
   // -----------------------------------------------------------------------
-  { name: "Dockyard Racing",              descriptor: "harbour-town mechanics turned racers", carClass: "E" },
+  { name: "Dockyard Racing",              descriptor: "from slipway to fast lane", carClass: "E" },
   { name: "Whitfield & Sons",             descriptor: "father-and-sons operation since forever", carClass: "E" },
   { name: "Copper Lane Autosport",        descriptor: "named after the street they wrench on", carClass: "E" },
-  { name: "North Star Racing",            descriptor: "Scandinavian expats chasing points", carClass: "E" },
+  { name: "North Star Racing",            descriptor: "Steady as the pole star", carClass: "E" },
   { name: "Terrace Motorsport",           descriptor: "working-class fan-funded team", carClass: "E" },
   { name: "Gasworks Racing",              descriptor: "smells like petrol, runs like clockwork", carClass: "E" },
   { name: "Southgate Motorsport",         descriptor: "suburban team, real commitment", carClass: "E" },
@@ -109,7 +109,7 @@ export const AI_TEAM_ROSTER: AiTeamEntry[] = [
   // CLASS B — 12 teams
   // -----------------------------------------------------------------------
   { name: "Scuderia Feretti",             descriptor: "Feretti's official works racing team", carClass: "B" },
-  { name: "Team Archer",            descriptor: "Archer' performance division works entry", carClass: "B" },
+  { name: "Team Archer",            descriptor: "Archer's performance division works entry", carClass: "B" },
   { name: "Liberty Performance Racing",      descriptor: "Liberty's factory GT programme", carClass: "B" },
   { name: "Molteni Corse",                descriptor: "Feretti customer team, Italian privateer", carClass: "B" },
   { name: "Apex Archer",                 descriptor: "Archer satellite with factory parts supply", carClass: "B" },

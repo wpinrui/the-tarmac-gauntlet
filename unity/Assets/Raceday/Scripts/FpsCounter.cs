@@ -24,7 +24,7 @@ namespace TarmacGauntlet.Raceday
 
         private void OnGUI()
         {
-            if (Event.current.type != EventType.Repaint) return;
+            if (Event.current.type != EventType.Repaint || DebugMenu.Bare) return;
             float scale = Screen.height / 1080f;
             if (style == null) style = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.UpperRight, fontStyle = FontStyle.Bold };
             style.fontSize = Mathf.RoundToInt(28 * scale);

@@ -12,7 +12,9 @@ namespace TarmacGauntlet.Simulation
     {
         private static readonly Dictionary<string, string> ById = new Dictionary<string, string>
         {
+            { "e-07", "Assets/Art/Vehicles/LibertyFantasy/LibertyFantasy.obj" },
             { "b-22", "Assets/Art/Vehicles/ArcherTachyon/ArcherTachyon.obj" },
+            { "b-23", "Assets/Art/Vehicles/ArcherJetBlack/ArcherJetBlack.obj" },
         };
 
         private static readonly Dictionary<CarClass, string> ByClass = new Dictionary<CarClass, string>
@@ -30,6 +32,13 @@ namespace TarmacGauntlet.Simulation
         private static readonly Dictionary<string, string> LiveryByTeam = new Dictionary<string, string>
         {
             { "Scuderia Feretti", "Assets/Art/Liveries/ScuderiaFeretti" },
+            { "Team Seorak", "Assets/Art/Liveries/TeamSeorak" },
+            { "Gravel Trap Racing", "Assets/Art/Liveries/GravelTrapRacing" },
+            { "Ironbark Racing", "Assets/Art/Liveries/IronbarkRacing" },
+            { "Poseidon Racing", "Assets/Art/Liveries/PoseidonRacing" },
+            { "North Star Racing", "Assets/Art/Liveries/NorthStarRacing" },
+            { "Team Archer", "Assets/Art/Liveries/TeamArcher" },
+            { "Dockyard Racing", "Assets/Art/Liveries/DockyardRacing" },
         };
 
         /// <summary>The team's livery folder, or null for a team with no livery yet.</summary>

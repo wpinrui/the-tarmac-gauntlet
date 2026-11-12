@@ -22,12 +22,12 @@ namespace TarmacGauntlet.Career
     }
 
     /// <summary>
-    /// Saves on disk, one folder per career: <c>root/&lt;careerId&gt;/autosave.json</c> holds the game and
-    /// <c>info.json</c> the <see cref="CareerInfo"/>. Every career has its own autosave, so careers never share one.
+    /// Saves on disk, one folder per career: <c>root/&lt;careerId&gt;/autosave.json</c> holds the game,
+    /// <c>info.json</c> the <see cref="CareerInfo"/> and <c>race.json</c> a race saved part way, if there is one. Every career has its own autosave, so careers never share one.
     /// </summary>
     public sealed class CareerStore
     {
-        private const string SaveFile = "autosave.json", InfoFile = "info.json";
+        private const string SaveFile = "autosave.json", InfoFile = "info.json", RaceFile = "race.json";
 
         public string Root { get; }
 
@@ -93,6 +93,36 @@ namespace TarmacGauntlet.Career
             Directory.CreateDirectory(folder);
             WriteAtomically(Path.Combine(folder, SaveFile), SaveJson.Serialize(stamped));
             WriteAtomically(Path.Combine(folder, InfoFile), JsonConvert.SerializeObject(info, Formatting.Indented));
+        }
+
+        /// <summary>Writes the race the career is part way through.</summary>
+        public void SaveRace(string careerId, RaceSave race)
+        {
+            string folder = Folder(careerId);
+            Directory.CreateDirectory(folder);
+            WriteAtomically(Path.Combine(folder, RaceFile), SaveJson.SerializeRace(race));
+        }
+
+        /// <summary>The race the career is part way through, or null for none. A race save that no longer reads is deleted.</summary>
+        public RaceSave? LoadRace(string careerId)
+        {
+            string path = Path.Combine(Folder(careerId), RaceFile);
+            if (!File.Exists(path)) return null;
+            try
+            {
+                return SaveJson.DeserializeRace(File.ReadAllText(path));
+            }
+            catch (Exception e) when (e is JsonException || e is InvalidOperationException || e is ArgumentException)
+            {
+                File.Delete(path);
+                return null;
+            }
+        }
+
+        public void DeleteRace(string careerId)
+        {
+            string path = Path.Combine(Folder(careerId), RaceFile);
+            if (File.Exists(path)) File.Delete(path);
         }
 
         public void Delete(string careerId)

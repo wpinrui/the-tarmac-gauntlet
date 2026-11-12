@@ -1,5 +1,4 @@
-// "situations": runs the set-ups of the AI racecraft spec (Situations.cs, shared with the raceday debug
-// menu) one by one. With an id ("situations T2") it prints the cars every half second: where they are,
+// "situations": runs the set-ups of the AI racecraft spec (Situations.cs) one by one. With an id ("situations T2") it prints the cars every half second: where they are,
 // across the track, speed and what racecraft is doing. Without one it prints a line per set-up.
 using System;
 using System.Collections.Generic;

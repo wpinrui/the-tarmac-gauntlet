@@ -16,7 +16,8 @@ namespace TarmacGauntlet.Raceday
     public sealed class TimeOfDay : MonoBehaviour
     {
         /// <summary>Local time when the race starts, hours.</summary>
-        public const float StartHour = 15f;
+        public static float StartHour = DefaultStartHour;
+        public const float DefaultStartHour = 15f;
         /// <summary>Race clock seconds since the start; zero until it is set.</summary>
         [NonSerialized] public Func<float> RaceSeconds;
         /// <summary>The weather now; the clear sky of the dry race until it is set.</summary>

@@ -37,10 +37,10 @@ namespace TarmacGauntlet.Simulation
             new AiTeamEntry { Name = "Basecamp Autosport", Descriptor = "starting from the bottom, climbing up", ModelId = "f-06", CarClass = CarClass.F },
             new AiTeamEntry { Name = "Cornerstone Racing", Descriptor = "building something from nothing", ModelId = "f-02", CarClass = CarClass.F },
             // CLASS E: 20 teams
-            new AiTeamEntry { Name = "Dockyard Racing", Descriptor = "harbour-town mechanics turned racers", ModelId = "e-07", CarClass = CarClass.E },
+            new AiTeamEntry { Name = "Dockyard Racing", Descriptor = "from slipway to fast lane", ModelId = "e-07", CarClass = CarClass.E },
             new AiTeamEntry { Name = "Whitfield & Sons", Descriptor = "father-and-sons operation since forever", ModelId = "e-08", CarClass = CarClass.E },
             new AiTeamEntry { Name = "Copper Lane Autosport", Descriptor = "named after the street they wrench on", ModelId = "e-09", CarClass = CarClass.E },
-            new AiTeamEntry { Name = "North Star Racing", Descriptor = "Scandinavian expats chasing points", ModelId = "e-10", CarClass = CarClass.E },
+            new AiTeamEntry { Name = "North Star Racing", Descriptor = "Steady as the pole star", ModelId = "e-10", CarClass = CarClass.E },
             new AiTeamEntry { Name = "Terrace Motorsport", Descriptor = "working-class fan-funded team", ModelId = "e-11", CarClass = CarClass.E },
             new AiTeamEntry { Name = "Gasworks Racing", Descriptor = "smells like petrol, runs like clockwork", ModelId = "e-07", CarClass = CarClass.E },
             new AiTeamEntry { Name = "Southgate Motorsport", Descriptor = "suburban team, real commitment", ModelId = "e-08", CarClass = CarClass.E },
@@ -96,7 +96,7 @@ namespace TarmacGauntlet.Simulation
             new AiTeamEntry { Name = "Barnacle Racing", Descriptor = "fuel giant's long-running works partnership", ModelId = "c-20", CarClass = CarClass.C },
             // CLASS B: 12 teams
             new AiTeamEntry { Name = "Scuderia Feretti", Descriptor = "Feretti's official works racing team", ModelId = "b-21", CarClass = CarClass.B },
-            new AiTeamEntry { Name = "Team Archer", Descriptor = "Archer' performance division works entry", ModelId = "b-22", CarClass = CarClass.B },
+            new AiTeamEntry { Name = "Team Archer", Descriptor = "Archer's performance division works entry", ModelId = "b-22", CarClass = CarClass.B },
             new AiTeamEntry { Name = "Liberty Performance Racing", Descriptor = "Liberty's factory GT programme", ModelId = "b-25", CarClass = CarClass.B },
             new AiTeamEntry { Name = "Molteni Corse", Descriptor = "Feretti customer team, Italian privateer", ModelId = "b-21", CarClass = CarClass.B },
             new AiTeamEntry { Name = "Apex Archer", Descriptor = "Archer satellite with factory parts supply", ModelId = "b-23", CarClass = CarClass.B },

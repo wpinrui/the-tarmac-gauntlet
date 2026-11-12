@@ -116,6 +116,56 @@ namespace TarmacGauntlet.Simulation.Tests
         }
 
         [Test]
+        public void AStopFixesOnlyTheIssuesItIsGiven()
+        {
+            (RaceDay _, CarRaceLog me) = PlayerRace(Never);
+            me.AddIssue("engine-misfire");
+            me.AddIssue("radiator-leak");
+            double both = me.WorkSeconds();
+            double one = me.WorkSeconds(new[] { "radiator-leak" });
+            Assert.That(one, Is.LessThan(both));
+            Assert.That(me.WorkSeconds(System.Array.Empty<string>()), Is.LessThan(one));
+            PitWork work = me.Pit(false, new[] { "radiator-leak" });
+            Assert.That(work.ExtraSeconds, Is.EqualTo(one).Within(1e-9));
+            Assert.That(me.ActiveIssues.Select(i => i.TemplateId), Is.EqualTo(new[] { "engine-misfire" }));
+            Assert.That(me.SpareParts, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void AStopWithNoListFixesEveryIssue()
+        {
+            (RaceDay _, CarRaceLog me) = PlayerRace(Never);
+            me.AddIssue("engine-misfire");
+            me.AddIssue("radiator-leak");
+            me.Pit(false);
+            Assert.That(me.ActiveIssues, Is.Empty);
+        }
+
+        [Test]
+        public void AnIssueGivenAndFixedFromTheDebugMenu()
+        {
+            (RaceDay _, CarRaceLog me) = PlayerRace(Never);
+            me.AddIssue("engine-misfire");
+            me.AddIssue("engine-misfire");
+            Assert.That(me.ActiveIssues.Count, Is.EqualTo(1));
+            Assert.That(me.Effects.Power, Is.EqualTo(0.9).Within(1e-9));
+            me.ClearIssues();
+            Assert.That(me.ActiveIssues, Is.Empty);
+            Assert.That(me.Effects.Power, Is.EqualTo(1));
+            Assert.That(me.Issues.Single().FixedLap, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void FatigueSetFromTheDebugMenuStaysInRange()
+        {
+            (RaceDay _, CarRaceLog me) = PlayerRace(Never);
+            me.SetFatigue(150);
+            Assert.That(me.Fatigue, Is.EqualTo(100));
+            me.SetFatigue(-5);
+            Assert.That(me.Fatigue, Is.EqualTo(0));
+        }
+
+        [Test]
         public void ALapAgesTheCar()
         {
             (RaceDay race, CarRaceLog me) = PlayerRace(Never);

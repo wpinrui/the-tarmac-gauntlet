@@ -125,6 +125,7 @@ namespace TarmacGauntlet.Management
             GameState game = GameSession.State;
             if (game == null || Player?.EnteredCarId == null) return;
             RaceWeekend.Begin(game);
+            GameSession.DropRace();
             GameSession.Flush();
             SceneManager.LoadScene(RacedayScene);
         }

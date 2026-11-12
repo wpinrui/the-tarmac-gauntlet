@@ -14,11 +14,11 @@ namespace TarmacGauntlet.Raceday
 
     /// <summary>
     /// A stop in the box: refuelling, then a new set of tyres, with the clock running. The car's
-    /// <see cref="PitOrders"/> can ask for fewer litres than a full tank or for the tyres to stay on,
-    /// and are put back to a full tank and new tyres once the stop starts. The
-    /// car's Pit Stop Time stat makes the crew quicker or slower. In a career race the car's
-    /// <see cref="CarRaceLog"/> decides the rest: tyres only while a set is left, the next driver in,
-    /// the active issues fixed while the spares last, and the crew's size and Engineer skill scale the work.
+    /// <see cref="StopPlanner"/>, the player's, sets the litres, the tyres and the repairs from its
+    /// <see cref="PitOrders"/>, which go back to the crew's call once the stop starts. A car with no planner
+    /// fills the tank and changes the tyres. The car's Pit Stop Time stat makes the crew quicker or slower. In
+    /// a career race the car's <see cref="CarRaceLog"/> decides the rest: tyres only while a set is left, the
+    /// next driver in, the issues fixed while the spares last, and the crew's size and Engineer skill scale the work.
     /// </summary>
     public sealed class PitService
     {
@@ -42,15 +42,14 @@ namespace TarmacGauntlet.Raceday
         {
             this.supplies = supplies;
             startFuel = supplies.Fuel;
-            PitOrders orders = supplies.Orders;
-            litres = Mathf.Clamp(orders.Litres ?? float.PositiveInfinity, 0f, Mathf.Max(supplies.Capacity - supplies.Fuel, 0f));
-            // The car's Pit Stop stat scales the work: 0.7 times at 0, 1.3 times at 100.
-            scale = 0.7f + 0.6f * (float)spec.Stats.PitStopTime / 100f;
-            PitWork work = supplies.Log?.Pit(orders.Tyres);
-            tyres = work == null ? orders.Tyres : work.ChangeTyres;
+            StopPlan plan = supplies.Planner != null ? supplies.Planner.Plan() : StopPlan.Default(supplies);
+            litres = Mathf.Clamp(plan.Litres, 0f, Mathf.Max(supplies.Capacity - supplies.Fuel, 0f));
+            scale = Scale(spec);
+            PitWork work = supplies.Log?.Pit(plan.Tyres, plan.Fix);
+            tyres = work == null ? plan.Tyres : work.ChangeTyres;
             NewTyres = tyres;
             NewDriver = work?.NewDriver != null;
-            orders.Reset();
+            supplies.Orders.Reset();
             if (work != null) scale *= (float)work.CrewMultiplier;
             float extra = work != null ? (float)work.ExtraSeconds : 0f;
             Duration = (Settle + litres / RefuelRate + (tyres ? TyreChange : 0f)) * scale + extra;
@@ -58,6 +57,20 @@ namespace TarmacGauntlet.Raceday
             supplies.Map = EngineMap.Normal;
             if (supplies.Log != null) supplies.Effects = supplies.Log.Effects;
         }
+
+        /// <summary>How the car's Pit Stop stat scales the work: 0.7 times at 0, 1.3 times at 100.</summary>
+        private static float Scale(CarSpec spec) => 0.7f + 0.6f * (float)spec.Stats.PitStopTime / 100f;
+
+        /// <summary>Seconds a stop would take: the fuel, the tyres and the <paramref name="extra"/> work, scaled as a stop scales them.</summary>
+        public static float Seconds(CarSpec spec, float litres, bool tyres, CarRaceLog log, double extra)
+        {
+            float scale = Scale(spec);
+            if (log != null) scale *= (float)PitStop.CrewMultiplier(log.Car.CrewSize, log.Car.EngineerSkill);
+            return (Settle + litres / RefuelRate + (tyres ? TyreChange : 0f)) * scale + (float)extra;
+        }
+
+        /// <summary>Seconds in the box each litre takes, before the crew's scaling.</summary>
+        public static double SecondsPerLitre(CarSpec spec) => Scale(spec) / RefuelRate;
 
         /// <summary>When the fuel starts and stops going in, s into the stop: the crew's cue, never their doing.</summary>
         public float FuelFrom => Settle * scale;

@@ -46,10 +46,10 @@ class Livery:
         d = " ".join(f"{'M' if i == 0 else 'L'}{u:.4f},{v:.4f}" for i, (u, v) in enumerate(self.uv(view, p) for p in pts))
         self.art[view].append(f'<path d="{d} Z" fill="{fill}"/>')
 
-    def text(self, view, s, p, height, fill, rotate=0, spacing=0.0):
+    def text(self, view, s, p, height, fill, rotate=0, spacing=0.0, font="Titillium"):
         u, v = self.uv(view, p)
         self.art[view].append(
-            f'<text x="{u:.4f}" y="{v:.4f}" font-family="Titillium" font-size="{height / 0.72:.4f}" '
+            f'<text x="{u:.4f}" y="{v:.4f}" font-family="{font}" font-size="{height / 0.72:.4f}" '
             f'letter-spacing="{spacing * height:.4f}" fill="{fill}" text-anchor="middle" dominant-baseline="central" '
             f'transform="rotate({rotate} {u:.4f} {v:.4f})">{s}</text>')
 
@@ -57,7 +57,7 @@ class Livery:
         """An existing brand mark (SVG file), height metres tall, centred on p. ink recolours
         every fill, for a mark that would vanish on the paint. underline: colours of equal
         bars laid side by side under the mark, turning with it; edge outlines them in a colour."""
-        src = Path(svg_path).read_text()
+        src = re.sub(r"<metadata>.*?</metadata>", "", Path(svg_path).read_text(), flags=re.S)  # e.g. a c2pa manifest
         vb = [float(x) for x in re.search(r'viewBox="([^"]+)"', src).group(1).split()]
         inner = re.search(r"<svg[^>]*>(.*)</svg>", src, re.S).group(1)
         if ink:
@@ -73,29 +73,33 @@ class Livery:
                       f'height="{height * 0.13:.4f}" fill="{c}"/>' for i, c in enumerate(underline or []))
             + "</g>")
 
-    def side_mark(self, svg_path, z, y, height, ink=None):
-        for view in ("left", "right"):
+    def side_mark(self, svg_path, z, y, height, ink=None, views=("left", "right")):
+        for view in views:
             self.mark(view, svg_path, self._side(view, z, y), height, ink)
 
 
-    def number(self, view, centre, w, h, ink, rotate=0):
+    def number(self, view, centre, w, h, ink, rotate=0, edge=None):
         """Where the game draws the race number: a box w by h metres, upright in the drawing
-        unless rotated (degrees, clockwise)."""
+        unless rotated (degrees, clockwise). edge colours the digits' outline, for a livery
+        baked with its own outlined digits (digits.js --edge)."""
         u, v = self.uv(view, centre)
-        self.numbers.append({"view": view, "u": round(u, 4), "v": round(v, 4), "w": w, "h": h, "ink": ink, "rotate": rotate})
+        box = {"view": view, "u": round(u, 4), "v": round(v, 4), "w": w, "h": h, "ink": ink, "rotate": rotate}
+        if edge:
+            box["edge"] = edge
+        self.numbers.append(box)
 
     # --- helpers for art that repeats across views ----------------------------------------
     def side_poly(self, zy, fill):
         for view in ("left", "right"):
             self.poly(view, [self._side(view, z, y) for z, y in zy], fill)
 
-    def side_text(self, s, z, y, height, fill, spacing=0.0):
+    def side_text(self, s, z, y, height, fill, spacing=0.0, font="Titillium"):
         for view in ("left", "right"):
-            self.text(view, s, self._side(view, z, y), height, fill, spacing=spacing)
+            self.text(view, s, self._side(view, z, y), height, fill, spacing=spacing, font=font)
 
-    def side_number(self, z, y, w, h, ink):
+    def side_number(self, z, y, w, h, ink, edge=None):
         for view in ("left", "right"):
-            self.number(view, self._side(view, z, y), w, h, ink)
+            self.number(view, self._side(view, z, y), w, h, ink, edge=edge)
 
     def band_x(self, x0, x1, fill, views=("top", "front", "rear"), z=(-9, 9), y=(-9, 9)):
         """A band between two widths, nose to tail over the chosen views."""

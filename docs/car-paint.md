@@ -20,8 +20,9 @@ A team with a livery wears it instead of the class paint. `CarBuilder.Spawn(mode
 
 - A livery is drawn on one model only. Its `livery.json` names that model, and `CarLivery` leaves any other model in the class paint.
 - Each livery lives in `unity/Assets/Art/Liveries/<Team>/` as `atlas.png` and `livery.json`, baked from the team's folder in `tools/liveries/`.
-- The `TarmacGauntlet/Livery` shader (`Raceday/Resources/Livery/`) replaces the `body` material. It projects the five views (left, right, top, front, rear) onto the paint by which way each face points, and draws the team's race number into the livery's number boxes from `Digits.png`.
+- The `TarmacGauntlet/Livery` shader (`Raceday/Resources/Livery/`) replaces the `body` material. It projects the five views (left, right, top, front, rear) onto the paint by which way each face points, and draws the team's race number into the livery's number boxes from `Digits.png`. Side faces turned in towards the middle of the car (vent walls, inner door skins) keep the base colour, so side art never shows on them back to front.
 - The race number is never painted into the art. It changes each season (`BaseTeam.RaceNumber`).
+- A livery can carry its own digits: `digits.js --font <ttf> --edge <outline> --step <spacing>` bakes `Digits.png` and `Digits.json` into the livery's folder. The face takes each number box's `ink` and the outline its `edge`; with `--step` under 1, digits sit closer and overlap. Without them the livery uses the shared digits.
 
 To make a livery:
 

@@ -7,23 +7,26 @@ namespace TarmacGauntlet.Raceday
     public enum EngineMap { Conserve, Normal, Push }
 
     /// <summary>
-    /// What the team asks for at the car's next stop, from live timing. Left alone, the car pits when it
-    /// needs to, fills the tank and changes the tyres. Every stop puts the orders back to that.
+    /// What the team asks for at the car's next stop, from live timing or the pit panel (<see cref="PitPanel"/>).
+    /// Left alone, the car pits when it needs to, and the crew make each call (<see cref="StopPlanner"/>). Every
+    /// stop puts the orders back to that.
     /// </summary>
     public sealed class PitOrders
     {
         /// <summary>True once the team calls the car in: it pits the next time it reaches the pit entry.</summary>
         public bool Requested;
-        /// <summary>Litres to put in, or null to fill the tank.</summary>
-        public float? Litres;
-        /// <summary>False to keep the tyres on.</summary>
-        public bool Tyres = true;
+        /// <summary>Laps of fuel to leave with, or null for the crew's call.</summary>
+        public int? Laps;
+        /// <summary>True for new tyres, false to keep them on, or null for the crew's call.</summary>
+        public bool? Tyres;
+        public RepairMode Repairs;
 
         public void Reset()
         {
             Requested = false;
-            Litres = null;
-            Tyres = true;
+            Laps = null;
+            Tyres = null;
+            Repairs = RepairMode.Crew;
         }
     }
 
@@ -57,6 +60,8 @@ namespace TarmacGauntlet.Raceday
         public IssueEffects Effects = IssueEffects.None;
         /// <summary>What the team asks for at the next stop.</summary>
         public readonly PitOrders Orders = new PitOrders();
+        /// <summary>Plans the player's stops from <see cref="Orders"/>, or null for a car that fills up and changes everything.</summary>
+        public StopPlanner Planner;
         /// <summary>
         /// A career car's power and grip next to a new one of its model: its age and condition wear
         /// them down, and its upgrades lift them. The physics car is the model's, so the tuned lines are shared.
@@ -114,11 +119,16 @@ namespace TarmacGauntlet.Raceday
         private float WearScale => (Map == EngineMap.Push ? 1.3f : Map == EngineMap.Conserve ? 0.7f : 1f) / Mathf.Max((float)Effects.TyreDurability, 0.1f)
             * (1f - 0.35f * RaceWeather.Now.Wet);
 
+        /// <summary>Litres a lap at the limit uses on the engine map in use.</summary>
+        public float LitresPerLap => FuelPerLap * FuelScale;
+        /// <summary>Tyre wear a lap at the limit adds on the engine map in use.</summary>
+        public float WearPerLapNow => WearPerLap * WearScale;
+
         /// <summary>Laps the fuel lasts at the limit on the engine map in use.</summary>
-        public float FuelLaps => Fuel / Mathf.Max(FuelPerLap * FuelScale, 0.01f);
+        public float FuelLaps => Fuel / Mathf.Max(LitresPerLap, 0.01f);
 
         /// <summary>Laps at the limit on the engine map in use before the tyres reach <paramref name="limit"/> worn.</summary>
-        public float TyreLaps(float limit) => Mathf.Max(limit - Wear, 0f) / Mathf.Max(WearPerLap * WearScale, 1e-5f);
+        public float TyreLaps(float limit) => Mathf.Max(limit - Wear, 0f) / Mathf.Max(WearPerLapNow, 1e-5f);
 
         /// <summary>The race maths' mode for the engine map.</summary>
         public InstructionMode Mode => Map == EngineMap.Push ? InstructionMode.Push : Map == EngineMap.Conserve ? InstructionMode.Conserve : InstructionMode.Normal;

@@ -2,7 +2,7 @@
 one toggle per livery and one for the doors. The projection here is the same one the game's
 livery shader does: each paint face takes the view it faces most, blended where views meet.
 
-Run from a team's folder, e.g. python3 ../common/viewer.py <model.obj> <out.html> <title> <name>=<baked dir> ... [--number 8]
+Run from a team's folder, e.g. python3 ../common/viewer.py <model.obj> <out.html> <title> <name>=<baked dir> ... [--number 88]
 """
 import base64
 import gzip
@@ -77,39 +77,46 @@ function liveryMaterial(lv) {
     sh.uniforms.uAtlas = { value: tex };
     sh.uniforms.uBase = { value: new THREE.Color(lv.base).convertSRGBToLinear() };
     // The race number, drawn as the game's shader draws it.
-    const num = String(lv.number || ''), boxes = (lv.numbers || []).slice(0, 4);
-    const dg = DIGITS ? new THREE.TextureLoader().load(DIGITS.png) : null;
+    const boxes = (lv.numbers || []).slice(0, 4);
+    const D = lv.digits || DIGITS || { cell: 0, padX: 0, pad: 0, height: 1, advance: [1], w: 1, h: 1 };
+    const dg = D.png ? new THREE.TextureLoader().load(D.png) : null;
     sh.uniforms.uDigits = { value: dg };
     sh.uniforms.uNumBox = { value: [0, 1, 2, 3].map(i => boxes[i] ? new THREE.Vector4(boxes[i].x / lv.size, boxes[i].y / lv.size, boxes[i].h / lv.size, boxes[i].rotate * Math.PI / 180) : new THREE.Vector4()) };
     sh.uniforms.uNumInk = { value: [0, 1, 2, 3].map(i => new THREE.Color(boxes[i] ? boxes[i].ink : '#fff').convertSRGBToLinear()) };
+    sh.uniforms.uNumEdge = { value: [0, 1, 2, 3].map(i => new THREE.Color(boxes[i] ? boxes[i].edge || boxes[i].ink : '#fff').convertSRGBToLinear()) };
     sh.uniforms.uNumBoxes = { value: boxes.length };
     sh.uniforms.uNumWidth = { value: new THREE.Vector4(...[0, 1, 2, 3].map(i => boxes[i] ? boxes[i].w / lv.size : 0)) };
-    sh.uniforms.uNumDigits = { value: new THREE.Vector4(+num[0] || 0, +num[1] || 0, +num[2] || 0, dg ? num.length : 0) };
-    const D = DIGITS || { cell: 0, padX: 0, pad: 0, height: 1, advance: [1], w: 1, h: 1 };
+    sh.uniforms.uNumDigits = NUM;
     sh.uniforms.uDigitCell = { value: new THREE.Vector4(D.cell, D.padX, D.advance[0] * D.height * D.h / D.w, D.pad) };
-    sh.uniforms.uDigitHeight = { value: D.height }; sh.uniforms.uDigitAdvance = { value: D.advance[0] };
+    sh.uniforms.uDigitHeight = { value: D.height }; sh.uniforms.uDigitAdvance = { value: D.advance[0] }; sh.uniforms.uDigitStep = { value: D.step || D.advance[0] };
     for (const n of ['left', 'right', 'top', 'front', 'rear']) {
       sh.uniforms[`uA_${n}`] = { value: v4(P[n].a) }; sh.uniforms[`uB_${n}`] = { value: v4(P[n].b) };
     }
     sh.vertexShader = 'varying vec3 vLp; varying vec3 vLn;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvLp = position; vLn = normal;');
     sh.fragmentShader = `varying vec3 vLp; varying vec3 vLn; uniform sampler2D uAtlas; uniform vec3 uBase;
 uniform vec4 uA_left, uB_left, uA_right, uB_right, uA_top, uB_top, uA_front, uB_front, uA_rear, uB_rear;
-uniform sampler2D uDigits; uniform vec4 uNumBox[4]; uniform vec3 uNumInk[4]; uniform float uNumBoxes; uniform vec4 uNumDigits; uniform vec4 uNumWidth;
-uniform vec4 uDigitCell; uniform float uDigitHeight, uDigitAdvance;
+uniform sampler2D uDigits; uniform vec4 uNumBox[4]; uniform vec3 uNumInk[4]; uniform vec3 uNumEdge[4]; uniform float uNumBoxes; uniform vec4 uNumDigits; uniform vec4 uNumWidth;
+uniform vec4 uDigitCell; uniform float uDigitHeight, uDigitAdvance, uDigitStep;
 vec3 lvNumber(vec2 q, vec3 art) {
-  float count = uNumDigits.w, width = count * uDigitAdvance;
+  float count = uNumDigits.w, width = (count - 1.0) * uDigitStep + uDigitAdvance;
   for (int i = 0; i < 4; i++) {
     vec4 box = uNumBox[i]; vec2 d = q - box.xy; float s = sin(box.w), c = cos(box.w);
     float h = min(box.z, uNumWidth[i] / max(width, 1e-5));
     vec2 l = vec2(c * d.x + s * d.y, -s * d.x + c * d.y) / max(h, 1e-5);
     float x = l.x + width / 2.0;
-    float k = clamp(floor(x / uDigitAdvance), 0.0, 2.0);
-    float digit = k < 0.5 ? uNumDigits.x : (k < 1.5 ? uNumDigits.y : uNumDigits.z);
-    float gx = clamp((x - k * uDigitAdvance) / uDigitAdvance, 0.0, 1.0);
-    vec2 g = vec2(digit * uDigitCell.x + uDigitCell.y + gx * uDigitCell.z, uDigitCell.w + clamp(l.y + 0.5, 0.0, 1.0) * uDigitHeight);
-    float inside = step(abs(l.y), 0.5) * step(0.0, x) * step(x, width) * step(float(i) + 0.5, uNumBoxes) * step(0.5, count);
+    float on = step(abs(l.y), 0.5) * step(float(i) + 0.5, uNumBoxes);
     vec2 smo = vec2(x / uDigitAdvance * uDigitCell.z, -l.y * uDigitHeight);
-    art = mix(art, uNumInk[i], textureGrad(uDigits, vec2(g.x, 1.0 - g.y), dFdx(smo), dFdy(smo)).a * inside);
+    float gy = uDigitCell.w + clamp(l.y + 0.5, 0.0, 1.0) * uDigitHeight;
+    // Digits sit uDigitStep apart, each laid over the one before where they overlap.
+    for (int k = 0; k < 3; k++) {
+      float digit = k == 0 ? uNumDigits.x : (k == 1 ? uNumDigits.y : uNumDigits.z);
+      float gx = (x - float(k) * uDigitStep) / uDigitAdvance;
+      float inside = on * step(0.0, gx) * step(gx, 1.0) * step(float(k) + 0.5, count);
+      vec2 g = vec2(digit * uDigitCell.x + uDigitCell.y + clamp(gx, 0.0, 1.0) * uDigitCell.z, gy);
+      // Digits are white with any outline black: the face takes the ink, the outline the edge.
+      vec4 t = textureGrad(uDigits, vec2(g.x, 1.0 - g.y), dFdx(smo), dFdy(smo));
+      art = mix(art, mix(uNumEdge[i], uNumInk[i], t.r), t.a * inside);
+    }
   }
   return art;
 }
@@ -117,13 +124,21 @@ vec3 lvTap(vec4 a, vec4 b, vec3 p) { vec2 uv = vec2(dot(a.xyz, p) + a.w, dot(b.x
 vec3 livery(vec3 p, vec3 n) {
   vec3 k = pow(abs(n), vec3(6.0));
   float wSide = k.x, wTop = n.y > 0.0 ? k.y : 0.0, wBot = n.y < 0.0 ? k.y : 0.0, wFront = n.z > 0.0 ? k.z : 0.0, wRear = n.z < 0.0 ? k.z : 0.0;
-  vec3 side = p.x > 0.0 ? lvTap(uA_left, uB_left, p) : lvTap(uA_right, uB_right, p);
+  // Which side by where the face is; faces turned in towards the middle keep the base colour.
+  vec3 side = n.x * p.x < 0.0 ? uBase : (p.x > 0.0 ? lvTap(uA_left, uB_left, p) : lvTap(uA_right, uB_right, p));
   vec3 c = side * wSide + lvTap(uA_top, uB_top, p) * wTop + uBase * wBot + lvTap(uA_front, uB_front, p) * wFront + lvTap(uA_rear, uB_rear, p) * wRear;
   return c / max(wSide + wTop + wBot + wFront + wRear, 1e-4);
 }
 ` + sh.fragmentShader.replace('#include <map_fragment>', 'diffuseColor.rgb = livery(vLp, normalize(vLn));');
   };
   return m;
+}
+// The race number every livery shows, shared so the number toggles reach them all.
+const NUM = { value: new THREE.Vector4() };
+function showNumber(n) {
+  const s = String(n);
+  NUM.value.set(+s[0] || 0, +s[1] || 0, +s[2] || 0, DIGITS ? s.length : 0);
+  numPick.forEach(b => b.setAttribute('aria-pressed', b.textContent === s));
 }
 const liveries = LIVERIES.map(liveryMaterial);
 const bodies = [];
@@ -148,15 +163,33 @@ function wear(i) {
     const mm = names.map(n => n === 'body' ? liveries[i] : (mats[n] || mats.body));
     o.material = mm.length === 1 ? mm[0] : mm;
   }
-  pick.forEach((b, j) => b.setAttribute('aria-pressed', i === j));
+  cur = i;
+  const [a, b] = LIVERIES[i].name.split('/');
+  pick.forEach(([btn, k]) => btn.setAttribute('aria-pressed', k === a || (b !== undefined && k === '/' + b)));
 }
 const bar = document.getElementById('bar');
 const button = (label, fn) => { const b = document.createElement('button'); b.textContent = label; b.onclick = fn; bar.appendChild(b); return b; };
-const pick = LIVERIES.map((lv, i) => button(lv.name, () => wear(i)));
+// A name "Design/Logo" splits into two rows of toggles: one picks the design, one the logo.
+let cur = 0;
+const firsts = [...new Set(LIVERIES.map(lv => lv.name.split('/')[0]))];
+const seconds = [...new Set(LIVERIES.filter(lv => lv.name.includes('/')).map(lv => lv.name.split('/')[1]))];
+const find = (a, b) => Math.max(0, LIVERIES.findIndex(lv => lv.name === (b === undefined ? a : a + '/' + b)));
+const pick = firsts.map(a => [button(a, () => wear(find(a, LIVERIES[cur].name.split('/')[1]))), a]);
+if (seconds.length) {
+  bar.appendChild(Object.assign(document.createElement('span'), { className: 'gap' }));
+  for (const b of seconds) pick.push([button(b, () => wear(find(LIVERIES[cur].name.split('/')[0], b))), '/' + b]);
+}
 bar.appendChild(Object.assign(document.createElement('span'), { className: 'gap' }));
 let goal = 0, t = 0;
 const doorBtn = button('Doors', () => { goal = 1 - goal; doorBtn.setAttribute('aria-pressed', goal === 1); });
 doorBtn.setAttribute('aria-pressed', 'false');
+// One, two and three digits, to check every number fits its box.
+const numPick = [];
+if (DIGITS) {
+  bar.appendChild(Object.assign(document.createElement('span'), { className: 'gap' }));
+  for (const n of [8, 88, 100]) numPick.push(button(String(n), () => showNumber(n)));
+  showNumber(LIVERIES[0].number || 8);
+}
 // doors.json is in Unity axes (X mirrored), so mirror the hinge back and turn the other way.
 function doors(dt) {
   t += Math.sign(goal - t) * Math.min(Math.abs(goal - t), dt / 0.9);
@@ -213,9 +246,22 @@ def _mtl(path):
 DIGITS = Path(__file__).resolve().parents[3] / "unity" / "Assets" / "Raceday" / "Resources" / "Livery"
 
 
+def _digits(folder):
+    """The digits baked in a folder (Digits.png and Digits.json), for the page; None if it has none.
+    A livery folder holding its own digits draws its numbers in them."""
+    folder = Path(folder)
+    if not (folder / "Digits.png").exists():
+        return None
+    from PIL import Image
+    digits = json.loads((folder / "Digits.json").read_text())
+    w, h = Image.open(folder / "Digits.png").size
+    digits.update(w=w, h=h, png="data:image/png;base64," + base64.b64encode((folder / "Digits.png").read_bytes()).decode())
+    return digits
+
+
 def write(obj_path, html_path, title, liveries, number=None):
-    """liveries: [(name, baked dir holding atlas.png and livery.json)]. number: a race number
-    drawn the game's way, for checking the game's atlas."""
+    """liveries: [(name, baked dir holding atlas.png and livery.json)]. Race numbers are drawn
+    the game's way, with toggles for 8, 88 and 100; number is the one shown first."""
     obj_path = Path(obj_path)
     obj = base64.b64encode(gzip.compress(_short(obj_path.read_text()).encode(), 9)).decode()
     doors_path = obj_path.with_suffix(".doors.json")
@@ -226,13 +272,8 @@ def write(obj_path, html_path, title, liveries, number=None):
         meta = json.loads((d / "livery.json").read_text())
         atlas = "data:image/png;base64," + base64.b64encode((d / "atlas.png").read_bytes()).decode()
         lvs.append({"name": name, "atlas": atlas, "base": meta["base"], "panels": meta["panels"],
-                    "size": meta["size"], "numbers": meta["numbers"], "number": number})
-    digits = None
-    if number:
-        from PIL import Image
-        digits = json.loads((DIGITS / "Digits.json").read_text())
-        w, h = Image.open(DIGITS / "Digits.png").size
-        digits.update(w=w, h=h, png="data:image/png;base64," + base64.b64encode((DIGITS / "Digits.png").read_bytes()).decode())
+                    "size": meta["size"], "numbers": meta["numbers"], "number": number, "digits": _digits(d)})
+    digits = _digits(DIGITS)
     html = (PAGE.replace("__TITLE__", title).replace("__OBJ__", obj).replace("__MATS__", json.dumps(_mtl(obj_path.with_suffix(".mtl"))))
             .replace("__DOORS__", json.dumps(doors)).replace("__LIVERIES__", json.dumps(lvs)).replace("__DIGITS__", json.dumps(digits)))
     Path(html_path).write_text(html)
