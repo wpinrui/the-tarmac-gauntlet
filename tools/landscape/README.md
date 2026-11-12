@@ -29,6 +29,20 @@ named in `trees.json`, each in `<folder>/<id>/<id>_1k.gltf`.
 If a tree's size changes, copy its height, radius and middle from `<bake folder>/<name>.json` into
 `LandscapePlan.ModelHeight`, `LandscapePlan.ModelRadius` and `Landscape.CentreAbove`.
 
+## Close trees
+
+The trees nearest the camera are drawn as meshes from the same models: bark cut down with meshoptimizer and the
+leaves as cards showing clusters of the model's own leaves. Each kind's `near` settings in `trees.json` set the cube
+the cards are gathered in; the cards' size is grown or shrunk until they cover what the impostor does.
+
+    node trees3d.js <poly haven folder>
+    node trees3d-view.js <out folder> ../../unity/Assets/Raceday/Resources/Landscape --calibrate
+    node trees3d-view.js <out folder> ../../unity/Assets/Raceday/Resources/Landscape
+
+`trees3d.js` writes `Resources/Landscape/Trees3D`. `--calibrate` lights each tree from several suns and scales its
+colour until it matches its impostor, so the hand-over doesn't show; run it twice after every bake. Without it the
+viewer draws both levels beside the impostor.
+
 ## Cost
 
     bash tools/landscape/check/run.sh --out <plan folder>
@@ -44,4 +58,6 @@ views. `--compare-crop` instead counts the pixels where cutting the quads down c
     bash tools/landscape/check/run.sh --out <plan folder>
     node preview.js <plan folder> <bake folder> <out folder>
 
-Renders each look from the cameras in `shots.json`, in a browser, with the same impostors.
+Renders each look from the cameras in `shots.json`, in a browser, with the same impostors. `--foliage 1` or `2`
+adds the grass and close trees at that setting; `--shots foliage-shots.json` uses cameras close to them. With foliage, each
+shot averages 16 frames of the hand-over dither, as the game's upscaler does.

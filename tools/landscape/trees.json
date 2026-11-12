@@ -1,10 +1,73 @@
 {
-  "oak": { "model": "island_tree_01", "thicken": 1.6 },
-  "beech": { "model": "island_tree_02", "thicken": 1.6 },
-  "birch": { "model": "tree_small_02", "thicken": 1.4 },
-  "pine_a": { "model": "fir_tree_01", "node": 0, "thicken": 1.2 },
-  "pine_b": { "model": "fir_tree_01", "node": 1, "thicken": 1.2 },
-  "spruce_a": { "model": "fir_sapling_medium", "node": 0, "thicken": 1.2 },
-  "spruce_b": { "model": "fir_sapling_medium", "node": 1, "thicken": 1.2 },
-  "bush": { "model": "island_tree_02", "leavesOnly": true, "thicken": 1.9 }
+ "oak": {
+  "model": "island_tree_01",
+  "thicken": 1.6,
+  "near": {
+   "cube": 0.35
+  }
+ },
+ "beech": {
+  "model": "island_tree_02",
+  "thicken": 1.6,
+  "near": {
+   "cube": 0.32
+  }
+ },
+ "birch": {
+  "model": "tree_small_02",
+  "thicken": 1.4,
+  "near": {
+   "cube": 0.32
+  }
+ },
+ "pine_a": {
+  "model": "fir_tree_01",
+  "node": 0,
+  "thicken": 1.2,
+  "near": {
+   "cube": 0.7,
+   "card": 1.35,
+   "keep": 0.3,
+   "tiers": true
+  }
+ },
+ "pine_b": {
+  "model": "fir_tree_01",
+  "node": 1,
+  "thicken": 1.2,
+  "near": {
+   "cube": 0.6,
+   "card": 1.35,
+   "keep": 0.3,
+   "tiers": true
+  }
+ },
+ "spruce_a": {
+  "model": "fir_sapling_medium",
+  "node": 0,
+  "thicken": 1.2,
+  "near": {
+   "cube": 0.55,
+   "card": 1.4,
+   "tiers": true
+  }
+ },
+ "spruce_b": {
+  "model": "fir_sapling_medium",
+  "node": 1,
+  "thicken": 1.2,
+  "near": {
+   "cube": 0.5,
+   "card": 1.4,
+   "tiers": true
+  }
+ },
+ "bush": {
+  "model": "island_tree_02",
+  "leavesOnly": true,
+  "thicken": 1.9,
+  "near": {
+   "cube": 0.3
+  }
+ }
 }

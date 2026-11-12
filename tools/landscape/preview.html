@@ -5,7 +5,9 @@
 // Draws the landscape that tools/landscape/check wrote for a look, with the circuit's ground and road,
 // so looks can be compared without Unity. Unity's frame (x east, y up, z north, left-handed) is
 // mirrored into three.js by z -> -z. Trees are drawn with the same hemi-octahedral impostors as the game.
+// shoot's foliage setting (0 to 2) adds the grass blades and the near 3D trees round the camera (foliage.js).
 import * as THREE from 'three';
+import * as Foliage from './foliage.js';
 
 const KINDS = ['oak', 'beech', 'birch', 'pine_a', 'pine_b', 'spruce_a', 'spruce_b', 'bush'];
 const bin = async u => new Uint8Array(await (await fetch(u)).arrayBuffer());
@@ -21,13 +23,15 @@ function sunDir(hour) {
 }
 
 const vert = `
-  uniform float radius, centreAbove, frames;
+  uniform float radius, centreAbove, frames; uniform vec3 nearAt, nearFade;
   attribute vec4 a; attribute vec4 b; attribute vec3 tint;   // base.xyz, scale; squash, yaw; leaf tint
-  varying vec2 vUv; varying vec3 vR; varying vec3 vU; varying vec3 vD; varying vec3 vTint; varying float vFog;
+  varying vec2 vUv; varying vec3 vR; varying vec3 vU; varying vec3 vD; varying vec3 vTint; varying float vFog; varying float vShare;
   vec3 rotY(vec3 v, float t) { float c = cos(t), s = sin(t); return vec3(c * v.x + s * v.z, v.y, -s * v.x + c * v.z); }
   void main() {
     float scale = a.w, squash = b.x, yaw = b.y;
     vec3 centre = a.xyz + vec3(0.0, centreAbove * scale * squash, 0.0);
+    // Foliage.hlsl's ImpostorShare: none where the near 3D tree stands whole.
+    vShare = nearFade.z == 0.0 ? 1.0 : clamp((distance(centre, nearAt) - nearFade.x) * nearFade.y, 0.0, 1.0);
     vec3 local = rotY(cameraPosition - centre, -yaw);
     local.y = max(local.y, 0.0);
     vec3 d = local / (abs(local.x) + abs(local.y) + abs(local.z));
@@ -37,7 +41,7 @@ const vert = `
     vec3 D = normalize(vec3(px, max(1.0 - abs(px) - abs(pz), 0.0), pz));
     vec3 up = abs(D.y) > 0.999 ? vec3(0.0, 0.0, -1.0) : vec3(0.0, 1.0, 0.0);
     vec3 R = normalize(cross(up, D)), U = cross(D, R);
-    vec3 off = (position.x * R + position.y * U) * radius * scale;
+    vec3 off = (position.x * R + position.y * U) * radius * scale * (vShare > 0.0 ? 1.0 : 0.0);
     off.y *= squash;
     vec3 w = centre + rotY(off, yaw);
     vUv = (f + position.xy * 0.5 + 0.5) / frames;
@@ -49,8 +53,10 @@ const vert = `
   }`;
 const frag = `
   uniform sampler2D colour, normals; uniform vec3 sun, sunColour, sky, ground, fogColour; uniform vec2 fogRange;
-  varying vec2 vUv; varying vec3 vR; varying vec3 vU; varying vec3 vD; varying vec3 vTint; varying float vFog;
+  varying vec2 vUv; varying vec3 vR; varying vec3 vU; varying vec3 vD; varying vec3 vTint; varying float vFog; varying float vShare;
+  ${Foliage.ditherGlsl}
   void main() {
+    if (vShare < 1.0) foliageFade(-vShare);
     vec4 c = texture2D(colour, vUv);
     // Unity keeps the leaves' coverage in the smaller mipmaps; three.js does not, so far trees would
     // thin out here. Raise alpha with the mip level instead.
@@ -129,6 +135,16 @@ window.build = async (look, hour) => {
         gl_FragColor = vec4(pow(mix(lit, fogColour, fog), vec3(1.0 / 2.2)), 1.0);
       }` });
   scene.add(new THREE.Mesh(gg, groundMat));
+  const hf = new Float32Array(nx * nz);
+  for (let z = 0; z < nz; z++) for (let x = 0; x < nx; x++) hf[z * nx + x] = H(x, z);
+  const heightTex = new THREE.DataTexture(hf, nx, nz, THREE.RedFormat, THREE.FloatType);
+  heightTex.needsUpdate = true;
+  const growthTex = new THREE.DataTexture(await bin(`/plan/${look}/growth.bin`), plan.mapX, plan.mapZ, THREE.RedFormat, THREE.UnsignedByteType);
+  growthTex.magFilter = THREE.LinearFilter; growthTex.minFilter = THREE.LinearFilter; growthTex.needsUpdate = true;
+  window.ground = { textures: { fields: { value: fields }, mowing: { value: mowing }, growth: { value: growthTex }, heights: { value: heightTex } },
+    terrain: t, map: groundMat.uniforms.map.value, stripes: window.stripes === false ? 0 : 1,
+    lights: { sun: groundMat.uniforms.sun, sunColour: groundMat.uniforms.sunColour, sky: groundMat.uniforms.sky, groundAmb: groundMat.uniforms.groundAmb,
+      fogColour: groundMat.uniforms.fogColour, fogRange: groundMat.uniforms.fogRange } };
 
   // Road: a ribbon a little above the ground.
   const cen = circuit.centre, w = circuit.width, nC = cen.length / 3;
@@ -167,8 +183,11 @@ window.build = async (look, hour) => {
   // Trees by kind.
   const trees = new Float32Array((await bin(`/plan/${look}/trees.bin`)).buffer);
   const loader = new THREE.TextureLoader();
+  const nearFade = { value: new THREE.Vector3(0, 0, 0) }, nearAt = { value: new THREE.Vector3() };
+  const above = [];
   for (let k = 0; k < KINDS.length; k++) {
     const meta = await json(`/atlas/${KINDS[k]}.json`);
+    above[k] = meta.centreAbove;
     const A = [], B = [], T = [];
     for (let i = 0; i < trees.length; i += 10) {
       if (trees[i + 6] !== k) continue;
@@ -187,25 +206,58 @@ window.build = async (look, hour) => {
     const colour = await loader.loadAsync(`/atlas/${KINDS[k]}_colour.png`), normals = await loader.loadAsync(`/atlas/${KINDS[k]}_normal.jpg`);
     for (const tx of [colour, normals]) { tx.flipY = true; tx.anisotropy = 8; }
     const mat = new THREE.ShaderMaterial({ vertexShader: vert, fragmentShader: frag, side: THREE.DoubleSide, uniforms: {
-      radius: { value: meta.radius }, centreAbove: { value: meta.centreAbove }, frames: { value: meta.frames },
+      radius: { value: meta.radius }, centreAbove: { value: meta.centreAbove }, frames: { value: meta.frames }, nearAt, nearFade, ditherFrame: Foliage.ditherFrame,
       colour: { value: colour }, normals: { value: normals }, sun: { value: L }, sunColour: { value: new THREE.Vector3(sunColour.r, sunColour.g, sunColour.b).multiplyScalar(0.9) },
       sky: { value: new THREE.Vector3(sky.r, sky.g, sky.b).multiplyScalar(0.9) }, ground: { value: new THREE.Vector3(0.12, 0.12, 0.08) },
       fogColour: { value: new THREE.Vector3(fogColour.r, fogColour.g, fogColour.b) }, fogRange: { value: new THREE.Vector2(1400, 7000) } } });
     const mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false; scene.add(mesh);
+    if (!window.treeLights) window.treeLights = { sun: mat.uniforms.sun, sunColour: mat.uniforms.sunColour, sky: mat.uniforms.sky, ground: mat.uniforms.ground,
+      fogColour: mat.uniforms.fogColour, fogRange: mat.uniforms.fogRange };
   }
+  window.trees = { list: trees, above, nearAt, nearFade };
   window.scene = scene; window.circuit = circuit;
   return true;
 };
 
-/** A camera from Unity-frame position and target, field of view in degrees. */
-window.shoot = (p, q, fov, w, h) => {
+/** A camera from Unity-frame position and target, field of view in degrees, and the foliage setting (0 none, 1, 2). */
+window.shoot = async (p, q, fov, w, h, foliage = 0) => {
   const r = window.renderer || (window.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }));
   r.setSize(w, h); r.outputColorSpace = THREE.SRGBColorSpace;
   if (!r.domElement.parentNode) document.body.appendChild(r.domElement);
-  const cam = new THREE.PerspectiveCamera(fov, w / h, 0.5, 9000);
+  const cam = new THREE.PerspectiveCamera(fov, w / h, 0.1, 9000);
   cam.position.set(p[0], p[1], -p[2]); cam.lookAt(q[0], q[1], -q[2]);
-  r.render(window.scene, cam);
-  return r.domElement.toDataURL('image/jpeg', 0.9);
+  if (window.foliage) { window.scene.remove(window.foliage); window.foliage = null; }
+  window.trees.nearFade.value.set(0, 0, 0);
+  if (foliage) {
+    if (!window.trees3d) {
+      const data = Foliage.parseTrees3d(await (await fetch('/trees3d/trees3d.bytes')).arrayBuffer());
+      const bark = await Foliage.textureArray([...Array(data.layers).keys()].map(i => `/trees3d/bark_${String(i).padStart(2, '0')}.jpg`), 512);
+      const leaves = await Foliage.textureArray(KINDS.map(k => `/trees3d/leaves_${k}.png`), 512);
+      leaves.wrapS = leaves.wrapT = THREE.ClampToEdgeWrapping;
+      window.trees3d = { data, bark, leaves };
+    }
+    const f = new THREE.Group();
+    const near = Foliage.nearTrees(window.trees3d.data, window.trees3d.bark, window.trees3d.leaves, window.trees.list, window.trees.above, p, foliage, window.treeLights);
+    f.add(near.group);
+    window.trees.nearFade.value.copy(near.fade);
+    window.trees.nearAt.value.set(p[0], p[1], -p[2]);
+    const g = window.ground;
+    f.add(Foliage.grass(p, cam, foliage, g.textures, g.terrain, g.map, g.stripes, g.lights).group);
+    window.scene.add(f);
+    window.foliage = f;
+  }
+  if (!foliage) { r.render(window.scene, cam); return r.domElement.toDataURL('image/jpeg', 0.9); }
+  // As the game's upscaler shows it: the dither steps on each frame and the frames are averaged.
+  const acc = document.createElement('canvas'); acc.width = w; acc.height = h;
+  const ctx = acc.getContext('2d');
+  for (let i = 0; i < 16; i++) {
+    Foliage.ditherFrame.value = i;
+    r.render(window.scene, cam);
+    ctx.globalAlpha = 1 / (i + 1);
+    ctx.drawImage(r.domElement, 0, 0);
+  }
+  Foliage.ditherFrame.value = 0;
+  return acc.toDataURL('image/jpeg', 0.9);
 };
 window.ready = true;
 </script></body></html>

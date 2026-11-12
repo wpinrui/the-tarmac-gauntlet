@@ -56,6 +56,20 @@ namespace TarmacGauntlet.Raceday
             return new Color(col.r + (m.r - col.r) * 0.6f, col.g + (m.g - col.g) * 0.6f, col.b + (m.b - col.b) * 0.6f);
         }
 
+        /// <summary>How tall the grass grows on the land, m: short where it is mown, longer where it is left, none in the woods.</summary>
+        public static float GrassHeight(LandUse use, bool uncut)
+        {
+            switch (use)
+            {
+                case LandUse.Mown: return uncut ? 0.22f : 0.07f;
+                case LandUse.Meadow: return 0.38f;
+                case LandUse.Pasture: return 0.14f;
+                case LandUse.Hay: return 0.3f;
+                case LandUse.Wheat: return 0.55f;
+                default: return 0f;
+            }
+        }
+
         /// <summary>Leaf tint by kind of tree and hue (<see cref="TreeSpot.Hue"/>), multiplied over the baked colour.</summary>
         public static Color Leaves(TreeKind kind, float hue)
         {

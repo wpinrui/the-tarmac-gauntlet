@@ -14,7 +14,8 @@ namespace TarmacGauntlet.Raceday
     /// </summary>
     public static class Landscape
     {
-        private static readonly string[] Kinds = { "oak", "beech", "birch", "pine_a", "pine_b", "spruce_a", "spruce_b", "bush" };
+        /// <summary>The kinds of tree by <see cref="TreeKind"/>, as their baked files are named.</summary>
+        public static readonly string[] KindNames = { "oak", "beech", "birch", "pine_a", "pine_b", "spruce_a", "spruce_b", "bush" };
         /// <summary>Chunks switch to the far version below this share of the screen's height.</summary>
         private const float FarAt = 0.25f;
 
@@ -23,9 +24,12 @@ namespace TarmacGauntlet.Raceday
         {
             var root = new GameObject("Landscape");
             var plan = new LandscapePlan(circuit, builder.RunoffReach, look, stands);
-            Fields(circuit, plan, materials);
+            Texture2D growth = Fields(circuit, plan, materials);
             Trees(plan, root.transform);
             Hills(circuit, look, root.transform);
+            Foliage foliage = root.AddComponent<Foliage>();
+            foliage.Trees = NearTrees.Load(plan.Trees);
+            if (growth != null) foliage.Grass = Grass.Load(new[] { materials.Terrain, materials.Grass, materials.Verge }, growth);
             return plan.Trees;
         }
 
@@ -36,12 +40,14 @@ namespace TarmacGauntlet.Raceday
         /// (Resources/Landscape/Ground.shader). The grass runoff and verges take the same shader, so the mown grass runs on
         /// unbroken from the road edge out to the fields.
         /// </summary>
-        private static void Fields(Circuit circuit, LandscapePlan plan, CircuitMaterials materials)
+        /// <returns>How tall the grass grows over the same map, for the blades (<see cref="Grass"/>); null without the ground shader.</returns>
+        private static Texture2D Fields(Circuit circuit, LandscapePlan plan, CircuitMaterials materials)
         {
             GroundData g = circuit.Data.terrain;
             float cell = g.spacing / LandscapePlan.MapPerCell;
             var px = new Color32[plan.MapX * plan.MapZ];
             var mowing = new ushort[px.Length * 4];
+            var tall = new byte[px.Length];
             for (int i = 0; i < px.Length; i++)
             {
                 int x = i % plan.MapX, z = i / plan.MapX;
@@ -52,6 +58,7 @@ namespace TarmacGauntlet.Raceday
                 mowing[i * 4 + 1] = Mathf.FloatToHalf(reach);
                 mowing[i * 4 + 2] = Mathf.FloatToHalf(alongX * fresh);
                 mowing[i * 4 + 3] = Mathf.FloatToHalf(alongZ * fresh);
+                tall[i] = (byte)Mathf.RoundToInt(255f * LandscapeLooks.GrassHeight(plan.Map[i], fromRoad > reach));
             }
             var map = new Texture2D(plan.MapX, plan.MapZ, TextureFormat.RGBA32, true)
                 { name = "Fields", wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear, anisoLevel = 4 };
@@ -62,8 +69,13 @@ namespace TarmacGauntlet.Raceday
             mow.SetPixelData(mowing, 0);
             mow.Apply(true, true);
 
+            var growth = new Texture2D(plan.MapX, plan.MapZ, TextureFormat.R8, false, true)
+                { name = "Growth", wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+            growth.SetPixelData(tall, 0);
+            growth.Apply(false, true);
+
             Shader ground = Resources.Load<Shader>("Landscape/Ground");
-            if (ground == null) return;
+            if (ground == null) return null;
             // The map's texel centres sit on the map points, from the ground's origin.
             var rect = new Vector4(g.originX - cell * 0.5f, g.originZ - cell * 0.5f, 1f / (plan.MapX * cell), 1f / (plan.MapZ * cell));
             Texture2D grain = Grain();
@@ -78,6 +90,7 @@ namespace TarmacGauntlet.Raceday
                 m.SetFloat("_Smoothness", 0.05f);
             }
             materials.ShowOptions();
+            return growth;
         }
 
         /// <summary>Grain about mid grey, so it darkens and lightens the field colour evenly.</summary>
@@ -209,7 +222,7 @@ namespace TarmacGauntlet.Raceday
         private static Texture2D Crop()
         {
             int across = Frames * Frames;
-            var bytes = new byte[across * Kinds.Length * 4];
+            var bytes = new byte[across * KindNames.Length * 4];
             TextAsset file = Resources.Load<TextAsset>("Landscape/crop");
             if (file != null && file.bytes.Length == bytes.Length) bytes = file.bytes;
             else
@@ -217,7 +230,7 @@ namespace TarmacGauntlet.Raceday
                 Debug.LogWarning("Landscape: crop.bytes missing or the wrong size, trees drawn on whole frames.");
                 for (int i = 0; i < bytes.Length; i += 4) { bytes[i + 2] = 255; bytes[i + 3] = 255; }
             }
-            var tex = new Texture2D(across, Kinds.Length, TextureFormat.RGBA32, false, true)
+            var tex = new Texture2D(across, KindNames.Length, TextureFormat.RGBA32, false, true)
                 { name = "Tree crop", filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
             tex.SetPixelData(bytes, 0);
             tex.Apply(false, true);
@@ -226,10 +239,10 @@ namespace TarmacGauntlet.Raceday
 
         private static Texture2DArray Layers(string suffix)
         {
-            var layers = new Texture2D[Kinds.Length];
-            for (int i = 0; i < Kinds.Length; i++)
+            var layers = new Texture2D[KindNames.Length];
+            for (int i = 0; i < KindNames.Length; i++)
             {
-                layers[i] = Resources.Load<Texture2D>("Landscape/" + Kinds[i] + suffix);
+                layers[i] = Resources.Load<Texture2D>("Landscape/" + KindNames[i] + suffix);
                 if (layers[i] == null) return null;
             }
             Texture2D first = layers[0];
