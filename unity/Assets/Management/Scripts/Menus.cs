@@ -333,10 +333,19 @@ namespace TarmacGauntlet.Management
         private static readonly float[] RimX = { 233.05f, 333.38f };
         private const float RollDelay = 0.35f, RollSeconds = 1.7f;
 
+        /// <summary>A frame counts for at most this long in the roll, s, so a slow first frame can't skip it.</summary>
+        private const float RollStep = 1 / 30f;
+
+        /// <summary>True once the car has rolled in this run: back on the main menu from a game it stays parked.</summary>
         private static bool rolledIn;
         private VisualElement car;
         private readonly List<VisualElement> rims = new List<VisualElement>();
-        private float rollStart = -1;
+        /// <summary>Seconds the main menu has shown, counted frame by frame; -1 until it shows.</summary>
+        private float rollTime = -1;
+
+        /// <summary>Every play in the editor is a launch, even with domain reload off, which keeps statics.</summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetRoll() => rolledIn = false;
 
         private VisualElement BuildWordmark()
         {
@@ -387,12 +396,13 @@ namespace TarmacGauntlet.Management
         private void RollWordmark()
         {
             if (rolledIn) return;
-            if (rollStart < 0)
+            if (rollTime < 0)
             {
                 if (!shown.Contains(mainColumn)) return;
-                rollStart = Time.unscaledTime + RollDelay;
+                rollTime = 0;
             }
-            float t = Mathf.Clamp01((Time.unscaledTime - rollStart) / RollSeconds);
+            else rollTime += Mathf.Min(Time.unscaledDeltaTime, RollStep);
+            float t = Mathf.Clamp01((rollTime - RollDelay) / RollSeconds);
             PlaceCar(CarStartLeft - (CarStartLeft - CarFinalLeft) * (1 - (1 - t) * (1 - t)));
             if (t >= 1) rolledIn = true;
         }

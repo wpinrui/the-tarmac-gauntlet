@@ -14,12 +14,13 @@ namespace TarmacGauntlet.Management
         private sealed class Pane
         {
             public VisualElement Glass, Blur, Shadow;
+            /// <summary>The blurred scene this pane last showed: each pane catches up on its own, so one hidden while the screen changed size doesn't keep the old one.</summary>
+            public RenderTexture Shown;
         }
 
         private readonly VisualElement root;
         private readonly List<Pane> panes = new List<Pane>();
         private readonly Texture2D sheen = Sheen(), shadow = ShadowTexture();
-        private RenderTexture shownTexture;
 
         public MenuGlass(VisualElement root)
         {
@@ -47,8 +48,6 @@ namespace TarmacGauntlet.Management
         public void Refresh()
         {
             RenderTexture texture = GlassBackdrop.Texture;
-            bool newTexture = texture != shownTexture;
-            shownTexture = texture;
             float width = root.layout.width, height = root.layout.height;
 
             foreach (Pane p in panes)
@@ -70,7 +69,11 @@ namespace TarmacGauntlet.Management
                 }
                 if (!shown) continue;
 
-                if (newTexture) p.Blur.style.backgroundImage = texture != null ? Background.FromRenderTexture(texture) : new StyleBackground(StyleKeyword.None);
+                if (texture != p.Shown)
+                {
+                    p.Shown = texture;
+                    p.Blur.style.backgroundImage = texture != null ? Background.FromRenderTexture(texture) : new StyleBackground(StyleKeyword.None);
+                }
                 Rect world = g.worldBound;
                 p.Blur.style.left = -world.x - g.resolvedStyle.borderLeftWidth;
                 p.Blur.style.top = -world.y - g.resolvedStyle.borderTopWidth;

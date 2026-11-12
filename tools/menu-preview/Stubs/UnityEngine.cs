@@ -88,7 +88,7 @@ namespace UnityEngine
         public RequireComponentAttribute(Type t) { }
     }
 
-    public enum RuntimeInitializeLoadType { AfterSceneLoad, BeforeSceneLoad }
+    public enum RuntimeInitializeLoadType { AfterSceneLoad, BeforeSceneLoad, SubsystemRegistration }
 
     [AttributeUsage(AttributeTargets.Method)]
     public sealed class RuntimeInitializeOnLoadMethodAttribute : Attribute
@@ -207,6 +207,7 @@ namespace UnityEngine
     public static class Time
     {
         public static float unscaledTime => 0;
+        public static float unscaledDeltaTime => 0;
         public static float timeScale { get; set; } = 1;
     }
 
