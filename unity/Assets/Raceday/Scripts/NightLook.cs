@@ -18,8 +18,16 @@ namespace TarmacGauntlet.Raceday
         public const float PoolBrightening = 7f;
         /// <summary>Light a pool adds to the blackest ground at its middle.</summary>
         public const float PoolLift = 0.035f;
-        /// <summary>The same for a headlamp beam.</summary>
-        public const float BeamBrightening = 5f, BeamLift = 0.03f;
+        /// <summary>
+        /// The same for a headlamp beam, though it brightens the ground as the night's own light leaves it, before the
+        /// floodlights' pools: under a pool it shows less, as real headlamps do under floodlights.
+        /// </summary>
+        public const float BeamBrightening = 10f, BeamLift = 0.03f;
+        /// <summary>
+        /// The most light a headlamp beam adds, in linear luminance, eased towards: a brightly lit floor such as the pit
+        /// garage's gains at most this, so it never blows out into bloom.
+        /// </summary>
+        public const float BeamCap = 0.4f;
         /// <summary>A floodlight lens's glow, and a headlamp's.</summary>
         public const float LensGlow = 2f, HeadlampGlow = 2.2f;
         /// <summary>Tail lamps at night, and brake lamps whenever the brakes are on.</summary>

@@ -124,6 +124,36 @@ namespace TarmacGauntlet.Raceday
             beam.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
             beam.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
             beam.enabled = shared.BeamsOn;
+            Hook();
+        }
+
+        /// <summary>
+        /// The beams are cast on the depth the game's cameras draw: a reflection probe draws none, so they are kept out of
+        /// every other camera's view.
+        /// </summary>
+        private static readonly List<Renderer> offForCamera = new List<Renderer>();
+        private static bool hooked;
+
+        private static void Hook()
+        {
+            if (hooked) return;
+            hooked = true;
+            UnityEngine.Rendering.RenderPipelineManager.beginCameraRendering += (context, camera) =>
+            {
+                if (camera == null || camera.cameraType == CameraType.Game) return;
+                foreach (CarLamps c in All)
+                {
+                    if (c.beam == null || c.beam.forceRenderingOff) continue;
+                    c.beam.forceRenderingOff = true;
+                    offForCamera.Add(c.beam);
+                }
+            };
+            UnityEngine.Rendering.RenderPipelineManager.endCameraRendering += (context, camera) =>
+            {
+                foreach (Renderer r in offForCamera)
+                    if (r != null) r.forceRenderingOff = false;
+                offForCamera.Clear();
+            };
         }
 
         /// <summary>True while the car's brake lamps are lit.</summary>
@@ -185,10 +215,16 @@ namespace TarmacGauntlet.Raceday
         private float night;
 
         private static readonly int EmissionId = Shader.PropertyToID("_EmissionColor"), ColorId = Shader.PropertyToID("_Color"),
-            LiftId = Shader.PropertyToID("_Lift");
+            LiftId = Shader.PropertyToID("_Lift"), CapId = Shader.PropertyToID("_Cap"), ShapeId = Shader.PropertyToID("_Shape"),
+            BandId = Shader.PropertyToID("_Band");
 
         /// <summary>The beam reaches from the nose to this far ahead, widening from the first width to the second, m.</summary>
         private const float BeamLength = 24f, BeamNear = 1.8f, BeamFar = 9f;
+        /// <summary>
+        /// The beam lights ground from this far below the car's own ground to this far above it, m: down a crest and up a
+        /// dip ahead, but not the bonnets and roofs of the cars in front.
+        /// </summary>
+        private const float BeamBelow = 3f, BeamAbove = 0.6f;
         /// <summary>How much of its lamps' glow a lens shows, and how see-through a lens is when the model's own is opaque.</summary>
         private const float LensGlow = 0.3f, LensAlpha = 0.25f, LensSmoothness = 0.98f;
 
@@ -198,7 +234,9 @@ namespace TarmacGauntlet.Raceday
             BoxHead = Glowing(Standard("Headlamp", new Color(0.78f, 0.8f, 0.82f), 0.92f));
             BoxTail = Glowing(Standard("Tail lamp", new Color(0.32f, 0.03f, 0.03f), 0.85f));
             BoxBrake = Glowing(Standard("Brake lamp", new Color(0.55f, 0.04f, 0.03f), 0.85f));
-            Beam = FloodMaterials.PoolMaterial("Headlamp beams");
+            Beam = new Material(Resources.Load<Shader>("Night/HeadlampBeam")) { name = "Headlamp beams", enableInstancing = true };
+            Beam.SetVector(ShapeId, new Vector4(BeamLength, BeamNear, BeamFar, 0f));
+            Beam.SetVector(BandId, new Vector4(BeamBelow, BeamAbove, 0f, 0f));
             Vector3 c = CarBuilder.BoxCentre, s = CarBuilder.BoxSize;
             BoxFront = Pair("Headlamps", c.z + s.z * 0.5f + 0.005f, 0.62f, c.y + s.y * 0.2f, 0.42f, 0.16f, 1f);
             BoxRear = Pair("Tail lamps", c.z - s.z * 0.5f - 0.005f, 0.68f, c.y + s.y * 0.25f, 0.36f, 0.14f, -1f);
@@ -249,7 +287,9 @@ namespace TarmacGauntlet.Raceday
             foreach (Material m in tailLenses.Values) m.SetColor(EmissionId, tail * LensGlow);
             Beam.SetVector(ColorId, FloodMaterials.Brightening(headTint, NightLook.BeamBrightening * amount));
             Beam.SetVector(LiftId, FloodMaterials.Lift(headTint, NightLook.BeamLift * amount));
+            Beam.SetFloat(CapId, NightLook.BeamCap * amount);
             BeamsOn = amount > 0.02f;
+            HeatHazeFeature.HeadlampBeams = BeamsOn;
         }
 
         public Color HeadTint => headTint;
@@ -292,28 +332,14 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>
-        /// The beam on the road: a widening strip from the nose forward, just above the road, its UVs running -1 to 1
-        /// across and along it, with the bright middle drawn back towards the car.
+        /// The box the beam is cast in (Night/HeadlampBeam): from the nose forward, as wide as the beam's far end and as
+        /// deep as the ground it may light. The shader shapes the beam inside it.
         /// </summary>
         private static Mesh BeamShape()
         {
-            const int along = 8, across = 4;
-            var rows = new List<Vector3[]>();
-            for (int r = 0; r <= along; r++)
-            {
-                float t = (float)r / along;
-                float z = BeamLength * t, half = Mathf.Lerp(BeamNear, BeamFar, t) * 0.5f;
-                var row = new Vector3[across + 1];
-                for (int c = 0; c <= across; c++) row[c] = new Vector3(-half + 2f * half * c / across, 0.05f, z);
-                rows.Add(row);
-            }
             var kit = new MeshKit();
-            kit.Strip(rows, 1f, 1f, false, null, p =>
-            {
-                float t = p.z / BeamLength;
-                float half = Mathf.Lerp(BeamNear, BeamFar, t) * 0.5f;
-                return new Vector2(p.x / half, Mathf.Pow(t, 0.7f) * 2f - 1f);
-            });
+            var size = new Vector3(BeamFar + 0.5f, BeamBelow + BeamAbove, BeamLength);
+            kit.Box(new Vector3(0f, (BeamAbove - BeamBelow) * 0.5f, BeamLength * 0.5f), Vector3.right, Vector3.forward, size);
             return kit.ToMesh("Headlamp beam");
         }
     }
