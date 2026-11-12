@@ -35,6 +35,18 @@ namespace TarmacGauntlet.Visuals
         /// <summary>The cars reflect the scene round them, refreshed every few frames. Changes live.</summary>
         public static readonly GraphicsOption CarReflections = Toggle("settings.carreflections", "Car reflections", true);
 
+        /// <summary>The filmic tone curve and the colour grade that follows the time of day and the weather.</summary>
+        public static readonly GraphicsOption ColourGrading = Toggle("settings.grading", "Colour grading", true);
+
+        /// <summary>A glow round the brightest lights, drawn at half resolution.</summary>
+        public static readonly GraphicsOption Bloom = Toggle("settings.bloom", "Bloom", true);
+
+        /// <summary>Soft shadow in creases and where things meet the ground, worked out on the screen at half resolution.</summary>
+        public static readonly GraphicsOption AmbientOcclusion = Toggle("settings.ssao", "Ambient occlusion", true);
+
+        /// <summary>A blur along the camera's own movement.</summary>
+        public static readonly GraphicsOption MotionBlur = Toggle("settings.motionblur", "Motion blur", true);
+
         /// <summary>An option that is on or off.</summary>
         private static GraphicsOption Toggle(string key, string label, bool on) => Add(new GraphicsOption(key, label, on ? 1 : 0, 1));
 
