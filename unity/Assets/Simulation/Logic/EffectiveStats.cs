@@ -6,19 +6,19 @@ namespace TarmacGauntlet.Simulation
     /// <summary>Port of simulation/effectiveStats.ts.</summary>
     public static class EffectiveStats
     {
-        // Age wears stats gradually: 0.4% per year, capped at 10% (reached at age 25).
-        private const double AgePenaltyPerYear = 0.004;
-        private const double MaxAgePenalty = 0.1;
+        // Age wears stats gradually: 0.6% per year, capped at 15% (reached at age 25).
+        private const double AgePenaltyPerYear = 0.006;
+        private const double MaxAgePenalty = 0.15;
 
-        // Condition wears stats linearly: a car at 0% condition loses 20%, one at 30% loses 14%.
-        private const double MaxConditionPenalty = 0.2;
+        // Condition wears stats linearly: a car at 0% condition loses 30%, one at 30% loses 21%.
+        private const double MaxConditionPenalty = 0.3;
 
         /// <summary>
         /// Returns the effective stats for a car at a given age and condition.
         ///
         /// Calculation chain (per stat):
         ///   1. Start with base value; use potential if the relevant upgrade pack is installed.
-        ///   2. Subtract the age penalty and the condition penalty from 1. Together they take at most 30%,
+        ///   2. Subtract the age penalty and the condition penalty from 1. Together they take at most 45%,
         ///      so an old wreck is clearly slower but can still race.
         ///   3. Multiply each stat by that.
         ///
