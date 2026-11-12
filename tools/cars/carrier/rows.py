@@ -137,18 +137,15 @@ DLO = [(-0.83, belt(-0.83)), (-0.76, 0.262), (-0.50, 0.483), (-0.30, 0.653), (-0
 B_PILLAR = (0.30, 0.37)          # its black, front and rear edge
 DIVIDER = [(0.835, 0.745), (0.89, belt(0.89))]    # the rear door's slanted frame, centre line, 0.03 wide
 
-# Shut lines (side render).
-FRONT_DOOR = [(-0.862, 0.29), (-0.866, 0.278), (-0.904, 0.122), (-0.918, -0.138), (-0.892, -0.294),
-              (-0.846, -0.415)]
-DOOR_BOTTOM = -0.415
-REAR_DOOR = [(0.96, 0.75), (1.20, 0.55), (1.45, 0.355), (1.404, 0.174), (1.352, 0.044),
-             (1.28, -0.035), (1.209, -0.067), (1.092, -0.067), (1.0, -0.19), (0.936, -0.385),
-             (0.80, -0.392)]
-REAR_DOOR_BOTTOM = -0.392
-B_SHUT = [(0.335, 0.745), (0.335, 0.30), (0.30, 0.12), (0.28, -0.06), (0.30, -0.392)]
-
+# Shut lines (side render), kept to straight runs and one arc round the rear arch.
+DOOR_BOTTOM = -0.40                                   # both doors' bottom edge, one straight line
+FRONT_DOOR = [(-0.83, 0.218), (-0.87, DOOR_BOTTOM)]  # front edge: from the window's corner, straight down
+B_SHUT = 0.335                                        # straight down the middle of the B-pillar's black
+REAR_DOOR = [(0.94, 0.742), (1.42, 0.37), (1.42, 0.10)]   # down the C-pillar, then straight down
+REAR_ARCH_GAP = 0.06                                  # then round the rear arch this far out from it
+SHUT_ROUND = 0.05                                     # every corner rounded this much
 # Windscreen (top render: Y, half width): foot and head, both straight across.
-SCREEN = {"y_base": -0.93, "y_top": -0.22, "w_base": 0.705, "w_top": 0.53}
+SCREEN = {"y_base": -0.93, "y_top": -0.30, "w_base": 0.705, "w_top": 0.485}   # inside the pillars
 # Rear glass (top render): head and foot.
 REAR_GLASS = {"y_top": 1.10, "y_base": 1.70, "w_top": 0.50, "w_base": 0.66}
 
@@ -157,14 +154,14 @@ HEAD = [(0.425, 0.072), (0.755, 0.072), (0.785, -0.082), (0.415, -0.082)]
 GRILLE = {"w": 0.41, "z0": -0.082, "z1": -0.012, "slats": [-0.03, -0.048, -0.066]}
 FRONT_STRIP = {"z0": -0.14, "z1": -0.085, "y_end": -1.85}      # black rubbing strip, round to the arch
 INTAKE = {"w": 0.47, "z0": -0.40, "z1": -0.305, "slats": [-0.338, -0.37]}
-BONNET = [(-0.93, 0.62), (-0.945, 0.735), (-0.99, 0.785), (-1.2, 0.786), (-2.08, 0.784),
-          (-2.15, 0.768), (-2.175, 0.70), (-2.185, 0.40), (-2.19, 0.0)]     # plan, left half, cowl to nose
+BONNET = {"y_rear": -0.91, "y_front": -2.185, "w": 0.785, "r": 0.05}   # plan: a plain rounded rectangle,
+                                                                      # its back edge under the windscreen
 
 # ---------------------------------------------------------------- rear (rear render, left half)
 TAIL = [(0.32, 0.20), (0.81, 0.20), (0.855, 0.047), (0.32, 0.047)]
 TAIL_SIDE = 0.15        # the lamp runs this far forward round the corner onto the side
 LID = {"w": 0.675, "z0": 0.205, "y_glass": 1.70}     # boot lid: half width, foot on the rear face
-BUMPER_TOP = [(1.64, -0.073), (2.25, -0.04), (2.27, 0.005), (2.45, 0.0)]  # side, then across the back at z 0
+BUMPER_TOP = {"z": 0.0, "y_side": 1.64}     # straight across the back, and straight along the side
 VALANCE = {"w": 0.82, "z0": -0.39, "z1": -0.32}
 EXHAUST = {"w": -0.48, "z": -0.36, "r": 0.03}       # on the car's right
 
@@ -183,8 +180,9 @@ data = {
     "front_door": side(FRONT_DOOR),
     "door_bottom": Z(DOOR_BOTTOM),
     "rear_door": side(REAR_DOOR),
-    "rear_door_bottom": Z(REAR_DOOR_BOTTOM),
-    "b_shut": side(B_SHUT),
+    "rear_arch_r": round(float(np.hypot(*(np.array(REAR_DOOR[-1]) - [Y_REAR, Z_WHEEL])) * S), 4),
+    "b_shut": X(B_SHUT),
+    "shut_round": H(SHUT_ROUND),
     "screen": {"x_base": X(SCREEN["y_base"]), "x_top": X(SCREEN["y_top"]), "w_base": H(SCREEN["w_base"]),
                "w_top": H(SCREEN["w_top"])},
     "rear_glass": {"x_top": X(REAR_GLASS["y_top"]), "x_base": X(REAR_GLASS["y_base"]),
@@ -195,16 +193,16 @@ data = {
     "front_strip": {"z0": Z(FRONT_STRIP["z0"]), "z1": Z(FRONT_STRIP["z1"]), "x_end": X(FRONT_STRIP["y_end"])},
     "intake": {"w": H(INTAKE["w"]), "z0": Z(INTAKE["z0"]), "z1": Z(INTAKE["z1"]),
                "slats": [Z(z) for z in INTAKE["slats"]]},
-    "bonnet": plan(BONNET),
+    "bonnet": {"x_rear": X(BONNET["y_rear"]), "x_front": X(BONNET["y_front"]), "w": H(BONNET["w"]), "r": H(BONNET["r"])},
     "tail": end(TAIL),
     "tail_side": H(TAIL_SIDE),
     "lid": {"w": H(LID["w"]), "z0": Z(LID["z0"]), "x_glass": X(LID["y_glass"])},
-    "bumper_top": side(BUMPER_TOP),
+    "bumper_top": {"z": Z(BUMPER_TOP["z"]), "x_side": X(BUMPER_TOP["y_side"])},
     "valance": {"w": H(VALANCE["w"]), "z0": Z(VALANCE["z0"]), "z1": Z(VALANCE["z1"])},
     "exhaust": {"y": H(EXHAUST["w"]), "z": Z(EXHAUST["z"]), "r": H(EXHAUST["r"])},
     "mirror": {"x_back": X(MIRROR["y1"]), "x_front": X(MIRROR["y0"]), "y_in": H(MIRROR["w0"]),
                "y_out": H(MIRROR["w1"]), "z0": Z(MIRROR["z0"]), "z1": Z(MIRROR["z1"])},
-    "picks": {"frontbadge": 1, "rearbadge": 1, "name": 1},
+    "picks": {"frontbadge": 2, "rearbadge": 4, "name": 1},
 }
 # belt line z = k x + c in build space
 _bx = np.array([X(y) for y in (-0.8, 1.2)]); _bz = np.array([Z(belt(y)) for y in (-0.8, 1.2)])

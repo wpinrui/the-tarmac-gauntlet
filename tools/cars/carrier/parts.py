@@ -178,7 +178,7 @@ def headlamps(ref, cutters, out):
             cell = soft(cell.buffer(-0.012, join_style=2), 0.01)
             out += blend.lay(ref, f"head_reflector_{side}{i}", cell.buffer(0.006).difference(cell), fr, -0.024, -0.02,
                              "reflector", 0.004, along_ray=True)
-            out += blend.lay(ref, f"lamp_head_{side}{i}", cell, fr, -0.024, -0.02, "lamp_head", 0.006, along_ray=True)
+            out += blend.lay(ref, f"lamp_head_{side}{i}", cell.buffer(-0.0015), fr, -0.0235, -0.0205, "lamp_head", 0.006, along_ray=True)
         out += blend.lay(ref, f"head_glass_{side}", shp.buffer(-0.002), fr, -0.0055, -0.0025, "head_glass", 0.01, along_ray=True)
 
 
@@ -227,7 +227,7 @@ def front_parts(ref, cutters, out):
     for sgn, side in ((1, "l"), (-1, "r")):
         wr = front_wrap(sgn)
         u1 = wr.side_u(s["x_end"])
-        band = soft(box(-0.004, s["z0"], u1, s["z1"]), 0.006)
+        band = soft(box(-0.02, s["z0"], u1, s["z1"]), 0.006).intersection(box(0, -5, 5, 5))
         out += blend.lay(ref, f"front_strip_{side}", band, wr, -0.001, 0.007, "trim", 0.01, along_ray=True)
 
 
@@ -310,37 +310,54 @@ def _b_mid():
     return float(np.mean(R["b_pillar"]))
 
 
+def fillet(pts, r, n=8):
+    """A polyline with each corner replaced by a circular arc of radius r."""
+    p = [np.asarray(q, float) for q in pts]
+    out = [p[0]]
+    for a, b, c in zip(p[:-2], p[1:-1], p[2:]):
+        u, v = (a - b) / np.linalg.norm(a - b), (c - b) / np.linalg.norm(c - b)
+        ang = np.arccos(np.clip(u @ v, -1, 1))
+        if ang > np.pi - 1e-3:
+            out.append(b); continue
+        d = min(r / np.tan(ang / 2), 0.45 * np.linalg.norm(a - b), 0.45 * np.linalg.norm(c - b))
+        p0, p1 = b + u * d, b + v * d
+        for t in np.linspace(0, 1, n):       # a quadratic through the corner, close to the arc
+            out.append((1 - t) ** 2 * p0 + 2 * (1 - t) * t * b + t * t * p1)
+    out.append(p[-1])
+    return [q.tolist() for q in out]
+
+
 def b_path():
-    """The shut line between the doors: down the middle of the B-pillar's black, then the traced line."""
-    p = np.array(R["b_shut"], float)
-    p[0, 0] = p[1, 0] = _b_mid()
-    p[0, 1] = belt(_b_mid()) + 0.03
-    return [p[0].tolist()] + geom.catmull_open(p[1:], 8).tolist()
+    """The shut line between the doors: straight down the middle of the B-pillar's black."""
+    x = R["b_shut"]
+    return [[x, belt(x) + 0.03], [x, R["door_bottom"]]]
 
 
 def front_path():
-    """The front door's front edge from just above the belt, then its bottom back to the B line."""
-    p = np.array(R["front_door"], float)
-    p[0, 1] = max(p[0, 1], belt(p[0, 0]) + 0.03)
-    edge = geom.catmull_open(p, 8)
-    bz = R["door_bottom"]
-    xb = float(np.array(b_path())[-1][0])
-    return edge.tolist() + [[xb, bz]]
+    """The front door's front edge, straight down from the window's corner, then its bottom
+    straight back to the B line."""
+    (x0, z0), (x1, z1) = R["front_door"]
+    return fillet([[x0, z0], [x1, z1], [R["b_shut"], z1]], R["shut_round"])
 
 
 def rear_path():
-    """The rear door's rear edge, from the window frame at the roof down the C-pillar, round the
-    arch, then its bottom forward to the B line."""
-    p = np.array(R["rear_door"], float)
-    edge = geom.catmull_open(p, 8)
-    xb = float(np.array(b_path())[-1][0])
-    return edge.tolist() + [[xb, R["rear_door_bottom"]]]
+    """The rear door's rear edge: straight down the C-pillar, straight down to the arch, round
+    the arch on one circle, then its bottom straight forward to the B line."""
+    pts = [list(p) for p in R["rear_door"]]
+    xc, zc, r = W["rear_x"], W["r"], R["rear_arch_r"]
+    zb = R["door_bottom"]
+    a0 = np.arctan2(pts[-1][1] - zc, pts[-1][0] - xc)
+    a1 = -np.arcsin((zc - zb) / r)        # round the front of the arch, down to the bottom line
+    arc = [[xc + r * np.cos(a), zc + r * np.sin(a)] for a in np.linspace(a0, a1, 24)]
+    line = fillet(pts + [arc[1]], R["shut_round"])[:-1]
+    tail = fillet([arc[-2], arc[-1], [R["b_shut"], zb]], R["shut_round"])
+    return line + arc[1:-1] + tail
 
 
 def bonnet_loop():
-    half = np.array(R["bonnet"], float)
-    pts = [tuple(p) for p in half] + [(x, -y) for x, y in half[-2::-1]]
-    return geom.catmull_closed(pts, 6)
+    b = R["bonnet"]
+    g = soft(box(b["x_front"], -b["w"], b["x_rear"], b["w"]), b["r"])
+    return np.array(g.exterior.coords)[:-1]
 
 
 class LidWrap:
@@ -386,11 +403,10 @@ def lid_loop():
 
 
 def bumper_path(wr):
-    """The rear bumper's top edge in the rear wrap's (u, z): across the back, then forward along the side."""
-    pts = np.array(R["bumper_top"], float)
-    zb = pts[-1, 1]
-    side = [(wr.side_u(x), z) for x, z in pts[::-1] if wr.side_u(x) > wr.u1]
-    return [(-0.01, zb), (wr.u1 - 0.02, zb)] + side
+    """The rear bumper's top edge in the rear wrap's (u, z): straight across the back, round the
+    corner and straight forward along the side, at one height."""
+    b = R["bumper_top"]
+    return [(-0.01, b["z"]), (wr.side_u(b["x_side"]), b["z"])]
 
 
 def grooves(ref):
@@ -402,8 +418,7 @@ def grooves(ref):
         obs.append(blend.groove(ref, f"g_bdoor_{side}", b_path(), fr))
         obs.append(blend.groove(ref, f"g_rdoor_{side}", rear_path(), fr))
         wr = rear_wrap(sgn)
-        path = sorted(bumper_path(wr), key=lambda p: p[0])
-        obs.append(blend.groove(ref, f"g_bumper_{side}", path, wr))
+        obs.append(blend.groove(ref, f"g_bumper_{side}", bumper_path(wr), wr))
     obs.append(blend.groove(ref, "g_bonnet", bonnet_loop(), top_fr(), closed=True))
     fr, lid = lid_loop()
     obs.append(blend.groove(ref, "g_lid", lid, fr, closed=True))
@@ -589,8 +604,8 @@ def interior():
     for sgn, side in ((1, "l"), (-1, "r")):
         clip = lambda x, s=sgn: (box(0.3, FLOOR + 0.08, 1.2, belt(x) - 0.02) if s > 0 else box(-1.2, FLOOR + 0.08, -0.3, belt(x) - 0.02)).intersection(
             body.inside(x, 0.035 + 0.003)).difference(body.inside(x, 0.035 + 0.022))
-        obs.append(_loft(f"door_card_{side}", bc + 0.006, R["front_door"][2][0] - 0.03, clip, n=10))
-        obs.append(_loft(f"door_card_{side}_rear", R["rear_door"][-2][0] + 0.03, bc - 0.006, clip, n=8))
+        obs.append(_loft(f"door_card_{side}", bc + 0.006, R["front_door"][1][0] - 0.04, clip, n=10))
+        obs.append(_loft(f"door_card_{side}_rear", W["rear_x"] + R["rear_arch_r"] + 0.03, bc - 0.006, clip, n=8))
         yc = 0.33 * sgn
         obs.append(_rbox(f"seat_base_{side}", -0.32, 0.18, yc - 0.23, yc + 0.23, FLOOR + 0.002, FLOOR + 0.22))
         obs.append(_rbox(f"seat_back_{side}", -0.46, -0.34, yc - 0.22, yc + 0.22, FLOOR + 0.221, FLOOR + 0.72, lean=0.22))
@@ -707,7 +722,7 @@ def badge_colour():
     for i, (g, fill) in enumerate(layers):
         above = unary_union([h for h, _f in layers[i + 1:]]) if i + 1 < len(layers) else None
         if above is not None:
-            g = g.difference(above.buffer(0.4))
+            g = g.difference(above.buffer(1.0))
         out.append((g, FILLS[fill]))
     whole = layers[0][0]
     shapes = _fit([g for g, _m in out] + [whole], whole)
