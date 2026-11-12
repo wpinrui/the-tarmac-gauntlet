@@ -182,6 +182,19 @@ into `Resources/Props` as `<id>.json`, `<id>_mesh.bytes` and its textures; `HqGe
 `tools/team-hq/props/props.json` holds each model's height, pose and simplification, and `props.txt` the list.
 `make_textures.py` turns Poly Haven photo textures into the building's surfaces in `Resources/Textures`.
 
+The room's light is baked (`HqLightingView.cs`). `bash tools/team-hq/bake/run.sh` (needs the .NET 8 SDK and Blender as a
+Python module, `pip install bpy`) bakes it with Cycles into `Resources/Lighting`: a lightmap holding the lamps, the daylight
+through the windows and every bounce, one reflection probe image per room (garage, office, trophy room), and the ambient
+light for whatever moves. The sun stays live for the cars' and crew's shadows, so only its bounce is baked. The lightmap
+layout is `HqLightmapLayout.cs`, run by both the bake and the game, and the lights and probes are in `HqLighting.cs`.
+Rebake after changing the building's lit parts, the props' places or the lights: until then the game lights the room
+live and logs that the bake is out of date. The Baked lighting and Baked reflections graphics options switch back to
+live lamps and one live probe.
+
+Wear (oil under the cars, tyre marks from the doors, grime along the walls, worn patches, scuffed paint) is quads laid
+just off the floor and walls in `HqGeometry.AddWear`, drawn by `Resources/Wear/Grime.shader`, which multiplies the
+surface under it. `tools/team-hq/props/make_wear.py` draws the textures. The Wear graphics option hides it.
+
 ## Menus and saving
 
 The management menus sit over the Team HQ scene (`Assets/Management`, approved in the viewer

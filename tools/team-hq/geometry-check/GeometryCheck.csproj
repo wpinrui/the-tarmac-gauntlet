@@ -10,7 +10,10 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Check.cs" />
+    <Compile Include="BakeScene.cs" />
     <Compile Include="../../circuit/geometry-check/UnityStubs.cs" />
     <Compile Include="../../../unity/Assets/TeamHq/Scripts/HqGeometry.cs" />
+    <Compile Include="../../../unity/Assets/TeamHq/Scripts/HqLightmapLayout.cs" />
+    <Compile Include="../../../unity/Assets/TeamHq/Scripts/HqLighting.cs" />
   </ItemGroup>
 </Project>

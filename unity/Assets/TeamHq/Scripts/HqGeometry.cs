@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace TarmacGauntlet.TeamHq
@@ -10,6 +11,18 @@ namespace TarmacGauntlet.TeamHq
         public readonly List<Vector3> Normals = new List<Vector3>();
         public readonly List<Vector2> Uvs = new List<Vector2>();
         public readonly List<int> Triangles = new List<int>();
+        /// <summary>Lightmap coordinates, one per vertex, laid out by <see cref="HqLightmapLayout"/>; empty for parts the lightmap skips.</summary>
+        public readonly List<Vector2> Uv2s = new List<Vector2>();
+        /// <summary>Each flat piece's own coordinates in metres, so the lightmap can lay the pieces out.</summary>
+        internal readonly List<Vector2> ChartUvs = new List<Vector2>();
+        internal readonly List<HqChart> Charts = new List<HqChart>();
+    }
+
+    /// <summary>One flat piece of a part: its vertices from First, and its size in metres.</summary>
+    internal struct HqChart
+    {
+        public int First, Count;
+        public float W, H;
     }
 
     /// <summary>A light in the building: point lights hang under the lamps, spots light the trophy cases.</summary>
@@ -47,6 +60,8 @@ namespace TarmacGauntlet.TeamHq
     public sealed class HqGeometry
     {
         public readonly Dictionary<string, HqPart> Parts = new Dictionary<string, HqPart>();
+        /// <summary>Oil, tyre marks and grime laid over the floor and walls, keyed "wear_" and the texture in Resources/Wear.</summary>
+        public readonly Dictionary<string, HqPart> Wear = new Dictionary<string, HqPart>();
         public readonly List<HqLight> Lights = new List<HqLight>();
         public readonly List<HqBay> Bays = new List<HqBay>();
         public readonly List<HqProp> Props = new List<HqProp>();
@@ -83,8 +98,13 @@ namespace TarmacGauntlet.TeamHq
             Garage();
             Office();
             TrophyRoom();
+            AddWear();
             MirrorIntoUnity();
+            Lightmap = new HqLightmapLayout(Parts);
         }
+
+        /// <summary>Where every lit surface sits in the baked lightmap.</summary>
+        public readonly HqLightmapLayout Lightmap;
 
         private void Shell()
         {
@@ -355,6 +375,62 @@ namespace TarmacGauntlet.TeamHq
             Lights.Add(new HqLight { Position = V(-10, f + 2.2f, -6.2f), Range = 3.5f, Intensity = 0.7f, Warm = true });
         }
 
+        /// <summary>
+        /// Years of work on the floor and walls: oil under the cars, tyre marks from the doors, grime against the walls,
+        /// worn patches where people stand, and scuffs above the dado. Each lies just off its surface and is drawn
+        /// multiplied over it.
+        /// </summary>
+        private void AddWear()
+        {
+            const float lift = 0.006f;
+            var rng = new System.Random(11);
+            float Rand(float a, float b) => a + (float)rng.NextDouble() * (b - a);
+            Rot Flat(float yaw) => Rot.Y(yaw) * Rot.X(-90);
+
+            foreach (float b in BayX)
+            {
+                // Under the engine, and a smaller drip further back.
+                Decal("wear_oil1", Rand(1.2f, 1.6f), Rand(0.9f, 1.2f), V(b + Rand(-0.25f, 0.25f), lift, CarZ + Rand(1.0f, 1.5f)), Flat(Rand(0, 360)), 0);
+                Decal("wear_oil2", Rand(0.6f, 0.9f), Rand(0.5f, 0.7f), V(b + Rand(-0.4f, 0.4f), lift, CarZ - Rand(0.6f, 1.2f)), Flat(Rand(0, 360)), 0);
+                // Each wheel's track in from the doors.
+                foreach (float side in new[] { -0.78f, 0.78f })
+                    Decal("wear_tyre", 0.34f, Z1 - CarZ + 1.6f, V(b + side + Rand(-0.05f, 0.05f), lift, (Z1 + CarZ - 1.6f) / 2), Flat(180), 0);
+                // Where the crew stand at the tool chest, and the threshold of the door.
+                Decal("wear_patch", 1.8f, 1.4f, V(b - 1.0f, lift, Z0 + 1.2f), Flat(Rand(0, 360)), 0);
+                Decal("wear_patch", 3.2f, 1.4f, V(b, lift, Z1 - 1.0f), Flat(Rand(-4, 4)), 0);
+            }
+            // In front of the workbench, round the compressor and at the foot of the stairs.
+            Decal("wear_patch", 2.2f, 4.2f, V(X0 + 1.5f, lift, 1.5f), Flat(0), 0);
+            Decal("wear_patch", 2.4f, 2.4f, V(10.8f, lift, -3.6f), Flat(40), 0);
+            Decal("wear_patch", 2f, 1.6f, V(11.4f, lift, 4.9f), Flat(0), 0);
+
+            // Grime swept against the foot of every wall.
+            const float reach = 0.7f;
+            Decal("wear_edge", W, reach, V(0, lift, Z0 + reach / 2), Flat(0), 2.5f);
+            Decal("wear_edge", W, reach, V(0, lift, Z1 - reach / 2), Flat(180), 2.5f);
+            Decal("wear_edge", D, reach, V(X0 + reach / 2, lift, 0), Flat(90), 2.5f);
+            Decal("wear_edge", D, reach, V(X1 - reach / 2, lift, 0), Flat(-90), 2.5f);
+
+            // Scuffed paint above the dado on the garage's back and end walls.
+            const float scuff = 1.4f;
+            Decal("wear_wall", W, scuff, V(0, DadoH + scuff / 2, Z0 + lift), Rot.Y(0), 3);
+            Decal("wear_wall", D, scuff, V(X0 + lift, DadoH + scuff / 2, 0), Rot.Y(90), 3);
+            Decal("wear_wall", D, scuff, V(X1 - lift, DadoH + scuff / 2, 0), Rot.Y(-90), 3);
+
+            // Office carpet worn under the desk chairs.
+            Decal("wear_patch", 1.3f, 1.1f, V(-3, MZ + 0.011f, -5.1f), Flat(0), 0);
+            Decal("wear_patch", 1.4f, 1.1f, V(5, MZ + 0.011f, -5.6f), Flat(180), 0);
+        }
+
+        /// <summary>A wear quad: its texture stretched once, or repeated every <paramref name="repeat"/> metres along its width.</summary>
+        private void Decal(string key, float w, float h, Vector3 c, Rot r, float repeat)
+        {
+            Plane(key, w, h, c, r, 0);
+            List<Vector2> uvs = Part(key).Uvs;
+            float u = repeat > 0 ? w / repeat : 1;
+            for (int i = uvs.Count - 4; i < uvs.Count; i++) uvs[i] = new Vector2(uvs[i].x * u, uvs[i].y);
+        }
+
         /// <summary>A glass case with thin dark metal edges.</summary>
         private void GlassBox(float w, float h, float d, Vector3 c)
         {
@@ -383,9 +459,12 @@ namespace TarmacGauntlet.TeamHq
 
         private HqPart Part(string key)
         {
-            if (!Parts.TryGetValue(key, out HqPart p)) Parts[key] = p = new HqPart();
+            Dictionary<string, HqPart> into = key.StartsWith(WearKey) ? Wear : Parts;
+            if (!into.TryGetValue(key, out HqPart p)) into[key] = p = new HqPart();
             return p;
         }
+
+        public const string WearKey = "wear_";
 
         private void Prop(string id, float x, float y, float z, float yaw = 0, float scale = 1) =>
             Props.Add(new HqProp { Id = id, Position = V(x, y, z), Yaw = yaw, Scale = scale });
@@ -403,6 +482,8 @@ namespace TarmacGauntlet.TeamHq
             p.Vertices.Add(c + r.Apply(V(w / 2, h / 2, 0))); p.Uvs.Add(new Vector2(u, v));
             p.Vertices.Add(c + r.Apply(V(-w / 2, h / 2, 0))); p.Uvs.Add(new Vector2(0, v));
             for (int i = 0; i < 4; i++) p.Normals.Add(n);
+            p.ChartUvs.Add(new Vector2(0, 0)); p.ChartUvs.Add(new Vector2(w, 0)); p.ChartUvs.Add(new Vector2(w, h)); p.ChartUvs.Add(new Vector2(0, h));
+            p.Charts.Add(new HqChart { First = s, Count = 4, W = w, H = h });
             // Counter-clockwise seen from the front, as in the viewer.
             p.Triangles.Add(s); p.Triangles.Add(s + 1); p.Triangles.Add(s + 2);
             p.Triangles.Add(s); p.Triangles.Add(s + 2); p.Triangles.Add(s + 3);
@@ -427,13 +508,16 @@ namespace TarmacGauntlet.TeamHq
             HqPart p = Part(key);
             float slope = (rBottom - rTop) / h;
             int s = p.Vertices.Count;
+            float round = 2 * Mathf.PI * Mathf.Max(rTop, rBottom);
             for (int i = 0; i <= seg; i++)
             {
                 float a = i * 2 * Mathf.PI / seg, sin = Mathf.Sin(a), cos = Mathf.Cos(a);
                 Vector3 n = r.Apply(V(sin, slope, cos).normalized);
                 p.Vertices.Add(c + r.Apply(V(rTop * sin, h / 2, rTop * cos))); p.Normals.Add(n); p.Uvs.Add(new Vector2((float)i / seg, 1));
                 p.Vertices.Add(c + r.Apply(V(rBottom * sin, -h / 2, rBottom * cos))); p.Normals.Add(n); p.Uvs.Add(new Vector2((float)i / seg, 0));
+                p.ChartUvs.Add(new Vector2(round * i / seg, h)); p.ChartUvs.Add(new Vector2(round * i / seg, 0));
             }
+            p.Charts.Add(new HqChart { First = s, Count = (seg + 1) * 2, W = round, H = h });
             for (int i = 0; i < seg; i++)
             {
                 int a = s + i * 2, b = a + 1, e = a + 2, g = a + 3;
@@ -450,12 +534,15 @@ namespace TarmacGauntlet.TeamHq
             int s = p.Vertices.Count;
             Vector3 n = r.Apply(V(0, up ? 1 : -1, 0));
             p.Vertices.Add(c + r.Apply(V(0, y, 0))); p.Normals.Add(n); p.Uvs.Add(new Vector2(0.5f, 0.5f));
+            p.ChartUvs.Add(new Vector2(radius, radius));
             for (int i = 0; i < seg; i++)
             {
                 float a = i * 2 * Mathf.PI / seg;
                 p.Vertices.Add(c + r.Apply(V(radius * Mathf.Sin(a), y, radius * Mathf.Cos(a)))); p.Normals.Add(n);
                 p.Uvs.Add(new Vector2(0.5f + 0.5f * Mathf.Sin(a), 0.5f + 0.5f * Mathf.Cos(a)));
+                p.ChartUvs.Add(new Vector2(radius * (1 + Mathf.Sin(a)), radius * (1 + Mathf.Cos(a))));
             }
+            p.Charts.Add(new HqChart { First = s, Count = seg + 1, W = 2 * radius, H = 2 * radius });
             for (int i = 0; i < seg; i++)
             {
                 int a = s + 1 + i, b = s + 1 + (i + 1) % seg;
@@ -467,7 +554,7 @@ namespace TarmacGauntlet.TeamHq
         /// <summary>Flips Z and the winding, so the building reads the same in Unity's left-handed frame.</summary>
         private void MirrorIntoUnity()
         {
-            foreach (HqPart p in Parts.Values)
+            foreach (HqPart p in Parts.Values.Concat(Wear.Values))
             {
                 for (int i = 0; i < p.Vertices.Count; i++)
                 {
