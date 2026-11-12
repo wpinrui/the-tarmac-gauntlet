@@ -69,6 +69,7 @@ namespace TarmacGauntlet.Management
             root.styleSheets.Add(Resources.Load<StyleSheet>("Menus"));
             root.AddToClassList("root");
             root.style.unityFontDefinition = FontDefinition.FromFont(SemiBold);
+            MenuSounds.Attach(root);
             glass = new MenuGlass(root);
 
             foreach ((PlayerSkillType type, _, _) in Skills) pending[type] = 0;

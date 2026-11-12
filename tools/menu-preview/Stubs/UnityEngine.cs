@@ -11,6 +11,7 @@ namespace UnityEngine
         public string name { get; set; } = "";
         public HideFlags hideFlags { get; set; }
         public static void Destroy(Object o) { }
+        public static void DontDestroyOnLoad(Object o) { }
         public static T FindAnyObjectByType<T>() where T : Object => GameObject.All.SelectMany(g => g.Components).OfType<T>().FirstOrDefault();
         public static implicit operator bool(Object o) => o != null;
     }
@@ -172,6 +173,7 @@ namespace UnityEngine
                 if (file != null) made = new Texture2D(1, 1) { Path = file, name = path };
             }
             else if (typeof(T) == typeof(Font)) made = new Font { name = System.IO.Path.GetFileName(path) };
+            else if (typeof(T) == typeof(AudioClip)) made = new AudioClip { name = path };
             else if (typeof(T) == typeof(UnityEngine.UIElements.StyleSheet)) made = new UnityEngine.UIElements.StyleSheet { name = path };
             else if (typeof(T) == typeof(Shader)) made = null;
             Cache[key] = made;

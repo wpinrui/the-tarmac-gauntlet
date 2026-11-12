@@ -59,6 +59,7 @@ namespace TarmacGauntlet.Management
             root.AddToClassList("root");
             root.pickingMode = PickingMode.Ignore;
             root.style.unityFontDefinition = FontDefinition.FromFont(SemiBold);
+            MenuSounds.Attach(root);
             glass = new MenuGlass(root);
 
             dimmer = Layer("dimmer");
@@ -110,6 +111,9 @@ namespace TarmacGauntlet.Management
 
         private void SetOverlay(Overlay next)
         {
+            // Opening the pause menu or settings slides a panel in; leaving either steps back.
+            if (next == Overlay.Settings || (overlay == Overlay.None && next != Overlay.None)) MenuSounds.Play(UiCue.Panel);
+            else if (next != overlay) MenuSounds.Play(UiCue.Back);
             if (next != Overlay.None && overlay == Overlay.None) Freeze();
             else if (next == Overlay.None && overlay != Overlay.None)
             {

@@ -215,7 +215,11 @@ namespace TarmacGauntlet.Management
         /// <summary>The back arrow at the top left of every panel.</summary>
         internal static VisualElement BackButton(Action onClick)
         {
-            VisualElement back = Chevron("arrow-left", onClick);
+            VisualElement back = Chevron("arrow-left", () =>
+            {
+                MenuSounds.Play(UiCue.Back);
+                onClick();
+            });
             back.AddToClassList("back");
             return back;
         }
@@ -227,14 +231,21 @@ namespace TarmacGauntlet.Management
         internal static VisualElement Stepper(string value, string cls, bool canBack, bool canOn, Action<int> step)
         {
             VisualElement stepper = Box("stepper", cls);
-            VisualElement back = Chevron("chevron-left", () => { if (canBack) step(-1); });
+            VisualElement back = Chevron("chevron-left", () => Step(canBack, -1));
             back.style.visibility = canBack ? Visibility.Visible : Visibility.Hidden;
             stepper.Add(back);
             stepper.Add(Text(value, "stepper-value", true));
-            VisualElement on = Chevron("chevron-right", () => { if (canOn) step(1); });
+            VisualElement on = Chevron("chevron-right", () => Step(canOn, 1));
             on.style.visibility = canOn ? Visibility.Visible : Visibility.Hidden;
             stepper.Add(on);
             return stepper;
+
+            void Step(bool can, int d)
+            {
+                if (!can) return;
+                MenuSounds.Play(UiCue.Step);
+                step(d);
+            }
         }
 
         /// <summary>YEAR N between two chevrons, at the top of a panel.</summary>
@@ -254,7 +265,12 @@ namespace TarmacGauntlet.Management
             Label label = Text(text.ToUpperInvariant(), "red-label", true);
             label.pickingMode = PickingMode.Ignore;
             button.Add(label);
-            button.RegisterCallback<ClickEvent>(_ => onClick());
+            // Every red button confirms; Race, Go, Hire and buying a car ask for their own sound over it.
+            button.RegisterCallback<ClickEvent>(_ =>
+            {
+                if (!button.ClassListContains("disabled")) MenuSounds.Play(UiCue.Confirm);
+                onClick();
+            });
             return button;
         }
 
@@ -427,7 +443,12 @@ namespace TarmacGauntlet.Management
             VisualElement button = Box("skill-step");
             button.Add(Icon(icon, "skill-step-icon"));
             button.style.visibility = on ? Visibility.Visible : Visibility.Hidden;
-            button.RegisterCallback<ClickEvent>(_ => { if (on) onClick(); });
+            button.RegisterCallback<ClickEvent>(_ =>
+            {
+                if (!on) return;
+                MenuSounds.Play(UiCue.Step);
+                onClick();
+            });
             return button;
         }
 

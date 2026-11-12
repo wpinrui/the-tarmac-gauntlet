@@ -90,6 +90,7 @@ namespace TarmacGauntlet.Management
             PlayerTeam p = Player;
             if (p == null || !Affordable(p, n)) return;
             int size = Target(n);
+            if (size > p.CrewSize) MenuSounds.Play(UiCue.Hire);
             hover = null;
             GameSession.Apply(g => GameActions.SetCrewSize(g, size));
         }
