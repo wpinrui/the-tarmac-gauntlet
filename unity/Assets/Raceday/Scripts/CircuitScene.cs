@@ -146,6 +146,10 @@ namespace TarmacGauntlet.Raceday
             view.Sky = sky;
             view.Materials = pitMaterials;
             Trackside trackside = Trackside.Build(circuit, builder, stands.Footprints);
+            var plainArmco = new List<Renderer>();
+            foreach (Transform child in track.transform)
+                if (child.name == "Armco" && child.TryGetComponent(out Renderer drawn)) plainArmco.Add(drawn);
+            trackside.SetPlainArmco(plainArmco.ToArray());
             Lap("trackside");
             yield return null;
             var floodMaterials = new FloodMaterials();
