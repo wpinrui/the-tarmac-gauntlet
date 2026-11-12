@@ -279,6 +279,9 @@ namespace TarmacGauntlet.Raceday
         public string Reason { get; private set; }
 
         private float clock = float.MaxValue;
+        private bool staggered;
+        /// <summary>Where in the plan interval a car's own beat falls, 0 to 0.9 of it.</summary>
+        private static float Beat(int id) => ((id * 7919) % 10 + 10) % 10 / 10f;
         // The defending move: 0 none yet, 1 made, 2 coming back.
         private int movePhase;
         private float moveDir;
@@ -423,15 +426,18 @@ namespace TarmacGauntlet.Raceday
                 placed = true;
                 pilot.Offset = Mathf.Clamp(me.Lateral - pilot.Line.Lateral[pilot.Index], AiPilot.LaneShifts[0], AiPilot.LaneShifts[AiPilot.LaneShifts.Length - 1]);
             }
-            clock += dt;
             float every = pilot.Gliding ? FarEvery : NearEvery;
+            clock += dt;
             if (clock < every - 1e-4f)
             {
                 // A fixed place across the track: the offset that keeps it there moves with the racing line.
                 if (fixedOn && pilot.Index >= 0) Target = Mathf.Clamp(fixedLat - pilot.Line.Lateral[pilot.Index], AiPilot.LaneShifts[0], AiPilot.LaneShifts[AiPilot.LaneShifts.Length - 1]);
                 return false;
             }
-            clock = 0f;
+            // Each car keeps its own beat after its first plan, so a full field doesn't all plan in the same step,
+            // a spike in that frame ten times a second (frame drops from the start). The first comes at once.
+            clock = staggered ? 0f : every * Beat(me.Id);
+            staggered = true;
             Choose(pilot, me, field);
             return true;
         }

@@ -200,7 +200,7 @@ static partial class Check
             double ms = (think - lastThink) * f;
             lastThink = think;
             worst = Math.Max(worst, ms); sum += ms; steps++;
-            if (ms > 40 && Environment.GetEnvironmentVariable("PERF_SPIKES") != null) Console.WriteLine($"  spike {ms:0} ms at {race.Time:0.00} s");
+            if (Environment.GetEnvironmentVariable("PERF_SPIKES") is string spikes && ms > (float.TryParse(spikes, out float over) ? over : 40f)) Console.WriteLine($"  spike {ms:0} ms at {race.Time:0.00} s");
             secWorst = Math.Max(secWorst, ms); secSum += ms; secSteps++;
             if (secSteps == 100)
             {
