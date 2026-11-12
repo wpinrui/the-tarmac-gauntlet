@@ -25,7 +25,6 @@ Ask every placement or visual choice (badge, name and the like) inside the viewe
 ## 2. Reference
 Ivan provides the photos: a four-view drawing (side, front, rear, top) and detail photos.
 Look up the published wheelbase, length, width and tyre size yourself.
-Before building, check the reference against those sizes and the body style asked for, such as a roadster when the car needs a hard top. If it is out of proportion or the wrong body, tell Ivan and ask for a better reference.
 Renders and measurements of a 3D model or scan he supplies replace the drawing.
 Reference images stay out of the repo.
 
