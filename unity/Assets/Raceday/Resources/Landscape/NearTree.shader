@@ -199,7 +199,7 @@ Shader "Hidden/TarmacGauntlet/NearTree"
                     half4 c = SAMPLE_TEXTURE2D_ARRAY(_Bark, sampler_Bark, i.uv.xy, i.uv.z);
                     half3 n = normalize(IS_FRONT_VFACE(face, i.normalWS, -i.normalWS));
                 #endif
-                half3 col = ShadeLambert(i.positionWS, n, i.positionCS, i.fog, c.rgb * i.tint.rgb * i.tint.a * _Colour);
+                half3 col = ShadeLambert(i.positionWS, n, i.positionCS, i.fog, c.rgb * GammaScale(i.tint.rgb) * i.tint.a * _Colour);
                 return half4(col, 1);
             }
             ENDHLSL

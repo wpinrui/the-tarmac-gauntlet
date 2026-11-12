@@ -113,7 +113,7 @@ namespace TarmacGauntlet.Raceday
                 centres[i] = t.Base + Vector3.up * (LandscapePlan.CentreAbove[k] * t.Scale * t.Squash);
                 footScale[i] = new Vector4(t.Base.x, t.Base.y, t.Base.z, t.Scale);
                 turn[i] = new Vector4(t.Yaw, t.Squash, 1f, 0f);
-                // As the impostor's vertex colour: the shader takes it raw, with no conversion from sRGB.
+                // As the impostor's vertex colour, at twice its value: the shader scales it for Linear as the impostor does.
                 Color c = LandscapeLooks.Leaves(t.Kind, t.Hue) * t.Shade;
                 tint[i] = new Vector4(c.r, c.g, c.b, 1f);
                 kinds[i] = t.Kind;

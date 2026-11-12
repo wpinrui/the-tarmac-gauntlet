@@ -88,13 +88,24 @@ Shader "Hidden/TarmacGauntlet/Grass"
             bool alive;
         };
 
+        // TarmacLit.hlsl's GammaScale, which not every pass here includes: a multiplier written for Gamma colour space,
+        // raised to the power 2.2 in Linear so it darkens or lightens as much as it did.
+        half GrassScale(half f)
+        {
+        #if defined(UNITY_COLORSPACE_GAMMA)
+            return f;
+        #else
+            return pow(max(f, 0.0), 2.2);
+        #endif
+        }
+
         // The ground's colour at a point, as Ground.shader draws it, with the width of a pixel there, m.
         half3 GroundAlbedo(float3 positionWS, float pixel)
         {
             float2 uv = (positionWS.xz - _Map.xy) * _Map.zw;
             half3 fields = SAMPLE_TEXTURE2D_LOD(_MainTex, sampler_MainTex, uv, 0).rgb;
             half grain = SAMPLE_TEXTURE2D_LOD(_Grain, sampler_Grain, positionWS.xz / 8, 0).r;
-            half3 albedo = fields * grain * 2 * _BaseColor.rgb;
+            half3 albedo = fields * GrassScale(grain * 2) * _BaseColor.rgb;
             #if defined(_GROUND_STRIPES)
                 half4 mow = SAMPLE_TEXTURE2D_LOD(_Mowing, sampler_Mowing, uv, 0);
                 float d = (mow.r + (grain - 0.5) * 0.3) / _StripeWidth;
@@ -105,7 +116,7 @@ Shader "Hidden/TarmacGauntlet/Grass"
                 half2 along = mow.ba / max(fresh, 1e-3);
                 float2 view = positionWS.xz - _WorldSpaceCameraPos.xz;
                 half lean = dot(view, along) / max(length(view), 1e-3);
-                albedo *= 1 + _StripeContrast * wave * fade * (0.35 + 0.65 * lean);
+                albedo *= GrassScale(1 + _StripeContrast * wave * fade * (0.35 + 0.65 * lean));
             #endif
             return albedo;
         }
