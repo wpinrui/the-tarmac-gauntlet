@@ -94,6 +94,9 @@ namespace TarmacGauntlet.Visuals
         /// </summary>
         public static readonly GraphicsOption ArmcoDetail = Toggle("settings.armcodetail", true);
 
+        /// <summary>Advertising hoardings, TV camera towers and portable cabins round the track. Changes live.</summary>
+        public static readonly GraphicsOption TracksideProps = Toggle("settings.tracksideprops", true);
+
         /// <summary>Stripes mown into the grass along the track. Changes live.</summary>
         public static readonly GraphicsOption Mowing = Toggle("settings.mowing", true);
 
@@ -157,7 +160,7 @@ namespace TarmacGauntlet.Visuals
             new GraphicsRow("Shadow detail", OnFromHigh, SoftShadows, LightShadows),
             new GraphicsRow("Depth of field", OffAtLow, DepthOfField),
             new GraphicsRow("Car detail", OffAtLow, Clearcoat, PaintFlake, CarGlass, LampLenses, CarTrims, CarReflections, BrakeGlow),
-            new GraphicsRow("Track detail", AlwaysOn, TarmacDetail, RubberedLine, KerbWear, SkidMarks, Mowing, ArmcoDetail),
+            new GraphicsRow("Track detail", AlwaysOn, TarmacDetail, RubberedLine, KerbWear, SkidMarks, Mowing, ArmcoDetail, TracksideProps),
             new GraphicsRow("Rain effects", OffAtLow, WetTrack, Puddles, RainRipples, Spray, SprayMist),
             new GraphicsRow("Smoke and sparks", OffAtLow, TyreSmoke, Sparks),
             new GraphicsRow("Heat haze", OnFromHigh, ExhaustHaze, TarmacShimmer),

@@ -3,6 +3,6 @@ namespace TarmacGauntlet.Raceday
 {
     public sealed class FurnitureMaterials
     {
-        public UnityEngine.Material GreenSteel, Concrete, WhitePaint, BlackSteel, Roof, Galvanised, BoardBack, Boards;
+        public UnityEngine.Material GreenSteel, Concrete, WhitePaint, BlackSteel, Roof, Galvanised, BoardBack, Boards, Hoardings, Glass;
     }
 }

@@ -5,6 +5,7 @@ Usage: python3 -I make_art.py <repo root>
 Writes into unity/Assets/Raceday/Resources/Furniture:
   boards.png               the distance boards' faces, 300, 200 and 100 side by side, each 720 by 384
   marshal_overalls.jpg     Team HQ's crew_overalls clothes texture with the blue overalls repainted for marshals
+  hoardings.png            the advertising hoardings' faces, two across and four down, each 1024 by 256
 The boards are black numbers on white with a clear margin round them. The overalls are orange.
 The numbers are set in D-DIN Bold (D-DIN-Bold.otf beside this script, SIL Open Font License), a free copy of the
 DIN 1451 road sign lettering that circuit boards use.
@@ -59,9 +60,38 @@ def overalls(root, out):
     Image.fromarray((res * 255).clip(0, 255).astype(np.uint8)).save(out, quality=88)
 
 
+# The hoardings advertise the game's own makes, each in its colours: (word, ground, ink), left to right, top to bottom.
+ADVERTS = [
+    ('FERETTI', (196, 18, 30), (250, 246, 238)),
+    ('ARCHER', (18, 19, 22), (206, 210, 214)),
+    ('KAISER', (240, 240, 236), (16, 40, 92)),
+    ('SEORAK', (10, 84, 60), (244, 244, 238)),
+    ('TORA', (246, 246, 242), (200, 22, 36)),
+    ('LIBERTY', (16, 34, 74), (250, 250, 246)),
+    ('NUSA', (250, 196, 20), (20, 20, 22)),
+    ('GAUNTLET', (40, 42, 46), (236, 182, 40)),
+]
+AD_W, AD_H = 1024, 256
+
+
+def hoardings(root, out):
+    font = ImageFont.truetype(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'D-DIN-Bold.otf'), 150)
+    im = Image.new('RGB', (AD_W * 2, AD_H * 4))
+    d = ImageDraw.Draw(im)
+    for i, (word, ground, ink) in enumerate(ADVERTS):
+        x0, y0 = (i % 2) * AD_W, (i // 2) * AD_H
+        d.rectangle([x0, y0, x0 + AD_W - 1, y0 + AD_H - 1], fill=ground)
+        # A band of the ink colour along the bottom edge, as printed vinyl banners carry.
+        d.rectangle([x0, y0 + AD_H - 22, x0 + AD_W - 1, y0 + AD_H - 1], fill=ink)
+        l, t, r, b = d.textbbox((0, 0), word, font=font)
+        d.text((x0 + AD_W / 2 - (l + r) / 2, y0 + (AD_H - 22) / 2 - (t + b) / 2), word, font=font, fill=ink)
+    im.save(out)
+
+
 if __name__ == '__main__':
     root = sys.argv[1]
     out = os.path.join(root, 'unity/Assets/Raceday/Resources/Furniture')
     os.makedirs(out, exist_ok=True)
     boards(root, os.path.join(out, 'boards.png'))
     overalls(root, os.path.join(out, 'marshal_overalls.jpg'))
+    hoardings(root, os.path.join(out, 'hoardings.png'))

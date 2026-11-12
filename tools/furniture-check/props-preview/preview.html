@@ -1,0 +1,127 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Trackside props</title>
+<style>html,body{margin:0;background:#9fbfdc}canvas{display:block}</style>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script>
+// Draws one view of views.json (written by the furniture check's --props-export) with flat colours close to the game's
+// materials, the hoardings' own texture, a sun with shadows and simple trees and people. window.shoot(view, props)
+// returns a JPEG data URL. Unity's axes are left-handed and three's right-handed, so every z is turned round and
+// every triangle rewound.
+const COLOURS = {
+  'Road': 0x3a3c3f, 'Road edges': 0x4a4b4d, 'Edge lines': 0xe8e8e4, 'Kerbs': 0xb83a30, 'Verges': 0x5f8a3c,
+  'Grass runoff': 0x618c3e, 'Gravel traps': 0x9a8b70, 'Pit lane': 0x45474a, 'Pit lane lines': 0xe0e0dc,
+  'Pit lane shoulders': 0x55585a, 'Pit wall': 0xb8b8b2, 'Tyre walls': 0x1d1d1f,
+  'Stand cladding': 0x2f5f9a, 'Stand concrete': 0xa8a8a2, 'Stand roofs': 0x9aa0a4, 'Stand seats': 0x3a6fb0, 'Stand steel': 0x5a6066,
+  'Catch fence': 0x8a8e90, 'Catch fence posts': 0x8a8e90, 'Armco catch fence': 0x9a9ea0, 'Armco catch fence posts': 0x9ea2a6,
+  'Armco steel': 0xccced0, 'Distance board backs': 0x4d4f52, 'Distance board legs': 0x9ea2a6, 'Distance boards': 0xecece8,
+  'Flag panel housings': 0x0d0d0e, 'Flag panel poles': 0x9ea2a6, 'Marshal post roofs': 0x8c9194, 'Marshal post steel': 0x33503d,
+  'Marshal posts': 0xa8a6a0, 'Panels': 0x161616, 'Red lenses': 0x2a0606, 'Green lenses': 0x06200a,
+  'Broadcast cameras': 0x0d0d0e, 'Cabin doors': 0x33503d, 'Cabin plinths': 0xa8a6a0, 'Cabin roofs': 0x8c9194,
+  'Cabin walls': 0xdcdcd6, 'Cabin windows': 0x161b20, 'Camera tower decks': 0x4d4f52, 'Camera tower roofs': 0x8c9194,
+  'Camera tower scaffold': 0x9ea2a6, 'Hoarding backs': 0x4d4f52, 'Hoarding legs': 0x9ea2a6,
+};
+const SKIP = new Set(['Armco', 'Crowd']);
+let data, hoardingTex;
+window.ready = false;
+(async () => {
+  data = await (await fetch('views.json')).json();
+  hoardingTex = await new THREE.TextureLoader().loadAsync('hoardings.png');
+  hoardingTex.encoding = THREE.sRGBEncoding;
+  hoardingTex.anisotropy = 8;
+  window.ready = true;
+})();
+
+function meshOf(m) {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(m.p.map((v, i) => (i % 3 === 2 ? -v : v) / 100), 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(m.n.map((v, i) => (i % 3 === 2 ? -v : v) / 100), 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(m.uv, 2));
+  const idx = m.i.slice();
+  for (let i = 0; i < idx.length; i += 3) [idx[i + 1], idx[i + 2]] = [idx[i + 2], idx[i + 1]];
+  g.setIndex(idx);
+  let mat;
+  if (m.name === 'Hoardings') mat = new THREE.MeshStandardMaterial({ map: hoardingTex, roughness: 0.7 });
+  else mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(COLOURS[m.name] ?? 0xff00ff).convertSRGBToLinear(), roughness: 0.8, metalness: 0,
+    side: m.name.includes('fence') && !m.name.includes('posts') ? THREE.DoubleSide : THREE.FrontSide,
+    transparent: m.name === 'Armco catch fence' || m.name === 'Catch fence', opacity: 0.35 });
+  if (mat.color && !m.name.includes('fence')) mat.opacity = 1, mat.transparent = false;
+  const mesh = new THREE.Mesh(g, mat);
+  mesh.castShadow = true; mesh.receiveShadow = true;
+  return mesh;
+}
+
+window.shoot = (name, props, w, h) => {
+  const v = data[name];
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x9fbfdc);
+  scene.fog = new THREE.Fog(0x9fbfdc, 250, 700);
+  scene.add(new THREE.HemisphereLight(0xcfe2f3, 0x4a5a32, 0.9));
+  const sun = new THREE.DirectionalLight(0xfff3e0, 2.4);
+  sun.position.set(120, 160, 70);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(4096, 4096);
+  Object.assign(sun.shadow.camera, { left: -200, right: 200, top: 200, bottom: -200, near: 1, far: 600 });
+  sun.shadow.bias = -0.0004;
+  scene.add(sun);
+  for (const m of v.meshes) {
+    if (SKIP.has(m.name) || (!props && m.group === 'props')) continue;
+    scene.add(meshOf(m));
+  }
+  // Ground.
+  const gr = v.ground, n = gr.n, size = gr.step * 2 * n;
+  const gg = new THREE.PlaneGeometry(size, size, 2 * n, 2 * n);
+  gg.rotateX(-Math.PI / 2);
+  const pos = gg.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = Math.round(pos.getX(i) / gr.step) + n, z = Math.round(pos.getZ(i) / gr.step) + n;
+    pos.setY(i, gr.h[z * (2 * n + 1) + x] / 100 - 0.03);
+    pos.setZ(i, -pos.getZ(i));
+  }
+  gg.computeVertexNormals();
+  gg.index.array.reverse();
+  gg.computeVertexNormals();
+  const ground = new THREE.Mesh(gg, new THREE.MeshStandardMaterial({ color: new THREE.Color(0x5d8a3a).convertSRGBToLinear(), roughness: 1 }));
+  ground.receiveShadow = true;
+  scene.add(ground);
+  // Trees: a trunk and a crown, a cone for the conifers.
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3a2a, roughness: 1 });
+  const leaf = [0x3f6a2a, 0x4a7430, 0x5f8a3a, 0x2c4f2a, 0x2a4a28, 0x274a30, 0x2a5032, 0x4a6e2e];
+  for (const [x, y, z, ht, r, kind] of v.trees) {
+    const conifer = kind >= 3 && kind <= 6;
+    const crown = conifer ? new THREE.ConeGeometry(r * 0.7, ht * 0.85, 9) : new THREE.SphereGeometry(r * 0.85, 10, 8);
+    const cm = new THREE.Mesh(crown, new THREE.MeshStandardMaterial({ color: new THREE.Color(leaf[kind]).convertSRGBToLinear(), roughness: 1 }));
+    cm.position.set(x, y + (conifer ? ht * 0.55 : ht - r * 0.85), -z);
+    if (!conifer) cm.scale.y = Math.min(1, ht / (2 * r));
+    cm.castShadow = true;
+    scene.add(cm);
+    const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.15 * r / 3, 0.2 * r / 3, ht * 0.5, 6), trunkMat);
+    tr.position.set(x, y + ht * 0.25, -z);
+    scene.add(tr);
+  }
+  // People, as capsules: marshals orange, camera operators in the crew's blue.
+  for (const [x, y, z, who] of v.people) {
+    if (who === 1 && !props) continue;
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.2, 1.45, 8), new THREE.MeshStandardMaterial({ color: who ? 0x3a5a8a : 0xe0601a }));
+    body.position.set(x, y + 0.72, -z);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), new THREE.MeshStandardMaterial({ color: 0xc89878 }));
+    head.position.set(x, y + 1.6, -z);
+    body.castShadow = head.castShadow = true;
+    scene.add(body, head);
+  }
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer.setSize(w, h);
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.body.innerHTML = '';
+  document.body.appendChild(renderer.domElement);
+  const cam = new THREE.PerspectiveCamera(v.fov, w / h, 0.3, 1500);
+  cam.position.set(v.eye[0], v.eye[1], -v.eye[2]);
+  cam.lookAt(new THREE.Vector3(v.look[0], v.look[1], -v.look[2]));
+  renderer.render(scene, cam);
+  const url = renderer.domElement.toDataURL('image/jpeg', 0.9);
+  renderer.dispose();
+  return url;
+};
+</script>

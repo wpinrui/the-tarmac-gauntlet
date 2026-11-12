@@ -1,7 +1,8 @@
 // Places and builds the trackside furniture exactly as the game does (TrackFurniture and FurnitureBuilder on the
 // circuit CircuitBuilder lays from circuit.json) and runs race control through set pieces. Each rule prints one
 // line: ok, or FAIL with details. Exit code 1 if any rule fails. --list prints every post and board. --export
-// <file> writes the furniture in each look, with the track round it, for the look preview.
+// <file> writes the furniture in each look, with the track round it, for the look preview. --props-export <file>
+// writes the trackside props and everything round them for props-preview.
 //
 // Rules:
 //   posts round the lap      no stretch flagged by one post is longer than 460 m
@@ -23,7 +24,15 @@
 //                            more than 4.5% from one post's span to the next; the ground right behind the line
 //                            is within 5 cm under it and never reaches the rails' bottom
 //   catch fences             behind every tyre wall, clear of the grandstands' own fences and the gantry's feet
-//   cheap to draw            at most 120k triangles in all and 20k in any one mesh, armco included
+//   props off the track      every hoarding, camera tower and cabin stands at least 1 m behind the runoff's edge
+//                            and within 13 m of it, off every road, pit lane, paddock and grandstand, and at least
+//                            3 m from the marshal posts, boards and gantry
+//   props on level ground    the ground under each prop's footprint varies by at most 0.6 m and lies within 3 m
+//                            of the road's height, and every leg, tube and plinth reaches into it
+//   props clear of trees     no prop stands under a tree's crown in the current landscape look
+//   props round the lap      at least 30 hoarding panels, 4 camera towers and 4 cabins
+//   cheap to draw            at most 120k triangles in all and 20k in any one mesh, armco included; props at
+//                            most 40k, at most 3k in any one cell's mesh
 //   race control             SC behind the pace car, red then green lights at the start, green panels on
 //                            the opening lap, yellow before a stopped car and green after it, clearing once
 //                            it goes, a crashed car flagged until recovered, nothing for a car in the pit lane
@@ -54,6 +63,8 @@ static class Check
         var stands = new Grandstands(c, b, null, StandLook.Main, StandLook.Corners);
         standParts = stands.Build();
         footprints = stands.Footprints;
+        int pe = Array.IndexOf(args, "--props-export");
+        if (pe >= 0) PropsExport.Write(args[pe + 1], c, b, track, standParts, footprints);
         if (args.Contains("--list")) foreach (var s in footprints) Console.WriteLine($"stand {s.Side} {s.From:F0}-{s.To:F0} far {s.Far:F0}");
         var f = new TrackFurniture(c, b, footprints);
         var built = new FurnitureBuilder(c, f, null);
@@ -71,6 +82,7 @@ static class Check
         ArmcoGrounded();
         CatchFences(armco, f);
         Budget(built, armco);
+        Props(f, armco);
         Flags(f);
         return failed ? 1 : 0;
     }
@@ -211,6 +223,131 @@ static class Check
         if (total > 120000) bad.Add($"{total} triangles");
         if (biggest > 20000) bad.Add($"a mesh of {biggest} triangles");
         Report("cheap to draw", bad, $"{total} triangles in {built.Parts.Count + built.Panels.Count + 2} meshes, {built.Marshals.Count} marshals");
+    }
+
+    static void Props(TrackFurniture f, ArmcoBuilder armco)
+    {
+        var props = new TracksideProps(c, b, footprints, f, armco.Ends, new LandscapePlan(c, b.RunoffReach, LandscapeLooks.Current, footprints).Trees);
+        var built = new PropBuilder(c, props, null);
+        var parts = built.Cells.SelectMany(cell => cell.Coarse.Concat(cell.Fine)).ToList();
+        if (Environment.GetCommandLineArgs().Contains("--list"))
+            foreach (PropSpot s in props.Spots) Console.WriteLine($"prop  {s.Kind,-11} {s.Distance,7:F0} m {(s.Side == 0 ? "left" : "right")} {Where(s.Base)} advert {s.Variant}");
+
+        // Off the track: every vertex of every prop.
+        var bad = new List<string>();
+        float nearest = float.MaxValue, furthest = 0f;
+        var furniture = f.Posts.Select(p => p.Base).Concat(f.Posts.Select(p => p.Panel)).Concat(f.Boards.Select(d => d.Base)).Concat(new[] { f.GantryLeft, f.GantryRight }).ToList();
+        foreach (PropSpot s in props.Spots)
+        {
+            float front = float.MinValue, back = float.MaxValue;
+            foreach (CircuitPart part in parts)
+                foreach (Vector3 v in part.Kit.Vertices)
+                {
+                    if (Flat(v - s.Base) > 6f) continue;
+                    float on = OnRunoff(v);
+                    front = Math.Max(front, on);
+                    back = Math.Min(back, on);
+                }
+            nearest = Math.Min(nearest, -front);
+            furthest = Math.Max(furthest, -back);
+            if (front > -1f) bad.Add($"{s.Kind} at {Where(s.Base)} reaches {front + 1f:F1} m too near the runoff");
+            if (-back > TracksideProps.TreeFree) bad.Add($"{s.Kind} at {Where(s.Base)} stands {-back:F1} m behind the runoff");
+            foreach (StandFootprint stand in footprints)
+            {
+                int k = Nearest(s.Base);
+                if (stand.Covers(c.Lap, k * c.Step, Lateral(s.Base, k))) bad.Add($"{s.Kind} at {Where(s.Base)} stands on a grandstand");
+            }
+            float lane = c.Data.pit.laneWidth * 0.5f + c.Data.pit.garageDepth;
+            if (c.Lane.Any(q => Flat(q - s.Base) < lane)) bad.Add($"{s.Kind} at {Where(s.Base)} stands on the pit lane");
+            if (c.Data.pit.garages.Any(g => Flat(new Vector3(g.x, 0, g.z) - s.Base) < 100f)) bad.Add($"{s.Kind} at {Where(s.Base)} stands in the paddock");
+            float r = s.Kind == PropKind.Cabin ? 3.4f : s.Kind == PropKind.CameraTower ? 1.8f : 2.2f;
+            foreach (Vector3 q in furniture)
+                if (Flat(q - s.Base) < r + 3f) bad.Add($"{s.Kind} at {Where(s.Base)} crowds the furniture at {Where(q)}");
+        }
+        for (int i = 0; i < props.Spots.Count; i++)
+            for (int j = i + 1; j < props.Spots.Count; j++)
+            {
+                PropSpot p = props.Spots[i], q = props.Spots[j];
+                float min = p.Kind == PropKind.Hoarding && q.Kind == PropKind.Hoarding ? TracksideProps.HoardingWidth : 6f;
+                if (Flat(p.Base - q.Base) < min) bad.Add($"{p.Kind} and {q.Kind} overlap at {Where(p.Base)}");
+            }
+        Report("props off the track", bad, $"{props.Spots.Count} props, {nearest:F1} to {furthest:F1} m behind the runoff");
+
+        // Level ground, and grounded.
+        bad = new List<string>();
+        float worst = 0f;
+        foreach (PropSpot s in props.Spots)
+        {
+            (float hl, float hd) = s.Kind == PropKind.Cabin ? (TracksideProps.CabinHalfLength, TracksideProps.CabinHalfDepth)
+                : s.Kind == PropKind.CameraTower ? (TracksideProps.TowerHalf, TracksideProps.TowerHalf) : (TracksideProps.HoardingWidth / 2f, 0.9f);
+            float low = float.MaxValue, high = float.MinValue;
+            for (int i = -4; i <= 4; i++)
+                for (int j = -2; j <= 2; j++)
+                {
+                    Vector3 p = s.Base + s.Along * (hl * i / 4f) + s.ToRoad * (hd * j / 2f);
+                    float h = c.TerrainHeight(p.x, p.z);
+                    low = Math.Min(low, h);
+                    high = Math.Max(high, h);
+                }
+            worst = Math.Max(worst, high - low);
+            if (high - low > 0.6f) bad.Add($"{s.Kind} at {Where(s.Base)} on ground varying {high - low:F2} m");
+            int k = c.IndexOf(s.Distance);
+            if (Math.Abs(low - c.Centre[k].y) > 3f || Math.Abs(high - c.Centre[k].y) > 3f) bad.Add($"{s.Kind} at {Where(s.Base)} sits {low - c.Centre[k].y:F1} m off the road's height");
+            if (s.High < high - 0.05f) bad.Add($"{s.Kind} at {Where(s.Base)} has its floor {high - s.High:F2} m under the ground");
+        }
+        // Every upright's foot is under the ground beside it: no vertex of a prop hangs below its lowest part in the air.
+        foreach (PropCell cell in built.Cells)
+            foreach (CircuitPart part in cell.Coarse)
+            {
+                var v = part.Kit.Vertices;
+                var t = part.Kit.Triangles;
+                // The lowest point of each prop's parts within 3 m in plan must be at or under the ground there.
+                foreach (PropSpot s in props.Spots)
+                {
+                    if (Flat(s.Base - cell.Centre) > PropBuilder.CellSize) continue;
+                    float lowest = float.MaxValue;
+                    Vector3 at = default;
+                    foreach (Vector3 p in v)
+                        if (Flat(p - s.Base) < 3f && p.y < lowest) { lowest = p.y; at = p; }
+                    if (lowest == float.MaxValue) continue;
+                    float g = c.TerrainHeight(at.x, at.z);
+                    if (lowest > g + 0.02f && part.Name != "Hoarding backs" && part.Name != "Hoardings" && !part.Name.EndsWith("roofs") && !part.Name.EndsWith("decks") && part.Name != "Cabin walls")
+                        bad.Add($"{part.Name} at {Where(s.Base)} stands {lowest - g:F2} m off the ground");
+                }
+            }
+        Report("props on level ground", bad, $"ground under a prop varies at most {worst:F2} m");
+
+        // Trees, in every look.
+        bad = new List<string>();
+        int trees = 0;
+        foreach (var (name, look) in new[] { ("the current look", LandscapeLooks.Current) })
+        {
+            var plan = new LandscapePlan(c, b.RunoffReach, look, footprints);
+            foreach (TreeSpot t in plan.Trees)
+            {
+                float crown = LandscapePlan.ModelRadius[(int)t.Kind] * t.Scale;
+                foreach (PropSpot s in props.Spots)
+                {
+                    float r = s.Kind == PropKind.Cabin ? 3.5f : s.Kind == PropKind.CameraTower ? 1.8f : 2.2f;
+                    if (Flat(t.Base - s.Base) < crown + r) { bad.Add($"{s.Kind} at {Where(s.Base)} under a {t.Kind} in {name}"); trees++; }
+                }
+            }
+        }
+        Report("props clear of trees", bad, "the current landscape look");
+
+        bad = new List<string>();
+        int panels = props.Spots.Count(s => s.Kind == PropKind.Hoarding), towers = props.Spots.Count(s => s.Kind == PropKind.CameraTower), cabins = props.Spots.Count(s => s.Kind == PropKind.Cabin);
+        if (panels < 30) bad.Add($"only {panels} hoarding panels");
+        if (towers < 4) bad.Add($"only {towers} camera towers");
+        if (cabins < 4) bad.Add($"only {cabins} cabins");
+        Report("props round the lap", bad, $"{panels} hoarding panels, {towers} camera towers, {cabins} cabins, {built.Operators.Count} camera operators in {built.Cells.Count} cells");
+
+        bad = new List<string>();
+        int total = parts.Sum(p => p.Kit.Triangles.Count / 3), biggest = parts.Count == 0 ? 0 : parts.Max(p => p.Kit.Triangles.Count / 3);
+        if (total > 40000) bad.Add($"{total} triangles");
+        if (biggest > 3000) bad.Add($"a cell's mesh of {biggest} triangles");
+        int coarse = built.Cells.Sum(cell => cell.Coarse.Sum(p => p.Kit.Triangles.Count / 3));
+        Report("props cheap to draw", bad, $"{total} triangles near, {coarse} far, in {parts.Count} meshes, biggest {biggest}");
     }
 
     /// <summary>The nearest track sample to a point, in plan.</summary>
