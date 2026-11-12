@@ -1,5 +1,5 @@
 """Poseidon Racing's marks as SVG files with every letter drawn as a path, so they bake the
-same anywhere: the life-ring logo, the trident, and each line of lettering. Writes them to
+same anywhere: the life-ring logo round its trident, and each line of lettering. Writes them to
 out/marks/.
 
 Run: python3 marks.py   (needs fonttools and shapely)
@@ -19,7 +19,6 @@ OUT = HERE / "out" / "marks"
 FONT = {
     "staat": HERE / "font" / "Staatliches-Regular.ttf",
     "alfa": HERE / "font" / "AlfaSlabOne-Regular.ttf",
-    "ops": HERE / "font" / "BlackOpsOne-Regular.ttf",
     "barlow": HERE / "font" / "BarlowCondensed-Bold.ttf",
 }
 
@@ -91,12 +90,6 @@ def words(name, font, s, fill, spacing=0.0, stroke=None):
     svg(OUT / f"{name}.svg", (x0 - pad, y0 - pad, x1 - x0 + 2 * pad, y1 - y0 + 2 * pad), f'{edge}<path d="{d}" fill="{fill}"/>')
 
 
-def trident_mark(name, fill):
-    t = trident()
-    x0, y0, x1, y1 = t.bounds
-    svg(OUT / f"{name}.svg", (x0, y0, x1 - x0, y1 - y0), f'<path d="{ring_d(t)}" fill="{fill}"/>')
-
-
 def lifering():
     """The team logo: a pink and white life ring round the trident on teal, the name on a plate."""
     cx, cy, R, r = 100, 92, 84, 50
@@ -127,13 +120,7 @@ def lifering():
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
     lifering()
-    for col, hexa in (("pink", PINK), ("foam", FOAM), ("teal", TEAL_D)):
-        trident_mark(f"trident-{col}", hexa)
     words("name-alfa", "alfa", "POSEIDON", FOAM, 0.02, (TEAL_D, 4))
-    words("name-ops", "ops", "POSEIDON", TEAL_D, 0.02)
-    words("sub-pink", "barlow", "FISHING SUPPLIES", PINK, 0.12)
     words("sub-foam", "barlow", "FISHING SUPPLIES", FOAM, 0.12)
-    words("sub-pinkd", "barlow", "FISHING SUPPLIES", "#c4166a", 0.12)
     words("rods", "alfa", "RODS  REELS  BAIT", FOAM, 0.04)
-    words("hooked", "ops", "HOOKED ON SPEED", TEAL_D, 0.03)
     print("wrote", OUT)

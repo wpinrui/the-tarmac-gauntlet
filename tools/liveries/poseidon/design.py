@@ -1,5 +1,6 @@
 """Poseidon Racing on the Tora Hanabi: teal with pink, fish scales, the trident and the life-ring
-logo, with a little of the owner's fishing shop. Independent, so no maker's logo. Writes one
+logo, with a little of the owner's fishing shop. Navy at the nose fades to teal ahead of the
+scales. Independent, so no maker's logo. Writes one
 folder of panels per option under out/.
 
 Run: node ../common/views.js ../../../unity/Assets/Art/Vehicles/ToraHanabi/ToraHanabi.obj out/views
@@ -21,16 +22,12 @@ HERE = Path(__file__).resolve().parent
 MARKS = HERE / "out" / "marks"
 sys.path.insert(0, str(HERE.parent / "common"))
 from livery import Livery  # noqa: E402
-import god  # noqa: E402
 
 TEAL = "#0e8f8c"
-TEAL_D = "#07484d"
-TEAL_DD = "#04292d"
 SCALE = "#13a19d"
 SCALE_EDGE = "#0a6b6b"
 FOAM = "#eafaf6"
 PINK = "#ff3d8b"
-PINK_D = "#c4166a"
 NAVY = "#13254d"
 NAVY_D = "#0a1530"
 
@@ -86,91 +83,18 @@ def fade(lv, view, z_teal, z_navy, pts):
     lv.poly(view, pts, f"url(#{gid})")
 
 
-def shop_line(lv, view, p, height, ribbon):
-    """FISHING SUPPLIES: on a pink ribbon, or larger pink letters."""
-    if ribbon:
-        w = height * 1.1 * 11.5 + height * 0.9
-        u, v = lv.uv(view, p)
-        lv.art[view].append(f'<rect x="{u - w / 2:.4f}" y="{v - height * 0.95:.4f}" width="{w:.4f}" '
-                            f'height="{height * 1.9:.4f}" rx="{height * 0.3:.4f}" fill="{PINK}"/>')
-        lv.mark(view, MARKS / "sub-foam.svg", p, height * 1.1)
-    else:
-        lv.mark(view, MARKS / "sub-pink.svg", p, height * 1.3)
+def shop_line(lv, view, p, height):
+    """FISHING SUPPLIES in foam on a pink ribbon, height the letters' height."""
+    w = height * 1.1 * 11.5 + height * 0.9
+    u, v = lv.uv(view, p)
+    lv.art[view].append(f'<rect x="{u - w / 2:.4f}" y="{v - height * 0.95:.4f}" width="{w:.4f}" '
+                        f'height="{height * 1.9:.4f}" rx="{height * 0.3:.4f}" fill="{PINK}"/>')
+    lv.mark(view, MARKS / "sub-foam.svg", p, height * 1.1)
 
 
-
-def bonnet_god(lv):
-    """Poseidon's head facing the nose, his hair trailing back and fading into the teal."""
-    u, v = lv.uv("top", (0, 0, 1.08))
-    k = 1.25 / 300                                  # 300 units = 1.25 m across the bonnet
-    (a, _), (b, _) = lv.uv("top", (0, 0, 0.8)), lv.uv("top", (0, 0, 0.42))
-    lv.art["top"].append(
-        f'<defs><linearGradient id="god-fade" gradientUnits="userSpaceOnUse" x1="{a:.4f}" y1="0" x2="{b:.4f}" y2="0">'
-        f'<stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#000"/></linearGradient>'
-        f'<mask id="god-mask" maskUnits="userSpaceOnUse" x="-9" y="-9" width="18" height="18">'
-        f'<rect x="-9" y="-9" width="18" height="18" fill="url(#god-fade)"/></mask></defs>'
-        f'<g mask="url(#god-mask)"><g transform="translate({u - 200 * k:.4f} {v - 160 * k:.4f}) scale({k:.6f})">'
-        f'{god.head(SCALE, NAVY)}</g></g>')
-
-
-def bonnet_logo(lv):
-    lv.mark("top", MARKS / "logo.svg", (0, 0, 1.15), 0.75, rotate=90)
-
-
-def bonnet_trident(lv):
-    lv.mark("top", MARKS / "trident-pink.svg", (0, 0, 1.12), 1.05, rotate=90)
-
-
-def scroll_line(z0, z1, y, h):
-    """A running wave scroll as (z, b) outline pieces: crests h tall breaking toward the nose."""
-    pieces = []
-    n = max(1, round((z1 - z0) / (h * 1.6)))
-    step = (z1 - z0) / n
-    for i in range(n):
-        za = z0 + i * step
-        c = [(za + step * t, y + h * f) for t, f in ((0, 0), (0.25, 0.1), (0.55, 0.65), (0.8, 1.0), (1.0, 0.9),
-                                                     (1.05, 0.6), (0.92, 0.45), (0.8, 0.55), (0.78, 0.7), (0.7, 0.5),
-                                                     (0.62, 0.2), (0.9, 0.0))]
-        pieces.append(c)
-    pieces.append([(z0, y - h * 0.18), (z1, y - h * 0.18), (z1, y + h * 0.02), (z0, y + h * 0.02)])
-    return pieces
-
-
-def bonnet_waves(lv):
-    """Twin pink wave-scroll stripes down the bonnet, breaking toward the nose."""
-    for side in (-1, 1):
-        for piece in scroll_line(0.45, 1.85, side * 0.22 - 0.06, 0.12):
-            lv.poly("top", [(b, 0, z) for z, b in piece], PINK)
-
-
-def meander(z0, z1, b, h):
-    """A Greek key line as a list of (z, b) points, h wide."""
-    u = h / 4
-    pts, z = [], z0
-    while z + 4 * u <= z1 + 1e-6:
-        pts += [(z, b), (z + 3 * u, b), (z + 3 * u, b + 3 * u), (z + u, b + 3 * u), (z + u, b + 2 * u),
-                (z + 2 * u, b + 2 * u), (z + 2 * u, b + u), (z, b + u), (z, b + 4 * u), (z + 4 * u, b + 4 * u)]
-        pts.append((z + 4 * u, b))
-        z += 4 * u
-    return pts
-
-
-def bonnet_key(lv):
-    """Twin Greek key stripes down the bonnet."""
-    for side in (-1, 1):
-        pts = meander(0.45, 1.85, side * 0.2 - 0.07, 0.14)
-        d = " ".join(f"{'M' if i == 0 else 'L'}{u:.4f},{v:.4f}" for i, (u, v) in
-                     enumerate(lv.uv("top", (b, 0, z)) for z, b in pts))
-        lv.art["top"].append(f'<path d="{d}" fill="none" stroke="{PINK}" stroke-width="0.022" stroke-linejoin="miter"/>')
-
-
-BONNET = {"god": bonnet_god, "logo": bonnet_logo, "waves": bonnet_waves, "key": bonnet_key, "clean": lambda lv: None,
-          "trident": bonnet_trident}
-
-
-def scale_mail(z0=-0.05, z_navy=0.9, ribbon=True, bonnet="trident"):
-    """Scales from z0 back on teal; in front of them the teal fades to navy by z_navy; a pink
-    pinstripe nose to tail."""
+def scale_mail(z0=-0.05, z_navy=2.0):
+    """Scales from z0 back on teal; in front of them the teal fades to navy at z_navy; a pink
+    pinstripe nose to tail; the life ring on the bonnet and the rear deck."""
     def make(views):
         lv = Livery(views, TEAL)
         for view in ("left", "right"):
@@ -195,61 +119,21 @@ def scale_mail(z0=-0.05, z_navy=0.9, ribbon=True, bonnet="trident"):
         # Name on the door's front half and the front wing, the shop under it.
         lv.side_mark(MARKS / "name-alfa.svg", 0.40, 0.62, 0.135)
         for view in ("left", "right"):
-            shop_line(lv, view, lv._side(view, 0.40, 0.48), 0.05, ribbon)
+            shop_line(lv, view, lv._side(view, 0.40, 0.48), 0.05)
         # Number on a foam plate on the door's back half, over the scales.
         lv.side_poly([(-0.18, 0.47), (-0.18, 0.75), (-0.72, 0.75), (-0.72, 0.47)], FOAM)
         lv.side_number(-0.45, 0.61, 0.46, 0.2, NAVY_D)
-        # Trident down the bonnet, prongs to the nose; logo on the rear deck.
-        BONNET[bonnet](lv)
-        lv.mark("top", MARKS / "logo.svg", (0, 0, -1.5), 0.5, rotate=90)
+        # The life ring on the bonnet, upright from the front, and on the rear deck, upright from behind.
+        lv.mark("top", MARKS / "logo.svg", (0, 0, 1.15), 0.75, rotate=-90)
+        lv.mark("top", MARKS / "logo.svg", (0, 0, -1.62), 0.4, rotate=90)
         # Shop line on the tail.
-        lv.mark("rear", MARKS / "rods.svg", (0, 0.46, 0), 0.07)
-        shop_line(lv, "rear", (0, 0.35, 0), 0.04, ribbon)
+        lv.mark("rear", MARKS / "rods.svg", (0, 0.545, 0), 0.07)
+        shop_line(lv, "rear", (0, 0.445, 0), 0.04)
         return lv
     return make
 
 
-def waterline():
-    """A boat's hull: foam topsides, teal below a waterline that rises to bow and stern, a pink
-    boot stripe on it and scales under the water."""
-    def wl(z):
-        return 0.42 + 0.06 * ((z + 0.04) / 2.08) ** 2
-
-    def make(views):
-        lv = Livery(views, FOAM)
-        line = [(z / 20, wl(z / 20)) for z in range(-44, 45)]
-        lv.side_poly(line + [(2.3, -0.1), (-2.3, -0.1)], TEAL)
-        for edge, face in scale_field(-2.3, 2.3, -0.1, 0.6, bulge=-1):
-            lv.side_poly(edge, SCALE_EDGE)
-            lv.side_poly(face, SCALE)
-        lv.side_poly(line + [(2.3, 2.0), (-2.3, 2.0)], FOAM)  # the scales stop at the water
-        lv.side_poly(strip(line, 0.06), PINK)
-        bow, stern = wl(2.02), wl(-2.11)
-        lv.band_x(-2, 2, TEAL, views=("front",), y=(-0.1, bow))
-        lv.band_x(-2, 2, TEAL, views=("rear",), y=(-0.1, stern))
-        lv.band_x(-2, 2, PINK, views=("front",), y=(bow - 0.03, bow + 0.03))
-        lv.band_x(-2, 2, PINK, views=("rear",), y=(stern - 0.03, stern + 0.03))
-        # Name amidships, the number forward on the wing like a boat's bow number.
-        lv.side_mark(MARKS / "name-ops.svg", -0.32, 0.73, 0.13)
-        lv.side_mark(MARKS / "sub-pinkd.svg", -0.32, 0.61, 0.045)
-        lv.side_number(0.6, 0.72, 0.46, 0.2, TEAL_D)
-        # Teal trident down the bonnet, logo on the rear deck.
-        lv.mark("top", MARKS / "trident-teal.svg", (0, 0, 1.12), 1.05, rotate=90)
-        lv.mark("top", MARKS / "logo.svg", (0, 0, -1.5), 0.5, rotate=90)
-        lv.mark("rear", MARKS / "hooked.svg", (0, 0.58, 0), 0.06)
-        return lv
-    return make
-
-
-OPTIONS = {
-    "god": scale_mail(bonnet="god"),
-    "logo": scale_mail(bonnet="logo"),
-    "waves": scale_mail(bonnet="waves"),
-    "key": scale_mail(bonnet="key"),
-    "clean": scale_mail(bonnet="clean"),
-    "long-fade": scale_mail(z_navy=2.0, bonnet="clean"),
-    "big-text": scale_mail(ribbon=False, bonnet="clean"),
-}
+OPTIONS = {"poseidon": scale_mail()}
 
 if __name__ == "__main__":
     views = HERE / "out" / "views" / "views.json"
