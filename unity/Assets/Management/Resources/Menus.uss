@@ -29,7 +29,7 @@
 .year { font-size: 15px; letter-spacing: 0.9px; color: rgba(255, 255, 255, 0.62); margin-right: 18px; }
 .money { font-size: 21px; color: rgb(61, 220, 132); }
 
-/* Hub menu and icon strip */
+/* Hub menu: on the hub and beside every panel, the open screen's item lit */
 .menu { position: absolute; left: 32px; top: 112px; padding: 10px; }
 .layer.centre > .menu { position: relative; left: 0; top: 0; }
 .group.spaced { margin-top: 14px; }
@@ -39,15 +39,8 @@
 .hub-item { padding-left: 50px; }
 .item-icon { position: absolute; left: 16px; top: 10px; width: 20px; height: 20px; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.75); }
 .item:hover .item-icon, .item.on .item-icon { -unity-background-image-tint-color: rgb(255, 255, 255); }
-.strip { position: absolute; left: 32px; top: 112px; padding: 8px; }
-.strip .group.spaced { margin-top: 12px; }
-.icon { width: 52px; height: 46px; border-radius: 12px; align-items: center; justify-content: center; }
-.icon:hover { background-color: rgba(255, 255, 255, 0.1); }
-.icon.on { background-color: rgba(255, 255, 255, 0.2); }
-.icon-image { width: 22px; height: 22px; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.75); }
-.icon:hover .icon-image, .icon.on .icon-image { -unity-background-image-tint-color: rgb(255, 255, 255); }
-.item.dim, .icon.dim { opacity: 0.35; }
-.item.dim:hover, .icon.dim:hover { background-color: rgba(0, 0, 0, 0); }
+.item.dim { opacity: 0.35; }
+.item.dim:hover { background-color: rgba(0, 0, 0, 0); }
 
 /* The race car's tag in the garage */
 .tag { position: absolute; min-width: 250px; padding: 12px 16px; }
@@ -60,6 +53,7 @@
 /* Panels */
 .panel { position: absolute; right: 32px; top: 100px; bottom: 32px; width: 620px; border-radius: 24px; padding: 16px; }
 .panel-body { flex-grow: 1; }
+.back { flex-shrink: 0; margin-bottom: 8px; }
 .panel#crew, .panel#new-game { bottom: auto; }
 .panel#finances { bottom: auto; max-height: 768px; }
 .side { position: absolute; right: 668px; top: 100px; width: 460px; border-radius: 24px; padding: 20px; }
