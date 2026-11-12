@@ -4,7 +4,7 @@ namespace TarmacGauntlet.Raceday
 {
     /// <summary>
     /// The pixels of the paved surfaces' textures, made in code: tarmac grain with its normals, the broad patches laid
-    /// over it, kerbs clean and worn, and the racing line along the lap. Every texture repeats seamlessly. Pixels are
+    /// over it, kerbs clean and worn, the racing line along the lap, where water pools on the road and raindrop ripples. Every texture repeats seamlessly. Pixels are
     /// rows from the bottom, as <see cref="Texture2D.SetPixels(Color[])"/> takes them, x along u and y along v.
     /// </summary>
     public static class TrackTextures
@@ -15,6 +15,11 @@ namespace TarmacGauntlet.Raceday
         public const int MacroSize = 256;
         /// <summary>Kerb tile in pixels: across its 1.5 m, and along one red and one white block.</summary>
         public const int KerbAcross = 128, KerbAlong = 256;
+        /// <summary>Side of the raindrop ripple tile in pixels, and the metres it covers.</summary>
+        public const int RippleSize = 256;
+        public const float RippleMetres = 1.6f;
+        /// <summary>Raindrops on the ripple tile, a jittered grid of this many a side.</summary>
+        private const int RippleCells = 22;
 
         /// <summary>Tarmac's shape, shared by every tarmac: its height, and what lies at each pixel.</summary>
         public sealed class Tarmac
@@ -109,7 +114,9 @@ namespace TarmacGauntlet.Raceday
                     float relaid = Fbm(x, y, s, 6, 2, seed + 11);
                     float patch = broad * 0.7f + (relaid > 0.35f ? 0.12f : relaid < -0.4f ? -0.1f : 0f);
                     float streak = Fbm(x, y, s, 32, 3, seed + 23);
-                    px[y * s + x] = new Color(Mathf.Clamp01(0.5f + patch * 0.5f), Mathf.Clamp01(0.5f + streak * 0.6f), 0.5f, 1f);
+                    // Where water stands first in a hollow: shallow dips in the surface, a few to the tile.
+                    float dips = Fbm(x, y, s, 5, 3, seed + 37);
+                    px[y * s + x] = new Color(Mathf.Clamp01(0.5f + patch * 0.5f), Mathf.Clamp01(0.5f + streak * 0.6f), Mathf.Clamp01(0.5f + dips * 0.9f), 1f);
                 }
             return px;
         }
@@ -217,6 +224,99 @@ namespace TarmacGauntlet.Raceday
                 float t = span > 1e-4f ? Mathf.Clamp01((d - along[seg]) / span) : 0f;
                 int b = (seg + 1) % n;
                 px[j] = new Color(Mathf.Lerp(fromLeft[seg], fromLeft[b], t), Mathf.Lerp(rubber[seg], rubber[b], t), 0f, 1f);
+            }
+            return px;
+        }
+
+        /// <summary>
+        /// Raindrop rings on a tile, read by the track shader to ripple standing water. Each pixel inside a drop's ring
+        /// holds how near the drop's centre it is in r (1 at the centre, 0 at the ring's edge), the direction out from the
+        /// centre in g and b (0.5 for none), and the drop's own moment in its cycle in a, so the drops fall out of step.
+        /// Pixels outside every drop are (0, 0.5, 0.5, 0). Repeats seamlessly.
+        /// </summary>
+        public static Color[] Ripples(int seed)
+        {
+            const int s = RippleSize, cells = RippleCells;
+            float cell = s / (float)cells;
+            var cx = new float[cells * cells];
+            var cy = new float[cells * cells];
+            var radius = new float[cells * cells];
+            var phase = new float[cells * cells];
+            var rng = new System.Random(seed);
+            for (int i = 0; i < cells * cells; i++)
+            {
+                cx[i] = ((i % cells) + 0.15f + 0.7f * (float)rng.NextDouble()) * cell;
+                cy[i] = ((i / cells) + 0.15f + 0.7f * (float)rng.NextDouble()) * cell;
+                radius[i] = cell * (0.55f + 0.5f * (float)rng.NextDouble());
+                phase[i] = (float)rng.NextDouble();
+            }
+            var px = new Color[s * s];
+            for (int y = 0; y < s; y++)
+                for (int x = 0; x < s; x++)
+                {
+                    float px0 = x + 0.5f, py0 = y + 0.5f;
+                    int gx = (int)(px0 / cell), gy = (int)(py0 / cell);
+                    Color best = new Color(0f, 0.5f, 0.5f, 0f);
+                    float nearest = 0f;
+                    for (int j = -1; j <= 1; j++)
+                        for (int i = -1; i <= 1; i++)
+                        {
+                            int ix = Wrap(gx + i, cells), iy = Wrap(gy + j, cells), k = iy * cells + ix;
+                            // The drop's centre, moved by a whole tile where the neighbour wrapped round.
+                            float dx = px0 - (cx[k] + (gx + i - ix) * cell), dy = py0 - (cy[k] + (gy + j - iy) * cell);
+                            float d = Mathf.Sqrt(dx * dx + dy * dy);
+                            float near = 1f - d / radius[k];
+                            if (near <= nearest) continue;
+                            nearest = near;
+                            float inv = d > 1e-4f ? 1f / d : 0f;
+                            best = new Color(near, 0.5f + 0.5f * dx * inv, 0.5f + 0.5f * dy * inv, phase[k]);
+                        }
+                    px[y * s + x] = best;
+                }
+            return px;
+        }
+
+        /// <summary>
+        /// Where water stands on the road along the lap, one texel a metre or so, read by the track shader beside the
+        /// racing line map: in r how ready the road is to hold a puddle, high in a dip it can't drain from and low on a
+        /// slope; in g which edge the camber drains to, 1 the right, -1 the left, 0 both; in b the road's width, m.
+        /// </summary>
+        /// <param name="along">Distance along the road at each sample and once more at the end, as <see cref="CircuitBuilder.RoadAlong"/>.</param>
+        /// <param name="height">The road's height at its middle at each sample, m.</param>
+        /// <param name="crossfall">Its rise to the left per metre across at each sample.</param>
+        /// <param name="width">Its width at each sample, m.</param>
+        public static Color[] Pools(float[] along, float[] height, float[] crossfall, float[] width, int texels)
+        {
+            int n = height.Length;
+            float total = along[n];
+            float step = total / n;
+            // A dip: lower than the highest road both ahead and behind within a reach, water can't run out of it.
+            int reach = Mathf.Max(1, Mathf.RoundToInt(80f / step)), near = Mathf.Max(1, Mathf.RoundToInt(6f / step));
+            var pool = new float[n];
+            for (int k = 0; k < n; k++)
+            {
+                float behind = height[k], ahead = height[k];
+                for (int j = 1; j <= reach; j++)
+                {
+                    behind = Mathf.Max(behind, height[((k - j) % n + n) % n]);
+                    ahead = Mathf.Max(ahead, height[(k + j) % n]);
+                }
+                float dip = Mathf.Clamp01((Mathf.Min(behind, ahead) - height[k]) / 0.3f);
+                float grade = Mathf.Abs(height[(k + near) % n] - height[((k - near) % n + n) % n]) / (2f * near * step);
+                float level = Mathf.Clamp01(1f - grade / 0.015f);
+                pool[k] = Mathf.Clamp01(dip * 0.9f + level * 0.4f);
+            }
+            var px = new Color[texels];
+            int seg = 0;
+            for (int j = 0; j < texels; j++)
+            {
+                float d = total * (j + 0.5f) / texels;
+                while (seg < n - 1 && along[seg + 1] <= d) seg++;
+                float span = along[seg + 1] - along[seg];
+                float t = span > 1e-4f ? Mathf.Clamp01((d - along[seg]) / span) : 0f;
+                int b = (seg + 1) % n;
+                float cross = Mathf.Lerp(crossfall[seg], crossfall[b], t);
+                px[j] = new Color(Mathf.Lerp(pool[seg], pool[b], t), Mathf.Clamp(cross / 0.012f, -1f, 1f), Mathf.Lerp(width[seg], width[b], t), 1f);
             }
             return px;
         }
