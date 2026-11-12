@@ -163,8 +163,8 @@ def cockpit_cutters():
     x1 = R["screen"]["x_base"] - 0.06
     rings = []
     for x in np.linspace(CABIN_BACK, x1, 44):
-        g = body.inside(x, 0.035).intersection(
-            box(-3, FLOOR, 3, BELT - 0.07).union(box(-COCKPIT_Y, FLOOR, COCKPIT_Y, BELT + 0.02)))
+        g = body.inside(x, 0.035).intersection(box(-3, FLOOR, 3, BELT - 0.07)).union(
+            box(-COCKPIT_Y, FLOOR, COCKPIT_Y, BELT + 0.02))      # no skin left under the opening's floor
         if g.geom_type != "Polygon":
             g = max(g.geoms, key=lambda q: q.area)
         rings.append(np.column_stack([np.full(96, x), ring_of(orient(g, 1), 96)]))
@@ -451,7 +451,9 @@ def prism_y(name, g, y0, y1, mat="interior"):
 
 def _door_top(grow, sgn=1):
     """The door top, straight through from the cockpit's edge outwards."""
-    g = biggest(door_outline().intersection(box(-5, DOOR_TOP, 5, 5)).buffer(grow, join_style=2))
+    o = door_outline()
+    lip = box(o.bounds[0], BELT - 0.01, DOOR_FRONT[0][0], BELT + 0.04)   # past the opening's floor: no sliver of body left above the door
+    g = biggest(o.union(lip).intersection(box(-5, DOOR_TOP, 5, 5)).buffer(grow, join_style=2))
     return [prism_y("door_top", g, (COCKPIT_Y - 0.01 - grow) * sgn, 1.4 * sgn, mat="body")]
 
 
