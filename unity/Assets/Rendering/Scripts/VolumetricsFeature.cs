@@ -12,7 +12,8 @@ namespace TarmacGauntlet.Rendering
     /// The race's volumetric clouds and fog, drawn once the sky is: real clouds in place of the sky shader's painted ones,
     /// lit towards the sun and shaped by the same cloud map as their shadows (<see cref="CloudShadows"/>), and a low mist
     /// that the sun shines through in shafts between the trees and the floodlights light in beams at night. Each follows
-    /// its graphics option. Both are worked out at half the resolution across and down, then smoothed over frames and laid
+    /// its graphics option. Both are worked out at a third of the resolution across and down at High and a half at Ultra,
+    /// skipping the 3D noise wherever the cloud map is clear, then smoothed over frames and laid
     /// over the picture by depth (the Volumetrics shader). Only the race's own cameras draw them, and only while a race sky
     /// is published (<see cref="Atmosphere"/>): reflections keep the painted clouds.
     /// </summary>
@@ -67,8 +68,13 @@ namespace TarmacGauntlet.Rendering
         private sealed class VolumetricsPass : ScriptableRenderPass
         {
             private const int March = 0, Resolve = 1, Composite = 2;
-            /// <summary>The clouds' extinction at full thickness, per m.</summary>
-            private const float CloudExtinction = 0.02f;
+            /// <summary>The clouds' extinction at full thickness, per m: dense enough that their edges read crisp.</summary>
+            private const float CloudExtinction = 0.05f;
+            /// <summary>
+            /// The march is worked out at the frame's size over this, across and down: a third at High, a half at Ultra, so the
+            /// clouds' edges stay crisp. At 2560 x 1440 High marches 853 x 480 and Ultra 1280 x 720 with more steps.
+            /// </summary>
+            private const int HighDivisor = 3, UltraDivisor = 2;
             /// <summary>How far the mist is marched, m: past it the scene's haze carries on.</summary>
             private const float FogReach = 700f;
             /// <summary>A camera that moves further than this in a frame, m, or turns further, degrees, has cut to another shot.</summary>
@@ -137,7 +143,9 @@ namespace TarmacGauntlet.Rendering
                 if (!color.IsValid() || !depth.IsValid()) return;
                 Camera camera = cameraData.camera;
                 TextureDesc frame = renderGraph.GetTextureDesc(color);
-                int w = Mathf.Max(1, frame.width / 2), h = Mathf.Max(1, frame.height / 2);
+                bool ultra = QualityLevels.Level >= 3;
+                int divisor = ultra ? UltraDivisor : HighDivisor;
+                int w = Mathf.Max(1, frame.width / divisor), h = Mathf.Max(1, frame.height / divisor);
                 History history = HistoryFor(camera, w, h);
 
                 Matrix4x4 viewProj = GL.GetGPUProjectionMatrix(cameraData.GetProjectionMatrix(), true) * cameraData.GetViewMatrix();
@@ -149,11 +157,10 @@ namespace TarmacGauntlet.Rendering
                 history.ViewProj = viewProj;
                 history.Pose = pose;
 
-                bool ultra = QualityLevels.Level >= 3;
                 Atmosphere.Sky sky = Atmosphere.Now;
                 float cloudBase = Atmosphere.CloudBase - 300f * sky.Overcast;
-                var steps = new Vector4(clouds ? (ultra ? 64 : 40) : 0, fog ? (ultra ? 40 : 24) : 0, FogReach, blend ? 1f : 0f);
-                var slab = new Vector4(cloudBase, cloudBase + Mathf.Lerp(1100f, 1700f, sky.Overcast), CloudExtinction, clouds ? 1f : 0f);
+                var steps = new Vector4(clouds ? (ultra ? 48 : 32) : 0, fog ? (ultra ? 24 : 16) : 0, FogReach, blend ? 1f : 0f);
+                var slab = new Vector4(cloudBase, cloudBase + Mathf.Lerp(900f, 1500f, sky.Overcast), CloudExtinction, clouds ? 1f : 0f);
                 var camPos = new Vector4(pose.position.x, pose.position.y, pose.position.z, Time.frameCount & 63);
                 var lowSize = new Vector4(1f / w, 1f / h, w, h);
                 Matrix4x4 invViewProj = viewProj.inverse;

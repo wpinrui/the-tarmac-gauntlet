@@ -126,34 +126,39 @@ Shader "Hidden/TarmacGauntlet/Volumetrics"
                 return _TgBeams.yzw * (lit / (4.0 * PI));
             }
 
-            // How thick the cloud is here, 0 to 1.
+            // How thick the cloud is here, 0 to 1. Each cloud is one patch of the cloud map, cut sharply at the same edge its
+            // shadow has, with blue sky between: a flat base at one height, and a dome whose top climbs with how far into
+            // the patch it is. The 3D noise only works at its outside, puffing the dome into billows and fraying its edges,
+            // and is not read at all where the map has no cloud.
             float CloudDensity(float3 p)
             {
                 float h = saturate((p.y - _TgCloudSlab.x) / (_TgCloudSlab.y - _TgCloudSlab.x));
-                float cover = TgCloudCover(p.xz);
-                // Flat bases, and tops that climb as the cover thickens: thin cloud is a low puff, a deck fills the layer.
-                float c = cover * saturate(h * 7.0) * saturate((cover * 1.15 - h) * 3.5);
-                if (c < 0.01) return 0.0;
+                float o = _TgCloudMap.z;
+                float n = TgCloudNoise(p.xz * _TgCloudMap.x, o);
+                float edge = _TgCloudMap.y + 0.04 - 0.2 * o;
+                float into = (n - edge) / (0.22 + 0.1 * o);
+                if (into <= 0.0) return 0.0;
+                float top = 0.2 + 0.8 * saturate(into) + o;
+                float dome = saturate((top - h) * 6.0) * saturate(h * 30.0) * saturate(into * 6.0);
+                if (dome <= 0.0) return 0.0;
                 float3 q = (p + float3(_TgCloudDrift.x, 0.0, _TgCloudDrift.y)) / 1800.0;
                 float billows = SAMPLE_TEXTURE3D_LOD(_TgCloudNoise3D, sampler_TgCloudNoise3D, q, 0).r;
-                float d = saturate((billows - (1.0 - c)) / max(c, 0.05));
-                if (d <= 0.0) return 0.0;
-                float detail = SAMPLE_TEXTURE3D_LOD(_TgCloudNoise3D, sampler_TgCloudNoise3D, q * 4.0, 0).g;
-                // The fine cells eat the edges, more at the wispy tops than the base.
-                float eat = (1.0 - detail) * 0.35 * (1.0 - 0.5 * h);
-                return saturate((d - eat) / (1.0 - eat));
+                float d = saturate((dome - (1.0 - billows) * 0.6) / 0.4);
+                if (d <= 0.0 || d >= 0.95) return d;
+                float detail = SAMPLE_TEXTURE3D_LOD(_TgCloudNoise3D, sampler_TgCloudNoise3D, q * 5.0, 0).g;
+                return saturate(d - (1.0 - detail) * 0.3 * (1.0 - d));
             }
 
-            // Optical depth from here towards the sun, through five steps of growing length.
+            // Optical depth from here towards the sun, over the same 900 m as ever in three steps of growing length.
             float TowardsSun(float3 p, float3 sun)
             {
-                float depth = 0.0, step = 60.0;
+                float depth = 0.0;
                 UNITY_UNROLL
-                for (int j = 0; j < 5; j++)
+                for (int j = 1; j <= 3; j++)
                 {
+                    float step = 150.0 * j;
                     p += sun * step;
                     depth += CloudDensity(p) * step;
-                    step += 60.0;
                 }
                 return depth * _TgCloudSlab.z;
             }
@@ -201,7 +206,8 @@ Shader "Hidden/TarmacGauntlet/Volumetrics"
                 if (_TgCloudSlab.w > 0.5 && d.y > 0.01)
                 {
                     float enter = max((_TgCloudSlab.x - cam.y) / d.y, 0.0);
-                    float leave = min(min((_TgCloudSlab.y - cam.y) / d.y, dist), 40000.0);
+                    // Rays low over the horizon cross the layer for many kilometres: they stop at 15, by when the haze has the clouds.
+                    float leave = min(min((_TgCloudSlab.y - cam.y) / d.y, dist), min(enter + 15000.0, 30000.0));
                     if (leave > enter)
                     {
                         int steps = (int)_TgSteps.x;
@@ -226,14 +232,14 @@ Shader "Hidden/TarmacGauntlet/Volumetrics"
                                 float through = exp(-rho * _TgCloudSlab.z * dt);
                                 cloudLight += cloudT * light * (1.0 - through);
                                 cloudT *= through;
-                                if (cloudT < 0.01) break;
+                                if (cloudT < 0.02) break;
                             }
                             t += dt;
                         }
                         // Low down the clouds fade into the haze at the horizon, and the furthest go altogether.
                         float haze = exp(-d.y * 10.0) * 0.8;
                         cloudLight = lerp(cloudLight, _TgHaze.rgb * (1.0 - cloudT), haze);
-                        float keep = saturate(1.0 - (enter - 20000.0) / 15000.0);
+                        float keep = saturate(1.0 - (enter - 12000.0) / 12000.0);
                         cloudLight *= keep;
                         cloudT = lerp(1.0, cloudT, keep);
                     }
