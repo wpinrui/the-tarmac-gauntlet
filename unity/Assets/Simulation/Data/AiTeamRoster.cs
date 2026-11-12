@@ -103,7 +103,7 @@ namespace TarmacGauntlet.Simulation
             new AiTeamEntry { Name = "Stonebridge Kaiser", Descriptor = "British-run Kaiser customer racing outfit", Nationality = "gb", ModelId = "b-24", CarClass = CarClass.B },
             new AiTeamEntry { Name = "Sip Vanessa Racing", Descriptor = "veteran-run multi-series operation", Nationality = "us", ModelId = "b-22", CarClass = CarClass.B },
             new AiTeamEntry { Name = "Vespro Corse", Descriptor = "Italian GT privateer powerhouse", Nationality = "it", ModelId = "b-23", CarClass = CarClass.B },
-            new AiTeamEntry { Name = "Green Goat Racing", Descriptor = "energy drink empire's factory racing arm", Nationality = "at", ModelId = "b-24", CarClass = CarClass.B },
+            new AiTeamEntry { Name = "Green Goat Racing", Descriptor = "energy drink empire's factory racing arm", Nationality = "cn", ModelId = "b-24", CarClass = CarClass.B },
             new AiTeamEntry { Name = "Vosper Liberty Racing", Descriptor = "Liberty-backed privateer with works engines", Nationality = "us", ModelId = "b-25", CarClass = CarClass.B },
             new AiTeamEntry { Name = "Tsubame Racing", Descriptor = "Japanese motorcycle giant's four-wheel factory effort", Nationality = "jp", ModelId = "b-21", CarClass = CarClass.B },
             new AiTeamEntry { Name = "Zugzwang Factory Racing", Descriptor = "Austrian works team with two-wheel pedigree", Nationality = "at", ModelId = "b-22", CarClass = CarClass.B },
