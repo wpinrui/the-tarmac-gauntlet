@@ -108,11 +108,14 @@ def flat(x, z):
 
 SHOTS = {
     # ground height, car pitch (degrees, nose up), masts along the track, garage, the car raised (m: up on its jacks)
-    "crest": (crest_height, math.degrees(math.atan(0.12)), True, False, 0.0),
+    "crest": (crest_height, math.degrees(math.atan(0.12)) + 3.0, True, False, 0.0),
     "straight": (flat, 0.0, True, False, 0.0),
-    "garage": (flat, 0.0, False, True, 0.3),
+    "garage": (flat, 0.0, False, True, 0.0),
 }
 LIFT = SHOTS[shot][4]
+# Other cars, each by its nose (x, z) and heading (degrees from ahead): their beams are drawn too.
+OTHERS = {"crest": [(1.0, -7.0, 0.0), (-1.2, -14.0, 0.0)], "straight": [(2.0, -9.0, 0.0)],
+          "garage": [(-4.0, 4.5, 90.0), (-12.0, 4.5, 90.0), (-6.0, -6.0, 90.0)]}
 
 
 def scene(s):
@@ -183,6 +186,12 @@ def scene(s):
         for x, z in ((-3.4, 18.5), (3.3, 18.6), (-3.6, 11)):
             box((x, 0.5, z), (1.0, 1.0, 0.6), tools)
         box((0, 0.6, -9), (40, 1.2, 0.4), concrete)
+    other = material("other car", (0.2, 0.25, 0.6), 0.3)
+    for origin, right, up, fwd in other_frames():
+        c = origin + up * 0.6 - fwd * 2.2
+        yaw = math.atan2(fwd[0], fwd[2])
+        pitch_o = math.asin(max(min(fwd[1], 1), -1))
+        box(c, (1.9, 0.9, 4.4), other, rot=(pitch_o, 0, -yaw))
     # The own car's bonnet, under the camera, nose at the beam's start.
     bonnet = material("bonnet", (0.55, 0.12, 0.05), 0.45)
     car = bpy.data.objects.new("car", None)
@@ -207,6 +216,7 @@ def world(s):
     mix.data_type = "RGBA"
     nt.links.new(lp.outputs["Is Camera Ray"], mix.inputs[0])
     amb = skyclock.ambient(s["amb_sky"] * 0.5 + s["amb_eq"] * 0.5)
+    sky_lin, cloud_lin = radiance_for(SKY_SEEN, s), radiance_for(CLOUD_SEEN, s)
     mix.inputs[6].default_value = (*amb, 1)
     # The sky the camera sees, with moonlit cumulus over it as in the race at night.
     noise = nt.nodes.new("ShaderNodeTexNoise")
@@ -214,13 +224,28 @@ def world(s):
     noise.inputs["Detail"].default_value = 6.0
     ramp = nt.nodes.new("ShaderNodeValToRGB")
     ramp.color_ramp.elements[0].position = 0.5
-    ramp.color_ramp.elements[0].color = (*lin(s["zenith"] * 0.6 + s["horizon"] * 0.4), 1)
+    ramp.color_ramp.elements[0].color = (*sky_lin, 1)
     ramp.color_ramp.elements[1].position = 0.7
-    ramp.color_ramp.elements[1].color = (*(lin(s["zenith"] * 0.6 + s["horizon"] * 0.4) + 0.12), 1)
+    ramp.color_ramp.elements[1].color = (*cloud_lin, 1)
     nt.links.new(noise.outputs["Fac"], ramp.inputs["Fac"])
     nt.links.new(ramp.outputs["Color"], mix.inputs[7])
     nt.links.new(mix.outputs[2], bg.inputs["Color"])
     bpy.context.scene.world = w
+
+
+# The race's sky and moonlit cloud at 19:03, as they come out on screen in Ivan's frames (sRGB).
+SKY_SEEN, CLOUD_SEEN = (62, 78, 110), (165, 175, 195)
+
+
+def radiance_for(seen, s):
+    """The linear sky radiance that the post stack turns into this sRGB colour on screen."""
+    want = lin(np.asarray(seen, dtype=np.float64) / 255.0)
+    g = skyclock.grade(s)
+    r = want.copy() * 0.3
+    for _ in range(60):
+        got = lin(frame(r[None, None, :], **g)[0, 0])
+        r = r * (want / np.maximum(got, 1e-6)) ** 0.7
+    return r
 
 
 def moon(s):
@@ -236,18 +261,35 @@ def moon(s):
     bpy.context.scene.collection.objects.link(o)
 
 
-def car_frame(pitch):
-    """The car's frame in Unity's axes: its origin on the ground under the nose, its right, up and forward."""
-    p = math.radians(pitch)
-    fwd = np.array([0.0, math.sin(p), math.cos(p)])
-    up = np.array([0.0, math.cos(p), -math.sin(p)])
-    return np.array([0.0, LIFT, 0.0]), np.array([1.0, 0, 0]), up, fwd
+def car_frame(pitch, origin=None, yaw=0.0):
+    """A car's frame in Unity's axes: its origin on the ground under the nose, its right, up and forward."""
+    p, y = math.radians(pitch), math.radians(yaw)
+    flat_fwd = np.array([math.sin(y), 0.0, math.cos(y)])
+    fwd = flat_fwd * math.cos(p) + np.array([0, 1.0, 0]) * math.sin(p)
+    up = np.array([0, 1.0, 0]) * math.cos(p) - flat_fwd * math.sin(p)
+    right = np.cross(up, fwd)
+    if origin is None: origin = np.array([0.0, LIFT, 0.0])
+    return np.asarray(origin, dtype=np.float64), right, up, fwd
+
+
+def other_frames():
+    """The other cars whose beams reach into the shot: close behind on the climb, or passing along the pit lane."""
+    height, pitch = SHOTS[shot][0], SHOTS[shot][1]
+    out = []
+    for x, z, yaw in OTHERS[shot]:
+        out.append(car_frame(pitch if shot == "crest" else 0.0, (x, height(x, z), z), yaw))
+    return out
 
 
 def camera(pitch):
     origin, right, up, fwd = car_frame(pitch)
-    pos = origin + up * 1.25 - fwd * 2.4
-    target = pos + fwd * 10 - up * 0.9
+    if shot == "garage":
+        # The low camera on the car's nose, as in Ivan's frame of the pit lane: no bonnet in view.
+        pos = origin + up * 0.7 + fwd * 0.1
+        target = pos + fwd * 10 - up * 0.4
+    else:
+        pos = origin + up * 1.25 - fwd * 2.4
+        target = pos + fwd * 10 - up * 0.9
     cam = bpy.data.cameras.new("cam")
     cam.sensor_fit = "VERTICAL"
     fov = 46.0
@@ -285,17 +327,18 @@ def read_layers(path):
 def pools(pos, up_facing, height):
     """LightPool's falloff for the masts' pools, which lie on the track under each lamp's aim."""
     p = np.zeros(pos.shape[:-1])
-    for k in range(-2, 34):
-        z = k * 45.0
-        x = 3.0 if k % 2 else -3.0
+    # The pit roof's pools along the lane, or the masts' along the track.
+    centres = [(x, -1.0) for x in (-24.0, -8.0, 8.0, 24.0)] if shot == "garage" else \
+        [(3.0 if k % 2 else -3.0, k * 45.0) for k in range(-2, 34)]
+    for x, z in centres:
         d = np.sqrt((pos[..., 0] - x) ** 2 + (pos[..., 2] - z) ** 2) / 26.0
         p = np.maximum(p, np.clip(1 - d * d, 0, 1) ** 2)
     return p * up_facing
 
 
-def beam_card(cam, dirs, depth_t, pitch):
+def beam_card(cam, dirs, depth_t, fr):
     """Before: the flat card 5 cm over the car's ground, drawn where it is in front of the scene. Returns its falloff."""
-    origin, right, up, fwd = car_frame(pitch)
+    origin, right, up, fwd = fr
     o = origin + up * 0.05
     denom = dirs @ up
     t = ((o - cam) @ up) / np.where(np.abs(denom) > 1e-6, denom, 1e-6)
@@ -330,9 +373,9 @@ def sm(a, b_, x):
     return t * t * (3 - 2 * t)
 
 
-def beam_decal(pos, sky, cam, pitch):
+def beam_decal(pos, sky, cam, fr):
     """After: HeadlampBeam's weight at each pixel: inside the beam, near the car's ground, facing up."""
-    origin, right, up, fwd = car_frame(pitch)
+    origin, right, up, fwd = fr
     rel = pos - origin
     x, y, z = rel @ right, rel @ up, rel @ fwd
     t = z / BEAM_LENGTH
@@ -462,35 +505,44 @@ def main():
 
     # The masts' pools, over the opaque scene.
     height = SHOTS[shot][0]
-    up_facing = (nrm[..., 1] > 0.7) & ~sky
-    p = pools(pos, up_facing, height)[..., None] * (shot != "garage")
-    pooled = opaque * (1 + ft * POOL_BRIGHTENING * on * p) + ft * POOL_LIFT * on * p
+    up_facing = (nrm[..., 1] > 0.7) & ~sky & (pos[..., 1] - np.vectorize(height)(pos[..., 0], pos[..., 2]) < 0.2)
+    p = pools(pos, up_facing, height)[..., None]
 
-    # Before: the card multiplies whatever is behind it.
-    f_old = beam_card(cam, dirs, dist, pitch)[..., None]
-    before = pooled * (1 + ht * BEAM_BRIGHTENING * on * f_old) + ht * BEAM_LIFT * on * f_old
-    # After: the decal adds the opaque scene's own colour, eased to the cap.
-    w = beam_decal(pos, sky, cam, pitch)[..., None]
-    add = opaque * ht * BEAM_ADD * on * w
-    lum = (add @ LUMA)[..., None]
-    add = add / (1 + lum / max(BEAM_CAP * on, 1e-4)) + ht * BEAM_LIFT * on * w
-    after = pooled + add
+    frames = [car_frame(pitch)] + other_frames()
+    cards = [beam_card(cam, dirs, dist, fr)[..., None] for fr in frames]
+    add = np.zeros_like(opaque)
+    for fr in frames:
+        w = beam_decal(pos, sky, cam, fr)[..., None]
+        a = opaque * ht * BEAM_ADD * on * w
+        lum = (a @ LUMA)[..., None]
+        add += a / (1 + lum / max(BEAM_CAP * on, 1e-4)) + ht * BEAM_LIFT * on * w
 
     beams = mast_beams(cam, height) if SHOTS[shot][2] else []
     g = skyclock.grade(s)
     for level, (scale, has_bloom, div, steps) in LEVELS.items():
-        for name, rad in (("before", before), ("after", after)):
-            r = resample(rad, scale)
+        for name in ("before", "after"):
+            # The volumetrics are composited after the skybox, before the transparent pass.
+            mist = np.zeros_like(opaque)
             if div and beams and on > 0.001:
                 h, w_ = H // div, W // div
                 d = dirs[div // 2::div, div // 2::div][:h, :w_]
                 reach = np.minimum(dist[div // 2::div, div // 2::div][:h, :w_], FOG_REACH)
                 jit = ign(h, w_, 7)
-                fn = mist_old if name == "before" else mist_new
-                lit = fn(cam, d, reach, jit, beams, steps) if name == "before" else fn(cam, d, reach, jit, beams)
+                lit = mist_old(cam, d, reach, jit, beams, steps) if name == "before" else mist_new(cam, d, reach, jit, beams)
                 light = ft * on * BEAM_STRENGTH / (4 * math.pi)
                 m = np.repeat(np.repeat(lit, div, 0), div, 1)[:H, :W, None] * light
-                r = r + np.pad(m, ((0, H - m.shape[0]), (0, W - m.shape[1]), (0, 0)))
+                mist = np.pad(m, ((0, H - m.shape[0]), (0, W - m.shape[1]), (0, 0)))
+            if name == "before":
+                # The pools and the card in the transparent pass, multiplying all that is drawn behind them.
+                behind = opaque + mist
+                behind = behind * (1 + ft * POOL_BRIGHTENING * on * p) + ft * POOL_LIFT * on * p
+                rad = behind
+                for f_old in cards:
+                    rad = rad * (1 + ht * BEAM_BRIGHTENING * on * f_old) + ht * BEAM_LIFT * on * f_old
+            else:
+                # The decal reads the opaque copy, taken before the volumetrics.
+                rad = (opaque + mist) * (1 + ft * POOL_BRIGHTENING * on * p) + ft * POOL_LIFT * on * p + add
+            r = resample(rad, scale)
             bl = bloom(r, g["exposure"]) if has_bloom else None
             grade = g if has_bloom else dict(exposure=g["exposure"])
             save(os.path.join(out_dir, f"{tag}-{level}-{name}.png"), frame(r, bloom=bl, **grade))
