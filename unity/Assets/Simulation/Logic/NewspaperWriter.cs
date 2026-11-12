@@ -192,7 +192,12 @@ namespace TarmacGauntlet.Simulation
                 if (c == null) return null;
                 string model = ModelName(c.ModelId);
                 int running = ClassPositionAtLap(c, c.Laps);
-                string how = c.RetirementReason == FailureType.Crash ? $"their {model} went off on lap {c.Laps}" : $"their {model} broke down on lap {c.Laps}";
+                string how = c.RetirementReason switch
+                {
+                    FailureType.Crash => $"their {model} went off on lap {c.Laps}",
+                    FailureType.Withdrawn => $"they withdrew their {model} on lap {c.Laps}",
+                    _ => $"their {model} broke down on lap {c.Laps}",
+                };
                 var paragraphs = new List<string>
                 {
                     running > 0
@@ -264,7 +269,7 @@ namespace TarmacGauntlet.Simulation
                 string cls = ClassName(c.CarClass), model = ModelName(c.ModelId);
                 var paragraphs = new List<string> { $"{Introduce(c)} arrived as the top team in class {cls} on prestige." };
                 if (c.Retired)
-                    paragraphs.Add($"Their {model} lasted {c.Laps} laps before {(c.RetirementReason == FailureType.Crash ? "a crash" : "a mechanical failure")} ended it.");
+                    paragraphs.Add($"Their {model} lasted {c.Laps} laps before {Cause(c.RetirementReason)} ended it.");
                 else
                 {
                     ClassifiedCar? classWinner = summary.Classification.FirstOrDefault(x => x.CarClass == c.CarClass && !x.Retired);
@@ -352,12 +357,12 @@ namespace TarmacGauntlet.Simulation
                 string cls = ClassName(p.CarClass), model = ModelName(p.ModelId);
                 int grid = GridPosition(p.CarId);
                 int? lastYear = LastYearPosition();
-                string reason = p.RetirementReason == FailureType.Crash ? "a crash" : "a mechanical failure";
+                string reason = Cause(p.RetirementReason);
 
                 if (coverage == PlayerCoverage.Footnote)
                 {
                     string line = p.Retired
-                        ? $"{team} retired from class {cls} after {p.Laps} laps with {reason}."
+                        ? $"{team} retired from class {cls} after {p.Laps} laps{(p.RetirementReason == FailureType.Withdrawn ? "" : " with " + reason)}."
                         : $"{team} were {Ordinal(p.ClassPosition)} in class {cls} and {Ordinal(p.Position)} overall after {p.Laps} laps.";
                     return new Story { Paragraphs = new[] { line }, TeamId = p.TeamId };
                 }
@@ -514,6 +519,14 @@ namespace TarmacGauntlet.Simulation
         // ------------------------------------------------------------------ words
 
         public static string ClassName(CarClass cls) => cls.ToString();
+
+        /// <summary>What ended a retired car's race, as "... ended it" reads it.</summary>
+        private static string Cause(FailureType? reason) => reason switch
+        {
+            FailureType.Crash => "a crash",
+            FailureType.Withdrawn => "the team's call",
+            _ => "a mechanical failure",
+        };
 
         public static string Ordinal(int n)
         {

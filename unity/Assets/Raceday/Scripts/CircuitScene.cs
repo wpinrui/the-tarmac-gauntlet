@@ -21,6 +21,9 @@ namespace TarmacGauntlet.Raceday
     /// your car, with the controls for its next stop (<see cref="LiveTiming"/>). While a teammate drives, N
     /// (or the button beside live timing's way back) fast forwards at 32x to your next stint and hands you the
     /// wheel once you are back on track. A stop that puts a teammate in hands the car back to the AI.
+    /// A race saved part way (<see cref="RaceWeekend.Resuming"/>) carries on from the save: every car where it was, on its
+    /// lap, fuel and tyres, the clocks and the weather as they were. A car that was in the pit lane goes back on track
+    /// beside where it was, at the edge on the pit side. Saved before the green, the race starts again.
     /// </summary>
     public sealed class CircuitScene : MonoBehaviour
     {
@@ -56,6 +59,10 @@ namespace TarmacGauntlet.Raceday
         /// <summary>True once the race has handed you the wheel at the start.</summary>
         private bool handedOver;
         private RaceTower raceTower;
+        private CarController[] carControllers;
+        private Circuit circuit;
+        private int weatherRoll;
+        private WeatherKind? weatherKind;
 
         private const string PlayerCar = "a-29";
         private const string PaceCarModel = "c-19";
@@ -77,9 +84,14 @@ namespace TarmacGauntlet.Raceday
             RaceWeather.Now = WeatherState.Dry;
             RaceWeather.Forced = null;
             bool testing = Debug.isDebugBuild;
-            TimeOfDay.StartHour = testing ? DebugSettings.StartHour : TimeOfDay.DefaultStartHour;
+            RaceSave resume = RaceWeekend.Resuming;
+            if (resume != null && (RaceWeekend.Setup == null || resume.Cars.Count != resume.Setup.Grid.Count || resume.Day.Cars.Count != resume.Setup.Grid.Count))
+                resume = null;
+            TimeOfDay.StartHour = resume != null ? resume.StartHour : testing ? DebugSettings.StartHour : TimeOfDay.DefaultStartHour;
             if (testing && DebugSettings.Start is StartMode chosen) start = chosen;
-            var circuit = new Circuit(CircuitData.Load());
+            bool resumed = resume != null && resume.Started;
+            if (resumed) start = StartMode.Grid;   // no start: the cars are put where they were
+            circuit = new Circuit(CircuitData.Load());
             var track = new GameObject("Circuit");
             var materials = new CircuitMaterials();
             var builder = new CircuitBuilder(circuit, materials);
@@ -115,8 +127,9 @@ namespace TarmacGauntlet.Raceday
             var pits = new PitLane(circuit);
             bool career = RaceWeekend.Setup != null;
             RaceSetup setup = RaceWeekend.Setup ?? RaceWeekend.Begin(TestCareer());
-            if (testing) setup = DebugActions.Field(setup, DebugSettings.Field, DebugSettings.Car);
+            if (testing && resume == null) setup = DebugActions.Field(setup, DebugSettings.Field, DebugSettings.Car);
             day = new RaceDay(setup);
+            if (resumed) day.Load(resume.Day);
             IReadOnlyList<GridCar> grid = setup.Grid;
             int player = -1;
             for (int i = 0; i < grid.Count; i++) if (grid[i].Player) player = i;
@@ -178,6 +191,8 @@ namespace TarmacGauntlet.Raceday
             }
             playerIndex = player;
             racingCars = racing;
+            carControllers = cars;
+            if (resumed) PlaceSaved(resume, cars, racing, drivers, pits);
             PhysicsRange range = new GameObject("Physics range").AddComponent<PhysicsRange>();
             range.Drivers = drivers;
             range.Player = ai.Car;
@@ -193,6 +208,7 @@ namespace TarmacGauntlet.Raceday
             if (!career) views.StartInChase();
             RaceTower tower = Tower(circuit, racing, field, teams, watched, starter);
             raceTower = tower;
+            if (resumed) tower.SetRaceTime(resume.RaceTime);
             views.Tower = tower;
             if (player >= 0 && TeamColour(setup.Game, grid[player].TeamId) is Color own) tower.Colours[player] = own;
             view.Fit(Complex, tower.Colours, pits.Garages);
@@ -206,8 +222,10 @@ namespace TarmacGauntlet.Raceday
             tv.Classes = tower.Classes;
             sky.RaceSeconds = () => tower.RaceTime;
             // Every race rolls its own weather (WeatherPlan), played on the race clock.
-            int seed = weatherSeed != 0 ? weatherSeed : new System.Random().Next(1, int.MaxValue);
-            var weather = new WeatherPlan(seed, TimeOfDay.StartHour, testing ? DebugSettings.Weather : null);
+            int seed = resume != null ? resume.WeatherSeed : weatherSeed != 0 ? weatherSeed : new System.Random().Next(1, int.MaxValue);
+            weatherRoll = seed;
+            weatherKind = resume != null ? (WeatherKind?)resume.WeatherKind : testing ? DebugSettings.Weather : null;
+            var weather = new WeatherPlan(seed, TimeOfDay.StartHour, weatherKind);
             Debug.Log($"Weather {seed}: {weather.Kind}");
             WeatherView rain = sky.gameObject.AddComponent<WeatherView>();
             rain.Plan = weather;
@@ -224,6 +242,8 @@ namespace TarmacGauntlet.Raceday
             director.Cars = racing;
             director.Drivers = drivers;
             director.Tower = tower;
+            if (resumed) director.Resume(resume);
+            RaceWeekend.Snapshot = Save;
             if (player >= 0)
             {
                 timing = new GameObject("Live timing").AddComponent<LiveTiming>();
@@ -275,6 +295,11 @@ namespace TarmacGauntlet.Raceday
                 pitStart.Pits = pits;
                 skipping = true;
             }
+            if (resumed)
+            {
+                handedOver = true;   // the save says who drives
+                if (resume.PlayerDriving && player >= 0) ai.enabled = false;
+            }
             if (start != StartMode.Rolling) return;
 
             // The pace car waits ahead of pole, in pole's column.
@@ -285,6 +310,105 @@ namespace TarmacGauntlet.Raceday
             rolling.Grid = racing;
             rolling.PaceCar = paceCar;
             rolling.Pits = pits;
+        }
+
+        private void OnDestroy()
+        {
+            RaceWeekend.Snapshot = null;
+        }
+
+        // ---------------------------------------------------------------- race saves
+
+        /// <summary>The race as it stands, for the pause menu's save.</summary>
+        private RaceSave Save()
+        {
+            bool started = director.Started && !director.Finished;
+            var cars = new CarSave[racingCars.Length];
+            for (int i = 0; i < cars.Length; i++)
+            {
+                RaceCar race = racingCars[i];
+                CarController car = carControllers[i];
+                Consumables supplies = car.Supplies;
+                TrafficCar t = race.Traffic;
+                Transform at = car.transform;
+                cars[i] = new CarSave
+                {
+                    Distance = Mathf.Repeat(t.Distance, circuit.Lap),
+                    Lateral = t.Lateral,
+                    Speed = Mathf.Max(t.Speed, 0f),
+                    Laps = race.Laps,
+                    InPitLane = race.InPitLane,
+                    SinceLine = director.SinceLine(i),
+                    Fuel = supplies.Fuel,
+                    Wear = supplies.Wear,
+                    Map = (int)supplies.Map,
+                    PitRequested = supplies.Orders.Requested,
+                    PitLitres = supplies.Orders.Litres,
+                    PitTyres = supplies.Orders.Tyres,
+                    Position = new[] { at.position.x, at.position.y, at.position.z },
+                    Forward = new[] { at.forward.x, at.forward.y, at.forward.z },
+                };
+            }
+            return new RaceSave
+            {
+                Setup = day.Setup,
+                Started = started,
+                RaceTime = raceTower.RaceTime,
+                Elapsed = director.Elapsed,
+                SinceTimeUp = director.SinceTimeUp,
+                StartHour = TimeOfDay.StartHour,
+                WeatherSeed = weatherRoll,
+                WeatherKind = (int?)weatherKind,
+                PlayerDriving = playerIndex >= 0 && !ai.enabled,
+                Day = day.Save(),
+                Cars = cars,
+            };
+        }
+
+        /// <summary>
+        /// Puts every car back where a race save had it: on its lap, at its spot and speed, with its fuel, tyres and
+        /// orders. A car in the pit lane goes on track beside where it was, at the edge on the pit side. A car out of
+        /// the race stands where it stood, or in its box, out of everyone's traffic.
+        /// </summary>
+        private void PlaceSaved(RaceSave save, CarController[] cars, RaceCar[] racing, AiDriver[] drivers, PitLane pits)
+        {
+            for (int i = 0; i < cars.Length; i++)
+            {
+                CarSave s = save.Cars[i];
+                CarController car = cars[i];
+                CarRaceLog log = day.Cars[i];
+                Consumables supplies = car.Supplies;
+                supplies.Fuel = Mathf.Clamp(s.Fuel, 0f, supplies.Capacity);
+                supplies.Wear = Mathf.Clamp01(s.Wear);
+                supplies.Map = (EngineMap)Mathf.Clamp(s.Map, 0, 2);
+                supplies.Orders.Requested = s.PitRequested;
+                supplies.Orders.Litres = s.PitLitres;
+                supplies.Orders.Tyres = s.PitTyres;
+                supplies.Effects = log.Effects;
+                racing[i].Resume(s.Laps);
+
+                if (log.Retired)
+                {
+                    if (log.RetirementReason == FailureType.Crash && s.Position is { Length: 3 } p && s.Forward is { Length: 3 } f)
+                        car.PlaceAt(new Vector3(p[0], p[1], p[2]), new Vector3(f[0], f[1], f[2]));
+                    else
+                    {
+                        Vector3 toGarage = pits.LaneLeft(pits.BoxLane[racing[i].Garage]);
+                        car.PlaceAt(pits.BoxPoint(racing[i].Garage), new Vector3(toGarage.z, 0f, -toGarage.x));
+                    }
+                    drivers[i].enabled = false;
+                    racing[i].enabled = false;   // out of every other car's traffic
+                    car.Hold = true;
+                    car.InputEnabled = false;
+                    continue;
+                }
+
+                int k = circuit.IndexOf(Mathf.Repeat(s.Distance, circuit.Lap));
+                float edge = Mathf.Max(circuit.HalfWidth(k) - 1.5f, 0f);
+                float lateral = s.InPitLane ? Mathf.Sign(s.Lateral) * edge : Mathf.Clamp(s.Lateral, -edge, edge);
+                car.PlaceAt(k, lateral);
+                car.Launch(s.InPitLane ? Mathf.Min(s.Speed, pits.LimitSpeed) : s.Speed);
+            }
         }
 
         /// <summary>The pit complex's layout: garages, the pit building's stations and where the crews stand.</summary>
@@ -349,6 +473,7 @@ namespace TarmacGauntlet.Raceday
         private void Update()
         {
             if (keys == null || ai == null) return;
+            if (RaceWeekend.Paused) return;   // the pause menu holds the clock
             if (director.Finished) return;   // the race summary is up, at normal speed
             if (keys.Pressed(KeyCode.Delete))
             {

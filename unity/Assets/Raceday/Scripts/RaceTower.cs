@@ -142,7 +142,7 @@ namespace TarmacGauntlet.Raceday
 
         private void OnGUI()
         {
-            if (Hidden || DebugMenu.Clean || Event.current.type != EventType.Repaint || rows.Count == 0) return;
+            if (Hidden || DebugMenu.Bare || Event.current.type != EventType.Repaint || rows.Count == 0) return;
             float u = Unit();
             Style(u);
 

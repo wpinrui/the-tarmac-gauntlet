@@ -138,7 +138,7 @@ namespace TarmacGauntlet.Raceday
 
         private void OnGUI()
         {
-            if (!Open || DebugMenu.Clean || entries == null || Supplies == null || Log == null) return;
+            if (!Open || DebugMenu.Bare || entries == null || Supplies == null || Log == null) return;
             k = Screen.height / 1080f;
             Style();
             bool paint = Event.current.type == EventType.Repaint;

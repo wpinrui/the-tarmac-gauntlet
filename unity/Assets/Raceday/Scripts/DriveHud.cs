@@ -38,7 +38,7 @@ namespace TarmacGauntlet.Raceday
 
         private void OnGUI()
         {
-            if (Car == null || Hidden || DebugMenu.Clean || !Car.InputEnabled || Event.current.type != EventType.Repaint) return;
+            if (Car == null || Hidden || DebugMenu.Bare || !Car.InputEnabled || Event.current.type != EventType.Repaint) return;
             float scale = Screen.height / 1080f;
             if (gear == null)
             {

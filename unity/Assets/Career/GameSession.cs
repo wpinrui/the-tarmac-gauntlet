@@ -105,12 +105,33 @@ namespace TarmacGauntlet.Career
 
         private static bool listeningToRaces;
 
-        /// <summary>A finished race replaces the game with its settled result, which autosaves the career.</summary>
+        /// <summary>
+        /// A finished race replaces the game with its settled result, which autosaves the career. A save of the race
+        /// part way is done with.
+        /// </summary>
         private static void SettleRace()
         {
             GameState? settled = RaceWeekend.Settled;
-            if (settled != null && State != null) Apply(_ => settled);
+            if (settled == null || State == null) return;
+            if (CareerId != null) Store.DeleteRace(CareerId);
+            Apply(_ => settled);
         }
+
+        /// <summary>Saves the race the career is part way through. Continuing the career races on from it.</summary>
+        public static void SaveRace(RaceSave race)
+        {
+            if (CareerId == null) throw new InvalidOperationException("No career is loaded.");
+            Store.SaveRace(CareerId, race);
+        }
+
+        /// <summary>Throws away the loaded career's race save, as a new race starts.</summary>
+        public static void DropRace()
+        {
+            if (CareerId != null) Store.DeleteRace(CareerId);
+        }
+
+        /// <summary>The race the loaded career is part way through, or null for none.</summary>
+        public static RaceSave? SavedRace() => CareerId == null ? null : Store.LoadRace(CareerId);
 
         private static void Set(string careerId, GameState game)
         {

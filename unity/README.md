@@ -191,6 +191,14 @@ For now a new game deletes the other careers once it is saved. A finished race (
 and saved by `GameSession` itself. Saves are JSON (Newtonsoft); raise `SaveJson.Version` and add a step to
 `SaveJson.Migrate` when the format changes.
 
+Escape in a race opens its pause menu (`RacePauseMenu.cs`): the race stops dead (`RaceWeekend.Paused`) under Resume,
+Save, Settings, Retire, Quit to main menu and Quit game. Save writes the race as it stands to `race.json` in the
+career's folder (`RaceSave`: the set-up, clocks, weather seed, every car's spot, lap, fuel, tyres and race log), and
+Continue on the main menu goes back into it. A car that was in the pit lane comes back on track beside its spot. Race
+saves are not migrated: one that no longer reads is deleted. The race save goes once the race is settled, or when
+the next race starts from the lineup. Retire takes the player's car out (`FailureType.Withdrawn`) and settles the race
+from where every car is.
+
 ```
 dotnet test unity/dotnet/TarmacGauntlet.Career.Tests
 ```

@@ -117,7 +117,7 @@ namespace TarmacGauntlet.Raceday
         private void OnGUI()
         {
             if (Event.current.type != EventType.Repaint || Director == null || !Director.OnAir) return;
-            if (Tower != null && Tower.Hidden || DebugMenu.Clean) return;
+            if (Tower != null && Tower.Hidden || DebugMenu.Bare) return;
             k = Screen.height / 1080f;
             offset = (Screen.width / k - 1920f) / 2f;
             Style();

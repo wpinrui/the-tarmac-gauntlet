@@ -21,6 +21,34 @@ namespace TarmacGauntlet.Simulation
         /// <summary>Fires once the race is settled, with <see cref="Settled"/> and <see cref="Summary"/> set.</summary>
         public static event Action? Finished;
 
+        /// <summary>True while the race is paused from its pause menu: the race scene holds its clock and ignores keys.</summary>
+        public static bool Paused { get; set; }
+
+        /// <summary>Fires when the player asks to withdraw from the race (<see cref="Withdraw"/>).</summary>
+        public static event Action? Withdrawing;
+
+        /// <summary>
+        /// Takes the player's car out of the race now (<see cref="FailureType.Withdrawn"/>) and settles the race from where
+        /// every car is. The race scene does it on <see cref="Withdrawing"/>.
+        /// </summary>
+        public static void Withdraw() => Withdrawing?.Invoke();
+
+        /// <summary>The race save the race scene carries on from, or null for a race from its start.</summary>
+        public static RaceSave? Resuming { get; private set; }
+
+        /// <summary>The race scene's way to save the race as it stands, or null outside a race.</summary>
+        public static Func<RaceSave>? Snapshot { get; set; }
+
+        /// <summary>Gets a saved race ready to carry on from: the menus call it before loading the race.</summary>
+        public static void Resume(RaceSave save)
+        {
+            Setup = save.Setup;
+            Resuming = save;
+            Paused = false;
+            Settled = null;
+            Summary = null;
+        }
+
         /// <summary>
         /// Gets the race ready from the career. <paramref name="lineup"/> is the player's driver ids
         /// in stint order, starter first, with <see cref="RaceEntry.PlayerCharacterDriverId"/> for the
@@ -29,6 +57,8 @@ namespace TarmacGauntlet.Simulation
         public static RaceSetup Begin(GameState game, IReadOnlyList<string>? lineup = null)
         {
             Setup = BuildSetup(game, lineup);
+            Resuming = null;
+            Paused = false;
             Settled = null;
             Summary = null;
             return Setup;
@@ -41,6 +71,8 @@ namespace TarmacGauntlet.Simulation
             Settled = game;
             Summary = summary;
             Setup = null;
+            Resuming = null;
+            Paused = false;
             Finished?.Invoke();
         }
 
