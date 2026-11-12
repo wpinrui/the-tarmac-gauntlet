@@ -111,6 +111,10 @@ namespace TarmacGauntlet.Raceday
             view.Sky = sky;
             view.Materials = pitMaterials;
             Trackside trackside = Trackside.Build(circuit, builder, stands.Footprints);
+            var plainArmco = new List<Renderer>();
+            foreach (Transform child in track.transform)
+                if (child.name == "Armco" && child.TryGetComponent(out Renderer drawn)) plainArmco.Add(drawn);
+            trackside.SetPlainArmco(plainArmco.ToArray());
             var floodMaterials = new FloodMaterials();
             var floods = new Floodlights(circuit, Complex, stands.RoofLamps, builder.PitWallRuns, parts, GantrySpan.Of(circuit, trackside.Placed));
             var lit = new GameObject("Floodlights");

@@ -67,6 +67,12 @@ namespace TarmacGauntlet.Visuals
         /// <summary>Rubber, chips and dust on the kerbs.</summary>
         public static readonly GraphicsOption KerbWear = Toggle("settings.kerbwear", true);
 
+        /// <summary>
+        /// The armco drawn as steel rails on posts, with catch fencing behind the tyre walls. Off, a plain band where the
+        /// armco stands. Changes live.
+        /// </summary>
+        public static readonly GraphicsOption ArmcoDetail = Toggle("settings.armcodetail", true);
+
         /// <summary>Marks a sliding or spinning tyre leaves on the track during the race.</summary>
         public static readonly GraphicsOption SkidMarks = Toggle("settings.skidmarks", true);
 
@@ -104,7 +110,7 @@ namespace TarmacGauntlet.Visuals
             new GraphicsRow("Post effects", OffAtLow, ColourGrading, Bloom, AmbientOcclusion),
             new GraphicsRow("Depth of field", OffAtLow, DepthOfField),
             new GraphicsRow("Car detail", OffAtLow, Clearcoat, PaintFlake, CarGlass, LampLenses, CarTrims, CarReflections),
-            new GraphicsRow("Track detail", AlwaysOn, TarmacDetail, RubberedLine, KerbWear, SkidMarks),
+            new GraphicsRow("Track detail", AlwaysOn, TarmacDetail, RubberedLine, KerbWear, SkidMarks, ArmcoDetail),
             new GraphicsRow("Rain effects", OffAtLow, WetTrack, Puddles, RainRipples, Spray, SprayMist),
             new GraphicsRow("Sky detail", OffAtLow, SkyDetail),
             new GraphicsRow("Crowd", AlwaysOn, Crowd),

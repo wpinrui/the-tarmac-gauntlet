@@ -27,6 +27,10 @@ namespace TarmacGauntlet.Raceday
         private const float LineAcross = 0.3f;     // thickness of lines painted across a surface
         private const float LaneWiden = 1.2f;      // pit lane surface runs this far past its track-side line
         private const float FenceTurn = 20f;       // most a fence turns from one track sample to the next, degrees
+        private const float EdgeArmcoMin = 6f;     // runoff cut short still gets armco at its edge when at least this deep
+        private const float EdgeArmcoStep = 1f;    // ...unless its edge moves less than this from one track sample to the next
+        // Tyre wall texture: one tile spans the stack's whole height, top to buried foot, and two tyres along it.
+        public const float TyreTop = 1.0f, TyreFoot = 0.5f, TyreTileAlong = 1.2f;
 
         private readonly Circuit c;
         private readonly CircuitMaterials m;
@@ -37,6 +41,7 @@ namespace TarmacGauntlet.Raceday
         // Per side (0 = left, 1 = right), per sample, measured outwards from the road edge.
         private readonly float[][] barrier = { null, null };
         private readonly bool[][] fenced = { null, null };
+        private readonly bool[][] edgeArmco = { null, null };  // armco at the edge of runoff cut short, standing on the ground
         private readonly float[][] rooms = { null, null };
         private readonly float[][] wants = { null, null };
         private readonly float[][] gravel = { null, null };
@@ -54,12 +59,17 @@ namespace TarmacGauntlet.Raceday
         public float[] GarageFloors { get; private set; }
         /// <summary>The pit wall's runs, each the middle of its top from one lane sample to the next.</summary>
         public readonly List<Vector3[]> PitWallRuns = new List<Vector3[]>();
+        /// <summary>The armco's runs, each along the line where the runoff meets it. Filled by <see cref="Build"/>.</summary>
+        public readonly List<ArmcoRun> ArmcoRuns = new List<ArmcoRun>();
 
         /// <summary>How far out from the road edge the runoff reaches on a side (0 = left), or 0 where the side is open.</summary>
         public float RunoffReach(int side, int k) => open[side][k] ? 0f : barrier[side][k];
 
         /// <summary>True where armco or a pit wall stands on a side (0 = left) at <see cref="RunoffReach"/>.</summary>
-        public bool Fenced(int side, int k) => !open[side][k] && (fenced[side][k] || pitWall[side][k]);
+        public bool Fenced(int side, int k) => !open[side][k] && (Armco(side, k) || pitWall[side][k]);
+
+        /// <summary>True where armco stands on a side (0 = left) at sample k.</summary>
+        private bool Armco(int side, int k) => (fenced[side][k] || edgeArmco[side][k]) && !pitWall[side][k] && !open[side][k];
 
         /// <summary>True where the barrier on a side (0 = left) is the pit wall.</summary>
         public bool PitWallAt(int side, int k) => !open[side][k] && pitWall[side][k];
@@ -236,6 +246,7 @@ namespace TarmacGauntlet.Raceday
                 // No gravel between the pit wall and the track: the wall side is grass only.
                 for (int k = 0; k < n; k++) gravel[s][k] = pitWall[s][k] ? 0f : Mathf.Min(gravel[s][k], barrier[s][k] - 1.5f);
                 fenced[s] = Fences(barrier[s], wants[s], open[s]);
+                edgeArmco[s] = EdgeFences(barrier[s], fenced[s], pitWall[s], open[s], s == 0 ? 1 : -1);
                 // Where the runoff stops for an opening, such as a pit road join, its end row settles onto
                 // the ground within a shoulder's width, as the pit lane's own shoulder does, so the two ends
                 // meet and nothing stands proud of the ground across the end. It eases back over a few rows.
@@ -351,6 +362,36 @@ namespace TarmacGauntlet.Raceday
         {
             var f = new bool[n];
             for (int k = 0; k < n; k++) f[k] = !shut[k] && bar[k] >= want[k] - 0.5f;
+            int minRun = Mathf.CeilToInt(40f / c.Step);
+            var keep = new bool[n];
+            foreach (List<int> run in Runs(k => f[k]))
+                if (run.Count >= minRun) foreach (int k in run) keep[k] = true;
+            return keep;
+        }
+
+        /// <summary>
+        /// Armco along the rest of the lap too, where another leg of the track or the inside of a bend cut the
+        /// runoff short: it stands at the runoff's edge, on the ground the runoff has settled onto. Only where
+        /// there is room for the verge and some grass in front of it, and in pieces at least 40 m long.
+        /// </summary>
+        private bool[] EdgeFences(float[] bar, bool[] full, bool[] wall, bool[] shut, float sign)
+        {
+            var f = new bool[n];
+            for (int k = 0; k < n; k++) f[k] = !shut[k] && !wall[k] && !full[k] && bar[k] >= EdgeArmcoMin;
+            // Where the runoff's edge turns sharply or bunches up, as where its room runs out on the inside of a
+            // bend, the armco leaves a gap.
+            float most = Mathf.Cos(FenceTurn * Mathf.PI / 180f);
+            var kink = new bool[n];
+            for (int k = 0; k < n; k++)
+            {
+                int a = c.Wrap(k - 1), b = c.Wrap(k + 1);
+                Vector3 p = Fence(k, bar, sign), d1 = p - Fence(a, bar, sign), d2 = Fence(b, bar, sign) - p;
+                d1.y = 0; d2.y = 0;
+                kink[k] = Vector3.Dot(d1.normalized, d2.normalized) < most || d1.magnitude < EdgeArmcoStep || d2.magnitude < EdgeArmcoStep;
+            }
+            for (int k = 0; k < n; k++)
+                if (kink[k])
+                    for (int d = -1; d <= 1; d++) f[c.Wrap(k + d)] = false;
             int minRun = Mathf.CeilToInt(40f / c.Step);
             var keep = new bool[n];
             foreach (List<int> run in Runs(k => f[k]))
@@ -505,6 +546,9 @@ namespace TarmacGauntlet.Raceday
 
         private bool HasGravel(int side, int k) => gravel[side][k] > Verge + 1f;
 
+        /// <summary>True where a tyre wall stands in front of the armco: behind a gravel trap.</summary>
+        private bool TyreWall(int side, int k) => fenced[side][k] && !pitWall[side][k] && HasGravel(side, k);
+
         /// <summary>How far from the road edge the gravel reaches, or just the verge where there is none.</summary>
         private float GravelEdge(int side, int k) => HasGravel(side, k) ? gravel[side][k] : Verge;
 
@@ -513,26 +557,41 @@ namespace TarmacGauntlet.Raceday
             var armco = new MeshKit();
             var tyres = new MeshKit();
             var wall = new MeshKit();
+            ArmcoRuns.Clear();
             for (int s = 0; s < 2; s++)
             {
                 float sign = s == 0 ? 1 : -1;
                 int side = s;
-                foreach (List<int> run in Runs(k => fenced[side][k] && !pitWall[side][k]))
+                foreach (List<int> run in Runs(k => Armco(side, k)))
+                {
                     armco.Strip(Vertical(run, k => c.HalfWidth(k) + barrier[side][k], sign, -Skirt, 0.8f), 4f, 4f, true);
+                    var line = new Vector3[run.Count];
+                    var stack = new bool[run.Count];
+                    for (int i = 0; i < run.Count; i++)
+                    {
+                        line[i] = Point(run[i], sign * (c.HalfWidth(run[i]) + barrier[side][run[i]]), 0, true);
+                        stack[i] = TyreWall(side, run[i]);
+                    }
+                    ArmcoRuns.Add(new ArmcoRun(side, run.ToArray(), line, stack));
+                }
 
-                // Tyre walls in front of the armco where a gravel trap catches cars.
-                foreach (List<int> run in Runs(k => fenced[side][k] && !pitWall[side][k] && HasGravel(side, k)))
+                // Tyre walls in front of the armco where a gravel trap catches cars. The texture's across runs down
+                // the stack's faces from the top, and the top takes the plain rubber at the bottom of the tile.
+                foreach (List<int> run in Runs(k => TyreWall(side, k)))
                 {
                     float Front(int k) => c.HalfWidth(k) + barrier[side][k] - 1.2f;
                     float Back(int k) => c.HalfWidth(k) + barrier[side][k] - 0.05f;
-                    tyres.Strip(Rows(run, k => Across(sign, Front(k), Back(k)), 1.0f, true), 1f, 1f);
-                    tyres.Strip(Vertical(run, Front, sign, -0.5f, 1.0f), 1f, 1f, true);
-                    tyres.Strip(Vertical(run, Back, sign, -0.5f, 1.0f), 1f, 1f, true);
+                    Vector2 rubber = new Vector2(0.97f, 0.5f);
+                    float height = TyreTop + TyreFoot;
+                    tyres.Strip(Rows(run, k => Across(sign, Front(k), Back(k)), TyreTop, true), 1f, 1f, false, null, p => rubber);
+                    tyres.Strip(Vertical(run, Front, sign, -TyreFoot, TyreTop), height, TyreTileAlong, true);
+                    tyres.Strip(Vertical(run, Back, sign, -TyreFoot, TyreTop), height, TyreTileAlong, true);
                     // Close both ends of the stack.
                     foreach ((int end, int inward) in new[] { (run[0], run[1]), (run[run.Count - 1], run[run.Count - 2]) })
                     {
                         Vector3 f = Point(end, sign * Front(end), 0, true), b = Point(end, sign * Back(end), 0, true);
-                        tyres.Face(f + Vector3.up * -0.5f, b + Vector3.up * -0.5f, f + Vector3.up, b + Vector3.up, Point(inward, sign * Front(inward), 0.5f, true));
+                        tyres.Face(f + Vector3.up * -TyreFoot, b + Vector3.up * -TyreFoot, f + Vector3.up * TyreTop, b + Vector3.up * TyreTop,
+                            Point(inward, sign * Front(inward), 0.5f, true), rubber);
                     }
                 }
 
@@ -1386,6 +1445,7 @@ namespace TarmacGauntlet.Raceday
         private float EaseLength(int side, int k)
         {
             float reach = barrier[side]?[k] ?? 0f;
+            // Only armco where the runoff reached its full width keeps it up; armco at a cut-short edge stands on the ground.
             bool armco = (fenced[side]?[k] ?? false) && !(pitWall[side]?[k] ?? false);
             if (armco) reach = float.MaxValue;
             return Mathf.Clamp(Mathf.Min(reach - Verge, endEase[side]?[k] ?? RunoffEase), 0.25f, RunoffEase);
@@ -1590,5 +1650,26 @@ namespace TarmacGauntlet.Raceday
 
         /// <summary>A corner within a hair of a cut line counts as on it, so no cut leaves a sliver.</summary>
         private static float Snap(float f) => Mathf.Abs(f) < 0.002f ? 0f : f;
+    }
+
+    /// <summary>One unbroken run of armco on one side of the track.</summary>
+    public sealed class ArmcoRun
+    {
+        /// <summary>0 = left of the track, 1 = right.</summary>
+        public readonly int Side;
+        /// <summary>The track sample beside each point.</summary>
+        public readonly int[] Samples;
+        /// <summary>Where the runoff meets the armco, on the runoff's surface: the face cars hit.</summary>
+        public readonly Vector3[] Line;
+        /// <summary>True where a tyre wall stands in front of it.</summary>
+        public readonly bool[] Tyres;
+
+        public ArmcoRun(int side, int[] samples, Vector3[] line, bool[] tyres)
+        {
+            Side = side;
+            Samples = samples;
+            Line = line;
+            Tyres = tyres;
+        }
     }
 }
