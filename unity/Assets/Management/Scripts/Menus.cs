@@ -71,6 +71,8 @@ namespace TarmacGauntlet.Management
 
         private Mode mode = Mode.Main;
         private string screen;
+        /// <summary>The camera shot the menus last asked for, so a screen change knows whether the camera moves.</summary>
+        private string shot;
         private Overlay overlay = Overlay.None, settingsFrom = Overlay.None;
         private bool tagWasShown;
 
@@ -110,6 +112,7 @@ namespace TarmacGauntlet.Management
             root.styleSheets.Add(Resources.Load<StyleSheet>("Menus"));
             root.AddToClassList("root");
             root.style.unityFontDefinition = FontDefinition.FromFont(SemiBold);
+            MenuSounds.Attach(root);
             glass = new MenuGlass(root);
             Build();
             gameObject.AddComponent<DriversPanel>();
@@ -129,12 +132,12 @@ namespace TarmacGauntlet.Management
             if (GameSession.State == null)
             {
                 Go(Mode.Main);
-                hqCamera.Cut(MainShot);
+                hqCamera.Cut(shot = MainShot);
             }
             else
             {
                 // Back from a race the camera starts on the hub, so it can glide to the paper.
-                hqCamera.Cut(HubShot);
+                hqCamera.Cut(shot = HubShot);
                 EnterGame();
             }
         }
@@ -201,7 +204,11 @@ namespace TarmacGauntlet.Management
             carTag.Add(tagCondition);
             gameLayer.Add(carTag);
 
-            race = RedButton("Race", "big-button", () => Go(Mode.Lineup));
+            race = RedButton("Race", "big-button", () =>
+            {
+                MenuSounds.Play(UiCue.Race);
+                Go(Mode.Lineup);
+            });
             race.AddToClassList("corner");
             race.AddToClassList("fade");
             gameLayer.Add(race);
@@ -446,7 +453,12 @@ namespace TarmacGauntlet.Management
                 lineupBody.Clear();
                 ScreenOpened?.Invoke(LineupSlug, lineupBody);
             }
-            hqCamera.Show(next == Mode.Main || next == Mode.NewGame ? MainShot : next == Mode.Screen ? slug : next == Mode.Paper ? PaperSlug : HubShot);
+            string to = next == Mode.Main || next == Mode.NewGame ? MainShot : next == Mode.Screen ? slug : next == Mode.Paper ? PaperSlug : HubShot;
+            // The camera's glide is the sound of a screen change; a panel that opens without one gets the panel's.
+            if (shot != null && to != shot) MenuSounds.Play(UiCue.Glide);
+            else if (next == Mode.NewGame || next == Mode.Lineup) MenuSounds.Play(UiCue.Panel);
+            shot = to;
+            hqCamera.Show(to);
             Render();
         }
 
@@ -529,6 +541,8 @@ namespace TarmacGauntlet.Management
 
         private void SetOverlay(Overlay next)
         {
+            // A panel slides in over the screen or over the Escape menu; stepping back from settings doesn't.
+            if (next != Overlay.None && next != overlay && (overlay == Overlay.None || next != settingsFrom)) MenuSounds.Play(UiCue.Panel);
             overlay = next;
             Render();
         }
@@ -719,6 +733,8 @@ namespace TarmacGauntlet.Management
             switch (ev.keyCode)
             {
                 case KeyCode.Escape:
+                    // Escape steps back out of anything open; on the hub it opens the Escape menu instead.
+                    if (overlay != Overlay.None || (mode != Mode.Hub && mode != Mode.Main)) MenuSounds.Play(UiCue.Back);
                     if (overlay == Overlay.Dialog) SetOverlay(Overlay.None);
                     else if (overlay == Overlay.Settings) SetOverlay(settingsFrom);
                     else if (overlay == Overlay.Pause) SetOverlay(Overlay.None);

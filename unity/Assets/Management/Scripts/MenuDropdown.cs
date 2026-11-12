@@ -66,6 +66,7 @@ namespace TarmacGauntlet.Management
         {
             if (open == null) return false;
             bool was = open.Catcher.panel != null;
+            if (was) MenuSounds.Play(UiCue.DropdownClose);
             open.Owner.RemoveFromClassList("open");
             open.Catcher.RemoveFromHierarchy();
             open = null;
@@ -162,6 +163,7 @@ namespace TarmacGauntlet.Management
 
             root.Add(catcher);
             box.AddToClassList("open");
+            MenuSounds.Play(UiCue.DropdownOpen);
             open = new Open { Owner = box, Catcher = catcher, List = list, Highlight = current, Pick = pick };
             Highlight(current, false);
             // The picked choice in view once the list has its size.
