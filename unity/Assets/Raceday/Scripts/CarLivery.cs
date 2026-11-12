@@ -104,6 +104,13 @@ namespace TarmacGauntlet.Raceday
             return made;
         }
 
+        /// <summary>The livery's base paint colour, the team's own colour; null when the livery cannot be loaded.</summary>
+        public static Color? BaseColour(string liveryPath)
+        {
+            LiveryFile file = Load(liveryPath).File;
+            return file != null && ColorUtility.TryParseHtmlString(file.@base, out Color c) ? c : null;
+        }
+
         /// <summary>A material in the livery, without a number; null if it cannot be used on this model.</summary>
         private static Material Build(string liveryPath, string modelPath)
         {
