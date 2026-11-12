@@ -69,6 +69,8 @@ namespace TarmacGauntlet.Raceday
         public bool Stopping => story == Story.Stop;
         /// <summary>True during a helicopter shot.</summary>
         public bool Helicopter => shot == Shot.Helicopter;
+        /// <summary>True during any onboard shot: the onboard, roll hoop, nose, mirror and rear cameras.</summary>
+        public bool OnboardShot => Onboard(shot);
         /// <summary>Counts the cuts to a new story or car, so graphics can tell a new one has started.</summary>
         public int Stories { get; private set; }
         /// <summary>Counts every cut.</summary>
