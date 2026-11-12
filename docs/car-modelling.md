@@ -48,6 +48,7 @@ body.py lofts the outer skin from rows.json, in pure numpy.
 Build space is metres: x forward from mid wheelbase, y left, z up from the ground.
 The skin splits into pieces: body, doors, bonnet, boot or engine cover, glass.
 Every door that opens is its own closed shell, cut from the body along its shut line, named `door_l` or `door_r`. The door's edges and the jambs of the opening it leaves are painted in `body`, like a real car.
+Open each door and look for a sliver of body left across the opening. It forms at the belt, where the shoulder curves in above the door and the cut stops short of the cabin's hollow.
 Every piece is a closed shell with thickness. Shut lines are V grooves.
 A bonnet shut line starts at the windscreen's base, inboard of its lower corners. It bends out to the bonnet's rear corners, then runs forward along the panels it meets, such as the lamps and the wings, then across the nose. The bonnet reaches back to the windscreen, so its line has no rear edge.
 Wheel arches step round at even angles.
