@@ -16,8 +16,7 @@ namespace TarmacGauntlet.Raceday
     /// onboard, and the pit lane. <see cref="RaceCameras"/> hands it the camera in its TV view. Every shot but the onboard
     /// focuses on its car, so the background blurs (<see cref="PostEffects.Focus"/>).
     /// With <see cref="Lock"/> set it stays on that one car: mostly trackside shots and pans, a helicopter shot now and
-    /// then, and an onboard about one shot in ten, from the roll hoop, the nose, the wing mirror, the back of the car or
-    /// the driver's seat in turn.
+    /// then, and an onboard about one shot in ten, from the roll hoop, the driver's seat or the wing mirror in turn.
     /// </summary>
     public sealed class BroadcastDirector : MonoBehaviour
     {
@@ -36,7 +35,8 @@ namespace TarmacGauntlet.Raceday
         /// <summary>The shots that follow one another on a locked car. Onboard stands for the next of <see cref="LockedOnboards"/>.</summary>
         private static readonly Shot[] LockedShots =
             { Shot.Trackside, Shot.Pan, Shot.Trackside, Shot.Trackside, Shot.Pan, Shot.Helicopter, Shot.Trackside, Shot.Pan, Shot.Trackside, Shot.Onboard, Shot.Trackside, Shot.Pan };
-        private static readonly Shot[] LockedOnboards = { Shot.RollHoop, Shot.Onboard, Shot.Mirror, Shot.Nose, Shot.Rear };
+        // Eye-level and above only: a camera down at the bumpers shows nothing but the car ahead's tail.
+        private static readonly Shot[] LockedOnboards = { Shot.RollHoop, Shot.Onboard, Shot.Mirror };
         private int lockedOnboard;
 
         /// <summary>A fight is two cars of a class this close, s.</summary>
