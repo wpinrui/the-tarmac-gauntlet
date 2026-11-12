@@ -104,5 +104,20 @@ Shader "Hidden/TarmacGauntlet/PitKit"
             #include "Assets/Rendering/Shaders/TarmacLit.hlsl"
             ENDHLSL
         }
+
+        Pass
+        {
+            Name "MotionVectors"
+            Tags { "LightMode" = "MotionVectors" }
+            ColorMask RG
+
+            HLSLPROGRAM
+            #pragma target 3.5
+            #pragma vertex TarmacMotionVertex
+            #pragma fragment TarmacMotionFragment
+            #pragma multi_compile_instancing
+            #include "Assets/Rendering/Shaders/TarmacMotion.hlsl"
+            ENDHLSL
+        }
     }
 }

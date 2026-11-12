@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TarmacGauntlet.Rendering;
 using TarmacGauntlet.Visuals;
 using UnityEngine;
 
@@ -114,7 +115,7 @@ namespace TarmacGauntlet.Raceday
             foreach (Light l in uplights)
             {
                 bool near = cam != null && (cam.transform.position - l.transform.position).sqrMagnitude < UplightReach * UplightReach;
-                l.intensity = on * UplightIntensity;
+                l.intensity = LightFalloff.Urp(on * UplightIntensity, UplightRange);
                 bool lit = near && on > 0.001f;
                 if (l.enabled != lit) l.enabled = lit;
             }
@@ -197,7 +198,7 @@ namespace TarmacGauntlet.Raceday
                 if (s.Light.enabled) s.Light.enabled = false;
                 return;
             }
-            s.Light.intensity = full * s.Level;
+            s.Light.intensity = LightFalloff.Urp(full * s.Level, s.Light.range);
             if (!s.Light.enabled) s.Light.enabled = true;
         }
 
