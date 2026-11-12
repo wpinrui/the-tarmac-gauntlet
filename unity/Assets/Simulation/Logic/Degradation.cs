@@ -54,11 +54,9 @@ namespace TarmacGauntlet.Simulation
         private const double MaxStaminaFatigueReduction = 0.25;
 
         // --- Car condition ---
-        // Condition multiplies power/handling directly via effectiveStats: at 1.0 %/lap
-        // a 48-lap race drops a fresh car to 52 %, which compresses peak-class lap
-        // times by ~25 %. That single knob alone can eat 5+ laps off the leader's
-        // total. 0.4 keeps a fresh car above 80 % across one race; cars still
-        // deteriorate meaningfully across the season's multi-race timescale.
+        // Condition takes up to 30% off power/handling via effectiveStats (0% condition).
+        // At 0.25 %/lap a fresh car stays well above 80 % across one race, so a race costs
+        // a few percent of pace; cars still deteriorate meaningfully across the season.
         /// <summary>Condition lost per lap (0 to 100 scale) at age 0, skill 0, Normal mode.</summary>
         private const double BaseConditionDecayPerLap = 0.25;
         /// <summary>Fractional increase in condition decay rate per year of car age.</summary>

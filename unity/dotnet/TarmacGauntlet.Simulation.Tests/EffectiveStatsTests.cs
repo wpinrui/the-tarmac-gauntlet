@@ -126,24 +126,22 @@ namespace TarmacGauntlet.Simulation.Tests
         // --- Age ---
 
         [Test]
-        public void AppliesA2PercentPenaltyPerYearOfAge()
+        public void AppliesA06PercentPenaltyPerYearOfAge()
         {
-            // age 5 → agePenalty = 0.10 → ageFraction = 0.90; condition = 100% → combined = 0.90
+            // age 5 → agePenalty = 0.03 → combined = 0.97
             var result = Calc(BaseInstance with { Age = 5 });
-            Assert.That(result.Power, Is.EqualTo(100 * 0.9).Within(Close));
-            Assert.That(result.Handling, Is.EqualTo(80 * 0.9).Within(Close));
-            // pitStopTime: 40 / 0.90
-            Assert.That(result.PitStopTime, Is.EqualTo(40 / 0.9).Within(Close));
+            Assert.That(result.Power, Is.EqualTo(100 * 0.97).Within(Close));
+            Assert.That(result.Handling, Is.EqualTo(80 * 0.97).Within(Close));
+            Assert.That(result.PitStopTime, Is.EqualTo(40 / 0.97).Within(Close));
         }
 
         [Test]
-        public void CapsAgePenaltyAt50PercentAge25Plus()
+        public void CapsAgePenaltyAt15PercentAge25Plus()
         {
             var result25 = Calc(BaseInstance with { Age = 25 });
             var result50 = Calc(BaseInstance with { Age = 50 });
-            // At age 25, penalty is exactly 50%; any older should give the same result.
             Assert.That(result25.Power, Is.EqualTo(result50.Power).Within(Close));
-            Assert.That(result25.Power, Is.EqualTo(100 * 0.5).Within(Close));
+            Assert.That(result25.Power, Is.EqualTo(100 * 0.85).Within(Close));
         }
 
         [Test]
@@ -156,12 +154,12 @@ namespace TarmacGauntlet.Simulation.Tests
         // --- Condition ---
 
         [Test]
-        public void ConditionActsAsADirectMultiplierOnNormalStats()
+        public void ConditionCostsUpTo30PercentOfNormalStats()
         {
-            // condition 50% → multiplier = 0.50
+            // condition 50% → conditionPenalty = 0.15 → combined = 0.85
             var result = Calc(BaseInstance with { Condition = 50 });
-            Assert.That(result.Power, Is.EqualTo(100 * 0.5).Within(Close));
-            Assert.That(result.Reliability, Is.EqualTo(90 * 0.5).Within(Close));
+            Assert.That(result.Power, Is.EqualTo(100 * 0.85).Within(Close));
+            Assert.That(result.Reliability, Is.EqualTo(90 * 0.85).Within(Close));
         }
 
         [Test]
@@ -170,31 +168,30 @@ namespace TarmacGauntlet.Simulation.Tests
             var full = Calc(BaseInstance with { Condition = 100 });
             var degraded = Calc(BaseInstance with { Condition = 50 });
             Assert.That(degraded.PitStopTime, Is.GreaterThan(full.PitStopTime));
-            Assert.That(degraded.PitStopTime, Is.EqualTo(40 / 0.5).Within(Close));
+            Assert.That(degraded.PitStopTime, Is.EqualTo(40 / 0.85).Within(Close));
+        }
+
+        [Test]
+        public void WearNeverShrinksTheFuelTank()
+        {
+            var result = Calc(BaseInstance with { Age = 25, Condition = 0 });
+            Assert.That(result.FuelCapacity, Is.EqualTo(120));
         }
 
         // --- Edge cases ---
 
         [Test]
-        public void ZeroConditionAllNormalStatsAre0()
+        public void WorstWearKeeps55PercentOfNormalStats()
         {
-            var result = Calc(BaseInstance with { Condition = 0 });
-            Assert.That(result.Power, Is.EqualTo(0));
-            Assert.That(result.Handling, Is.EqualTo(0));
-            Assert.That(result.FuelEfficiency, Is.EqualTo(0));
-            Assert.That(result.TyreDurability, Is.EqualTo(0));
-            Assert.That(result.Comfort, Is.EqualTo(0));
-            Assert.That(result.Reliability, Is.EqualTo(0));
-            Assert.That(result.FuelCapacity, Is.EqualTo(0));
-        }
-
-        [Test]
-        public void ZeroConditionPitStopTimeIsCappedDoesNotReachInfinity()
-        {
-            var result = Calc(BaseInstance with { Condition = 0 });
-            // combined = 0, clamped to MinCombinedMultiplier = 0.1 → pitStopTime = 40 / 0.1 = 400
-            Assert.That(result.PitStopTime, Is.EqualTo(40 / 0.1).Within(Close));
-            Assert.That(double.IsFinite(result.PitStopTime), Is.True);
+            // age 25+ and 0% condition: 1 - 0.15 - 0.30 = 0.55
+            var result = Calc(BaseInstance with { Age = 40, Condition = 0 });
+            Assert.That(result.Power, Is.EqualTo(100 * 0.55).Within(Close));
+            Assert.That(result.Handling, Is.EqualTo(80 * 0.55).Within(Close));
+            Assert.That(result.FuelEfficiency, Is.EqualTo(60 * 0.55).Within(Close));
+            Assert.That(result.TyreDurability, Is.EqualTo(70 * 0.55).Within(Close));
+            Assert.That(result.Comfort, Is.EqualTo(50 * 0.55).Within(Close));
+            Assert.That(result.Reliability, Is.EqualTo(90 * 0.55).Within(Close));
+            Assert.That(result.PitStopTime, Is.EqualTo(40 / 0.55).Within(Close));
         }
 
         // --- All factors combined ---
@@ -202,9 +199,7 @@ namespace TarmacGauntlet.Simulation.Tests
         [Test]
         public void CombinesUpgradesAgeAndConditionCorrectly()
         {
-            // age 10 → agePenalty = 0.20 → ageFraction = 0.80
-            // condition 75% → conditionFraction = 0.75
-            // combined = 0.80 * 0.75 = 0.60
+            // age 10 → agePenalty = 0.06; condition 75% → conditionPenalty = 0.075; combined = 0.865
             var instance = BaseInstance with
             {
                 Age = 10,
@@ -212,7 +207,7 @@ namespace TarmacGauntlet.Simulation.Tests
                 InstalledUpgrades = Upgrades(true, true, true),
             };
             var result = Calc(instance);
-            const double combined = 0.8 * 0.75;
+            const double combined = 0.865;
 
             Assert.That(result.Power, Is.EqualTo(120 * combined).Within(Close));
             Assert.That(result.FuelEfficiency, Is.EqualTo(75 * combined).Within(Close));
@@ -221,7 +216,7 @@ namespace TarmacGauntlet.Simulation.Tests
             Assert.That(result.Comfort, Is.EqualTo(70 * combined).Within(Close));
             Assert.That(result.Reliability, Is.EqualTo(90 * combined).Within(Close));
             Assert.That(result.PitStopTime, Is.EqualTo(40 / combined).Within(Close));
-            Assert.That(result.FuelCapacity, Is.EqualTo(120 * combined).Within(Close));
+            Assert.That(result.FuelCapacity, Is.EqualTo(120));
         }
     }
 }
