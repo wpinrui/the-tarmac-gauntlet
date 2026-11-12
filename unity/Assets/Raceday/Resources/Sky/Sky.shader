@@ -1,9 +1,10 @@
-// The race's sky: a zenith to horizon gradient, the sunset glow towards the sun, the sun and moon,
+// The race's sky: a zenith to horizon gradient that pales over the lower half of the sky, a band of haze in the fog's
+// colour at the horizon so the far trees fade into the same air, the sunset glow towards the sun, the sun and moon,
 // stars at night and two layers of drifting cloud. Every colour comes from TimeOfDay each frame.
 // Under weather (_Overcast) the clouds grow, soften and close into a grey deck with broad darker patches.
 //
 // With _SKY_DETAIL (the Sky detail graphics option) the sky is drawn with more care, still in one pass with no
-// volumetrics: the horizon brightens smoothly into the haze colour so the far hills melt into it, the air round
+// volumetrics: the air round
 // the sun scatters its light in a bright halo and a broad glow, the sun is a sharp disc darker at its rim, the
 // moon has a faint halo, and the clouds get a third, finer layer that breaks up their edges, light and shade
 // from two steps towards the sun, darker bases where they are thick and bright rims where the sun is behind them.
@@ -95,15 +96,16 @@ Shader "Hidden/TarmacGauntlet/Sky"
                 float above = saturate(sun.y * 20.0 + 1.0);
                 float o = _Overcast;
 
-            #if defined(_SKY_DETAIL)
-                // How much air the view looks through, 1 at the horizon falling away smoothly overhead.
-                float air = exp(-max(up, 0.0) * 5.5);
+                // How much air the view looks through, 1 at the horizon falling away smoothly overhead: the deep blue
+                // is only high up, and the sky pales through the lower half towards the horizon.
+                float air = exp(-max(up, 0.0) * 3.2);
                 float3 sky = lerp(_Zenith.rgb, _Horizon.rgb, air);
+                // A low band of haze in the fog's colour, so the far trees and the sky meet in one colour.
+                float haze = exp(-abs(up) * 10.0);
+            #if defined(_SKY_DETAIL)
                 float band = exp(-max(up, 0.0) * 6.5);
                 sky += _Glow.rgb * (towards * towards * towards * band);
-                // A low band of haze in the fog's colour, so the far hills and the sky meet in one colour.
-                float haze = exp(-abs(up) * 16.0);
-                sky = lerp(sky, _Haze.rgb, haze * 0.75);
+                sky = lerp(sky, _Haze.rgb, haze * 0.85);
                 sky = lerp(sky, _Ground.rgb, saturate(-up * 6.0) * (1.0 - haze * 0.6));
 
                 // The sun's halo and a broad glow round it, stronger through the thicker air low down.
@@ -116,10 +118,10 @@ Shader "Hidden/TarmacGauntlet/Sky"
                 // Low down the sun sinks into the haze.
                 discCol *= saturate(up * 25.0 + 0.4);
             #else
-                float3 sky = lerp(_Zenith.rgb, _Horizon.rgb, h * h * h * h);
                 float band = h * h * h * h * h * h;
                 sky += _Glow.rgb * (towards * towards * towards * band);
-                sky = lerp(sky, _Ground.rgb, saturate(-up * 6.0));
+                sky = lerp(sky, _Haze.rgb, haze * 0.85);
+                sky = lerp(sky, _Ground.rgb, saturate(-up * 6.0) * (1.0 - haze * 0.6));
                 sky += _SunColor.rgb * (pow(saturate(cs), 12.0) * 0.18 + pow(saturate(cs), 400.0) * 0.6) * above;
                 float disc = smoothstep(0.99985, 0.99992, cs) * above;
                 float3 discCol = _SunColor.rgb * 3.0;
@@ -162,7 +164,7 @@ Shader "Hidden/TarmacGauntlet/Sky"
                 lit = lerp(lit, 1.0 - smoothstep(0.3, 0.75, n), o);
                 float3 cloud = lerp(_CloudShade.rgb, _CloudLit.rgb, lit) * (1.0 - 0.35 * o * smoothstep(0.3, 0.8, n));
                 cloud += _SunColor.rgb * pow(saturate(cs), 6.0) * (1.0 - c) * 0.6 * above;
-                cloud = lerp(cloud, _Horizon.rgb, band * 0.7);
+                cloud = lerp(cloud, _Haze.rgb, haze * 0.8);
             #endif
 
                 float3 col = sky + (discCol * disc + 0.9 * star + float3(0.85, 0.88, 0.95) * moon * _Night) * (1.0 - c);

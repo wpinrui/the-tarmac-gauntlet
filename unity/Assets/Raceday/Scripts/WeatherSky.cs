@@ -21,12 +21,15 @@ namespace TarmacGauntlet.Raceday
         /// <summary>How hard the rain falls, 0 to 1: a shower of 3 mm an hour is about half way.</summary>
         public static float Heavy(float rain) => 1f - Mathf.Exp(-rain / 4f);
 
-        /// <summary>Distance the haze hides everything at, m: the clear day's haze, closing in to a few hundred metres in a downpour.</summary>
+        /// <summary>Distance the haze hides everything at, m: the clear day's haze, closing in to under a kilometre in a downpour.</summary>
         public static float Haze(float clear, WeatherState w)
         {
             float grey = Mathf.Lerp(clear, clear * 0.55f, Overcast(w.Cloud));
-            return Mathf.Lerp(grey, 450f, Heavy(w.Rain));
+            return Mathf.Lerp(grey, Downpour, Heavy(w.Rain));
         }
+
+        /// <summary>Distance the haze hides everything at in the heaviest rain, m.</summary>
+        public const float Downpour = 900f;
 
         /// <summary>How overcast the sky is, 0 to 1: fair weather cumulus up to about a third of the sky leaves the clear day's look alone.</summary>
         public static float Overcast(float cloud) => SkyClock.Smooth(0.35f, 1f, cloud);
