@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Works out every car's wheel blur from its OBJ outside Unity and checks it, and the fade. Run through run.sh. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)../../out/wheel-check/obj/</BaseIntermediateOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Check.cs;../circuit/geometry-check/UnityStubs.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/WheelBlurProfile.cs" />
+  </ItemGroup>
+</Project>

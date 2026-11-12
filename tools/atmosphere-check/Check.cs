@@ -17,6 +17,12 @@ public static class Check
     public static int Main(string[] args)
     {
         float[] big = CloudField.Fbm(Size, 4, 5, 11), small = CloudField.Fbm(Size, 8, 4, 29);
+        int dump = Array.IndexOf(args, "--dump");
+        if (dump >= 0)
+        {
+            Dump(args[dump + 1], big, small);
+            return 0;
+        }
         CloudMap Map(float cover, float overcast, Vector4 offset = default) => new CloudMap
         {
             Big = big, Small = small, Size = Size, Tiles = CloudMap.TilesFor(CloudScale, overcast), Cover = cover, Overcast = overcast, Offset = offset,
@@ -83,6 +89,8 @@ public static class Check
         }
         Noise();
         Grade();
+        Look();
+        Palette();
 
         Console.WriteLine(failed == 0 ? "All atmosphere checks pass" : $"{failed} atmosphere checks FAILED");
         return failed == 0 ? 0 : 1;
@@ -117,6 +125,59 @@ public static class Check
         }
     }
 
+    /// <summary>
+    /// The volumetric clouds' constants: CloudLook.hlsl holds them, the shader includes it and the cloud preview reads it,
+    /// so the CPU's copies must agree with it, and every period of the 3D noise must divide where the wind's drift wraps.
+    /// </summary>
+    private static void Look()
+    {
+        string dir = AppContext.BaseDirectory;
+        while (dir != null && !System.IO.Directory.Exists(System.IO.Path.Combine(dir, "unity", "Assets"))) dir = System.IO.Path.GetDirectoryName(dir);
+        if (dir == null) { Expect("CloudLook.hlsl is found", false, "no unity/Assets above " + AppContext.BaseDirectory); return; }
+        string shaders = System.IO.Path.Combine(dir, "unity", "Assets", "Rendering", "Shaders");
+        var look = new System.Collections.Generic.Dictionary<string, float>();
+        foreach (string file in new[] { "CloudCover.hlsl", "CloudLook.hlsl" })
+            foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(
+                System.IO.File.ReadAllText(System.IO.Path.Combine(shaders, file)), @"^#define TG_CLOUD_(\w+)\s+(-?[\d.]+)\s*$", System.Text.RegularExpressions.RegexOptions.Multiline))
+                look[m.Groups[1].Value] = float.Parse(m.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
+        void Same(string name, float cpu)
+        {
+            bool has = look.TryGetValue(name, out float v);
+            Expect($"TG_CLOUD_{name} matches the CPU's", has && Math.Abs(v - cpu) < 1e-4f, has ? $"{v} in the shader, {cpu} on the CPU" : "missing");
+        }
+        Same("BASE", CloudMap.Base);
+        Same("HIGH_STEPS", CloudLook.HighSteps);
+        Same("ULTRA_STEPS", CloudLook.UltraSteps);
+        Same("REPEAT", CloudLook.Repeat);
+        bool divides = true;
+        string odd = "";
+        foreach (var kv in look)
+            if (kv.Key.EndsWith("_PERIOD"))
+            {
+                double r = CloudLook.Repeat / kv.Value;
+                if (Math.Abs(r - Math.Round(r)) > 1e-4) { divides = false; odd += $" {kv.Key} {kv.Value}"; }
+            }
+        Expect("every 3D noise period divides where the drift wraps, so the clouds never jump", divides, odd);
+    }
+
+    /// <summary>The clear day's palette: deeper by day, untouched at night and under a grey sky, golden only with the sun low.</summary>
+    private static void Palette()
+    {
+        SkyState Painted(float hour, float overcast)
+        {
+            SkyState s = SkyClock.At(hour, SkyClock.Look);
+            SkyPalette.Apply(ref s, overcast);
+            return s;
+        }
+        SkyState noon = SkyClock.At(13f, SkyClock.Look), deep = Painted(13f, 0f), grey = Painted(13f, 1f), night = Painted(1f, 0f);
+        Expect("a clear noon's zenith is a deeper blue", deep.Zenith.r < noon.Zenith.r * 0.6f && deep.Zenith.b > noon.Zenith.b * 0.8f, $"{deep.Zenith.r:0.00} {deep.Zenith.g:0.00} {deep.Zenith.b:0.00}");
+        Expect("a grey sky keeps its colours", Math.Abs(grey.Zenith.r - noon.Zenith.r) < 1e-5f && grey.Deep == 0f, "");
+        SkyState dark = SkyClock.At(1f, SkyClock.Look);
+        Expect("the night keeps its colours", Math.Abs(night.Zenith.b - dark.Zenith.b) < 1e-5f && night.Deep < 1e-4f, $"{night.Deep}");
+        SkyState low = Painted(16.6f, 0f);
+        Expect("a low sun is golden and noon is not", low.Golden > 0.8f && deep.Golden < 0.01f && low.CloudLit.r > low.CloudLit.b * 2f, $"{low.Golden:0.00} {deep.Golden:0.00}");
+    }
+
     /// <summary>The grade as the sun breaks through, and nothing changed where there is nothing to break through.</summary>
     private static void Grade()
     {
@@ -133,6 +194,50 @@ public static class Check
         Expect("the night grades as before", Same(SkyGrade.For(night, 0f, 0f, 1f, broken), SkyGrade.For(night, 0f, 0f)), "");
         Expect("broken cloud is most between a third and a half of the sky", SkyGrade.Patchy(0.4f, WeatherSky.Overcast(0.4f)) > 0.8f
             && SkyGrade.Patchy(0.1f, 0f) < 0.05f && SkyGrade.Patchy(1f, WeatherSky.Overcast(1f)) < 0.05f, "");
+    }
+
+    /// <summary>
+    /// Writes what the cloud preview (tools/cloud-preview) needs to draw the sky as the game does: the cloud map's noise,
+    /// the 3D noise, and the sky's colours and light for each preview scene.
+    /// </summary>
+    private static void Dump(string dir, float[] big, float[] small)
+    {
+        System.IO.Directory.CreateDirectory(dir);
+        var map = new byte[Size * Size * 8];
+        Buffer.BlockCopy(big, 0, map, 0, Size * Size * 4);
+        Buffer.BlockCopy(small, 0, map, Size * Size * 4, Size * Size * 4);
+        System.IO.File.WriteAllBytes(System.IO.Path.Combine(dir, "map.f32"), map);
+        System.IO.File.WriteAllBytes(System.IO.Path.Combine(dir, "noise3d.u8"), CloudNoise.Field(CloudNoise.Size));
+        var scenes = new (string name, float hour, float cloud, float rain)[]
+        {
+            ("noon", 12.5f, 0.3f, 0f), ("partly-cloudy", 14f, 0.5f, 0f), ("golden-hour", 16.6f, 0.3f, 0f), ("overcast", 13f, 1f, 0.3f),
+        };
+        var json = new System.Text.StringBuilder("[\n");
+        for (int i = 0; i < scenes.Length; i++)
+        {
+            var sc = scenes[i];
+            SkyState s = SkyClock.At(sc.hour, SkyClock.Look);
+            var w = new WeatherState { Cloud = sc.cloud, Rain = sc.rain, Wind = 1f };
+            WeatherSky.Apply(ref s, w, WeatherSky.Lights(s.SunElevation, WeatherSky.Dusk(w)));
+            float o = WeatherSky.Overcast(sc.cloud);
+            SkyPalette.Apply(ref s, o);
+            Color sun = s.LightColour * s.LightIntensity;
+            SkyPalette.CloudAmbient(s, sun, out Color above, out Color below);
+            PostEffects.Grade g = SkyGrade.For(s, o, WeatherSky.Heavy(sc.rain), 0f, SkyGrade.Patchy(sc.cloud, o));
+            float haze = WeatherSky.Haze(s.Haze, w);
+            string C(Color c) => $"[{c.r:0.0000},{c.g:0.0000},{c.b:0.0000}]";
+            string V(Vector3 v) => $"[{v.x:0.0000},{v.y:0.0000},{v.z:0.0000}]";
+            json.Append($"{{\"name\":\"{sc.name}\",\"cloud\":{sc.cloud},\"overcast\":{o:0.0000},\"cover\":{CloudMap.CoverFor(sc.cloud):0.0000},")
+                .Append($"\"skyCover\":{WeatherSky.Cover(sc.cloud):0.0000},\"tiles\":{CloudMap.TilesFor(0.45f, o):0.00000000},")
+                .Append($"\"sunDir\":{V(s.LightDir)},\"sun\":{C(sun)},\"sunColour\":{C(s.SunElevation > -2f ? s.LightColour : Color.black)},")
+                .Append($"\"zenith\":{C(s.Zenith)},\"horizon\":{C(s.Horizon)},\"haze\":{C(s.Fog)},\"glow\":{C(s.Glow)},\"goldenGlow\":{C(SkyPalette.Glow(s))},")
+                .Append($"\"deep\":{s.Deep:0.0000},\"cloudLit\":{C(s.CloudLit)},\"cloudShade\":{C(s.CloudShade)},\"ground\":{C(s.AmbientGround)},")
+                .Append($"\"skyLight\":{C(above)},\"groundLight\":{C(below)},")
+                .Append($"\"grade\":[{g.Exposure:0.000},{g.Contrast:0.00},{g.Saturation:0.00},{g.Temperature:0.00},{g.Tint:0.00}],\"elevation\":{s.SunElevation:0.00},")
+                .Append($"\"hazeDistance\":{haze:0.0},\"hazeDensity\":{SkyClock.Density(haze):0.00000000}}}{(i + 1 < scenes.Length ? "," : "")}\n");
+        }
+        json.Append("]\n");
+        System.IO.File.WriteAllText(System.IO.Path.Combine(dir, "scenes.json"), json.ToString());
     }
 
     private static bool Same(PostEffects.Grade a, PostEffects.Grade b) =>

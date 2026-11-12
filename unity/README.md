@@ -93,11 +93,15 @@ target speed for every 2 m sample (`SpeedProfile.cs`, from the car's grip, downf
 brakes). After a hard crash, or when stuck or spun, it puts the car back on track itself. The console
 shows its predicted lap time and each lap it drives.
 
-The camera starts on the TV view when the race comes from the career, and on the chase camera when the scene runs on
-its own. `C` cycles TV, chase, bonnet, bumper, free and follow. In the TV view the director (`BroadcastDirector.cs`) picks
+The camera starts on the broadcast when the race comes from the career, and on the chase camera when the scene runs on
+its own. `C` cycles the car cameras: TV, chase, bonnet and bumper. The TV camera is a long lens locked to the car. `B`
+puts the broadcast on, and `B` or `C` takes it off. While you are not driving your own car, the car camera is yours to
+move and still rides along with the car. Hold the right mouse button and drag to look, `W` `A` `S` `D` move, `Q` and `E`
+go down and up, `Shift` is 5x faster and the wheel changes speed. On the TV camera the drag orbits the car and the wheel
+zooms. Switching camera or car, or taking the wheel, puts the view back. On the broadcast the director (`BroadcastDirector.cs`) picks
 the story once a real second: a car stopped off the track, a fight for a class lead, any fight within a class under
 0.5 s, your car, a class leader's stop or yours, a car rejoining, the leader. It cuts between trackside, pan,
-helicopter, onboard and pit lane shots. While you drive, the TV view is your onboard.
+helicopter, onboard and pit lane shots.
 
 The director's shots carry the broadcast graphics (`BroadcastGraphics.cs`): a battle strip with the gap in a
 fight, a driver strip the first time a car is on air in a stint, a pit timer with fuel, tyres and driver
@@ -137,7 +141,7 @@ Driving: left and right arrows steer, up accelerates, down brakes (hold it at a 
 reverse). The settings menu picks an automatic or manual gearbox; in manual `A` and `Z` shift up and down. The
 bottom right shows speed in km/h and the gear, blue in automatic and white in manual. Steering help
 is a setting too. Anti-lock brakes are always on. `R` puts the car back on track, which you
-need after a hard hit on a barrier. `C` cycles the chase, bonnet and bumper views, the free camera and the follow camera.
+need after a hard hit on a barrier.
 
 The car's physics come from its game stats (`Raceday/Scripts/CarSpec.cs`): Power sets the engine,
 Handling sets tyre grip and downforce. Grass and gravel have less grip and slow the car.

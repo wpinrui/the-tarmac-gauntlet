@@ -68,8 +68,6 @@ namespace TarmacGauntlet.Rendering
         private sealed class VolumetricsPass : ScriptableRenderPass
         {
             private const int March = 0, Resolve = 1, Composite = 2;
-            /// <summary>The clouds' extinction at full thickness, per m: dense enough that their edges read crisp.</summary>
-            private const float CloudExtinction = 0.05f;
             /// <summary>
             /// The march is worked out at the frame's size over this, across and down: a third at High, a half at Ultra, so the
             /// clouds' edges stay crisp. At 2560 x 1440 High marches 853 x 480 and Ultra 1280 x 720 with more steps.
@@ -157,10 +155,9 @@ namespace TarmacGauntlet.Rendering
                 history.ViewProj = viewProj;
                 history.Pose = pose;
 
-                Atmosphere.Sky sky = Atmosphere.Now;
-                float cloudBase = Atmosphere.CloudBase - 300f * sky.Overcast;
-                var steps = new Vector4(clouds ? (ultra ? 48 : 32) : 0, fog ? (ultra ? 24 : 16) : 0, FogReach, blend ? 1f : 0f);
-                var slab = new Vector4(cloudBase, cloudBase + Mathf.Lerp(900f, 1500f, sky.Overcast), CloudExtinction, clouds ? 1f : 0f);
+                // The cloud layer itself, and every constant of the clouds' look, is in CloudLook.hlsl.
+                var steps = new Vector4(clouds ? (ultra ? CloudLook.UltraSteps : CloudLook.HighSteps) : 0, fog ? (ultra ? 24 : 16) : 0, FogReach, blend ? 1f : 0f);
+                var slab = new Vector4(0f, 0f, 0f, clouds ? 1f : 0f);
                 var camPos = new Vector4(pose.position.x, pose.position.y, pose.position.z, Time.frameCount & 63);
                 var lowSize = new Vector4(1f / w, 1f / h, w, h);
                 Matrix4x4 invViewProj = viewProj.inverse;

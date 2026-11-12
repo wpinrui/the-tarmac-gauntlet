@@ -30,6 +30,14 @@ namespace TarmacGauntlet.Raceday
         private const float GarageTuck = 0.063f;   // the shoulder in front of a garage lies this far under the lane edge, about 4 cm under the floor
         private const float EdgeArmcoMin = 6f;     // runoff cut short still gets armco at its edge when at least this deep
         private const float EdgeArmcoStep = 1f;    // ...unless its edge moves less than this from one track sample to the next
+        // Armco stands only where the ground along it is about flat, so its rails never kink, float or bury.
+        private const float ArmcoSlope = 0.06f;    // steepest it may climb or fall along its line over a post's span
+        private const float ArmcoBend = 0.02f;     // most that slope may change from one post's span to the next
+        private const float ArmcoCross = 0.15f;    // steepest the ground may fall away just behind it, leaving the posts hanging
+        private const int ArmcoBridge = 2;         // a run carries on over this many samples that fail
+        private const float ArmcoMinRun = 100f;    // shortest run that stands, m
+        private const float ArmcoMinGap = 30f;     // shortest gap left between two runs, m; closer, the shorter goes
+        private const int ArmcoPast = 6;           // samples of runoff edge handed on past each end of a run
         // Tyre wall texture: one tile spans the stack's whole height, top to buried foot, and two tyres along it.
         public const float TyreTop = 1.0f, TyreFoot = 0.5f, TyreTileAlong = 1.2f;
 
@@ -248,6 +256,9 @@ namespace TarmacGauntlet.Raceday
                 for (int k = 0; k < n; k++) gravel[s][k] = pitWall[s][k] ? 0f : Mathf.Min(gravel[s][k], barrier[s][k] - 1.5f);
                 fenced[s] = Fences(barrier[s], wants[s], open[s]);
                 edgeArmco[s] = EdgeFences(barrier[s], fenced[s], pitWall[s], open[s], s == 0 ? 1 : -1);
+                KeepFlatArmco(s);
+                StopShortOfBanks(s);
+                for (int k = 0; k < n; k++) gravel[s][k] = Mathf.Min(gravel[s][k], barrier[s][k] - 1.5f);
                 // Where the runoff stops for an opening, such as a pit road join, its end row settles onto
                 // the ground within a shoulder's width, as the pit lane's own shoulder does, so the two ends
                 // meet and nothing stands proud of the ground across the end. It eases back over a few rows.
@@ -398,6 +409,116 @@ namespace TarmacGauntlet.Raceday
             foreach (List<int> run in Runs(k => f[k]))
                 if (run.Count >= minRun) foreach (int k in run) keep[k] = true;
             return keep;
+        }
+
+        /// <summary>
+        /// Keeps the armco on one side only where the ground along its line is about flat, and decides it run by
+        /// run so no broken bits stand: a run carries on over a sample or two that fail, runs shorter than
+        /// <see cref="ArmcoMinRun"/> go, and of two runs closer than <see cref="ArmcoMinGap"/> the shorter goes.
+        /// Where it goes, the runoff, its collider, tyre walls and catch fences go with it.
+        /// </summary>
+        private void KeepFlatArmco(int s)
+        {
+            float sign = s == 0 ? 1 : -1;
+            bool[] bar = new bool[n];
+            for (int k = 0; k < n; k++) bar[k] = Armco(s, k);
+            // Where the armco would stand, on the runoff as it would lie against it.
+            Vector3 At(int k) => Point(k, sign * (c.HalfWidth(k) + barrier[s][k]), 0, true);
+            float Ground(Vector3 p) => c.UntouchedHeight(p.x, p.z);
+            float Slope(int a, int b)
+            {
+                Vector3 p = At(a), q = At(b);
+                float run = Mathf.Max(0.1f, Mathf.Sqrt((q.x - p.x) * (q.x - p.x) + (q.z - p.z) * (q.z - p.z)));
+                return (q.y - p.y) / run;
+            }
+            var ok = new bool[n];
+            var near = new bool[n];   // fails, but by little enough to bridge
+            for (int k = 0; k < n; k++)
+            {
+                if (!bar[k]) continue;
+                float before = Slope(c.Wrap(k - 2), k), after = Slope(k, c.Wrap(k + 2));
+                Vector3 p = At(k), back = p - c.Centre[k];
+                back.y = 0;
+                back.Normalize();
+                // A bank rising behind is fine: the rail stands in front of it, as against a hillside, and
+                // with no armco the runoff would end at a wall of ground.
+                float cross = (Ground(p + back * 1.5f) - p.y) / 1.5f;
+                float slope = Mathf.Max(Mathf.Abs(before), Mathf.Abs(after)), bend = Mathf.Abs(after - before);
+                ok[k] = slope <= ArmcoSlope && bend <= ArmcoBend && cross >= -ArmcoCross;
+                near[k] = slope <= ArmcoSlope * 1.25f && bend <= ArmcoBend * 2f && cross >= -ArmcoCross * 1.25f;
+            }
+            // Bridge short, slight failures inside a stretch that is armco anyway.
+            foreach (List<int> run in Runs(k => bar[k]))
+                for (int i = 0; i < run.Count; i++)
+                {
+                    if (ok[run[i]]) continue;
+                    int j = i;
+                    while (j < run.Count && !ok[run[j]]) j++;
+                    bool slight = true;
+                    for (int q = i; q < j; q++) slight &= near[run[q]];
+                    if (i > 0 && j < run.Count && j - i <= ArmcoBridge && slight)
+                        for (int q = i; q < j; q++) ok[run[q]] = true;
+                    i = j;
+                }
+            int minRun = Mathf.CeilToInt(ArmcoMinRun / c.Step), minGap = Mathf.CeilToInt(ArmcoMinGap / c.Step);
+            for (int round = 0; round < 100; round++)
+            {
+                var runs = new List<List<int>>(Runs(k => ok[k]));
+                List<int> drop = runs.Find(r => r.Count < minRun);
+                if (drop == null && runs.Count > 1)
+                    for (int i = 0; i < runs.Count && drop == null; i++)
+                    {
+                        List<int> a = runs[i], b = runs[(i + 1) % runs.Count];
+                        int gap = c.Wrap(b[0] - a[a.Count - 1]) - 1;
+                        if (gap < minGap) drop = a.Count < b.Count ? a : b;
+                    }
+                if (drop == null) break;
+                foreach (int k in drop) ok[k] = false;
+            }
+            for (int k = 0; k < n; k++)
+                if (!ok[k]) { fenced[s][k] = false; edgeArmco[s][k] = false; }
+        }
+
+        /// <summary>
+        /// Where no armco stands, the runoff ends at the foot of any steep bank beyond it rather than against
+        /// the bank's face, so grass carries on from its edge up the slope.
+        /// </summary>
+        private void StopShortOfBanks(int s)
+        {
+            float sign = s == 0 ? 1 : -1;
+            const float Steepest = 0.8f, Look = 3f;
+            var bar = barrier[s];
+            var cut = new float[n];
+            for (int k = 0; k < n; k++)
+            {
+                cut[k] = float.MaxValue;
+                if (open[s][k] || Armco(s, k) || pitWall[s][k]) continue;
+                Vector3 out_ = c.Left[k] * sign;
+                out_.y = 0;
+                out_.Normalize();
+                float reach = bar[k];
+                while (reach > Verge + 1f)
+                {
+                    Vector3 p = c.Surface(k, sign * (c.HalfWidth(k) + reach)), q = p + out_ * Look;
+                    if ((c.UntouchedHeight(q.x, q.z) - c.UntouchedHeight(p.x, p.z)) / Look <= Steepest) break;
+                    reach -= 0.5f;
+                }
+                if (reach < bar[k]) cut[k] = reach;
+            }
+            // Ease the change in over the neighbouring samples, so the edge stays smooth.
+            const int Reach = 6;
+            for (int k = 0; k < n; k++)
+            {
+                float most = bar[k];
+                for (int d = -Reach; d <= Reach; d++)
+                {
+                    int j = c.Wrap(k + d);
+                    if (cut[j] == float.MaxValue) continue;
+                    float t = Mathf.Abs(d) / (float)(Reach + 1);
+                    most = Mathf.Min(most, Mathf.Lerp(cut[j], bar[k], t * t));
+                }
+                if (!Armco(s, k) && !pitWall[s][k]) bar[k] = Mathf.Max(0f, most);
+            }
         }
 
         /// <summary>
@@ -573,7 +694,21 @@ namespace TarmacGauntlet.Raceday
                         line[i] = Point(run[i], sign * (c.HalfWidth(run[i]) + barrier[side][run[i]]), 0, true);
                         stack[i] = TyreWall(side, run[i]);
                     }
-                    ArmcoRuns.Add(new ArmcoRun(side, run.ToArray(), line, stack));
+                    // The runoff's edge on past each end, from the end itself, for the rails' terminals to follow.
+                    Vector3[] Past(int from, int step)
+                    {
+                        var past = new List<Vector3> { line[from == run[0] ? 0 : run.Count - 1] };
+                        float reach = barrier[side][from];
+                        for (int d = 1; d <= ArmcoPast; d++)
+                        {
+                            int k = c.Wrap(from + step * d);
+                            if (open[side][k] || pitWall[side][k]) break;
+                            reach = barrier[side][k];
+                            past.Add(Point(k, sign * (c.HalfWidth(k) + reach), 0, true));
+                        }
+                        return past.ToArray();
+                    }
+                    ArmcoRuns.Add(new ArmcoRun(side, run.ToArray(), line, stack, Past(run[0], -1), Past(run[run.Count - 1], 1)));
                 }
 
                 // Tyre walls in front of the armco where a gravel trap catches cars. The texture's across runs down
@@ -1677,12 +1812,17 @@ namespace TarmacGauntlet.Raceday
         /// <summary>True where a tyre wall stands in front of it.</summary>
         public readonly bool[] Tyres;
 
-        public ArmcoRun(int side, int[] samples, Vector3[] line, bool[] tyres)
+        /// <summary>The runoff's edge on past the run's first and last points, each starting from that point.</summary>
+        public readonly Vector3[] Before, After;
+
+        public ArmcoRun(int side, int[] samples, Vector3[] line, bool[] tyres, Vector3[] before, Vector3[] after)
         {
             Side = side;
             Samples = samples;
             Line = line;
             Tyres = tyres;
+            Before = before;
+            After = after;
         }
     }
 }

@@ -66,6 +66,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>How deep in a cloud's shadow the camera's spot is, eased (<see cref="ShadeEase"/>); NaN until the first frame.</summary>
         private float shade = float.NaN;
 
+        private static readonly int DeepId = Shader.PropertyToID("_Deep"), GoldenGlowId = Shader.PropertyToID("_GoldenGlow");
         private static readonly int ZenithId = Shader.PropertyToID("_Zenith"), HorizonId = Shader.PropertyToID("_Horizon"),
             GlowId = Shader.PropertyToID("_Glow"), GroundId = Shader.PropertyToID("_Ground"), SunColorId = Shader.PropertyToID("_SunColor"), HazeId = Shader.PropertyToID("_Haze"),
             CloudLitId = Shader.PropertyToID("_CloudLit"), CloudShadeId = Shader.PropertyToID("_CloudShade"),
@@ -146,8 +147,8 @@ namespace TarmacGauntlet.Raceday
             for (int k = 0; k < 4; k++) clouds[k] = Mathf.Repeat(clouds[k], 1f);
             // The map's clouds move the other way to its offset; the volumetric noise follows them.
             float tiles = CloudMap.TilesFor(CloudScale, o);
-            drift.x = Mathf.Repeat(drift.x + blown.x / tiles, Atmosphere.NoisePeriod);
-            drift.y = Mathf.Repeat(drift.y + blown.y / tiles, Atmosphere.NoisePeriod);
+            drift.x = Mathf.Repeat(drift.x + blown.x / tiles, CloudLook.Repeat);
+            drift.y = Mathf.Repeat(drift.y + blown.y / tiles, CloudLook.Repeat);
             Apply();
         }
 
@@ -174,6 +175,7 @@ namespace TarmacGauntlet.Raceday
                 cloud = w.Cloud + rain;
                 share = w.Cloud;
             }
+            SkyPalette.Apply(ref s, overcast);
             var map = new CloudMap
             {
                 Big = bigCloud,
@@ -220,12 +222,18 @@ namespace TarmacGauntlet.Raceday
             sky.SetFloat(CoverId, cover);
             sky.SetFloat(OvercastId, overcast);
             sky.SetFloat(NightId, s.Night);
+            sky.SetFloat(DeepId, s.Deep);
+            sky.SetColor(GoldenGlowId, SkyPalette.Glow(s));
 
             float misty = SkyClock.Misty(hour);
+            Color sunLight = lamp.enabled ? s.LightColour * s.LightIntensity : Color.black;
+            SkyPalette.CloudAmbient(s, sunLight, out Color above, out Color below);
             Atmosphere.Publish(new Atmosphere.Sky
             {
+                SkyLight = above,
+                GroundLight = below,
                 SunDir = s.LightDir,
-                Sun = lamp.enabled ? s.LightColour * s.LightIntensity : Color.black,
+                Sun = sunLight,
                 CloudLit = s.CloudLit,
                 CloudShade = s.CloudShade,
                 Haze = s.Fog,

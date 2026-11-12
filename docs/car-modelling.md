@@ -48,6 +48,7 @@ body.py lofts the outer skin from rows.json, in pure numpy.
 Build space is metres: x forward from mid wheelbase, y left, z up from the ground.
 The skin splits into pieces: body, doors, bonnet, boot or engine cover, glass.
 Every door that opens is its own closed shell, cut from the body along its shut line, named `door_l` or `door_r`. The door's edges and the jambs of the opening it leaves are painted in `body`, like a real car.
+Open each door and look for a sliver of body left across the opening. It forms at the belt, where the shoulder curves in above the door and the cut stops short of the cabin's hollow.
 Every piece is a closed shell with thickness. Shut lines are V grooves.
 A bonnet shut line starts at the windscreen's base, inboard of its lower corners. It bends out to the bonnet's rear corners, then runs forward along the panels it meets, such as the lamps and the wings, then across the nose. The bonnet reaches back to the windscreen, so its line has no rear edge.
 Wheel arches step round at even angles.
@@ -59,6 +60,7 @@ Trace every headlight and tail light outline closely from the reference. Never a
 Lamp interiors are our own, not copied from the real car.
 Lamp parts and materials are named so the game can light them: `lamp_head`, `lamp_tail`, `lamp_brake`, `lamp_rain`.
 Parts that swing with a door start with its name: `door_l_glass`, `door_l_card`, `door_l_mirror`.
+Every part of a wheel is named `wheel_<part>_<corner>` with corners `fl`, `fr`, `rl`, `rr`, and every corner has a `wheel_tyre_<corner>`, so the game can spin and blur them. `tools/wheel-check/run.sh` checks this.
 The interior gets a firewall, a dash meeting it, seats, door cards and a mirror.
 Door mirrors get a separate recessed glass part.
 Every car is left-hand drive: the driver's seat and wheel sit on the left, because the pit lane is on the left. Both doors open, so the car stays symmetrical.

@@ -24,6 +24,12 @@ namespace TarmacGauntlet.Raceday
         /// <summary>The rails follow the armco line to within this, m, with no straight piece longer than <see cref="MaxPiece"/>.</summary>
         public const float Tolerance = 0.03f, MaxPiece = 8f;
 
+        /// <summary>
+        /// Each run's ends turn away from the road by <see cref="FlareBack"/> over <see cref="TerminalLength"/>, sinking until
+        /// the rails' top lies <see cref="TerminalBury"/> under the ground, m.
+        /// </summary>
+        public const float TerminalLength = 8f, FlareBack = 1f, TerminalBury = 0.1f;
+
         /// <summary>Catch fence: how far behind the armco line, how tall, and how far its posts stand apart, m.</summary>
         public const float FenceBack = 0.8f, FenceHeight = 3.5f, FencePostSpacing = 4f;
         /// <summary>A catch fence carries on this far past each end of a tyre wall, m.</summary>
@@ -39,6 +45,8 @@ namespace TarmacGauntlet.Raceday
         public readonly MeshKit Fence = new MeshKit(), FencePosts = new MeshKit();
         /// <summary>Each run's rail line as built: the points the rails pass through, on the armco line.</summary>
         public readonly List<Vector3[]> Rails = new List<Vector3[]>();
+        /// <summary>Each run's two terminals: the rails' top edge, from the run's end out to where it lies buried.</summary>
+        public readonly List<Vector3[]> Ends = new List<Vector3[]>();
         /// <summary>Each post's foot on the armco line.</summary>
         public readonly List<Vector3> Posts = new List<Vector3>();
         /// <summary>Each catch fence's foot line, with its side of the track.</summary>
@@ -105,6 +113,19 @@ namespace TarmacGauntlet.Raceday
             for (int i = 0; i < kept.Count; i++) line[i] = run.Line[kept[i]];
             Rails.Add(line);
 
+            // The rails' path: the run itself, then at each end a terminal that turns away from the road and
+            // dips into the ground, so no open end faces the cars.
+            var path = new List<(Vector3 l, Vector3 b, float drop)>();
+            int first = kept[0], last = kept[kept.Count - 1];
+            List<(Vector3 l, Vector3 b, float drop)> start = Terminal(run.Before, back[first], Flat(run.Line[first] - run.Line[kept[1]]).normalized);
+            List<(Vector3 l, Vector3 b, float drop)> end = Terminal(run.After, back[last], Flat(run.Line[last] - run.Line[kept[kept.Count - 2]]).normalized);
+            for (int i = start.Count - 1; i > 0; i--) path.Add(start[i]);
+            foreach (int k in kept) path.Add((run.Line[k], back[k], 0f));
+            for (int i = 1; i < end.Count; i++) path.Add(end[i]);
+            float railTop = RailBottom + 2f * RailHeight;
+            Ends.Add(start.ConvertAll(f => f.l + Vector3.up * (railTop - f.drop)).ToArray());
+            Ends.Add(end.ConvertAll(f => f.l + Vector3.up * (railTop - f.drop)).ToArray());
+
             int m = Profile.Length;
             var normals = new Vector2[m];
             for (int t = 0; t < m; t++)
@@ -114,26 +135,70 @@ namespace TarmacGauntlet.Raceday
                 if (t < m - 1) n += EdgeNormal(Profile[t], Profile[t + 1]);
                 normals[t] = n.normalized;
             }
-            for (int i = 0; i + 1 < kept.Count; i++)
+            Vector2 Sunk(Vector2 p, float drop) => new Vector2(p.x, p.y - drop);
+            for (int i = 0; i + 1 < path.Count; i++)
             {
-                int a = kept[i], b = kept[i + 1];
-                Vector3 la = run.Line[a], lb = run.Line[b], ba = back[a], bb = back[b];
+                var (la, ba, da) = path[i];
+                var (lb, bb, db) = path[i + 1];
                 for (int t = 0; t + 1 < m; t++)
                 {
                     // Rounded over the ridges and the valley between them, creased at the edges, so the seam where the
                     // two rails meet shows as a dark line.
                     Vector2 edge = EdgeNormal(Profile[t], Profile[t + 1]);
                     Vector2 n0 = Lip(t) ? edge : normals[t], n1 = Lip(t + 1) ? edge : normals[t + 1];
-                    Quad(Steel, At(la, ba, Profile[t]), At(la, ba, Profile[t + 1]), At(lb, bb, Profile[t]), At(lb, bb, Profile[t + 1]),
+                    Quad(Steel, At(la, ba, Sunk(Profile[t], da)), At(la, ba, Sunk(Profile[t + 1], da)), At(lb, bb, Sunk(Profile[t], db)), At(lb, bb, Sunk(Profile[t + 1], db)),
                         Dir(ba, n0), Dir(ba, n1), Dir(bb, n0), Dir(bb, n1));
                 }
                 // The back of the rails, flat from the top edge down to the bottom one.
                 Vector2 top = Profile[m - 1], bottom = Profile[0];
-                Quad(Steel, At(la, ba, top), At(la, ba, bottom), At(lb, bb, top), At(lb, bb, bottom), ba, ba, bb, bb);
+                Quad(Steel, At(la, ba, Sunk(top, da)), At(la, ba, Sunk(bottom, da)), At(lb, bb, Sunk(top, db)), At(lb, bb, Sunk(bottom, db)), ba, ba, bb, bb);
             }
-            Cap(run.Line[kept[0]], back[kept[0]], Flat(run.Line[kept[0]] - run.Line[kept[1]]).normalized);
-            int last = kept[kept.Count - 1];
-            Cap(run.Line[last], back[last], Flat(run.Line[last] - run.Line[kept[kept.Count - 2]]).normalized);
+        }
+
+        /// <summary>
+        /// A rail terminal from a run's end: following the runoff's edge on past the end, it turns back from it by
+        /// <see cref="FlareBack"/> and sinks until its top is <see cref="TerminalBury"/> under the ground, over
+        /// <see cref="TerminalLength"/>. The first entry is the run's end itself, with nothing sunk.
+        /// </summary>
+        private List<(Vector3 l, Vector3 b, float drop)> Terminal(Vector3[] past, Vector3 back, Vector3 outward)
+        {
+            const int pieces = 6;
+            Vector3 end = past[0];
+            float[] lengths = Lengths(past);
+            var frames = new List<(Vector3, Vector3, float)> { (end, back, 0f) };
+            float full = RailBottom + 2f * RailHeight + TerminalBury;
+            Vector3 prev = end, prevBack = back;
+            for (int i = 1; i <= pieces; i++)
+            {
+                float s = i / (float)pieces, ease = s * s * (3f - 2f * s), u = TerminalLength * s;
+                // The edge at this far along, carrying straight on past the last of it.
+                Vector3 edge, dir;
+                int j = 0;
+                while (j < past.Length - 2 && lengths[j + 1] < u) j++;
+                if (past.Length >= 2 && u <= lengths[past.Length - 1])
+                {
+                    float t = Mathf.Clamp01((u - lengths[j]) / Mathf.Max(1e-4f, lengths[j + 1] - lengths[j]));
+                    edge = Vector3.Lerp(past[j], past[j + 1], t);
+                    dir = Flat(past[j + 1] - past[j]).normalized;
+                }
+                else
+                {
+                    Vector3 tip = past[past.Length - 1];
+                    dir = past.Length >= 2 ? Flat(tip - past[past.Length - 2]).normalized : outward;
+                    edge = tip + dir * (u - lengths[past.Length - 1]);
+                }
+                Vector3 side = Vector3.Cross(Vector3.up, dir).normalized;
+                if (Vector3.Dot(side, prevBack) < 0) side = -side;
+                Vector3 p = edge + side * (FlareBack * s * s);
+                // Its foot comes off the runoff's edge onto the ground as it goes.
+                p.y = Mathf.Lerp(edge.y, c.TerrainHeight(p.x, p.z), ease);
+                Vector3 b = Vector3.Cross(Vector3.up, Flat(p - prev)).normalized;
+                if (Vector3.Dot(b, side) < 0) b = -b;
+                frames.Add((p, b, full * ease));
+                prev = p;
+                prevBack = side;
+            }
+            return frames;
         }
 
         /// <summary>
@@ -166,20 +231,6 @@ namespace TarmacGauntlet.Raceday
                 if ((a + ab * t - line[k]).magnitude > Tolerance) return false;
             }
             return true;
-        }
-
-        /// <summary>A plate across the rails' open end, facing out along the line.</summary>
-        private void Cap(Vector3 l, Vector3 back, Vector3 outward)
-        {
-            Vector2 mid = Vector2.zero;
-            foreach (Vector2 p in Profile) mid += p;
-            mid /= Profile.Length;
-            Vector3 centre = At(l, back, mid);
-            for (int t = 0; t < Profile.Length; t++)
-            {
-                Vector3 p0 = At(l, back, Profile[t]), p1 = At(l, back, Profile[(t + 1) % Profile.Length]);
-                Tri(Steel, centre, p0, p1, outward);
-            }
         }
 
         // ---------------------------------------------------------------- posts

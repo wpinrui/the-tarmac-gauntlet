@@ -48,6 +48,7 @@ namespace TarmacGauntlet.Raceday
             car.Keys = keys;
             car.Circuit = circuit;
             car.Setup(spec, wheels);
+            WheelBlur.Fit(car, wheels);
             CarLamps.Fit(car, model != null ? root.transform.Find("Model")?.gameObject : null);
             root.AddComponent<EngineAudio>().Setup(modelId, ++spawned);
             return car;
@@ -76,28 +77,40 @@ namespace TarmacGauntlet.Raceday
             foreach (Transform t in model.GetComponentsInChildren<Transform>()) t.gameObject.layer = IgnoreRaycastLayer;
             CarDoors.Attach(model, modelPath);
 
-            string[] corners = { "fl", "fr", "rl", "rr" };
             var pivots = new Transform[4];
+            Transform[] parts = model.GetComponentsInChildren<Transform>(true);
             for (int i = 0; i < 4; i++)
             {
-                Transform tyre = Find(model.transform, "wheel_tyre_" + corners[i]);
-                Transform rim = Find(model.transform, "wheel_rim_" + corners[i]);
+                Transform tyre = Find(parts, "wheel_tyre_" + Corners[i]);
                 if (tyre == null) continue;
                 Bounds b = tyre.GetComponent<Renderer>().bounds;
-                var pivot = new GameObject("Wheel " + corners[i]).transform;
+                var pivot = new GameObject("Wheel " + Corners[i]).transform;
                 pivot.SetParent(model.transform, false);
                 pivot.position = b.center;
                 pivot.gameObject.layer = IgnoreRaycastLayer;
-                tyre.SetParent(pivot, true);
-                if (rim != null) rim.SetParent(pivot, true);
+                // Every part of the wheel turns with it: tyre, rim, and any cap or disc the model adds.
+                foreach (Transform t in parts)
+                    if (IsWheelPart(t.name, Corners[i])) t.SetParent(pivot, true);
                 pivots[i] = pivot;
             }
             return pivots;
         }
 
-        private static Transform Find(Transform parent, string name)
+        private static readonly string[] Corners = { "fl", "fr", "rl", "rr" };
+
+        /// <summary>A model part named wheel_&lt;part&gt;_&lt;corner&gt;, with or without a suffix after the corner.</summary>
+        internal static bool IsWheelPart(string name, string corner)
         {
-            foreach (Transform t in parent.GetComponentsInChildren<Transform>(true))
+            if (!name.StartsWith("wheel_")) return false;
+            string[] words = name.Split('_');
+            for (int i = 2; i < words.Length; i++)
+                if (words[i] == corner) return true;
+            return false;
+        }
+
+        private static Transform Find(Transform[] parts, string name)
+        {
+            foreach (Transform t in parts)
                 if (t.name == name || t.name.StartsWith(name + "_")) return t;
             return null;
         }
