@@ -24,9 +24,6 @@ namespace TarmacGauntlet.TeamHq
         public static readonly Vector3 WarmLamp = new Vector3(1f, 0.93f, 0.82f);
         public static readonly Vector3 WhiteLamp = new Vector3(1f, 1f, 1f);
 
-        /// <summary>A lamp's intensity in the bake. The lamps were set for the old falloff, which ran out at the range; the
-        /// bake falls off with the square of distance, so this keeps the pools under the lamps as bright as the viewer's.</summary>
-        public static float BakedIntensity(HqLight l) => l.Intensity * l.Range * l.Range / 8.6f;
 
         /// <summary>The garage first, then the office and the trophy room on the mezzanine.</summary>
         public static readonly HqProbe[] Probes =

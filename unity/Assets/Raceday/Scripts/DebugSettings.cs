@@ -5,8 +5,7 @@ namespace TarmacGauntlet.Raceday
 {
     /// <summary>
     /// The race set-up the debug menu picks (<see cref="DebugMenu"/>): how the race starts, the kind of weather and
-    /// the start hour, how many cars race and what your car is. Kept between runs, so a retest is one click. The scene reads it only in the editor and in
-    /// development builds.
+    /// the start hour, how many cars race and what your car is. Kept between runs, so a retest is one click.
     /// </summary>
     public static class DebugSettings
     {

@@ -15,5 +15,6 @@
     <Compile Include="../../../unity/Assets/TeamHq/Scripts/HqGeometry.cs" />
     <Compile Include="../../../unity/Assets/TeamHq/Scripts/HqLightmapLayout.cs" />
     <Compile Include="../../../unity/Assets/TeamHq/Scripts/HqLighting.cs" />
+    <Compile Include="../../../unity/Assets/Rendering/Scripts/LightFalloff.cs" />
   </ItemGroup>
 </Project>

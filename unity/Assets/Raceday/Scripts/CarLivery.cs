@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using TarmacGauntlet.Visuals;
 using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
@@ -195,23 +196,8 @@ namespace TarmacGauntlet.Raceday
             return made;
         }
 
-        private static string LoadText(string path)
-        {
-#if UNITY_EDITOR
-            var asset = UnityEditor.AssetDatabase.LoadAssetAtPath<TextAsset>(path);
-            return asset != null ? asset.text : null;
-#else
-            return null;
-#endif
-        }
+        private static string LoadText(string path) => ArtLibrary.Load<TextAsset>(path)?.text;
 
-        private static Texture2D LoadTexture(string path)
-        {
-#if UNITY_EDITOR
-            return UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>(path);
-#else
-            return null;
-#endif
-        }
+        private static Texture2D LoadTexture(string path) => ArtLibrary.Load<Texture2D>(path);
     }
 }

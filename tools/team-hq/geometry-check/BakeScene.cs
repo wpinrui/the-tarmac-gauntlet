@@ -3,6 +3,7 @@
 using System.Globalization;
 using System.IO;
 using System.Text;
+using TarmacGauntlet.Rendering;
 using TarmacGauntlet.TeamHq;
 using UnityEngine;
 
@@ -40,7 +41,7 @@ internal static class BakeScene
         {
             HqLight l = g.Lights[i];
             Vector3 c = l.Warm ? HqLighting.WarmLamp : HqLighting.WhiteLamp;
-            s.Append(i > 0 ? "," : "").Append(string.Format(Ci, "[{0},{1},{2},{3},{4},{5},{6}]", l.Position.x, l.Position.y, l.Position.z, HqLighting.BakedIntensity(l), c.x, c.y, c.z));
+            s.Append(i > 0 ? "," : "").Append(string.Format(Ci, "[{0},{1},{2},{3},{4},{5},{6}]", l.Position.x, l.Position.y, l.Position.z, LightFalloff.Urp(l.Intensity, l.Range), c.x, c.y, c.z));
         }
         Vector3 d = HqLighting.SunDirection, sc = HqLighting.SunColour;
         s.Append(string.Format(Ci, "],\"sun\":[{0},{1},{2},{3},{4},{5},{6}],\"probes\":[", d.x, d.y, d.z, sc.x, sc.y, sc.z, HqLighting.SunIntensity));

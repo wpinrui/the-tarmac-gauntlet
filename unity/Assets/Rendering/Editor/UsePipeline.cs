@@ -6,12 +6,13 @@ namespace TarmacGauntlet.Rendering.Editor
 {
     /// <summary>
     /// Renders the project with the Universal Render Pipeline. ProjectSettings is not in the repository, so a fresh clone
-    /// opens on the built-in pipeline: this puts the game's pipeline asset in the graphics settings each time the editor loads.
+    /// opens on the built-in pipeline: this puts the Medium quality level's pipeline asset in the graphics settings each time
+    /// the editor loads. In Play the game picks its quality level's asset itself (QualityLevels).
     /// </summary>
     [InitializeOnLoad]
     internal static class UsePipeline
     {
-        private const string AssetPath = "Assets/Rendering/Settings/Pipeline.asset";
+        private const string AssetPath = "Assets/Rendering/Resources/Quality/Medium.asset";
 
         static UsePipeline()
         {
@@ -28,8 +29,8 @@ namespace TarmacGauntlet.Rendering.Editor
                 return;
             }
             if (GraphicsSettings.defaultRenderPipeline != asset) GraphicsSettings.defaultRenderPipeline = asset;
-            // A quality level with its own pipeline would override the default one.
-            if (QualitySettings.renderPipeline != null && QualitySettings.renderPipeline != asset) QualitySettings.renderPipeline = null;
+            // A Unity quality level with its own pipeline would override the default one outside Play.
+            if (!EditorApplication.isPlayingOrWillChangePlaymode && QualitySettings.renderPipeline != null) QualitySettings.renderPipeline = null;
         }
     }
 }

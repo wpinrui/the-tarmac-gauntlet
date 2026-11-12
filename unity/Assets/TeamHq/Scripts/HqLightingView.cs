@@ -116,7 +116,6 @@ namespace TarmacGauntlet.TeamHq
             sun.shadows = LightShadows.Soft;
             sun.shadowStrength = 0.85f;
             sun.shadowNormalBias = 0.2f;
-            Shadows.Distance = Mathf.Max(Shadows.Distance, 60);
         }
 
         private GameObject AddLamp(HqLight l)
@@ -127,7 +126,7 @@ namespace TarmacGauntlet.TeamHq
             Light p = go.AddComponent<Light>();
             p.type = LightType.Point;
             p.range = l.Range;
-            p.intensity = l.Intensity;
+            p.intensity = LightFalloff.Urp(l.Intensity, l.Range);
             p.color = ToColor(l.Warm ? HqLighting.WarmLamp : HqLighting.WhiteLamp);
             p.shadows = LightShadows.None;
             return go;

@@ -8,7 +8,7 @@ using UnityEngine.SceneManagement;
 namespace TarmacGauntlet.Management
 {
     /// <summary>
-    /// The Team HQ's debug menu, on Tab, in the editor and development builds only: it changes the career so any part
+    /// The Team HQ's debug menu, on Tab, in the editor and in every build: it changes the career so any part
     /// of the game can be tested without playing up to it (<see cref="DebugActions"/>). Money, any car for free, every
     /// car mint or wrecked, any free agent hired for nothing, every contract ended, tyres, spares, crew and skills.
     /// It skips the race too: the race runs in an instant with your car where you pick, and the race summary opens over
@@ -34,7 +34,6 @@ namespace TarmacGauntlet.Management
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Hook()
         {
-            if (!Debug.isDebugBuild) return;
             SceneManager.sceneLoaded -= Loaded;
             SceneManager.sceneLoaded += Loaded;
             Attach();

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TarmacGauntlet.Rendering;
 using UnityEngine;
 
 namespace TarmacGauntlet.Management
@@ -11,7 +12,7 @@ namespace TarmacGauntlet.Management
     /// </summary>
     public static class GameSettings
     {
-        private const string VolumeKey = "settings.volume", QualityKey = "settings.quality", VSyncKey = "settings.vsync";
+        private const string VolumeKey = "settings.volume", VSyncKey = "settings.vsync";
 
         public static readonly (FullScreenMode Mode, string Name)[] DisplayModes =
         {
@@ -20,14 +21,12 @@ namespace TarmacGauntlet.Management
             (FullScreenMode.Windowed, "Windowed"),
         };
 
-        /// <summary>Applies the remembered settings. Unity remembers the display mode and resolution itself.</summary>
+        /// <summary>
+        /// Applies the remembered settings. Unity remembers the display mode and resolution itself, and the quality level
+        /// applies itself as the game starts (<see cref="QualityLevels"/>).
+        /// </summary>
         public static void Load()
         {
-            if (PlayerPrefs.HasKey(QualityKey))
-            {
-                int q = PlayerPrefs.GetInt(QualityKey);
-                if (q >= 0 && q < QualitySettings.names.Length) QualitySettings.SetQualityLevel(q, true);
-            }
             if (PlayerPrefs.HasKey(VSyncKey)) QualitySettings.vSyncCount = PlayerPrefs.GetInt(VSyncKey) != 0 ? 1 : 0;
             AudioListener.volume = PlayerPrefs.GetFloat(VolumeKey, 1);
         }
@@ -61,19 +60,12 @@ namespace TarmacGauntlet.Management
             set => Screen.SetResolution(value.x, value.y, Screen.fullScreenMode);
         }
 
-        public static string[] QualityNames => QualitySettings.names;
+        public static string[] QualityNames => QualityLevels.Names;
 
         public static int Quality
         {
-            get => QualitySettings.GetQualityLevel();
-            set
-            {
-                bool vSync = VSync;
-                QualitySettings.SetQualityLevel(Mathf.Clamp(value, 0, QualitySettings.names.Length - 1), true);
-                QualitySettings.vSyncCount = vSync ? 1 : 0;
-                PlayerPrefs.SetInt(QualityKey, QualitySettings.GetQualityLevel());
-                PlayerPrefs.Save();
-            }
+            get => QualityLevels.Level;
+            set => QualityLevels.Level = value;
         }
 
         public static bool VSync

@@ -63,6 +63,7 @@ namespace TarmacGauntlet.Raceday
                 // Tarmac darkens a lot and turns glossy; paint and kerbs a little; concrete and gravel
                 // darken; grass only goes a shade deeper.
                 Wet(Materials.Asphalt, 0.45f, 0.72f);
+                Wet(Materials.RoadEdge, 0.45f, 0.72f);
                 Wet(Materials.PitAsphalt, 0.45f, 0.7f);
                 Wet(Materials.White, 0.12f, 0.8f);
                 Wet(Materials.Yellow, 0.12f, 0.8f);
