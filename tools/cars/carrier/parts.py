@@ -168,7 +168,7 @@ def headlamps(ref, cutters, out):
     for sgn, side in ((1, "l"), (-1, "r")):
         shp = head_shape() if sgn > 0 else flip(head_shape())
         cutters += blend.lay(ref, f"cut_head_{side}", shp, fr, -0.03, 0.006, "housing", 0.01, along_ray=True)
-        out += blend.lay(ref, f"head_back_{side}", shp.buffer(-0.002), fr, -0.029, -0.025, "housing", 0.01, along_ray=True)
+        out += blend.lay(ref, f"head_back_{side}", shp.buffer(-0.002), fr, -0.034, -0.025, "housing", 0.01, along_ray=True)
         b = shp.bounds
         # our own interior: a wide main lamp outboard and a square lamp inboard, each in a reflector
         mid = b[0] + 0.40 * (b[2] - b[0]) if sgn > 0 else b[2] - 0.40 * (b[2] - b[0])
@@ -199,7 +199,7 @@ def taillamps(ref, cutters, out):
         # our own interior: a square brake lamp inboard, the tail lamp in a long band outboard
         brake = shp.intersection(box(b[0], b[1], b[0] + 0.11, b[3])).buffer(-0.01, join_style=2)
         tail = shp.intersection(box(b[0] + 0.125, b[1], b[2] + 1, b[3])).buffer(-0.01, join_style=2)
-        out += blend.lay(ref, f"tail_back_{side}", shp.buffer(-0.002), wr, -0.024, -0.02, "housing", 0.008, along_ray=True)
+        out += blend.lay(ref, f"tail_back_{side}", shp.buffer(-0.002), wr, -0.029, -0.02, "housing", 0.008, along_ray=True)
         out += blend.lay(ref, f"lamp_brake_{side}", brake, wr, -0.019, -0.015, "lamp_brake", 0.006, along_ray=True)
         out += blend.lay(ref, f"lamp_tail_{side}", tail, wr, -0.019, -0.015, "lamp_tail", 0.006, along_ray=True)
         out += blend.lay(ref, f"tail_glass_{side}", shp.buffer(-0.002), wr, -0.0055, -0.0025, "tail_glass", 0.008, along_ray=True)
@@ -213,28 +213,31 @@ def front_parts(ref, cutters, out):
     cutters += blend.lay(ref, "cut_grille", mouth, fr, -0.035, 0.006, "grille", 0.01, along_ray=True)
     out += blend.lay(ref, "grille_back", mouth.buffer(-0.002), fr, -0.034, -0.03, "grille", 0.01, along_ray=True)
     for i, z in enumerate(g["slats"]):
-        bar = box(-g["w"] + 0.004, z - 0.0045, g["w"] - 0.004, z + 0.0045)
+        bar = box(-g["w"] - 0.004, z - 0.0045, g["w"] + 0.004, z + 0.0045)
         out += blend.lay(ref, f"grille_slat_{i}", bar, fr, -0.022, -0.004, "body", 0.008, along_ray=True)
     it = R["intake"]
     mouth = soft(box(-it["w"], it["z0"], it["w"], it["z1"]), 0.008)
     cutters += blend.lay(ref, "cut_intake", mouth, fr, -0.035, 0.006, "grille", 0.012, along_ray=True)
-    out += blend.lay(ref, "intake_back", mouth.buffer(-0.002), fr, -0.034, -0.03, "grille", 0.012, along_ray=True)
+    out += blend.lay(ref, "intake_back", mouth.buffer(-0.002), fr, -0.039, -0.03, "grille", 0.012, along_ray=True)
     for i, z in enumerate(it["slats"]):
-        bar = box(-it["w"] + 0.004, z - 0.005, it["w"] - 0.004, z + 0.005)
+        bar = box(-it["w"] - 0.004, z - 0.005, it["w"] + 0.004, z + 0.005)
         out += blend.lay(ref, f"intake_slat_{i}", bar, fr, -0.022, -0.006, "trim", 0.01, along_ray=True)
     # the black rubbing strip round the nose, back to the front arches
     s = R["front_strip"]
     for sgn, side in ((1, "l"), (-1, "r")):
         wr = front_wrap(sgn)
         u1 = wr.side_u(s["x_end"])
-        band = soft(box(-0.02, s["z0"], u1, s["z1"]), 0.006).intersection(box(0, -5, 5, 5))
-        out += blend.lay(ref, f"front_strip_{side}", band, wr, -0.001, 0.007, "trim", 0.01, along_ray=True)
+        # the left strip runs a little past the middle under the right one, a hair thinner
+        lap = 0.004 if sgn > 0 else 0.0
+        band = soft(box(-0.02, s["z0"], u1, s["z1"]), 0.006).intersection(box(-lap, -5, 5, 5))
+        d0, d1 = (-0.001, 0.007) if sgn > 0 else (-0.0015, 0.0075)
+        out += blend.lay(ref, f"front_strip_{side}", band, wr, d0, d1, "trim", 0.01, along_ray=True)
 
 
 def rear_parts(ref, out):
     v = R["valance"]
-    out += blend.lay(ref, "valance", soft(box(-v["w"], v["z0"], v["w"], v["z1"]), 0.01), rear_fr(), -0.001, 0.003,
-                     "trim", 0.012, along_ray=True)
+    out += blend.lay(ref, "valance", soft(box(-v["w"], v["z0"], v["w"], v["z1"]), 0.01), rear_fr(), -0.004, 0.004,
+                     "trim", 0.012)
 
 
 # ---------------------------------------------------------------- glass and trim
@@ -573,7 +576,7 @@ def interior():
     x0 = R["screen"]["x_base"] - 0.05
     belt_z = belt(0.0)
     obs = [_loft("firewall", x0 - 0.010, x0 - 0.004, lambda x: box(-0.8, FLOOR + 0.002, 0.8, 3), n=2),
-           _loft("dash", x0 - 0.0125, 0.36, lambda x: box(-0.8, belt_z - 0.12, 0.8, belt_z - 0.12 + 0.15 * (1 - (x0 - x) / 0.5) + 0.04), n=10)]
+           _loft("dash", x0 - 0.0125, 0.36, lambda x: box(-0.8, belt_z - 0.12, 0.8, belt_z - 0.12 + 0.15 * (1 - (x0 - x) / 0.5) + 0.04), n=10, gap=0.006)]
     bc = _b_mid()
     for sgn, side in ((1, "l"), (-1, "r")):
         clip = lambda x, s=sgn: (box(0.3, FLOOR + 0.08, 1.2, belt(x) - 0.02) if s > 0 else box(-1.2, FLOOR + 0.08, -0.3, belt(x) - 0.02)).intersection(
@@ -585,7 +588,7 @@ def interior():
         obs.append(_rbox(f"seat_back_{side}", -0.46, -0.34, yc - 0.22, yc + 0.22, FLOOR + 0.221, FLOOR + 0.72, lean=0.22))
         obs.append(_rbox(f"headrest_{side}", -0.58, -0.49, yc - 0.12, yc + 0.12, FLOOR + 0.721, FLOOR + 0.84, r=0.035, lean=0.1))
     obs.append(_rbox("bench_base", -1.02, -0.58, -0.43, 0.43, FLOOR + 0.004, FLOOR + 0.22))
-    obs.append(_rbox("bench_back", -1.16, -1.00, -0.43, 0.43, FLOOR + 0.221, FLOOR + 0.70, lean=0.25))
+    obs.append(_rbox("bench_back", -1.16, -0.99, -0.43, 0.43, FLOOR + 0.205, FLOOR + 0.70, lean=0.25))
     obs.append(steering())
     xm = R["screen"]["x_top"] - 0.03
     roof_in = body.inside(xm, 0.035).bounds[3]
