@@ -64,6 +64,9 @@ namespace TarmacGauntlet.Management.Editor
             FillArtLibrary();
             IncludeRuntimeShaders();
             FillLitVariants();
+            // ProjectSettings is not in the repository, so this is set here: the collector clears garbage a little each
+            // frame instead of stopping the game to clear it all at once.
+            PlayerSettings.gcIncremental = true;
             if (Directory.Exists(BuildFolder)) Directory.Delete(BuildFolder, true);
             BuildReport report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
             {
