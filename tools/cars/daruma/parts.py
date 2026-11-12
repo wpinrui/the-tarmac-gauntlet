@@ -117,59 +117,21 @@ def glass_fr(sgn):
 
 
 # ---------------------------------------------------------------- lamps
-# A lamp wraps round a corner of the body, so its outline is traced twice: from ahead (or behind)
-# and from the side. A vertical plane at 45 degrees through the corner splits the lamp: ahead of
-# it the end outline bounds the lamp, beside it the side outline does.
+# A lamp wraps round a corner of the body, so its outline is traced on a render looking at that
+# corner from 45 degrees, and the lamp is that outline pushed along the view (rows.diag_prism).
 
-def _prism(name, shape, axis, lo, hi, sgn=1):
-    """A closed solid: a flat shape extruded along a build axis from lo to hi. shape is (a, b)
-    in the view's own coordinates: front or rear (y, z), side (x, z), top (x, y)."""
-    pts, tris = blend.triangulate(shape, 0.02)
-    pts = np.asarray(pts, float)
-    n = len(pts)
-    def place(d):
-        if axis == "x":
-            return np.column_stack([np.full(n, d), pts[:, 0] * sgn, pts[:, 1]])
-        if axis == "y":
-            return np.column_stack([pts[:, 0], np.full(n, d * sgn), pts[:, 1]])
-        return np.column_stack([pts[:, 0], pts[:, 1] * sgn, np.full(n, d)])
-    verts = np.vstack([place(lo), place(hi)])
-    count = {}
-    for t in tris:
-        for e in ((t[0], t[1]), (t[1], t[2]), (t[2], t[0])):
-            count[tuple(sorted(e))] = count.get(tuple(sorted(e)), 0) + 1
-    faces = [tuple(t[::-1]) for t in tris] + [(t[0] + n, t[1] + n, t[2] + n) for t in tris]
-    for t in tris:
-        for a, b in ((t[0], t[1]), (t[1], t[2]), (t[2], t[0])):
-            if count[tuple(sorted((a, b)))] == 1:
-                faces.append((a, b, b + n, a + n))
-    return blend.make(name, verts, faces, "housing")
-
-
-def _half_space(name, corner, normal, size=3.0):
-    """A big box filling the side of the vertical plane through corner (x, y) that normal (x, y)
-    points to."""
-    n = np.array([normal[0], normal[1], 0.0]); n /= np.linalg.norm(n)
-    t = np.array([-n[1], n[0], 0.0])
-    c = np.array([corner[0], corner[1], 0.0])
-    v, f = geom.box(0, size, -size, size, -size, size)
-    v = np.asarray(v, float)
-    v = c + np.outer(v[:, 0], n) + np.outer(v[:, 1], t) + np.outer(v[:, 2], (0, 0, 1))
-    return blend.make(name, v, f, "housing")
-
-
-def lamp_volume(name, ends, side, corner, end_dir, sgn, x_lo, x_hi, shrink=0.0):
-    """The solid inside one lamp's traced outlines: ends (y, z) seen from ahead or behind, side
-    (x, z), each shrunk by shrink. corner (x, y) is where the lamp turns round the body; end_dir
-    is +1 for a lamp at the nose, -1 at the tail."""
-    sh = lambda p: poly(p).buffer(-shrink) if shrink else poly(p)
-    c = (corner[0], corner[1] * sgn)
-    a = _prism(name, sh(ends), "x", x_lo, x_hi, sgn)
-    blend.boolean(a, _half_space(name + "_h", c, (end_dir, -sgn)), "INTERSECT")
-    b = _prism(name + "_s", sh(side), "y", 0.0, 1.5, sgn)
-    blend.boolean(b, _half_space(name + "_hs", c, (-end_dir, sgn)), "INTERSECT")
-    blend.boolean(a, b, "UNION")
-    return a
+def lamp_volume(name, prism, sgn):
+    """The closed prism between a lamp's two traced caps, mirrored to the right for sgn -1."""
+    import bmesh
+    near, far = (np.asarray(c, float) * [1, sgn, 1] for c in prism)
+    n = len(near)
+    faces = [tuple(range(n)), tuple(range(2 * n - 1, n - 1, -1))]
+    faces += [(i, (i + 1) % n, (i + 1) % n + n, i + n) for i in range(n)]
+    ob = blend.make(name, np.vstack([near, far]), faces, "housing")
+    bm = bmesh.new(); bm.from_mesh(ob.data)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(ob.data); bm.free()
+    return ob
 
 
 LAMP_DEPTH = 0.035    # how deep each lamp's pocket sinks into the body
@@ -202,13 +164,13 @@ class Skins:
         self.made = {}
 
 
-def lamp(skins, name, ends, side, corner, end_dir, sgn, x_lo, x_hi, lens_mat, cutters, out):
+def lamp(skins, name, prism, lens_prism, sgn, lens_mat, cutters, out):
     """One lamp: a pocket cut into the skin, its floor and walls dark, and a clear lens lying just
     under the skin's own surface across it."""
-    pocket = lamp_volume(f"cut_{name}", ends, side, corner, end_dir, sgn, x_lo, x_hi)
+    pocket = lamp_volume(f"cut_{name}", prism, sgn)
     blend.boolean(pocket, skins.copy(LAMP_DEPTH, "deep"), "DIFFERENCE")
     cutters.append(pocket)
-    lens = lamp_volume(f"{name}_glass", ends, side, corner, end_dir, sgn, x_lo, x_hi, shrink=0.002)
+    lens = lamp_volume(f"{name}_glass", lens_prism, sgn)
     blend.boolean(lens, skins.copy(0.002, "outer"), "INTERSECT")
     blend.boolean(lens, skins.copy(0.006, "inner"), "DIFFERENCE")
     for p in lens.data.polygons:
@@ -219,10 +181,8 @@ def lamp(skins, name, ends, side, corner, end_dir, sgn, x_lo, x_hi, lens_mat, cu
 
 def headlamps(ref, skins, cutters, out):
     fr = front_fr()
-    xs = [p[0] for p in R["head_side"]]
     for sgn, side in ((1, "l"), (-1, "r")):
-        lamp(skins, f"head_{side}", R["head"], R["head_side"], R["head_corner"], 1, sgn, min(xs) - 0.05, NOSE + 0.2,
-             "head_glass", cutters, out)
+        lamp(skins, f"head_{side}", R["head_prism"], R["head_lens"], sgn, "head_glass", cutters, out)
         # our own interior: two round reflector bowls, a lamp in each, on the lamp's front face
         hd = poly(R["head"])
         b = hd.bounds
@@ -238,10 +198,8 @@ def headlamps(ref, skins, cutters, out):
 
 def taillamps(ref, skins, cutters, out):
     fr = rear_fr()
-    xs = [p[0] for p in R["tail_side"]]
     for sgn, side in ((1, "l"), (-1, "r")):
-        lamp(skins, f"tail_{side}", R["tail"], R["tail_side"], R["tail_corner"], -1, sgn, TAIL - 0.2, max(xs) + 0.05,
-             "tail_glass", cutters, out)
+        lamp(skins, f"tail_{side}", R["tail_prism"], R["tail_lens"], sgn, "tail_glass", cutters, out)
         # our own interior: the upper half glows as the tail lamp, a round brake lamp low and outboard
         tl = poly(R["tail"])
         b = tl.bounds
@@ -773,6 +731,7 @@ def _flat(ref, g, size, fr, a, b, up, name, d0, d1, mat, step=0.004):
     return blend.lay(ref, name, sscale(g, size, size, origin=(0, 0)), pf, d0, d1, mat, step)
 
 
+RB_LIFT = 0.03        # the rear badge sits this much above the tailgate's middle
 BADGE_RIM = 0.06      # the chrome outline round every badge, in badge heights
 
 
@@ -812,9 +771,10 @@ def options(ref):
         # front: in the middle of the upper grille (the reference's spot), or on the bonnet's nose
         add("frontbadge", 1 + k, badge(ref, style, 0.07, front_fr(), 0, up_z, up, "fb"))
         add("frontbadge", 3 + k, badge(ref, style, 0.06, top_fr(), bonnet_x, 0, fwd, "fb"))
-        # rear: on the tailgate's middle between the lamps (the reference's spot), or just under the glass
-        add("rearbadge", 1 + k, badge(ref, style, 0.07, rear_fr(), 0, lid_z, up, "rb"))
-        add("rearbadge", 3 + k, badge(ref, style, 0.06, rear_fr(), 0, lid_z + 0.09, up, "rb"))
+        # rear: on the tailgate's middle between the lamps, raised to leave room for the name under
+        # it, or just under the glass
+        add("rearbadge", 1 + k, badge(ref, style, 0.07, rear_fr(), 0, lid_z + RB_LIFT, up, "rb"))
+        add("rearbadge", 3 + k, badge(ref, style, 0.06, rear_fr(), 0, lid_z + 0.13, up, "rb"))
     cap = 0.03
     tl = poly(R["tail"]).bounds
     name_z = lid_z - 0.09
@@ -826,4 +786,7 @@ def options(ref):
     for sgn in (1, -1):
         q += _flat(ref, nm, cap, side_fr(sgn), wx, R["door_bottom"] + 0.08, up, "nm", 0.0012, 0.0025, "chrome")
     add("name", 3, q)
+    # name 4: centred under the rear badge
+    add("name", 4, _flat(ref, nm, cap, rear_fr(), 0, lid_z + RB_LIFT - 0.035 - 0.012 - cap / 2, up, "nm", 0.0012,
+                         0.0025, "chrome"))
     return out

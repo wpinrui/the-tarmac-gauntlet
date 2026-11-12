@@ -177,6 +177,8 @@ HEAD = [(192.5, 326), (125.5, 330), (155.5, 294), (174.5, 274), (195.5, 258), (2
 HEAD_SIDE = [(95, 330), (92, 329), (94, 325), (118, 298), (140, 282), (175, 264), (203, 258), (215, 262),
              (222, 271), (230, 283), (230, 287), (226, 290), (203, 300), (156, 316)]
 HEAD_CORNER = (130, 213)    # where the lamp turns from the front to the side (top render: px, u)
+HEAD_DIAG = [(512, 326), (448, 330), (448, 329), (467, 310), (485, 296), (500, 286), (526, 274), (550, 264),
+             (574, 258), (594, 262), (607, 268), (622, 285), (621, 290), (599, 302), (556, 318)]
 # The upper grille: a band under the bonnet's front edge, its outer end cut along the lamp.
 GRILLE_UP = [(0, 295), (148, 290), (124, 331), (30, 337), (0, 337)]
 GRILLE_UP_SLATS = [304, 312, 320]
@@ -194,6 +196,11 @@ TAIL = [(137.5, 288), (205.5, 284), (224.5, 278), (230.5, 272), (232.5, 254), (2
 TAIL_SIDE = [(1287, 288), (1260, 282), (1244, 276), (1130, 220), (1128, 215), (1130, 212), (1199, 212),
              (1217, 214), (1243, 222), (1254, 230), (1270, 247), (1282, 267)]
 TAIL_CORNER = (1258, 219)   # where the lamp turns from the back to the side (top render: px, u)
+# Each lamp wraps round a corner, so its outline is traced once more on a render looking at that
+# corner from 45 degrees (front-left or rear-left, see DIAG), and the lamp is that outline pushed
+# along the view. One outline means one lamp, with no seam where the end and side meet.
+TAIL_DIAG = [(1105, 288), (1031, 282), (1011, 276), (968, 248), (940, 226), (932, 218), (932, 216), (936, 212),
+             (987, 212), (1005, 214), (1039, 226), (1072, 250), (1088, 265)]
 STOP = [(0, 88), (48, 88), (52, 91), (50, 96), (45, 100), (0, 100)]     # high stop lamp over the glass
 # Tailgate shut line (rear render): across the roof at the spoiler's front (top render px), down
 # beside the rear glass, along the lamp's inner edge, and across the bumper top.
@@ -204,6 +211,44 @@ LID = [(162, 95), (189.5, 185), (204.5, 215), (160.5, 259), (134.5, 285), (104.5
 # ---------------------------------------------------------------- side
 SILL = (425, 985, 433)        # black sill strip: from, to (px), its top (py), down to the bottom
 MIRROR = {"x0": 469, "x1": 509, "u0": 233, "u1": 292, "z0": 228, "z1": 188}
+
+# ---------------------------------------------------------------- 45 degree renders
+# Reference render space: the front at -Y, car-left at +X, PPU pixels per unit. A 45 degree render
+# looks along d; its pixel (a, b) is the line C + (a - w/2)/PPU right + (h/2 - b)/PPU up + t d.
+PPU = 30000
+RX0, RY0, RZ1 = -0.0115, -0.0235, 0.0155
+DIAG = {"front": {"d": (-0.7071068, 0.7071068, 0.0), "right": (0.7071068, 0.7071068, 0.0)},
+        "rear": {"d": (-0.7071068, -0.7071068, 0.0), "right": (-0.7071068, 0.7071068, 0.0)}}
+DIAG_C, DIAG_W, DIAG_H = (0.0, -0.0005, 0.007), 1560, 510
+
+
+def build_of_ref(p):
+    """A reference-space point in build space. The overhang scale holds on past the wheel line, so
+    the map stays one affine map and a lamp's straight prism stays straight."""
+    px, py = (p[1] - RY0) * PPU, (RZ1 - p[2]) * PPU
+    front = px < (PX_WF + PX_WR) / 2
+    x = WHEELBASE / 2 + (PX_WF - px) * S * K if front else -WHEELBASE / 2 - (px - PX_WR) * S * K
+    return [round(float(x), 4), round(float(p[0] * PPU * SH), 4), round(float(TYRE_R + (PY_W - py) * S), 4)]
+
+
+def diag_prism(pts, view, corner, reach=0.004, shrink=0.0):
+    """The lamp outline pts (45 degree render px) as a prism round the corner (top render px, u):
+    each point's line from reach before the corner to reach past it, in build space."""
+    from shapely.geometry import Polygon
+    g = Polygon(pts)
+    if shrink:
+        g = g.buffer(-shrink, join_style=2)
+    pts = list(g.exterior.coords)[:-1]
+    v = DIAG[view]
+    d, r, c = np.array(v["d"]), np.array(v["right"]), np.array(DIAG_C)
+    k = np.array([corner[1] / PPU, RY0 + corner[0] / PPU, 0.0])
+    tc = float((k - c) @ d)
+    out = []
+    for t in (tc - reach, tc + reach):
+        out.append([build_of_ref(c + (a - DIAG_W / 2) / PPU * r + np.array([0, 0, (DIAG_H / 2 - b) / PPU]) + t * d)
+                    for a, b in pts])
+    return out
+
 
 data = {
     "name": "ToraDaruma",
@@ -229,17 +274,21 @@ data = {
                    "x_base_edge": X(REAR_GLASS["x_base_edge"]), "w_base": H(REAR_GLASS["w_base"])},
     "bonnet": plan(BONNET),
     "head": end(HEAD), "head_side": side(HEAD_SIDE), "head_corner": plan([HEAD_CORNER])[0],
+    "head_prism": diag_prism(HEAD_DIAG, "front", HEAD_CORNER),
+    "head_lens": diag_prism(HEAD_DIAG, "front", HEAD_CORNER, shrink=0.6),
     "grille_up": end(GRILLE_UP), "grille_up_slats": [Z(z) for z in GRILLE_UP_SLATS],
     "grille_low": end(GRILLE_LOW), "grille_low_slats": [Z(z) for z in GRILLE_LOW_SLATS],
     "grille_low_bars": [H(u) for u in GRILLE_LOW_BARS],
     "fog": end(FOG), "fog_lamp": [H(FOG_LAMP[0]), Z(FOG_LAMP[1]), H(FOG_LAMP[2])],
     "tail": end(TAIL), "tail_side": side(TAIL_SIDE), "tail_corner": plan([TAIL_CORNER])[0],
+    "tail_prism": diag_prism(TAIL_DIAG, "rear", TAIL_CORNER),
+    "tail_lens": diag_prism(TAIL_DIAG, "rear", TAIL_CORNER, shrink=0.6),
     "stop": end(STOP),
     "lid_roof": X(LID_ROOF), "lid": end(LID),
     "sill": [X(SILL[0]), X(SILL[1]), Z(SILL[2])],
     "mirror": {"x_back": X(MIRROR["x1"]), "x_front": X(MIRROR["x0"]), "y_in": H(MIRROR["u0"]),
                "y_out": H(MIRROR["u1"]), "z0": Z(MIRROR["z0"]), "z1": Z(MIRROR["z1"])},
-    "picks": {"frontbadge": 1, "rearbadge": 1, "name": 1},
+    "picks": {"frontbadge": 2, "rearbadge": 2, "name": 4},
 }
 # belt line z = k x + c in build space
 _bx = np.array([X(p) for p in (420, 1072)]); _bz = np.array([Z(belt(p)) for p in (420, 1072)])
