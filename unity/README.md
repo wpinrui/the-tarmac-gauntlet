@@ -7,6 +7,12 @@ assembly (`TarmacGauntlet.Simulation.asmdef`) with no UnityEngine references.
 
 Every new file and folder under `Assets/` needs a committed `.meta` file with its own random guid.
 
+## Building
+
+`Tarmac Gauntlet > Build` writes the Windows game to `unity/Builds/Windows`. `Tarmac Gauntlet > Build and Install` also
+copies it to `%LOCALAPPDATA%\Programs\The Tarmac Gauntlet`, replacing the last install, with Start menu and desktop
+shortcuts (`WindowsBuild.cs`).
+
 ## Running the simulation tests
 
 The same `.cs` files also build as a plain .NET library, so the tests run without Unity.
