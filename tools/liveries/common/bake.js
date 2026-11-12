@@ -50,7 +50,7 @@ const toAtlas = (n, u, w) => {
 };
 const numbers = marks.numbers.map(m => {
   const [x, y] = toAtlas(m.view, m.u, m.v);
-  return { view: m.view, x: +x.toFixed(1), y: +y.toFixed(1), w: +(m.w * ppm).toFixed(1), h: +(m.h * ppm).toFixed(1), rotate: m.rotate + (place[m.view].turned ? 90 : 0), ink: m.ink };
+  return { view: m.view, x: +x.toFixed(1), y: +y.toFixed(1), w: +(m.w * ppm).toFixed(1), h: +(m.h * ppm).toFixed(1), rotate: m.rotate + (place[m.view].turned ? 90 : 0), ink: m.ink, ...(m.edge ? { edge: m.edge } : {}) };
 });
 
 function paint(size, pieces, numbers, sample, font) {

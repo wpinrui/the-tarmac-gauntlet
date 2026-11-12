@@ -38,6 +38,7 @@ namespace TarmacGauntlet.Simulation
             { "Poseidon Racing", "Assets/Art/Liveries/PoseidonRacing" },
             { "North Star Racing", "Assets/Art/Liveries/NorthStarRacing" },
             { "Team Archer", "Assets/Art/Liveries/TeamArcher" },
+            { "Dockyard Racing", "Assets/Art/Liveries/DockyardRacing" },
         };
 
         /// <summary>The team's livery folder, or null for a team with no livery yet.</summary>
