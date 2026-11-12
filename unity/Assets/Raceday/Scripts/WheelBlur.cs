@@ -114,8 +114,8 @@ namespace TarmacGauntlet.Raceday
             foreach (Renderer r in parts)
             {
                 MeshFilter mf = r.GetComponent<MeshFilter>();
-                key.Append(mf != null && mf.sharedMesh != null ? mf.sharedMesh.GetInstanceID() : 0).Append(',');
-                foreach (Material m in r.sharedMaterials) key.Append(m != null ? m.GetInstanceID() : 0).Append(';');
+                key.Append(mf != null && mf.sharedMesh != null ? mf.sharedMesh.GetHashCode() : 0).Append(',');
+                foreach (Material m in r.sharedMaterials) key.Append(m != null ? m.GetHashCode() : 0).Append(';');
             }
             string k = key.ToString();
             // A profile from an earlier scene whose texture was unloaded since is worked out again.

@@ -55,6 +55,7 @@ namespace TarmacGauntlet.Management
 
             VisualElement audio = SettingsGroup(2);
             audio.Add(Slider("Volume", GameSettings.Volume, v => GameSettings.Volume = v));
+            audio.Add(Slider("Music", GameSettings.Music, v => GameSettings.Music = v));
             scroll.Add(audio);
             settingsPanel.Add(scroll);
         }
@@ -87,12 +88,15 @@ namespace TarmacGauntlet.Management
         {
             VisualElement row = Setting(label);
             int current = Mathf.Clamp(index, 0, Mathf.Max(0, options.Length - 1));
+            // An Off and On stepper is a switch, and sounds like one.
+            bool toggle = options.Length == 2 && options[0] == "Off" && options[1] == "On";
             VisualElement stepper = null;
             void Draw()
             {
                 VisualElement next = MenuKit.Stepper(options.Length > 0 ? options[current].ToUpperInvariant() : "", "settings-stepper", current > 0, current < options.Length - 1, d =>
                 {
                     current += d;
+                    if (toggle) MenuSounds.Play(current == 1 ? UiCue.ToggleOn : UiCue.ToggleOff);
                     set(current);
                     Draw();
                 });
@@ -136,6 +140,7 @@ namespace TarmacGauntlet.Management
                 float v = Mathf.Clamp01(local.x / Mathf.Max(1, track.layout.width));
                 Show(v);
                 set(v);
+                MenuSounds.Slide(v);
             }
             Show(value01);
             track.RegisterCallback<PointerDownEvent>(e => { track.CapturePointer(e.pointerId); SetFrom(e.localPosition); });

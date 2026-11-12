@@ -266,7 +266,12 @@ namespace TarmacGauntlet.Management
                 foot.Add(full);
                 return;
             }
-            VisualElement button = RedButton(label, "panel-button", () => { if (enabled && !Garage.Full(Player)) buy(); });
+            VisualElement button = RedButton(label, "panel-button", () =>
+            {
+                if (!enabled || Garage.Full(Player)) return;
+                MenuSounds.Play(UiCue.Buy);
+                buy();
+            });
             button.EnableInClassList("disabled", !enabled);
             foot.Add(button);
         }

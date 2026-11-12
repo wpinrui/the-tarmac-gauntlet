@@ -12,7 +12,7 @@ namespace TarmacGauntlet.Management
     /// </summary>
     public static class GameSettings
     {
-        private const string VolumeKey = "settings.volume", VSyncKey = "settings.vsync", DisplayModeKey = "settings.displaymode",
+        private const string VolumeKey = "settings.volume", MusicKey = "settings.music", VSyncKey = "settings.vsync", DisplayModeKey = "settings.displaymode",
             WidthKey = "settings.width", HeightKey = "settings.height";
 
         public static readonly (FullScreenMode Mode, string Name)[] DisplayModes =
@@ -144,6 +144,17 @@ namespace TarmacGauntlet.Management
             {
                 AudioListener.volume = Mathf.Clamp01(value);
                 PlayerPrefs.SetFloat(VolumeKey, AudioListener.volume);
+                PlayerPrefs.Save();
+            }
+        }
+
+        /// <summary>The menu music's level, 0 to 1, under <see cref="Volume"/> (<see cref="MenuMusic"/>).</summary>
+        public static float Music
+        {
+            get => PlayerPrefs.GetFloat(MusicKey, 0.7f);
+            set
+            {
+                PlayerPrefs.SetFloat(MusicKey, Mathf.Clamp01(value));
                 PlayerPrefs.Save();
             }
         }

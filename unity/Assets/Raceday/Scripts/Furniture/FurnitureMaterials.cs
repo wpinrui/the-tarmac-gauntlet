@@ -10,6 +10,8 @@ namespace TarmacGauntlet.Raceday
     public sealed class FurnitureMaterials
     {
         public readonly Material GreenSteel, Concrete, WhitePaint, BlackSteel, Roof, Galvanised, BoardBack, Boards;
+        /// <summary>The advertising hoardings' faces, and the cabins' windows.</summary>
+        public readonly Material Hoardings, Glass;
         /// <summary>The armco's rails and posts, and the catch fencing behind it.</summary>
         public readonly Material ArmcoSteel, CatchFence;
         public readonly Material RedOn, RedOff, GreenOn, GreenOff;
@@ -29,6 +31,8 @@ namespace TarmacGauntlet.Raceday
             Galvanised = Make("Galvanised steel", null, 0.55f, 0.8f, new Color(0.62f, 0.64f, 0.66f));
             BoardBack = Make("Board back", null, 0.2f, 0f, new Color(0.3f, 0.31f, 0.32f));
             Boards = Make("Distance boards", Resources.Load<Texture2D>("Furniture/boards"), 0.25f);
+            Hoardings = Make("Hoardings", Resources.Load<Texture2D>("Furniture/hoardings"), 0.3f);
+            Glass = Make("Cabin glass", null, 0.9f, 0f, new Color(0.08f, 0.1f, 0.12f));
             // Weathered galvanised steel, more matt than new: bright enough to pick the rails out against the grass.
             ArmcoSteel = Make("Armco steel", null, 0.5f, 0.25f, new Color(0.8f, 0.81f, 0.82f));
             CatchFence = Make("Armco catch fence", ChainLink(), 0.4f, 0.5f, new Color(0.66f, 0.68f, 0.68f));

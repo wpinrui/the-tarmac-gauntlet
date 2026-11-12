@@ -356,6 +356,7 @@ namespace UnityEngine.UIElements
 
         public void RemoveFromClassList(string c) => classes.Remove(c);
         public bool ClassListContains(string c) => classes.Contains(c);
+        public IEnumerable<string> GetClasses() => classes;
         public void EnableInClassList(string c, bool on) { if (on) AddToClassList(c); else RemoveFromClassList(c); }
         public void SetEnabled(bool on) => enabledSelf = on;
 

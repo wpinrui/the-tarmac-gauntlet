@@ -9,7 +9,7 @@
     <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)../../out/furniture-check/obj/</BaseIntermediateOutputPath>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Check.cs;Export.cs;Stubs.cs;../grandstands/Stubs.cs;../circuit/geometry-check/UnityStubs.cs" />
+    <Compile Include="Check.cs;Export.cs;PropsExport.cs;Stubs.cs;../grandstands/Stubs.cs;../circuit/geometry-check/UnityStubs.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/Circuit.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/CircuitData.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/CircuitBuilder.cs" />
@@ -21,5 +21,10 @@
     <Compile Include="../../unity/Assets/Raceday/Scripts/Furniture/FurnitureBuilder.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/Furniture/ArmcoBuilder.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/Furniture/RaceFlags.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Furniture/TracksideProps.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Furniture/PropBuilder.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/LandscapePlan.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/LandscapeLooks.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/SkyClock.cs" />
   </ItemGroup>
 </Project>

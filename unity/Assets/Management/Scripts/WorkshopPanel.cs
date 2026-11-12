@@ -279,6 +279,8 @@ namespace TarmacGauntlet.Management
             order.RemoveAt(index);
             carId = order.Count > 0 ? order[Math.Min(index, order.Count - 1)].Id : null;
             repairParts = -1;
+            // Money changes hands for a car either way, so a sale sounds like a purchase.
+            MenuSounds.Play(UiCue.Buy);
             GameSession.Apply(g => GameActions.SellCar(g, car.Id, price, name));
             if (order.Count == 0) Menus.CloseScreen();
         }

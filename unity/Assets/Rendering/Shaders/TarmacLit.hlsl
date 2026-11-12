@@ -5,6 +5,7 @@
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
 
 // Colours and multipliers written into the shaders while the game rendered in Gamma colour space, where they were sRGB
 // values and scaled sRGB values. In Linear a colour is turned into linear light, and a multiplier on a colour is raised

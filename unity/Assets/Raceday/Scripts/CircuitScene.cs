@@ -131,7 +131,7 @@ namespace TarmacGauntlet.Raceday
             track.AddComponent<CrowdView>().Material = standMaterials.Crowd;
             Lap("grandstands");
             yield return null;
-            Landscape.Build(circuit, builder, stands.Footprints, materials, LandscapeLooks.Current);
+            IReadOnlyList<TreeSpot> trees = Landscape.Build(circuit, builder, stands.Footprints, materials, LandscapeLooks.Current);
             Lap("landscape");
             yield return null;
             Complex = new PitComplex(circuit, builder.GarageFloors);
@@ -148,7 +148,7 @@ namespace TarmacGauntlet.Raceday
             PitComplexView view = buildings.AddComponent<PitComplexView>();
             view.Sky = sky;
             view.Materials = pitMaterials;
-            Trackside trackside = Trackside.Build(circuit, builder, stands.Footprints);
+            Trackside trackside = Trackside.Build(circuit, builder, stands.Footprints, trees);
             var plainArmco = new List<Renderer>();
             foreach (Transform child in track.transform)
                 if (child.name == "Armco" && child.TryGetComponent(out Renderer drawn)) plainArmco.Add(drawn);
