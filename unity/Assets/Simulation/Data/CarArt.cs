@@ -13,6 +13,7 @@ namespace TarmacGauntlet.Simulation
         private static readonly Dictionary<string, string> ById = new Dictionary<string, string>
         {
             { "b-22", "Assets/Art/Vehicles/ArcherTachyon/ArcherTachyon.obj" },
+            { "b-23", "Assets/Art/Vehicles/ArcherJetBlack/ArcherJetBlack.obj" },
         };
 
         private static readonly Dictionary<CarClass, string> ByClass = new Dictionary<CarClass, string>

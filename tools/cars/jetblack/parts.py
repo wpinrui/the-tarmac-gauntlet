@@ -176,7 +176,7 @@ def taillamps(ref, cutters, out, sgn):
     side = "l" if sgn > 0 else "r"
     fr, _to2, shp, _v = lamp_shape("tail", sgn, (-1, sgn * 0.6, 0.2))
     cutters += blend.lay(ref, f"cut_tail_{side}", shp, fr, -0.016, 0.006, "housing", 0.01, along_ray=True)
-    out += blend.lay(ref, f"tail_back_{side}", shp.buffer(-0.002), fr, -0.0125, -0.0105, "housing", 0.008, along_ray=True)
+    out += blend.lay(ref, f"tail_back_{side}", shp.buffer(-0.002), fr, -0.0145, -0.012, "housing", 0.008, along_ray=True)
     b = shp.bounds
     mid = b[1] + 0.5 * (b[3] - b[1])
     inner = shp.buffer(-0.009)
@@ -201,6 +201,9 @@ def grille_shape():
     return soft(mirrored(hull(R["grille"])), 0.03)
 
 
+SLOT_FLOOR = 0.20     # the low slot stays this far up, clear of the nose's underside
+
+
 def front_parts(ref, cutters, out):
     """The grille with one chrome blade across it either side of the middle, the two outer
     intakes and the low slot, each a dark recess with a mesh back."""
@@ -216,7 +219,7 @@ def front_parts(ref, cutters, out):
         bar = (bar if sgn > 0 else flip(bar)).intersection(g.buffer(-0.006))
         out += blend.lay(ref, f"grille_blade_{side}", bar, fr, -0.0395, -0.008, "chrome", 0.006, along_ray=True)
     i = soft(hull(R["intake"]), 0.02)
-    s = soft(mirrored(hull(R["slot"]).buffer(0.006)), 0.012)
+    s = soft(mirrored(hull(R["slot"]).buffer(0.006)).intersection(box(-5, SLOT_FLOOR, 5, 5)), 0.012)
     for name, shape, depth in (("intake_l", i, 0.035), ("intake_r", flip(i), 0.035), ("slot", s, 0.03)):
         cutters += blend.lay(ref, f"cut_{name}", shape, fr, -depth, 0.006, "grille", 0.01, along_ray=True)
         out += blend.lay(ref, f"{name}_back", shape.buffer(-0.002), fr, -depth + 0.006, -depth + 0.01, "mesh", 0.01, along_ray=True)
@@ -652,6 +655,7 @@ def exhaust():
 
 
 DIFF_FINS = 4
+DIFF_FLOOR = 0.24     # the diffuser starts just above the tail's underside, on the rear face
 
 
 def rear_parts(ref, out, pocket):
@@ -660,11 +664,12 @@ def rear_parts(ref, out, pocket):
     t = tip_shape()
     y1 = t.bounds[0] - 0.03
     z1 = t.bounds[3] + 0.01
-    d = soft(box(-y1, 0.0, y1, z1), 0.02).difference(pocket.buffer(0.004))
+    z0 = DIFF_FLOOR
+    d = soft(box(-y1, z0, y1, z1), 0.02).difference(pocket.buffer(0.004))
     out += blend.lay(ref, "diffuser", d, fr, 0.002, 0.0045, "grille", 0.008, along_ray=True)
     for i, y in enumerate(np.linspace(-0.8 * y1, 0.8 * y1, DIFF_FINS)):
-        fin = box(y - 0.006, 0.0, y + 0.006, z1 - 0.03).intersection(d.buffer(-0.01))
-        out += blend.lay(ref, f"diffuser_fin_{i}", fin, fr, 0.0044, 0.05, "grille", 0.006, along_ray=True)
+        fin = box(y - 0.006, z0, y + 0.006, z1 - 0.03).intersection(d.buffer(-0.01))
+        out += blend.lay(ref, f"diffuser_fin_{i}", fin, fr, 0.0035, 0.05, "grille", 0.006, along_ray=True)
     return []
 
 
@@ -727,6 +732,8 @@ def steering_wheel(x, y, z, tilt):
     col.data.transform(Matrix.Translation((0, -0.0, 0)) @ Matrix.Rotation(np.pi / 2, 4, "Z") @ Matrix.Scale(9, 4, (1, 0, 0)))
     parts.append(col)
     wheel = blend.union_all(parts, "steering_wheel")
+    blend.tidy(wheel)
+    blend.outward(wheel)
     wheel.data.transform(Matrix.Translation((x, y, z)) @ Matrix.Rotation(tilt, 4, "Y") @ Matrix.Rotation(np.pi / 2, 4, "Z"))
     return wheel
 
@@ -885,7 +892,7 @@ def grille_badge(style, size):
         for k, q in enumerate(getattr(g, "geoms", [g])):
             pts, tris = blend.triangulate(q, 0.003)
             n = len(pts)
-            x0, x1 = x + 0.027, x + 0.031
+            x0, x1 = x + 0.0275, x + 0.0315
             verts = np.vstack([np.column_stack([np.full(n, x0), pts[:, 0], z + pts[:, 1]]),
                                np.column_stack([np.full(n, x1), pts[:, 0], z + pts[:, 1]])])
             count = {}
