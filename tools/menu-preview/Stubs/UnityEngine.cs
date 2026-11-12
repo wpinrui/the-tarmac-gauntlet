@@ -193,6 +193,7 @@ namespace UnityEngine
     {
         public static void Log(object o) => Console.Error.WriteLine(o);
         public static void LogWarning(object o) => Console.Error.WriteLine(o);
+        public static void LogError(object o) => Console.Error.WriteLine(o);
         public static void LogException(Exception e) => Console.Error.WriteLine(e);
     }
 

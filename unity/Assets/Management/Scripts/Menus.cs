@@ -362,7 +362,9 @@ namespace TarmacGauntlet.Management
         {
             var e = new VisualElement { pickingMode = PickingMode.Ignore };
             e.AddToClassList("wordmark-layer");
-            e.style.backgroundImage = Resources.Load<Texture2D>("Wordmark/" + file);
+            var texture = Resources.Load<Texture2D>("Wordmark/" + file);
+            if (texture == null) Debug.LogError("Main menu wordmark: Resources/Wordmark/" + file + ".png did not load, so it won't show.");
+            e.style.backgroundImage = texture;
             e.style.left = left;
             e.style.top = top;
             e.style.width = width;
