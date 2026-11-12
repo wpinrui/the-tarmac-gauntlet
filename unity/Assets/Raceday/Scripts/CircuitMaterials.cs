@@ -21,7 +21,7 @@ namespace TarmacGauntlet.Raceday
             LineLengthId = Shader.PropertyToID("_LineLength"), UvMetresId = Shader.PropertyToID("_UvMetres"),
             RepairsId = Shader.PropertyToID("_Repairs"), RepairAmountId = Shader.PropertyToID("_RepairAmount"), MarksId = Shader.PropertyToID("_Marks"),
             PoolsId = Shader.PropertyToID("_Pools"), PorosityId = Shader.PropertyToID("_Porosity"), PuddlesId = Shader.PropertyToID("_Puddles");
-        private const string DetailKeyword = "_TRACK_DETAIL", RubberKeyword = "_TRACK_RUBBER", WetKeyword = "_TRACK_WET";
+        private const string DetailKeyword = "_TRACK_DETAIL", RubberKeyword = "_TRACK_RUBBER", WetKeyword = "_TRACK_WET", StripesKeyword = "_GROUND_STRIPES";
 
         private readonly Texture2D kerbClean, kerbWorn, kerbCleanNormals, kerbWornNormals;
         private bool lineLaid, wet;
@@ -110,7 +110,7 @@ namespace TarmacGauntlet.Raceday
             ShowOptions();
         }
 
-        /// <summary>Sets the paved surfaces to the graphics options as they stand.</summary>
+        /// <summary>Sets the paved surfaces and the mown grass to the graphics options as they stand.</summary>
         public void ShowOptions()
         {
             bool detail = GraphicsOptions.TarmacDetail.On;
@@ -123,6 +123,9 @@ namespace TarmacGauntlet.Raceday
             bool worn = GraphicsOptions.KerbWear.On;
             Kerb.SetTexture(MainTexId, worn ? kerbWorn : kerbClean);
             Kerb.SetTexture(BumpMapId, worn ? kerbWornNormals : kerbCleanNormals);
+            bool stripes = GraphicsOptions.Mowing.On;
+            foreach (Material m in new[] { Terrain, Grass, Verge })
+                if (stripes) m.EnableKeyword(StripesKeyword); else m.DisableKeyword(StripesKeyword);
         }
 
         /// <summary>

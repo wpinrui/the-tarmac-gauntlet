@@ -131,7 +131,7 @@ namespace TarmacGauntlet.Raceday
             track.AddComponent<CrowdView>().Material = standMaterials.Crowd;
             Lap("grandstands");
             yield return null;
-            Landscape.Build(circuit, builder, materials, LandscapeLooks.Current);
+            Landscape.Build(circuit, builder, stands.Footprints, materials, LandscapeLooks.Current);
             Lap("landscape");
             yield return null;
             Complex = new PitComplex(circuit, builder.GarageFloors);

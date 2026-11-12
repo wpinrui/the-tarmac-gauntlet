@@ -22,43 +22,64 @@ namespace TarmacGauntlet.Raceday
         private const int FarKeep = 3;
         private const float FarGrow = 1.45f;
 
-        public static void Build(Circuit circuit, CircuitBuilder builder, CircuitMaterials materials, LandscapeLook look)
+        public static void Build(Circuit circuit, CircuitBuilder builder, IReadOnlyList<StandFootprint> stands, CircuitMaterials materials, LandscapeLook look)
         {
             var root = new GameObject("Landscape");
-            var plan = new LandscapePlan(circuit, builder.RunoffReach, look);
-            Fields(circuit, plan, materials.Terrain);
+            var plan = new LandscapePlan(circuit, builder.RunoffReach, look, stands);
+            Fields(circuit, plan, materials);
             Trees(plan, root.transform);
             Hills(circuit, look, root.transform);
         }
 
         // ---------------------------------------------------------------- ground
 
-        /// <summary>Paints the fields' colours over the ground, with a grass grain over them (Resources/Landscape/Ground.shader).</summary>
-        private static void Fields(Circuit circuit, LandscapePlan plan, Material terrain)
+        /// <summary>
+        /// Paints the fields' colours over the ground, with a grass grain over them and stripes mown along the track
+        /// (Resources/Landscape/Ground.shader). The grass runoff and verges take the same shader, so the mown grass runs on
+        /// unbroken from the road edge out to the fields.
+        /// </summary>
+        private static void Fields(Circuit circuit, LandscapePlan plan, CircuitMaterials materials)
         {
+            GroundData g = circuit.Data.terrain;
+            float cell = g.spacing / LandscapePlan.MapPerCell;
             var px = new Color32[plan.MapX * plan.MapZ];
+            var mowing = new ushort[px.Length * 4];
             for (int i = 0; i < px.Length; i++)
             {
-                Color col = LandscapeLooks.Ground(plan.Map[i]) * (0.94f + 0.12f * CloudField.Hash(i % plan.MapX, i / plan.MapX, 91));
+                int x = i % plan.MapX, z = i / plan.MapX;
+                Color col = LandscapeLooks.Field(plan.Map[i], g.originX + x * cell, g.originZ + z * cell) * (0.94f + 0.12f * CloudField.Hash(x, z, 91));
                 px[i] = col;
+                float mown = plan.Mowing(i, out float fromRoad, out float alongX, out float alongZ);
+                mowing[i * 4] = Mathf.FloatToHalf(fromRoad);
+                mowing[i * 4 + 1] = Mathf.FloatToHalf(mown);
+                mowing[i * 4 + 2] = Mathf.FloatToHalf(alongX);
+                mowing[i * 4 + 3] = Mathf.FloatToHalf(alongZ);
             }
             var map = new Texture2D(plan.MapX, plan.MapZ, TextureFormat.RGBA32, true)
                 { name = "Fields", wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear, anisoLevel = 4 };
             map.SetPixels32(px);
             map.Apply(true, true);
+            var mow = new Texture2D(plan.MapX, plan.MapZ, TextureFormat.RGBAHalf, true, true)
+                { name = "Mowing", wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear, anisoLevel = 4 };
+            mow.SetPixelData(mowing, 0);
+            mow.Apply(true, true);
 
-            // The ground's uvs are its position over 8 m (CircuitBuilder.Ground). Map them onto the field map.
-            GroundData g = circuit.Data.terrain;
-            float cell = g.spacing / LandscapePlan.MapPerCell;
-            float w = plan.MapX * cell, h = plan.MapZ * cell;
             Shader ground = Resources.Load<Shader>("Landscape/Ground");
             if (ground == null) return;
-            terrain.shader = ground;
-            terrain.mainTexture = map;
-            terrain.mainTextureScale = new Vector2(8f / w, 8f / h);
-            terrain.mainTextureOffset = new Vector2((cell * 0.5f - g.originX) / w, (cell * 0.5f - g.originZ) / h);
-            terrain.SetTexture("_Grain", Grain());
-            terrain.SetFloat("_Smoothness", 0.05f);
+            // The map's texel centres sit on the map points, from the ground's origin.
+            var rect = new Vector4(g.originX - cell * 0.5f, g.originZ - cell * 0.5f, 1f / (plan.MapX * cell), 1f / (plan.MapZ * cell));
+            Texture2D grain = Grain();
+            foreach (Material m in new[] { materials.Terrain, materials.Grass, materials.Verge })
+            {
+                m.shader = ground;
+                m.color = Color.white;
+                m.mainTexture = map;
+                m.SetTexture("_Grain", grain);
+                m.SetTexture("_Mowing", mow);
+                m.SetVector("_Map", rect);
+                m.SetFloat("_Smoothness", 0.05f);
+            }
+            materials.ShowOptions();
         }
 
         /// <summary>Grain about mid grey, so it darkens and lightens the field colour evenly.</summary>
@@ -132,7 +153,8 @@ namespace TarmacGauntlet.Raceday
                 int k = (int)t.Kind;
                 float radius = LandscapePlan.ModelRadius[k] * t.Scale;
                 var s = new Vector4(radius, CentreAbove[k] * t.Scale * t.Squash, t.Yaw, k);
-                Color32 tint = LandscapeLooks.Leaves(t.Kind) * t.Shade;
+                // Halved, so the tint can lighten as well as darken; the shader doubles it.
+                Color32 tint = LandscapeLooks.Leaves(t.Kind, t.Hue) * (t.Shade * 0.5f);
                 int b = verts.Count;
                 for (int c = 0; c < 4; c++)
                 {
