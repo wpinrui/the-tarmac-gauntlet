@@ -167,6 +167,25 @@ namespace TarmacGauntlet.Simulation
             CloseStint();
         }
 
+        /// <summary>Gives the car an issue now, as if it had come up on this lap. For the debug menu.</summary>
+        public void AddIssue(string templateId)
+        {
+            if (Retired || active.Any(i => i.TemplateId == templateId)) return;
+            active.Add(new ActiveIssue { TemplateId = templateId, LapOccurred = Laps });
+            issues.Add(new IssueRecord { Lap = Laps, TemplateId = templateId, DriverId = Driver.Id });
+        }
+
+        /// <summary>Fixes every active issue at once, without a stop. For the debug menu.</summary>
+        public void ClearIssues()
+        {
+            for (int i = 0; i < issues.Count; i++)
+                if (issues[i].FixedLap == null) issues[i] = issues[i] with { FixedLap = Laps };
+            active.Clear();
+        }
+
+        /// <summary>Sets how tired the driver at the wheel is, 0 to 100. For the debug menu.</summary>
+        public void SetFatigue(double fatigue) => Fatigue = Math.Max(0, Math.Min(100, fatigue));
+
         /// <summary>How the active issues scale the car's stats.</summary>
         public IssueEffects Effects
         {

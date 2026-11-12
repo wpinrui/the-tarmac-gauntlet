@@ -163,11 +163,22 @@ function wear(i) {
     const mm = names.map(n => n === 'body' ? liveries[i] : (mats[n] || mats.body));
     o.material = mm.length === 1 ? mm[0] : mm;
   }
-  pick.forEach((b, j) => b.setAttribute('aria-pressed', i === j));
+  cur = i;
+  const [a, b] = LIVERIES[i].name.split('/');
+  pick.forEach(([btn, k]) => btn.setAttribute('aria-pressed', k === a || (b !== undefined && k === '/' + b)));
 }
 const bar = document.getElementById('bar');
 const button = (label, fn) => { const b = document.createElement('button'); b.textContent = label; b.onclick = fn; bar.appendChild(b); return b; };
-const pick = LIVERIES.map((lv, i) => button(lv.name, () => wear(i)));
+// A name "Design/Logo" splits into two rows of toggles: one picks the design, one the logo.
+let cur = 0;
+const firsts = [...new Set(LIVERIES.map(lv => lv.name.split('/')[0]))];
+const seconds = [...new Set(LIVERIES.filter(lv => lv.name.includes('/')).map(lv => lv.name.split('/')[1]))];
+const find = (a, b) => Math.max(0, LIVERIES.findIndex(lv => lv.name === (b === undefined ? a : a + '/' + b)));
+const pick = firsts.map(a => [button(a, () => wear(find(a, LIVERIES[cur].name.split('/')[1]))), a]);
+if (seconds.length) {
+  bar.appendChild(Object.assign(document.createElement('span'), { className: 'gap' }));
+  for (const b of seconds) pick.push([button(b, () => wear(find(LIVERIES[cur].name.split('/')[0], b))), '/' + b]);
+}
 bar.appendChild(Object.assign(document.createElement('span'), { className: 'gap' }));
 let goal = 0, t = 0;
 const doorBtn = button('Doors', () => { goal = 1 - goal; doorBtn.setAttribute('aria-pressed', goal === 1); });

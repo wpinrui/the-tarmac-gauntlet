@@ -13,8 +13,8 @@ namespace TarmacGauntlet.Raceday
     /// the race for the career and settles it at the flag. Start picks how the race starts: from the
     /// grid at once, behind the pace car, or from the pit lane, where the cars queue in the fast lane
     /// and leave three seconds apart, moving up to the pit exit line (<see cref="PitLaneStart"/>). The pit lane start fast forwards
-    /// until the car ahead of the player's is about to leave. Tab opens the AI debug menu (<see cref="SituationMenu"/>). I hands the player's car to you and
-    /// back. V moves the cameras to the next car, and P to the next car making a pit stop. F steps
+    /// until the car ahead of the player's is about to leave. In the editor and development builds Tab opens the debug menu (<see cref="DebugMenu"/>), whose race set-up (<see cref="DebugSettings"/>) picks the start, the weather, the start hour, the field and your car. Delete hands the player's car to you and
+    /// back. = rides with the car behind the one you watch, - with the car ahead, and P with the next car making a pit stop. F steps
     /// the race through normal speed, 4x and 16x while the AI drives your car, and ends the pit lane
     /// start's fast forward. Cars away from the camera glide without physics (<see cref="PhysicsRange"/>).
     /// The field is shown on the timing tower (<see cref="RaceTower"/>). T opens live timing while the AI drives
@@ -43,7 +43,7 @@ namespace TarmacGauntlet.Raceday
         private const float SkipSpeed = 32f;
         private PitLaneStart pitLaneStart;
         private bool skipping;
-        private SituationMenu lab;
+        private DebugMenu debug;
         private RaceDay day;
         private RaceDirector director;
         private LiveTiming timing;
@@ -72,6 +72,10 @@ namespace TarmacGauntlet.Raceday
         {
             Time.fixedDeltaTime = 0.01f;
             RaceWeather.Now = WeatherState.Dry;
+            RaceWeather.Forced = null;
+            bool testing = Debug.isDebugBuild;
+            TimeOfDay.StartHour = testing ? DebugSettings.StartHour : TimeOfDay.DefaultStartHour;
+            if (testing && DebugSettings.Start is StartMode chosen) start = chosen;
             var circuit = new Circuit(CircuitData.Load());
             var track = new GameObject("Circuit");
             var materials = new CircuitMaterials();
@@ -108,6 +112,7 @@ namespace TarmacGauntlet.Raceday
             var pits = new PitLane(circuit);
             bool career = RaceWeekend.Setup != null;
             RaceSetup setup = RaceWeekend.Setup ?? RaceWeekend.Begin(TestCareer());
+            if (testing) setup = DebugActions.Field(setup, DebugSettings.Field, DebugSettings.Car);
             day = new RaceDay(setup);
             IReadOnlyList<GridCar> grid = setup.Grid;
             int player = -1;
@@ -184,6 +189,7 @@ namespace TarmacGauntlet.Raceday
             // Run on its own the scene is for AI testing, so it starts on the chase camera.
             if (!career) views.StartInChase();
             RaceTower tower = Tower(circuit, racing, field, teams, watched, starter);
+            views.Tower = tower;
             if (player >= 0 && TeamColour(setup.Game, grid[player].TeamId) is Color own) tower.Colours[player] = own;
             view.Fit(Complex, tower.Colours, pits.Garages);
             // Each team's hired crew wait in its garage and work its stops.
@@ -197,7 +203,7 @@ namespace TarmacGauntlet.Raceday
             sky.RaceSeconds = () => tower.RaceTime;
             // Every race rolls its own weather (WeatherPlan), played on the race clock.
             int seed = weatherSeed != 0 ? weatherSeed : new System.Random().Next(1, int.MaxValue);
-            var weather = new WeatherPlan(seed, TimeOfDay.StartHour);
+            var weather = new WeatherPlan(seed, TimeOfDay.StartHour, testing ? DebugSettings.Weather : null);
             Debug.Log($"Weather {seed}: {weather.Kind}");
             WeatherView rain = sky.gameObject.AddComponent<WeatherView>();
             rain.Plan = weather;
@@ -205,7 +211,7 @@ namespace TarmacGauntlet.Raceday
             rain.Materials = materials;
             rain.Cars = racing;
             rain.Night = () => SkyClock.At(sky.Hour, SkyClock.Look).Night;
-            sky.Weather = () => weather.At(tower.RaceTime);
+            sky.Weather = () => RaceWeather.Forced ?? weather.At(tower.RaceTime);
             trackside.Cars = racing;
             trackside.Racing = tower.Racing;
             if (starter is RaceStart formation) trackside.PaceCarOut = () => !formation.Racing;
@@ -214,7 +220,6 @@ namespace TarmacGauntlet.Raceday
             director.Cars = racing;
             director.Drivers = drivers;
             director.Tower = tower;
-            var hidden = new List<GameObject> { tower.gameObject, director.gameObject };
             if (player >= 0)
             {
                 timing = new GameObject("Live timing").AddComponent<LiveTiming>();
@@ -233,7 +238,6 @@ namespace TarmacGauntlet.Raceday
                 timing.Game = setup.Game;
                 timing.CanSkip = CanSkip;
                 timing.Skip = () => stintSkip = true;
-                hidden.Add(timing.gameObject);
             }
             BroadcastGraphics graphics = new GameObject("Broadcast graphics").AddComponent<BroadcastGraphics>();
             graphics.Director = tv;
@@ -250,15 +254,15 @@ namespace TarmacGauntlet.Raceday
             graphics.Player = player;
             graphics.Tower = tower;
             graphics.Keys = keys;
-            hidden.Add(graphics.gameObject);
-            foreach (CarController c in cars) hidden.Add(c.gameObject);
-            if (starter != null) hidden.Add(starter.gameObject);
-            lab = new GameObject("AI debug menu").AddComponent<SituationMenu>();
-            lab.Circuit = circuit;
-            lab.Keys = keys;
-            lab.Cameras = views;
-            lab.Range = range;
-            lab.Race = hidden.ToArray();
+            if (testing)
+            {
+                debug = new GameObject("Debug menu").AddComponent<DebugMenu>();
+                debug.Keys = keys;
+                debug.Cameras = views;
+                debug.Tower = tower;
+                debug.Director = director;
+                debug.Game = setup.Game;
+            }
             if (start == StartMode.PitLane)
             {
                 var pitStart = (PitStart)starter;
@@ -276,8 +280,6 @@ namespace TarmacGauntlet.Raceday
             var rolling = (RaceStart)starter;
             rolling.Grid = racing;
             rolling.PaceCar = paceCar;
-            hidden.Add(paceCar.gameObject);
-            lab.Race = hidden.ToArray();
             rolling.Pits = pits;
         }
 
@@ -342,9 +344,9 @@ namespace TarmacGauntlet.Raceday
 
         private void Update()
         {
-            if (keys == null || ai == null || lab.Running) return;   // a debug set-up runs instead of the race
+            if (keys == null || ai == null) return;
             if (director.Finished) return;   // the race summary is up, at normal speed
-            if (keys.Pressed(KeyCode.I)) ai.enabled = !ai.enabled;
+            if (keys.Pressed(KeyCode.Delete)) ai.enabled = !ai.enabled;
             if (keys.Pressed(KeyCode.F))
             {
                 if (skipping) skipping = false;
@@ -361,6 +363,7 @@ namespace TarmacGauntlet.Raceday
                 stintSkip = false;
             }
             if (skipping && pitLaneStart.Time >= pitLaneStart.FastForwardTo) skipping = false;
+            if (debug != null && debug.Speed.HasValue) return;   // the debug menu holds the speed
             // Live timing runs the race at the top speed behind it.
             float scale = skipping || stintSkip ? SkipSpeed : timing != null && timing.Open ? Speeds[Speeds.Length - 1] : Speeds[speed];
             if (Time.timeScale != scale)
@@ -447,7 +450,6 @@ namespace TarmacGauntlet.Raceday
             Vector3 p = circuit.Centre[k] + circuit.Left[k] * 18f + Vector3.up * 9f;
             cam.transform.position = p;
             cam.transform.rotation = Quaternion.LookRotation(circuit.Centre[circuit.IndexOf(40f)] - p);
-            cam.gameObject.AddComponent<FreeCamera>();
             RaceCameras views = cam.gameObject.AddComponent<RaceCameras>();
             views.Cars = cars;
             views.Car = cars[watched];   // the player's car

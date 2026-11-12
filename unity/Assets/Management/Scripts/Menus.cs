@@ -632,6 +632,21 @@ namespace TarmacGauntlet.Management
             Render();
         }
 
+        /// <summary>True on the hub or one of its screens, with nothing over it.</summary>
+        internal bool InHub => overlay == Overlay.None && (mode == Mode.Hub || mode == Mode.Screen);
+
+        /// <summary>Opens the latest paper again, from the hub. For the debug menu.</summary>
+        internal void ShowPaper()
+        {
+            if (InHub) OpenPaper();
+        }
+
+        /// <summary>Takes every menu off the screen, for the race summary over the HQ. For the debug menu.</summary>
+        internal void HideAll()
+        {
+            if (root != null) root.style.display = DisplayStyle.None;
+        }
+
         /// <summary>Starts a new career, replacing the current one, and opens the hub.</summary>
         internal void StartCareer(NewGameOptions options)
         {

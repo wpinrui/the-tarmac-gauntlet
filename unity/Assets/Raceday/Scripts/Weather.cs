@@ -52,7 +52,8 @@ namespace TarmacGauntlet.Raceday
         private readonly float[] cloud, rain, water, wind;
         private readonly System.Random random;
 
-        public WeatherPlan(int seed, float startHour)
+        /// <param name="kind">The kind of weekend, or null to roll it from the seed.</param>
+        public WeatherPlan(int seed, float startHour, WeatherKind? kind = null)
         {
             Seed = seed;
             StartHour = startHour;
@@ -64,7 +65,7 @@ namespace TarmacGauntlet.Raceday
             wind = new float[n];
 
             double roll = random.NextDouble();
-            Kind = roll < 0.28 ? WeatherKind.Settled : roll < 0.32 ? WeatherKind.Thundery : roll < 0.73 ? WeatherKind.Changeable : WeatherKind.Unsettled;
+            Kind = kind ?? (roll < 0.28 ? WeatherKind.Settled : roll < 0.32 ? WeatherKind.Thundery : roll < 0.73 ? WeatherKind.Changeable : WeatherKind.Unsettled);
             float cover = Kind switch { WeatherKind.Settled => 0.22f, WeatherKind.Thundery => 0.25f, WeatherKind.Changeable => 0.5f, _ => 0.72f };
             float unstable = Kind switch { WeatherKind.Settled => 0.05f, WeatherKind.Thundery => 0.35f, WeatherKind.Changeable => 0.22f, _ => 0.42f };
             float frontsExpected = Kind switch { WeatherKind.Settled => 0.12f, WeatherKind.Thundery => 0.3f, WeatherKind.Changeable => 1f, _ => 1.6f };

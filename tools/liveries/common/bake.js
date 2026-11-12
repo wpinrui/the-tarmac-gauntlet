@@ -59,7 +59,7 @@ function paint(size, pieces, numbers, sample, font) {
     const cv = document.createElement('canvas'); cv.width = cv.height = size;
     const g = cv.getContext('2d');
     g.fillStyle = pieces[0].base; g.fillRect(0, 0, size, size);
-    const load = src => new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = src; });
+    const load = src => new Promise((r, no) => { const i = new Image(); i.onload = () => r(i); i.onerror = () => no(new Error('a panel SVG does not load: check it is valid XML')); i.src = src; });
     for (const p of pieces) {
       const img = await load(p.svg);
       g.save(); g.translate(p.turned ? p.x + p.w : p.x, p.y); if (p.turned) g.rotate(Math.PI / 2);
