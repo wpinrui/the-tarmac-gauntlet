@@ -337,7 +337,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>The car's body in its own frame, from its meshes, measured once per car.</summary>
         private Bounds Body(Transform car)
         {
-            if (bodies.TryGetValue(car.GetInstanceID(), out Bounds b)) return b;
+            if (bodies.TryGetValue(car.GetHashCode(), out Bounds b)) return b;
             bool any = false;
             Matrix4x4 toCar = car.worldToLocalMatrix;
             foreach (MeshFilter mf in car.GetComponentsInChildren<MeshFilter>())
@@ -355,7 +355,7 @@ namespace TarmacGauntlet.Raceday
             }
             // A car with no meshes yet: a typical racing car.
             if (!any) b = new Bounds(new Vector3(0f, 0.6f, 0f), new Vector3(1.9f, 1.2f, 4.6f));
-            else bodies[car.GetInstanceID()] = b;
+            else bodies[car.GetHashCode()] = b;
             return b;
         }
 
