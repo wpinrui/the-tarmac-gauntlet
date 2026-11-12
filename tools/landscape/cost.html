@@ -222,7 +222,7 @@ function inFrustum(M, lo, hi) {
  * farAt the screen height below which a chunk draws its far version. Returns counts per screen pixel.
  */
 window.measure = (p, q, fov, opts) => {
-  const { lodBias = 1, farAt = 0.25, useCrop = 1, band = [0, 1e9] } = opts;
+  const { lodBias = 1, farAt = 0.25, useCrop = 1, band = [0, 1e9], batch = 64 } = opts;
   const M = viewProjection(p, q, fov, W / H), vp = columnMajor(M);
   const tan = Math.tan(fov * Math.PI / 360);
   const draws = [];
@@ -237,7 +237,7 @@ window.measure = (p, q, fov, opts) => {
   const quads = draws.reduce((s, d) => s + d.part.count, 0);
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, fb); gl.viewport(0, 0, W, H);
-  const pass = (alphaTest, depthWrite, colour, depthFunc) => {
+  const pass = (alphaTest, depthWrite, colour, depthFunc, countFirst = false) => {
     gl.useProgram(progTree);
     gl.uniformMatrix4fv(gl.getUniformLocation(progTree, 'vp'), false, vp);
     gl.uniform3fv(gl.getUniformLocation(progTree, 'cam'), p);
@@ -253,6 +253,22 @@ window.measure = (p, q, fov, opts) => {
     for (const d of draws) {
       gl.vertexAttribPointer(quad.la, 4, gl.FLOAT, false, 32, d.part.first * 32);
       gl.vertexAttribPointer(quad.lb, 4, gl.FLOAT, false, 32, d.part.first * 32 + 16);
+      if (countFirst) {
+        // Count each batch's fragments that pass the depth already drawn, then draw its depth: a batch stands for the
+        // trees in flight together, which cannot hide each other from the coarse depth test.
+        for (let b = 0; b < d.part.count; b += batch) {
+          const k = Math.min(batch, d.part.count - b), at = (d.part.first + b) * 32;
+          gl.vertexAttribPointer(quad.la, 4, gl.FLOAT, false, 32, at);
+          gl.vertexAttribPointer(quad.lb, 4, gl.FLOAT, false, 32, at + 16);
+          gl.uniform1i(gl.getUniformLocation(progTree, 'alphaTest'), 0);
+          gl.depthMask(false); gl.colorMask(true, true, true, true); gl.enable(gl.BLEND);
+          gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, k);
+          gl.uniform1i(gl.getUniformLocation(progTree, 'alphaTest'), 1);
+          gl.depthMask(true); gl.colorMask(false, false, false, false);
+          gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, k);
+        }
+        continue;
+      }
       gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, d.part.count);
     }
   };
@@ -283,11 +299,14 @@ window.measure = (p, q, fov, opts) => {
   begin(); gl.disable(gl.BLEND); pass(1, true, false, gl.LESS); gl.enable(gl.BLEND);
   pass(0, false, true, gl.LEQUAL); const primedRaster = read();
   gl.clear(gl.COLOR_BUFFER_BIT); pass(1, false, true, gl.LEQUAL); const primedLit = read();
+  // The depth pass's fragments in front of the depth drawn before their chunk: what it pays for when the coarse depth
+  // test throws away the hidden ones before the shader runs, as it may on hardware that has one.
+  begin(); pass(1, true, false, gl.LEQUAL, true); const depthFront = read();
   gl.bindVertexArray(null);
   return {
     chunks: draws.length, nearChunks: draws.filter(d => d.near).length, quads,
     raster: raster.layers, leaves: leaves.layers, early: early.layers,
-    primedRaster: primedRaster.layers, primedLit: primedLit.layers, covered: early.covered, worstPixel: raster.worst,
+    primedRaster: primedRaster.layers, depthFront: depthFront.layers, primedLit: primedLit.layers, covered: early.covered, worstPixel: raster.worst,
   };
 };
 /** Pixels where the trees' outline differs with the quads cut down and without, per screen pixel. */
