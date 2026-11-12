@@ -15,8 +15,9 @@ namespace TarmacGauntlet.Raceday
     /// ahead of the car that zooms as it comes, a pan from close beside the track, the helicopter, an
     /// onboard, and the pit lane. <see cref="RaceCameras"/> hands it the camera in its TV view. Every shot but the onboard
     /// focuses on its car, so the background blurs (<see cref="PostEffects.Focus"/>).
-    /// With <see cref="Lock"/> set it stays on that one car and cuts between trackside shots and onboards from the
-    /// roll hoop, the nose, the wing mirror, the back of the car and the driver's seat.
+    /// With <see cref="Lock"/> set it stays on that one car: mostly trackside shots and pans, a helicopter shot now and
+    /// then, and an onboard about one shot in ten, from the roll hoop, the nose, the wing mirror, the back of the car or
+    /// the driver's seat in turn.
     /// </summary>
     public sealed class BroadcastDirector : MonoBehaviour
     {
@@ -32,9 +33,11 @@ namespace TarmacGauntlet.Raceday
         private enum Story { None, Leader, Rejoin, Stop, Mine, Battle, LeadBattle, Crash }
         private enum Shot { Trackside, Pan, Helicopter, Onboard, PitLane, RollHoop, Nose, Mirror, Rear }
 
-        /// <summary>The shots that follow one another on a locked car.</summary>
+        /// <summary>The shots that follow one another on a locked car. Onboard stands for the next of <see cref="LockedOnboards"/>.</summary>
         private static readonly Shot[] LockedShots =
-            { Shot.Trackside, Shot.RollHoop, Shot.Pan, Shot.Nose, Shot.Trackside, Shot.Mirror, Shot.Pan, Shot.Rear, Shot.Trackside, Shot.Onboard };
+            { Shot.Trackside, Shot.Pan, Shot.Trackside, Shot.Trackside, Shot.Pan, Shot.Helicopter, Shot.Trackside, Shot.Pan, Shot.Trackside, Shot.Onboard, Shot.Trackside, Shot.Pan };
+        private static readonly Shot[] LockedOnboards = { Shot.RollHoop, Shot.Onboard, Shot.Mirror, Shot.Nose, Shot.Rear };
+        private int lockedOnboard;
 
         /// <summary>A fight is two cars of a class this close, s.</summary>
         private const float BattleGap = 0.5f;
@@ -223,6 +226,7 @@ namespace TarmacGauntlet.Raceday
             if (newStory) Stories++;
             Shots++;
             shot = Lock >= 0 ? Cars[car].InPitLane ? Shot.PitLane : LockedShots[shotCount % LockedShots.Length] : Pick(s, shotCount);
+            if (Lock >= 0 && shot == Shot.Onboard) shot = LockedOnboards[lockedOnboard++ % LockedOnboards.Length];
             // A stop is shown until it's over: once the car leaves its box the story moves on.
             if (s == Story.Stop && shotCount > 0) shot = Shot.Trackside;
             shotStart = Now;
