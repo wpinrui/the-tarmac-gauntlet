@@ -13,8 +13,8 @@ namespace TarmacGauntlet.Raceday
     /// the race for the career and settles it at the flag. Start picks how the race starts: from the
     /// grid at once, behind the pace car, or from the pit lane, where the cars queue in the fast lane
     /// and leave three seconds apart, moving up to the pit exit line (<see cref="PitLaneStart"/>). The pit lane start fast forwards
-    /// until the car ahead of the player's is about to leave. In the editor and development builds Tab opens the debug menu (<see cref="DebugMenu"/>), whose race set-up (<see cref="DebugSettings"/>) picks the start, the weather and the start hour. I hands the player's car to you and
-    /// back. V moves the cameras to the next car, and P to the next car making a pit stop. F steps
+    /// until the car ahead of the player's is about to leave. In the editor and development builds Tab opens the debug menu (<see cref="DebugMenu"/>), whose race set-up (<see cref="DebugSettings"/>) picks the start, the weather and the start hour. Delete hands the player's car to you and
+    /// back. = rides with the car behind the one you watch, - with the car ahead, and P with the next car making a pit stop. F steps
     /// the race through normal speed, 4x and 16x while the AI drives your car, and ends the pit lane
     /// start's fast forward. Cars away from the camera glide without physics (<see cref="PhysicsRange"/>).
     /// The field is shown on the timing tower (<see cref="RaceTower"/>). T opens live timing while the AI drives
@@ -188,6 +188,7 @@ namespace TarmacGauntlet.Raceday
             // Run on its own the scene is for AI testing, so it starts on the chase camera.
             if (!career) views.StartInChase();
             RaceTower tower = Tower(circuit, racing, field, teams, watched, starter);
+            views.Tower = tower;
             if (player >= 0 && TeamColour(setup.Game, grid[player].TeamId) is Color own) tower.Colours[player] = own;
             view.Fit(Complex, tower.Colours, pits.Garages);
             // Each team's hired crew wait in its garage and work its stops.
@@ -344,7 +345,7 @@ namespace TarmacGauntlet.Raceday
         {
             if (keys == null || ai == null) return;
             if (director.Finished) return;   // the race summary is up, at normal speed
-            if (keys.Pressed(KeyCode.I)) ai.enabled = !ai.enabled;
+            if (keys.Pressed(KeyCode.Delete)) ai.enabled = !ai.enabled;
             if (keys.Pressed(KeyCode.F))
             {
                 if (skipping) skipping = false;
@@ -448,7 +449,6 @@ namespace TarmacGauntlet.Raceday
             Vector3 p = circuit.Centre[k] + circuit.Left[k] * 18f + Vector3.up * 9f;
             cam.transform.position = p;
             cam.transform.rotation = Quaternion.LookRotation(circuit.Centre[circuit.IndexOf(40f)] - p);
-            cam.gameObject.AddComponent<FreeCamera>();
             RaceCameras views = cam.gameObject.AddComponent<RaceCameras>();
             views.Cars = cars;
             views.Car = cars[watched];   // the player's car

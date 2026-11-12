@@ -171,7 +171,7 @@ namespace TarmacGauntlet.Raceday
             Camera cam = Camera.main;
             if (cam != null)
             {
-                foreach (Behaviour b in new Behaviour[] { cam.GetComponent<RaceCameras>(), cam.GetComponent<FreeCamera>(), cam.GetComponent<DriveHud>(), cam.GetComponent<FpsCounter>() })
+                foreach (Behaviour b in new Behaviour[] { cam.GetComponent<RaceCameras>(), cam.GetComponent<DriveHud>(), cam.GetComponent<FpsCounter>() })
                     if (b != null) b.enabled = false;
             }
             Cursor.lockState = CursorLockMode.None;

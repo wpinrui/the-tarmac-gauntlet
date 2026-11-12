@@ -8,8 +8,7 @@ namespace TarmacGauntlet.Raceday
     /// Above that are the fuel and tyre bars, each behind its icon. The gear is blue in automatic and
     /// white in manual. The speed turns amber while the pit lane limiter is on. The fuel bar is green in
     /// Conserve, white in Normal and orange in Push. The tyre bar turns red once the tyres are nearly
-    /// worn out. Green and red bars to the left of the speed show the throttle and brake. Hidden in the
-    /// free camera. Laid out on a 1920 by 1080 screen and scaled to the screen's height.
+    /// worn out. Green and red bars to the left of the speed show the throttle and brake. Laid out on a 1920 by 1080 screen and scaled to the screen's height.
     /// </summary>
     public sealed class DriveHud : MonoBehaviour
     {
