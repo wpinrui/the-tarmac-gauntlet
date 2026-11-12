@@ -117,6 +117,20 @@ namespace TarmacGauntlet.Raceday
             return Mathf.Max(1, Mathf.FloorToInt(room / RowHeight));
         }
 
+        /// <summary>The screen pixels the tower covers, or an empty rect while it isn't drawn.</summary>
+        public Rect Area
+        {
+            get
+            {
+                if (Hidden || rows.Count == 0) return Rect.zero;
+                float u = Unit();
+                int breaks = 0;
+                foreach (Standings.Row r in rows) if (r.BreakBefore) breaks++;
+                float height = TabHeight + 2f * BodyPad + HeaderHeight + rows.Count * RowHeight + breaks * BreakHeight;
+                return new Rect(Margin * u, Margin * u, Width * u, height * u);
+            }
+        }
+
         /// <summary>The whole tower is drawn at this share of the design's size.</summary>
         private const float Scale = 0.7f;
 
