@@ -1028,7 +1028,7 @@ static partial class Check
 
         // ---- report
         string version = File.Exists(VersionFile) ? File.ReadAllText(VersionFile).Trim() : "v?";
-        string label = $"{version} {Experiments.Label}";
+        string label = version;
         Console.WriteLine($"AI suite, {(full ? "full" : "quick")} mode, {label}, {clock.Elapsed.TotalMinutes:0.0} min");
         Console.WriteLine();
         int fails = limits.Count(l => !l.Pass);

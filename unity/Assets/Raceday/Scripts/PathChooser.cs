@@ -4,7 +4,7 @@ using UnityEngine;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// Path choosing, experiment E1 of the racecraft spec. A few times a second of race time the car
+    /// Path choosing, the racecraft spec's AI (E1, now v2). A few times a second of race time the car
     /// tries a handful of paths for the next few seconds: hold where it is going, move to one of
     /// several places either side of its racing line, and for each go, lift or brake. It predicts the
     /// cars near it along each path, throws out every path that breaks a hard limit, and takes the
@@ -15,8 +15,6 @@ namespace TarmacGauntlet.Raceday
     /// </summary>
     public sealed class PathChooser
     {
-        public const int Experiment = 1;
-
         private const int Steps = 30;
         private const float Tick = 0.1f;               // Steps * Tick: the 3 s looked ahead
         private const int DrawEvery = 3;

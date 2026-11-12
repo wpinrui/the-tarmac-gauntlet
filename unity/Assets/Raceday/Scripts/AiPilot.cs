@@ -191,7 +191,7 @@ namespace TarmacGauntlet.Raceday
         /// </summary>
         private float StraightSpeed(float laneSpeed, int k, float offset)
         {
-            if (!Experiments.Is(PathChooser.Experiment) || toArc == null) return laneSpeed;
+            if (toArc == null) return laneSpeed;
             float line = LaneProfiles[MiddleLane].Speed[k];
             if (laneSpeed >= line) return laneSpeed;
             float back = Mathf.Abs(offset) / Endurance.OvertakeOffsetRate * line + 20f;
@@ -236,7 +236,7 @@ namespace TarmacGauntlet.Raceday
         /// </summary>
         public AiPilot BuildPlaces()
         {
-            if (Experiments.Is(PathChooser.Experiment) && LaneProfiles[0] != LaneProfiles[MiddleLane])
+            if (LaneProfiles[0] != LaneProfiles[MiddleLane])
                 for (int i = 0; i < PlaceCount; i++) Place(i);
             return this;
         }
@@ -389,7 +389,7 @@ namespace TarmacGauntlet.Raceday
                 laneSpeed = StraightSpeed(Mathf.Lerp(pa.SpeedAt(lookahead), pb.SpeedAt(lookahead), pt), la, HoldLateral - Line.Lateral[la]);
                 laneAccel = Mathf.Lerp(pa.Accel[la], pb.Accel[la], pt);
             }
-            if (LagSpeeds && Experiments.Is(PathChooser.Experiment))
+            if (LagSpeeds)
             {
                 // A car lagging its path is on the path where it is: never faster than that one allows,
                 // or it slides wider still, out of a corner it is already wide in (T20a, T11).

@@ -8,10 +8,9 @@ namespace TarmacGauntlet.Raceday
     /// The AI debug menu, on Tab. It lists the set-ups of the racecraft spec (<see cref="Situations"/>)
     /// by rule. Picking one puts the race away and places that set-up's cars at their spot and speed,
     /// each on its tuned line, and they race at once. The menu also picks a car to drive, or none to
-    /// watch, switches slow motion (T) and restarts the set-up (Backspace), and switches an
-    /// <see cref="Experiments"/> variant on. While a set-up runs, each AI car shows the path it is
-    /// steering for and, above it, why. The AI version, experiment and set-up are shown small in the
-    /// bottom left corner at all times, e.g. "v0 E0 T2", so feedback can name what it was about.
+    /// watch, switches slow motion (T) and restarts the set-up (Backspace). While a set-up runs, each
+    /// AI car shows the path it is steering for and, above it, why. The AI version and set-up are shown
+    /// small in the bottom left corner at all times, e.g. "v2 T2", so feedback can name what it was about.
     /// </summary>
     public sealed class SituationMenu : MonoBehaviour
     {
@@ -168,7 +167,7 @@ namespace TarmacGauntlet.Raceday
             corner.fontSize = Mathf.RoundToInt(18 * scale);
             carLabel.fontSize = Mathf.RoundToInt(18 * scale);
 
-            string label = $"{version} {Experiments.Label}" + (situation != null ? $" {situation.Id}" : "");
+            string label = version + (situation != null ? $" {situation.Id}" : "");
             Shadowed(new Rect(12f * scale, Screen.height - 40f * scale, 400f * scale, 30f * scale), label, corner, scale);
             if (Running && Event.current.type == EventType.Repaint) CarLabels(scale);
             if (open) Menu(scale);
@@ -194,12 +193,6 @@ namespace TarmacGauntlet.Raceday
                 if (GUILayout.Button("Restart", button)) { Pick(situation); open = false; }
                 if (GUILayout.Button("Slow motion", slow ? on : button)) slow = !slow;
                 GUILayout.EndHorizontal();
-            }
-            if (Experiments.All.Length > 0)
-            {
-                if (GUILayout.Button("E0", Experiments.On == 0 ? on : button)) Experiments.On = 0;
-                for (int e = 1; e <= Experiments.All.Length; e++)
-                    if (GUILayout.Button($"E{e}.{Experiments.Revisions[e - 1]} {Experiments.All[e - 1]}", Experiments.On == e ? on : button)) Experiments.On = e;
             }
             GUILayout.Space(8f * scale);
             scroll = GUILayout.BeginScrollView(scroll);
