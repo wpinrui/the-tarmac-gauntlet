@@ -7,7 +7,8 @@ namespace TarmacGauntlet.Raceday
     /// lights from the left as the engine climbs to the redline, and flashes blue at the shift point.
     /// Above that are the fuel and tyre bars, each behind its icon. The gear is blue in automatic and
     /// white in manual. The speed turns amber while the pit lane limiter is on. The fuel bar is green in
-    /// Conserve, white in Normal and orange in Push. The tyre bar turns red once the tyres are nearly
+    /// Conserve, white in Normal and orange in Push. Above the fuel bar the engine maps sit on their keys, 1, 2
+    /// and 3, the one in use lit in its colour. The tyre bar turns red once the tyres are nearly
     /// worn out. Green and red bars to the left of the speed show the throttle and brake. Laid out on a 1920 by 1080 screen and scaled to the screen's height.
     /// </summary>
     public sealed class DriveHud : MonoBehaviour
@@ -16,7 +17,10 @@ namespace TarmacGauntlet.Raceday
         /// <summary>True while the TV view shows the broadcast.</summary>
         [System.NonSerialized] public bool Hidden;
 
-        private GUIStyle gear, speed;
+        private GUIStyle gear, speed, key;
+        /// <summary>The engine maps in the order of their keys.</summary>
+        private static readonly EngineMap[] Maps = { EngineMap.Conserve, EngineMap.Normal, EngineMap.Push };
+        private static readonly Color Ink = new Color(0.07f, 0.07f, 0.07f);
         private Texture2D fuelIcon, tyreIcon;
         private static readonly Color Auto = new Color(0.55f, 0.75f, 1f);
         private static readonly Color Limiter = new Color(1f, 0.75f, 0.2f);
@@ -88,6 +92,22 @@ namespace TarmacGauntlet.Raceday
             float fuelRow = tyreRow - rowGap - icon;
             Supply(new Rect(left, tyreRow, width, icon), tyreIcon, tyres, tyres < 0.15f ? Worn : Color.white, barHeight);
             Supply(new Rect(left, fuelRow, width, icon), fuelIcon, s.Fuel / s.Capacity, fuelColour, barHeight);
+
+            // The engine maps, on their keys, above the fuel bar.
+            if (key == null) key = new GUIStyle(speed) { alignment = TextAnchor.MiddleCenter };
+            key.fontSize = Mathf.RoundToInt(18 * scale);
+            float keyHeight = 26f * scale, keyGap = 6f * scale;
+            float keyWidth = (width - 2f * keyGap) / 3f;
+            float mapRow = fuelRow - 12f * scale - keyHeight;
+            for (int i = 0; i < Maps.Length; i++)
+            {
+                bool lit = s.Map == Maps[i];
+                var r = new Rect(left + i * (keyWidth + keyGap), mapRow, keyWidth, keyHeight);
+                Color c = Maps[i] == EngineMap.Push ? Push : Maps[i] == EngineMap.Conserve ? Conserve : Color.white;
+                GUI.DrawTexture(r, Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, lit ? c : Track, 0f, 5f * scale);
+                key.normal.textColor = lit ? Ink : new Color(1f, 1f, 1f, 0.6f);
+                GUI.Label(r, (i + 1).ToString(), key);
+            }
         }
 
         /// <summary>The rect of a line of text with its baseline at baseline.</summary>
