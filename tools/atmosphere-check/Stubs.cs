@@ -88,8 +88,3 @@ namespace TarmacGauntlet.Rendering
         }
     }
 }
-namespace UnityEngine.Experimental.Rendering
-{
-    public enum GraphicsFormat { R8G8B8A8_UNorm }
-    public enum TextureCreationFlags { None }
-}
