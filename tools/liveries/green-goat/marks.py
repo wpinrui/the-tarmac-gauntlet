@@ -186,6 +186,20 @@ def decals():
     svg("drop", (-14, -14, 148, 184), edged(drop, M, STICKER)
         + f'<path d="M34,100 L52,108 L35,115 Z M86,100 L68,108 L85,115 Z" fill="{K}"/>'
         + f'<path d="M44,132 Q60,146 76,132" fill="none" stroke="{K}" stroke-width="6" stroke-linecap="round"/>')
+    # A milk bottle with the goat on its label.
+    bottle = ("M38,0 h44 v18 q0,8 6,16 q20,24 20,52 v86 q0,10 -10,10 h-76 q-10,0 -10,-10 v-86 "
+              "q0,-28 20,-52 q6,-8 6,-16 Z")
+    svg("bottle", (-16, -16, 152, 220), edged(bottle, M, STICKER)
+        + f'<rect x="34" y="-4" width="52" height="14" rx="3" fill="{G}" stroke="{K}" stroke-width="5"/>'
+        + f'<rect x="14" y="90" width="92" height="74" fill="{G}"/>' + goat(K, G, x=28, y=92, s=64)
+        + f'<path d="M24,48 q-4,20 -4,40" fill="none" stroke="{K}" stroke-width="5" stroke-linecap="round" opacity="0.25"/>')
+    # A flexed arm, the strongman's pose.
+    arm = ("M10,175 L10,128 Q10,96 40,92 Q72,40 108,78 Q116,58 112,42 Q108,22 126,18 L152,14 "
+           "Q170,13 170,30 L168,50 Q166,64 152,64 L140,66 Q150,100 136,124 Q118,156 74,166 L10,175 Z")
+    lines = ('<g fill="none" stroke="#0a0d08" stroke-width="6" stroke-linecap="round">'
+             '<path d="M58,96 Q80,74 100,92"/><path d="M128,30 L156,27"/><path d="M128,44 L158,42"/>'
+             '<path d="M118,112 Q108,132 88,140"/></g>')
+    svg("flex", (-16, -16, 202, 207), edged(arm, G, STICKER) + lines)
     # Lettering stickers.
     words("gg-sticker", "bangers", "GREEN GOAT", M, 0.03, ((M, 22), (K, 12)))
     words("more", "bangers", "MORE! MORE! MORE!", G, 0.03, STICKER)

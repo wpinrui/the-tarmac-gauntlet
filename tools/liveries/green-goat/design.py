@@ -82,9 +82,14 @@ def drips(line, z0, z1, rng, longest, skip=(), short=()):
                 body = [(cz + w / 2, y + 0.01), (cz + w / 2, y - n)]
                 body += [(cz + w / 2 * math.cos(math.pi * k / 10), y - n - w / 2 * math.sin(math.pi * k / 10)) for k in range(11)]
                 body += [(cz - w / 2, y - n), (cz - w / 2, y + 0.01)]
-                # A little neck where the drip leaves the pour.
+                # Concave fillets where the drip leaves the pour, as a liquid's meniscus.
                 polys.append(body)
-                polys.append([(cz + w * 0.85, y + 0.005), (cz, y - min(n, 0.06)), (cz - w * 0.85, y + 0.005)])
+                f = min(w * 0.45, n * 0.6)
+                for s in (1, -1):
+                    c = cz + s * w / 2
+                    arc = [(c + s * f + s * f * math.cos(math.radians(a)), y - f + f * math.sin(math.radians(a)))
+                           for a in range(90, 181, 10)]
+                    polys.append([(c, y + 0.005), (c + s * f, y + 0.005), *arc])
                 if n > 0.12 and rng.random() < 0.3:
                     polys.append(disc(cz, y - n - w * 1.2, w * 0.3, 12))
         z -= w + rng.uniform(0.03, 0.2)
@@ -139,8 +144,10 @@ def milk_sides(lv, door_cap=0.05, span=(2.45, -2.35), ramp=0.3):
         if span == (2.45, -2.35):
             return shoulder(z) - 0.06
         t = max(0.0, min(1.0, (zf - z) / ramp, (z - zr) / ramp))
-        wob = 0.035 * math.sin(z * 9.0 + 1.3) + 0.02 * math.sin(z * 23.0)
-        return shoulder(z) + 0.06 - (0.12 + wob * (1 - t) * 4 * t) * (t * t * (3 - 2 * t))
+        # The pour's end runs down the side unevenly, in lobes, never along a straight line.
+        wob = 0.03 * math.sin(z * 9.0 + 1.3) + 0.025 * math.sin(z * 23.0 + 0.4) + 0.06 * math.sin(z * 4.7)
+        e = t * t * (3 - 2 * t)
+        return shoulder(z) + 0.06 - (0.12 + max(-0.1, wob) * e) * e
     walls = [(a + 0.035, a - 0.035) for a in DOOR]
     for poly in drips(line, zf, zr, rng, 0.3, skip=walls,
                       short=[(0.25, -0.4, door_cap), (0.8, 0.25, door_cap if door_cap < 0.05 else 0.3),
@@ -246,7 +253,7 @@ def cartoon_number(lv):
 def stickers(lv):
     """The cartoon decals on the sides."""
     side_mark_at(lv, "goat-sticker", -0.1, 0.56, 0.42, 8)
-    side_mark_at(lv, "gg-sticker", 0.2, 0.3, 0.16, -3)
+    side_mark_at(lv, "gg-sticker", 0.2, 0.3, 0.16, -9)
     side_mark_at(lv, "burst-30g", 2.0, 0.48, 0.4, -10)
     side_mark_at(lv, "bolt", 0.98, 0.5, 0.42, -15)
     side_mark_at(lv, "bubble", -1.95, 0.5, 0.22, 6)
@@ -305,24 +312,32 @@ def milk_riot(views):
     two thirds of the car. The nose and tail are all Overload."""
     lv = Livery(views, K)
     halftone(lv, G)
-    milk_sides(lv, door_cap=0.04, span=RIOT_SPAN)
+    milk_sides(lv, door_cap=0.04, span=(RIOT_SPAN[0] + 0.35, RIOT_SPAN[1] - 0.35), ramp=0.4)
     slashes(lv)
     milk_top(lv, PK, span=RIOT_SPAN, bonnet=RIOT_BONNET[0])
     cartoon_number(lv)
     stickers(lv)
     logos_top(lv, "team", "overstim", 0.09, bolts=True, bonnet=RIOT_BONNET)
     lv.mark("front", MARKS / "goat-sticker.svg", (0, 0.47, 0), 0.22)
-    lv.mark("rear", MARKS / "protein.svg", (0, 0.575, 0), 0.06)
-    # Word stickers plastered over the bare milk and the empty corners.
-    side_mark_at(lv, "milk-sticker", -1.2, 0.76, 0.1, -4)
-    side_mark_at(lv, "limit-sticker", -0.75, 0.25, 0.085, 3)
-    side_mark_at(lv, "overstim", -1.9, 0.3, 0.07, -6)
-    side_mark_at(lv, "more", 1.45, 0.72, 0.065, 5)
-    for x, rot in ((0.72, 180), (-0.72, 0)):
-        lv.mark("top", MARKS / "milk-sticker.svg", (x * 0.95, 0, 1.0), 0.11, rotate=rot + (4 if x > 0 else -4))
-        lv.mark("top", MARKS / "limit-sticker.svg", (x * 0.92, 0, -0.95), 0.09, rotate=rot)
-    lv.mark("top", MARKS / "more.svg", (0, 0, -0.36), 0.06, rotate=-90)
-    lv.mark("top", MARKS / "limit-sticker.svg", (0, 0, -1.63), 0.1, rotate=90)
+    lv.mark("rear", MARKS / "protein.svg", (0.1, 0.56, 0), 0.06, rotate=-8)
+    # Stickers plastered over the bare milk and the empty corners, at jaunty angles.
+    side_mark_at(lv, "milk-sticker", -1.18, 0.72, 0.1, -14)
+    side_mark_at(lv, "limit-sticker", -0.78, 0.26, 0.085, 9)
+    side_mark_at(lv, "overstim", -1.92, 0.3, 0.07, -18)
+    side_mark_at(lv, "more", 1.5, 0.7, 0.065, 12)
+    side_mark_at(lv, "flex", 1.2, 0.27, 0.15, -20)
+    side_mark_at(lv, "bottle", -1.62, 0.6, 0.2, 16)
+    for x, side in ((0.72, 1), (-0.72, -1)):
+        rot = 0 if side < 0 else 180
+        lv.mark("top", MARKS / "milk-sticker.svg", (x * 0.95, 0, 0.95), 0.11, rotate=rot - 18 * side)
+        lv.mark("top", MARKS / "limit-sticker.svg", (x * 0.9, 0, -0.95), 0.09, rotate=rot + 22 * side)
+        lv.mark("top", MARKS / "flex.svg", (x * 1.05, 0, 0.05), 0.14, rotate=rot + 30 * side)
+    lv.mark("top", MARKS / "more.svg", (0.05, 0, -0.36), 0.06, rotate=-90 + 14)
+    lv.mark("top", MARKS / "limit-sticker.svg", (-0.05, 0, -1.63), 0.1, rotate=90 - 12)
+    lv.mark("top", MARKS / "bottle.svg", (0.45, 0, -1.68), 0.2, rotate=120)
+    lv.mark("top", MARKS / "bottle.svg", (-0.5, 0, 2.0), 0.18, rotate=-60)
+    lv.mark("front", MARKS / "flex.svg", (0.68, 0.36, 0), 0.12, rotate=-15)
+    lv.mark("rear", MARKS / "bottle.svg", (-0.7, 0.4, 0), 0.16, rotate=14)
     return lv
 
 
