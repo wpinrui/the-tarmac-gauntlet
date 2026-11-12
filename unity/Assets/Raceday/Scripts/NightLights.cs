@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TarmacGauntlet.Visuals;
 using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
@@ -18,15 +19,8 @@ namespace TarmacGauntlet.Raceday
         public FloodMaterials Materials;
         public StandMaterials Stands;
 
-        /// <summary>
-        /// Where the settings menu keeps how many real lights to use (GameSettings.RealLights in Management, which this
-        /// assembly can't see), how many it allows, and how many there are before anyone sets it.
-        /// </summary>
-        public const string RealLightsKey = "settings.reallights";
-        public const int MostRealLights = 24, DefaultRealLights = 6;
-
         /// <summary>The real lights from the settings: a third of them headlamps, the rest at floodlights.</summary>
-        public static int RealLights => Mathf.Clamp(PlayerPrefs.GetInt(RealLightsKey, DefaultRealLights), 0, MostRealLights);
+        public static int RealLights => GraphicsOptions.RealLights.Value;
         /// <summary>Real seconds between looks at the sky and at where the camera is.</summary>
         private const float Check = 0.25f;
         /// <summary>A real light fades in or out over this long, real seconds.</summary>

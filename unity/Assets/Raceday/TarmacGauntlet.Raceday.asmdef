@@ -3,7 +3,8 @@
     "rootNamespace": "TarmacGauntlet.Raceday",
     "references": [
         "TarmacGauntlet.Simulation",
-        "TarmacGauntlet.TeamHq"
+        "TarmacGauntlet.TeamHq",
+        "TarmacGauntlet.Visuals"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

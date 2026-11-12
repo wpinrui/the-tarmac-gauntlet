@@ -1,7 +1,9 @@
 {
     "name": "TarmacGauntlet.TeamHq",
     "rootNamespace": "TarmacGauntlet.TeamHq",
-    "references": [],
+    "references": [
+        "TarmacGauntlet.Visuals"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

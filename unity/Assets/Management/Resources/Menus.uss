@@ -258,6 +258,18 @@
 .popup-item:hover { background-color: rgba(255, 255, 255, 0.1); }
 .popup-item.on { background-color: rgba(255, 255, 255, 0.2); }
 
+/* Dropdowns: a value between a spacer and a down chevron, the size of a stepper, opening a popup list of every choice */
+.dropdown { flex-direction: row; align-items: center; flex-shrink: 0; border-radius: 10px; }
+.dropdown:hover, .dropdown.open { background-color: rgba(255, 255, 255, 0.1); }
+.dropdown-side { width: 36px; height: 36px; align-items: center; justify-content: center; }
+.dropdown-chevron { width: 18px; height: 18px; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.75); }
+.dropdown:hover .dropdown-chevron, .dropdown.open .dropdown-chevron { -unity-background-image-tint-color: rgb(255, 255, 255); }
+.dropdown-value { flex-grow: 1; font-size: 15px; letter-spacing: 0.6px; -unity-text-align: middle-center; }
+.settings-dropdown { width: 250px; }
+.dropdown-list { background-color: rgb(24, 24, 26); }
+.dropdown-list > .popup-list { min-height: 0; }
+.dropdown-list .popup-item { -unity-text-align: middle-center; }
+
 /* Tooltips: only on stats and skills */
 .tip { position: absolute; max-width: 260px; padding: 10px 14px; border-radius: 12px; font-size: 14px; white-space: normal; background-color: rgba(20, 20, 22, 0.92); border-width: 1px; border-color: rgba(255, 255, 255, 0.14); }
 
@@ -283,7 +295,8 @@
 .main-item .sub { font-size: 14px; color: rgba(255, 255, 255, 0.62); margin-top: 2px; }
 
 /* Settings */
-.settings { width: 560px; border-radius: 24px; padding: 16px; }
+.settings { width: 560px; max-height: 92%; border-radius: 24px; padding: 16px; }
+.settings-scroll { flex-shrink: 1; min-height: 0; }
 .settings-group.spaced { margin-top: 22px; }
 .setting { flex-direction: row; align-items: center; height: 44px; padding-left: 16px; padding-right: 6px; border-radius: 12px; }
 .setting:hover { background-color: rgba(255, 255, 255, 0.1); }

@@ -705,6 +705,11 @@ namespace TarmacGauntlet.Management
                 }
                 return;
             }
+            if (MenuDropdown.Key(ev.keyCode))
+            {
+                ev.Use();
+                return;
+            }
             switch (ev.keyCode)
             {
                 case KeyCode.Escape:
