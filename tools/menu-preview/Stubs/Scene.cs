@@ -39,6 +39,13 @@ namespace TarmacGauntlet.Rendering
 {
     [RequireComponent(typeof(Camera))]
     public sealed class GlassBackdrop : MonoBehaviour { }
+
+    /// <summary>The quality levels the settings menu steps through; the level is only remembered here.</summary>
+    public static class QualityLevels
+    {
+        public static readonly string[] Names = { "Low", "Medium", "High" };
+        public static int Level { get; set; } = 1;
+    }
 }
 
 namespace TarmacGauntlet.Management
