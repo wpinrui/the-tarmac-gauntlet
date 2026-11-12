@@ -51,6 +51,7 @@ namespace TarmacGauntlet.Raceday
             WheelBlur.Fit(car, wheels);
             CarLamps.Fit(car, model != null ? root.transform.Find("Model")?.gameObject : null);
             root.AddComponent<EngineAudio>().Setup(modelId, ++spawned);
+            TyreAudio.Fit(car, spawned);
             return car;
         }
 

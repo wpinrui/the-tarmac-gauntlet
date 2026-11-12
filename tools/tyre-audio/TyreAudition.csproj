@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Renders the tyre and surface sounds to WAV files outside Unity, alone and over an engine. Run through run.sh. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)../../out/tyre-audio/obj/</BaseIntermediateOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Audition.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/TyreSynth.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/EngineSound.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/EngineSounds.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/EngineSynth.cs" />
+    <Compile Include="../../unity/Assets/Simulation/**/*.cs" />
+  </ItemGroup>
+</Project>
