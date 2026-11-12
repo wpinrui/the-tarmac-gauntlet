@@ -335,7 +335,7 @@ namespace TarmacGauntlet.Raceday
                 CarRaceLog log = car.Supplies?.Log;
                 c.NewDriver = log != null && log.NextDriverIndex != log.DriverIndex;
                 // As the stop will: the tyres ordered and a set left, so the fresh tyres are fetched as the car comes in.
-                c.NewTyres = car.Supplies != null && car.Supplies.Orders.Tyres && car.Supplies.TyresLeft;
+                c.NewTyres = car.Supplies != null && (car.Supplies.Planner != null ? car.Supplies.Planner.Tyres : car.Supplies.TyresLeft);
             }
             return c;
         }

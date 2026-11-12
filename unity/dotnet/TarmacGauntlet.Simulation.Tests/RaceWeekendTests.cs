@@ -116,6 +116,32 @@ namespace TarmacGauntlet.Simulation.Tests
         }
 
         [Test]
+        public void AStopFixesOnlyTheIssuesItIsGiven()
+        {
+            (RaceDay _, CarRaceLog me) = PlayerRace(Never);
+            me.AddIssue("engine-misfire");
+            me.AddIssue("radiator-leak");
+            double both = me.WorkSeconds();
+            double one = me.WorkSeconds(new[] { "radiator-leak" });
+            Assert.That(one, Is.LessThan(both));
+            Assert.That(me.WorkSeconds(System.Array.Empty<string>()), Is.LessThan(one));
+            PitWork work = me.Pit(false, new[] { "radiator-leak" });
+            Assert.That(work.ExtraSeconds, Is.EqualTo(one).Within(1e-9));
+            Assert.That(me.ActiveIssues.Select(i => i.TemplateId), Is.EqualTo(new[] { "engine-misfire" }));
+            Assert.That(me.SpareParts, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void AStopWithNoListFixesEveryIssue()
+        {
+            (RaceDay _, CarRaceLog me) = PlayerRace(Never);
+            me.AddIssue("engine-misfire");
+            me.AddIssue("radiator-leak");
+            me.Pit(false);
+            Assert.That(me.ActiveIssues, Is.Empty);
+        }
+
+        [Test]
         public void AnIssueGivenAndFixedFromTheDebugMenu()
         {
             (RaceDay _, CarRaceLog me) = PlayerRace(Never);

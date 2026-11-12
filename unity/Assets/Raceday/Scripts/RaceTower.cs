@@ -305,6 +305,27 @@ namespace TarmacGauntlet.Raceday
             return (d > 0.34f && d < 0.48f) || (d > 0.1f && d < 0.18f);
         });
 
+        /// <summary>A helmet side on, its visor cut out.</summary>
+        internal static Texture2D HelmetIcon() => Shape(1f, 1f, (x, y) =>
+        {
+            float d = Mathf.Sqrt((x - 0.5f) * (x - 0.5f) + (y - 0.42f) * (y - 0.42f));
+            bool shell = d < 0.44f && y > 0.12f;
+            bool visor = x > 0.46f && y > 0.36f && y < 0.56f;
+            return shell && !visor;
+        });
+
+        /// <summary>A spanner on the slant, its open jaw top right.</summary>
+        internal static Texture2D SpannerIcon() => Shape(1f, 1f, (x, y) =>
+        {
+            float along = (x + y) * 0.7071f, across = (y - x) * 0.7071f;
+            bool handle = Mathf.Abs(across) < 0.09f && along > 0.14f && along < 1.0f;
+            float hx = x - 0.7f, hy = y - 0.7f;
+            bool head = hx * hx + hy * hy < 0.23f * 0.23f;
+            float jx = x - 0.8f, jy = y - 0.8f;
+            bool jaw = jx * jx + jy * jy < 0.12f * 0.12f || (Mathf.Abs((jy - jx) * 0.7071f) < 0.08f && (jx + jy) > 0f);
+            return (handle || head) && !jaw;
+        });
+
         /// <summary>A fuel pump with its hose.</summary>
         internal static Texture2D FuelIcon() => Shape(1f, 1f, (x, y) =>
         {

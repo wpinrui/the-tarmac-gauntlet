@@ -5,8 +5,8 @@ namespace TarmacGauntlet.Raceday
     /// <summary>
     /// C cycles the TV view, then the chase, bonnet and bumper views of the car.
     /// The TV view is the broadcast while the AI drives the car (<see cref="BroadcastDirector"/>), and
-    /// the bonnet view while you drive it. = rides with the car behind in race order, - with the car
-    /// ahead, and P with the next car making a pit stop, all in the chase view if the TV view was on.
+    /// the bonnet view while you drive it. = rides with the car behind in race order and - with the car
+    /// ahead, both in the chase view if the TV view was on.
     /// The timing tower is seen from the car ridden with. Riding with another car leaves your own car
     /// in your hands: only it reads the driving keys.
     /// </summary>
@@ -51,16 +51,6 @@ namespace TarmacGauntlet.Raceday
             }
             if (Keys.Pressed(KeyCode.Equals)) Step(+1);
             if (Keys.Pressed(KeyCode.Minus)) Step(-1);
-            if (Keys.Pressed(KeyCode.P) && Cars != null)
-            {
-                int from = System.Array.IndexOf(Cars, Car);
-                for (int i = 1; i <= Cars.Length; i++)
-                {
-                    CarController next = Cars[(from + i + Cars.Length) % Cars.Length];
-                    AiDriver d = next.GetComponent<AiDriver>();
-                    if (d != null && d.isActiveAndEnabled && d.Pitting) { Watch(next); break; }
-                }
-            }
         }
 
         /// <summary>Rides with the next car in race order: +1 the car behind, -1 the car ahead, wrapping round the field.</summary>

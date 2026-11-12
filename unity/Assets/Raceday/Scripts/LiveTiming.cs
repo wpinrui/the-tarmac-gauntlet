@@ -9,10 +9,10 @@ namespace TarmacGauntlet.Raceday
     /// it. Left: every car in race order, filtered by class, your row in white. Right: your car's
     /// onboard and the track map, then your car's driver, fuel, tyres, condition and the driver's fatigue,
     /// fuel and tyres with the laps they last on the engine map in use (the one that runs out first in amber), the engine map, and
-    /// the next stop: litres, tyres, next driver and Pit now (<see cref="PitOrders"/>). Left alone the
-    /// car still pits and chooses for itself. The red button top right, or T, returns to the race, and
-    /// the button beside it, or N, skips to your next stint, while a teammate drives. Over the race, the same
-    /// corner has the way in, and the skip, each with its key.
+    /// the next stop: laps of fuel, tyres, repairs, next driver and Pit now (<see cref="PitOrders"/>), the same plan
+    /// as the pit panel's (<see cref="PitPanel"/>). Left alone the car still pits and the crew choose (<see cref="StopPlanner"/>).
+    /// The red button top right, or T, returns to the race, and the button beside it, or N, skips to your next stint,
+    /// while a teammate drives. Over the race, the same corner has the way in, and the skip, each with its key.
     /// Laid out on a 1920 by 1080 screen and scaled to the screen's height.
     /// </summary>
     public sealed class LiveTiming : MonoBehaviour
@@ -41,7 +41,7 @@ namespace TarmacGauntlet.Raceday
 
         public bool Open { get; private set; }
 
-        private const float FuelStep = 5f;
+        private static readonly RepairMode[] RepairChoices = { RepairMode.Crew, RepairMode.All, RepairMode.None };
         /// <summary>Where the timing columns start along a row, px on the 1920 layout.</summary>
         private const float ClassX = 560f, LapX = 676f, PitX = 740f;
         private const int PipWidth = 880, PipHeight = 496, MapWidth = 1040, MapHeight = 496;
@@ -350,7 +350,7 @@ namespace TarmacGauntlet.Raceday
 
         private static string Laps(float laps) => Mathf.FloorToInt(laps) + " LAPS";
 
-        /// <summary>The next stop: litres, tyres, next driver and Pit now.</summary>
+        /// <summary>The next stop: laps of fuel, tyres, repairs, next driver and Pit now. Each is the crew's call until set.</summary>
         private void Stop(Rect panel, bool paint)
         {
             if (paint) Fill(panel, Panel, 9f);
@@ -358,28 +358,38 @@ namespace TarmacGauntlet.Raceday
             PitOrders orders = s.Orders;
             float x = panel.x + 24f * k, w = panel.width - 48f * k, y = panel.y + 24f * k;
 
-            float room = Mathf.Max(s.Capacity - s.Fuel, 0f);
-            float litres = Mathf.Clamp(orders.Litres ?? room, 0f, room);
+            StopPlanner plan = s.Planner;
+            if (plan == null) return;
             if (paint) Label(new Rect(x, y, w, 44f * k), "FUEL", small, Dim, TextAnchor.MiddleLeft);
             var plus = new Rect(x + w - 44f * k, y, 44f * k, 44f * k);
-            var amount = new Rect(plus.x - 104f * k, y, 92f * k, 44f * k);
+            var amount = new Rect(plus.x - 124f * k, y, 112f * k, 44f * k);
             var minus = new Rect(amount.x - 56f * k, y, 44f * k, 44f * k);
             if (paint)
             {
                 Step(minus, "-");
                 Step(plus, "+");
-                Label(amount, "+" + Mathf.RoundToInt(litres) + " L", big, Color.white, TextAnchor.MiddleCenter);
+                Label(amount, plan.Full ? "FULL" : plan.Laps == 1 ? "1 LAP" : plan.Laps + " LAPS", big, Color.white, TextAnchor.MiddleCenter);
             }
-            if (Click(minus)) orders.Litres = Mathf.Max(0f, Mathf.Ceil(litres / FuelStep) * FuelStep - FuelStep);
-            if (Click(plus)) orders.Litres = Mathf.Min(room, Mathf.Floor(litres / FuelStep) * FuelStep + FuelStep);
+            if (Click(minus)) orders.Laps = Mathf.Max(1, plan.Laps - 1);
+            if (Click(plus)) orders.Laps = Mathf.Min(plan.FullLaps, plan.Laps + 1);
             y += 66f * k;
 
             bool sets = s.TyresLeft;
-            bool fresh = orders.Tyres && sets;
+            bool fresh = plan.Tyres;
             if (paint) Label(new Rect(x, y, w, 44f * k), "TYRES", small, Dim, TextAnchor.MiddleLeft);
             var tyres = new Rect(x + w - 140f * k, y, 140f * k, 44f * k);
             if (paint) Chip(tyres, fresh ? "NEW SET" : "KEEP", fresh, sets);
-            if (sets && Click(tyres)) orders.Tyres = !orders.Tyres;
+            if (sets && Click(tyres)) orders.Tyres = !fresh;
+            y += 66f * k;
+
+            if (paint) Label(new Rect(x, y, w, 44f * k), "REPAIRS", small, Dim, TextAnchor.MiddleLeft);
+            for (int i = 0; i < RepairChoices.Length; i++)
+            {
+                var chip = new Rect(x + w - (RepairChoices.Length - i) * 100f * k + 8f * k, y, 92f * k, 44f * k);
+                RepairMode m = RepairChoices[i];
+                if (paint) Chip(chip, m.ToString().ToUpperInvariant(), orders.Repairs == m, true);
+                if (Click(chip)) orders.Repairs = m;
+            }
             y += 66f * k;
 
             IReadOnlyList<RaceDriver> lineup = Log.Car.Lineup;

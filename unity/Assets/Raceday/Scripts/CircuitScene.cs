@@ -14,7 +14,7 @@ namespace TarmacGauntlet.Raceday
     /// grid at once, behind the pace car, or from the pit lane, where the cars queue in the fast lane
     /// and leave three seconds apart, moving up to the pit exit line (<see cref="PitLaneStart"/>). The pit lane start fast forwards
     /// until the car ahead of the player's is about to leave. In the editor and development builds Tab opens the debug menu (<see cref="DebugMenu"/>), whose race set-up (<see cref="DebugSettings"/>) picks the start, the weather, the start hour, the field and your car. You drive your own car from the green when you start the race, and Delete hands it to the AI and
-    /// back. = rides with the car behind the one you watch, - with the car ahead, and P with the next car making a pit stop. F steps
+    /// back. = rides with the car behind the one you watch and - with the car ahead. While you drive, P opens the plan for your next stop (<see cref="PitPanel"/>), and your box is marked once you are in the pit lane (<see cref="BoxMarker"/>). F steps
     /// the race through normal speed, 4x and 16x while the AI drives your car, and ends the pit lane
     /// start's fast forward. Cars away from the camera glide without physics (<see cref="PhysicsRange"/>).
     /// The field is shown on the timing tower (<see cref="RaceTower"/>). T opens live timing while the AI drives
@@ -262,6 +262,24 @@ namespace TarmacGauntlet.Raceday
                 timing.Game = setup.Game;
                 timing.CanSkip = CanSkip;
                 timing.Skip = () => stintSkip = true;
+
+                // The player's stops follow the team's plan, the crew's call wherever it is left open.
+                CarController mine = cars[player];
+                CarRaceLog log = day.Cars[player];
+                AiDriver ownDriver = drivers[player];
+                mine.Supplies.Planner = new StopPlanner(mine.Supplies, mine.Spec,
+                    () => Mathf.Max(0f, RaceTower.RaceLength - tower.RaceTime) / RaceTower.TimeCompression,
+                    () => LapSeconds(log, ownDriver));
+                PitPanel panel = new GameObject("Pit panel").AddComponent<PitPanel>();
+                panel.Car = mine;
+                panel.Keys = keys;
+                panel.Planner = mine.Supplies.Planner;
+                panel.Game = setup.Game;
+                panel.Hud = views.Hud;
+                BoxMarker marker = new GameObject("Box marker").AddComponent<BoxMarker>();
+                marker.Car = mine;
+                marker.Race = racing[player];
+                marker.Pits = pits;
             }
             BroadcastGraphics graphics = new GameObject("Broadcast graphics").AddComponent<BroadcastGraphics>();
             graphics.Director = tv;
@@ -342,8 +360,9 @@ namespace TarmacGauntlet.Raceday
                     Wear = supplies.Wear,
                     Map = (int)supplies.Map,
                     PitRequested = supplies.Orders.Requested,
-                    PitLitres = supplies.Orders.Litres,
+                    PitLaps = supplies.Orders.Laps,
                     PitTyres = supplies.Orders.Tyres,
+                    PitRepairs = supplies.Orders.Repairs,
                     Position = new[] { at.position.x, at.position.y, at.position.z },
                     Forward = new[] { at.forward.x, at.forward.y, at.forward.z },
                 };
@@ -381,8 +400,9 @@ namespace TarmacGauntlet.Raceday
                 supplies.Wear = Mathf.Clamp01(s.Wear);
                 supplies.Map = (EngineMap)Mathf.Clamp(s.Map, 0, 2);
                 supplies.Orders.Requested = s.PitRequested;
-                supplies.Orders.Litres = s.PitLitres;
+                supplies.Orders.Laps = s.PitLaps;
                 supplies.Orders.Tyres = s.PitTyres;
+                supplies.Orders.Repairs = s.PitRepairs;
                 supplies.Effects = log.Effects;
                 racing[i].Resume(s.Laps);
 
@@ -408,6 +428,20 @@ namespace TarmacGauntlet.Raceday
                 car.PlaceAt(k, lateral);
                 car.Launch(s.InPitLane ? Mathf.Min(s.Speed, pits.LimitSpeed) : s.Speed);
             }
+        }
+
+        /// <summary>
+        /// Seconds a lap of yours takes, for planning stops: the quickest of the last three, so a lap with a stop
+        /// in it doesn't count, or the AI's lap at the limit before there is one.
+        /// </summary>
+        private static float LapSeconds(CarRaceLog log, AiDriver driver)
+        {
+            IReadOnlyList<double> laps = log.LapTimes;
+            double best = double.PositiveInfinity;
+            for (int i = Mathf.Max(0, laps.Count - 3); i < laps.Count; i++)
+                if (laps[i] > 0 && laps[i] < best) best = laps[i];
+            if (!double.IsPositiveInfinity(best)) return (float)best;
+            return driver.Pilot != null ? driver.Pilot.Profile.LapTime : 120f;
         }
 
         /// <summary>The pit complex's layout: garages, the pit building's stations and where the crews stand.</summary>
