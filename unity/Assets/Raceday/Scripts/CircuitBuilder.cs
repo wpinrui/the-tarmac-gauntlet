@@ -27,6 +27,7 @@ namespace TarmacGauntlet.Raceday
         private const float LineAcross = 0.3f;     // thickness of lines painted across a surface
         private const float LaneWiden = 1.2f;      // pit lane surface runs this far past its track-side line
         private const float FenceTurn = 20f;       // most a fence turns from one track sample to the next, degrees
+        private const float GarageTuck = 0.063f;   // the shoulder in front of a garage lies this far under the lane edge, about 4 cm under the floor
         private const float EdgeArmcoMin = 6f;     // runoff cut short still gets armco at its edge when at least this deep
         private const float EdgeArmcoStep = 1f;    // ...unless its edge moves less than this from one track sample to the next
         // Tyre wall texture: one tile spans the stack's whole height, top to buried foot, and two tyres along it.
@@ -801,7 +802,7 @@ namespace TarmacGauntlet.Raceday
                         float out_ = ShoulderWidth * j / (row.Length - 1);
                         Vector3 q = Squared(i, LanePoint(i, laneHalf + out_, 0));
                         float t = Mathf.Clamp01(out_ / ease);
-                        q.y = garage ? q.y - 0.07f : Settle(new Vector3(q.x, q.y - RunoffFall * out_, q.z), t);
+                        q.y = garage ? q.y - GarageTuck : Settle(new Vector3(q.x, q.y - RunoffFall * out_, q.z), t);
                         // At the lane's ends the shoulder takes over from the track's own runoff, so there
                         // it lies exactly as that runoff does and the two meet flush.
                         float own = 1f - Mathf.Clamp01(Mathf.Min(r, run.Count - 1 - r) / 3f);
@@ -1549,6 +1550,9 @@ namespace TarmacGauntlet.Raceday
                 if (!chunk.IsEmpty) parts.Add(new CircuitPart(name, chunk, material, solid, shadows));
         }
 
+        /// <summary>A point on a draped triangle's edge follows the ground only when its ends follow it at least this much.</summary>
+        private const float EdgeFollow = 0.7f;
+
         /// <summary>Surfaces laid over the ground rather than at a height of their own.</summary>
         private static readonly HashSet<string> Draped = new HashSet<string> { "Grass runoff", "Gravel traps", "Pit lane shoulders" };
 
@@ -1601,6 +1605,11 @@ namespace TarmacGauntlet.Raceday
                             groundLine += wq * (v[id[q]].y - over[q]);
                             follow += wq * Mathf.Clamp01(1.2f - Mathf.Abs(over[q] - 0.03f) / 0.25f);
                         }
+                        // A point on one of the triangle's own edges stays on that straight edge unless its ends lie
+                        // nearly on the ground: there the surface beside it (the verge) shares the straight edge, and
+                        // following the ground partly would leave a step at the seam.
+                        bool onEdge = w.x < 1e-5f || w.y < 1e-5f || w.z < 1e-5f;
+                        if (onEdge && follow < EdgeFollow) follow = 0f;
                         p.y += follow * (c.TerrainHeight(p.x, p.z) - groundLine);
                         pos[j] = p;
                     }
@@ -1648,8 +1657,12 @@ namespace TarmacGauntlet.Raceday
             into.Add(rest);
         }
 
-        /// <summary>A corner within a hair of a cut line counts as on it, so no cut leaves a sliver.</summary>
-        private static float Snap(float f) => Mathf.Abs(f) < 0.002f ? 0f : f;
+        /// <summary>
+        /// A corner within a hair of a cut line counts as on it, so no cut leaves a sliver. The hair is in cells: 1e-3 of
+        /// an 8 m cell is 8 mm. Wider, a corner a centimetre off the line went into the pieces either side of it,
+        /// and the two overlapped in a sliver that flickered.
+        /// </summary>
+        private static float Snap(float f) => Mathf.Abs(f) < 1e-3f ? 0f : f;
     }
 
     /// <summary>One unbroken run of armco on one side of the track.</summary>

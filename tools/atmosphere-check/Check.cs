@@ -1,0 +1,262 @@
+using System;
+using TarmacGauntlet.Raceday;
+using TarmacGauntlet.Rendering;
+using UnityEngine;
+
+/// <summary>
+/// Checks the clouds' map and their shadows on the ground, the volumetric clouds' 3D noise, and how the colour grade
+/// follows the sun in and out of the clouds' shadows.
+/// </summary>
+public static class Check
+{
+    private static int failed;
+    private const int Size = 256;
+    /// <summary>The sky shader's cloud scale, as TimeOfDay sets it.</summary>
+    private const float CloudScale = 0.45f;
+
+    public static int Main(string[] args)
+    {
+        float[] big = CloudField.Fbm(Size, 4, 5, 11), small = CloudField.Fbm(Size, 8, 4, 29);
+        int dump = Array.IndexOf(args, "--dump");
+        if (dump >= 0)
+        {
+            Dump(args[dump + 1], big, small);
+            return 0;
+        }
+        CloudMap Map(float cover, float overcast, Vector4 offset = default) => new CloudMap
+        {
+            Big = big, Small = small, Size = Size, Tiles = CloudMap.TilesFor(CloudScale, overcast), Cover = cover, Overcast = overcast, Offset = offset,
+        };
+
+        if (Array.IndexOf(args, "--table") >= 0)
+            for (float c = 0.1f; c < 0.95f; c += 0.05f)
+                Console.WriteLine($"cover {c:0.00}: {Shaded(Map(c, 0f)):P0} shaded, overcast 0.5 {Shaded(Map(c, 0.5f)):P0}");
+        // The fair day's sky, and the dry race's weather (a third of the sky under cloud).
+        float dryCloud = WeatherState.Dry.Cloud;
+        CloudMap fair = Map(CloudMap.CoverFor(dryCloud), WeatherSky.Overcast(dryCloud));
+        float fairShare = Shaded(fair);
+        Expect("the dry race leaves most of the ground in sun, and clouds for it to break through", fairShare > 0.12f && fairShare < 0.4f,
+            $"{fairShare:P0} in shade under {dryCloud:P0} cloud");
+        float before = -1f, worst = 0f;
+        bool more = true;
+        for (float cloud = 0f; cloud <= 1.001f; cloud += 0.1f)
+        {
+            float share = Shaded(Map(CloudMap.CoverFor(cloud), WeatherSky.Overcast(cloud)));
+            more &= share >= before - 0.01f;
+            before = share;
+            if (cloud > 0.05f && cloud < 0.95f) worst = Math.Max(worst, Math.Abs(share - cloud));
+        }
+        Expect("more cloud in the weather, more of the ground in shade", more, "");
+        Expect("the ground's shade follows the weather's share of the sky", worst < 0.2f, $"at worst {worst:P0} out");
+        float deck = Shaded(Map(CloudMap.CoverFor(1f), WeatherSky.Overcast(1f)));
+        Expect("an overcast deck covers nearly everything", deck > 0.9f, $"{deck:P0}");
+
+        float lo = 1f, hi = 0f;
+        bool finite = true;
+        for (int i = 0; i < 4000; i++)
+        {
+            float c = fair.At(i * 37.3f - 70000f, i * 91.7f - 120000f);
+            finite &= !float.IsNaN(c);
+            lo = Math.Min(lo, c);
+            hi = Math.Max(hi, c);
+        }
+        Expect("cover runs 0 to 1", finite && lo >= 0f && hi <= 1f && lo < 0.05f && hi > 0.95f, $"{lo:0.00} to {hi:0.00}");
+
+        // A cloud's shadow falls along the sun's rays: with the sun low in the west, east of the spot under the cloud.
+        Vector3 west = new Vector3(-0.8f, 0.6f, 0f).normalized;
+        Vector3 spot = new Vector3(300f, 20f, -200f);
+        float along = (CloudMap.Base - spot.y) / west.y;
+        float cast = fair.Shading(spot, west), under = fair.At(spot.x + west.x * along, spot.z + west.z * along);
+        Expect("the shadow is cast along the sun's rays", Math.Abs(cast - under) < 1e-5f, $"{cast:0.000} against {under:0.000}");
+        Vector3 high = new Vector3(0f, 1f, 0f);
+        Expect("a sun overhead shades the spot under the cloud", Math.Abs(fair.Shading(spot, high) - fair.At(spot.x, spot.z)) < 1e-5f, "");
+
+        // The wind carries the shadows: the map's offset moves them the other way.
+        CloudMap moved = Map(fair.Cover, 0f, new Vector4(0.01f, 0f, 0.023f, 0f));
+        float shift = 0.01f / fair.Tiles, slip = 0f;
+        for (int i = 0; i < 200; i++)
+            slip = Math.Max(slip, Math.Abs(moved.At(i * 29f - shift, 100f) - fair.At(i * 29f, 100f)));
+        Expect("the drift carries the clouds the offset's metres the other way", slip < 1e-3f, $"{slip:0.0000} at {shift:0} m");
+
+        Expect("fair weather cloud shadows are deep", CloudMap.Strength(0f) > 0.7f, $"{CloudMap.Strength(0f):0.00}");
+        Expect("an overcast deck's shadows are faint", CloudMap.Strength(1f) < 0.1f, $"{CloudMap.Strength(1f):0.00}");
+
+        if (Array.IndexOf(args, "--time") >= 0)
+        {
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            CloudNoise.Field(CloudNoise.Size);
+            Console.WriteLine($"the 3D noise takes {clock.ElapsedMilliseconds} ms to make");
+        }
+        Noise();
+        Grade();
+        Look();
+        Palette();
+
+        Console.WriteLine(failed == 0 ? "All atmosphere checks pass" : $"{failed} atmosphere checks FAILED");
+        return failed == 0 ? 0 : 1;
+    }
+
+    /// <summary>The volumetric clouds' 3D noise: it spans its range and wraps on every face.</summary>
+    private static void Noise()
+    {
+        const int n = 32;
+        byte[] f = CloudNoise.Field(n);
+        int At(int x, int y, int z, int c) => f[((z * n + y) * n + x) * 2 + c];
+        for (int c = 0; c < 2; c++)
+        {
+            int lo = 255, hi = 0;
+            double inner = 0, face = 0;
+            int innerCount = 0, faceCount = 0;
+            for (int z = 0; z < n; z++)
+                for (int y = 0; y < n; y++)
+                    for (int x = 0; x < n; x++)
+                    {
+                        int v = At(x, y, z, c);
+                        lo = Math.Min(lo, v);
+                        hi = Math.Max(hi, v);
+                        int step = Math.Abs(v - At((x + 1) % n, y, z, c)) + Math.Abs(v - At(x, (y + 1) % n, z, c)) + Math.Abs(v - At(x, y, (z + 1) % n, c));
+                        if (x == n - 1 || y == n - 1 || z == n - 1) { face += step; faceCount++; }
+                        else { inner += step; innerCount++; }
+                    }
+            string name = c == 0 ? "billows" : "detail";
+            Expect($"3D noise {name} spans its range", lo < 40 && hi > 200, $"{lo} to {hi}");
+            double a = inner / innerCount, b = face / faceCount;
+            Expect($"3D noise {name} wraps without a seam", b < a * 1.25, $"{b:0.0} across the faces against {a:0.0} inside");
+        }
+    }
+
+    /// <summary>
+    /// The volumetric clouds' constants: CloudLook.hlsl holds them, the shader includes it and the cloud preview reads it,
+    /// so the CPU's copies must agree with it, and every period of the 3D noise must divide where the wind's drift wraps.
+    /// </summary>
+    private static void Look()
+    {
+        string dir = AppContext.BaseDirectory;
+        while (dir != null && !System.IO.Directory.Exists(System.IO.Path.Combine(dir, "unity", "Assets"))) dir = System.IO.Path.GetDirectoryName(dir);
+        if (dir == null) { Expect("CloudLook.hlsl is found", false, "no unity/Assets above " + AppContext.BaseDirectory); return; }
+        string shaders = System.IO.Path.Combine(dir, "unity", "Assets", "Rendering", "Shaders");
+        var look = new System.Collections.Generic.Dictionary<string, float>();
+        foreach (string file in new[] { "CloudCover.hlsl", "CloudLook.hlsl" })
+            foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(
+                System.IO.File.ReadAllText(System.IO.Path.Combine(shaders, file)), @"^#define TG_CLOUD_(\w+)\s+(-?[\d.]+)\s*$", System.Text.RegularExpressions.RegexOptions.Multiline))
+                look[m.Groups[1].Value] = float.Parse(m.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
+        void Same(string name, float cpu)
+        {
+            bool has = look.TryGetValue(name, out float v);
+            Expect($"TG_CLOUD_{name} matches the CPU's", has && Math.Abs(v - cpu) < 1e-4f, has ? $"{v} in the shader, {cpu} on the CPU" : "missing");
+        }
+        Same("BASE", CloudMap.Base);
+        Same("HIGH_STEPS", CloudLook.HighSteps);
+        Same("ULTRA_STEPS", CloudLook.UltraSteps);
+        Same("REPEAT", CloudLook.Repeat);
+        bool divides = true;
+        string odd = "";
+        foreach (var kv in look)
+            if (kv.Key.EndsWith("_PERIOD"))
+            {
+                double r = CloudLook.Repeat / kv.Value;
+                if (Math.Abs(r - Math.Round(r)) > 1e-4) { divides = false; odd += $" {kv.Key} {kv.Value}"; }
+            }
+        Expect("every 3D noise period divides where the drift wraps, so the clouds never jump", divides, odd);
+    }
+
+    /// <summary>The clear day's palette: deeper by day, untouched at night and under a grey sky, golden only with the sun low.</summary>
+    private static void Palette()
+    {
+        SkyState Painted(float hour, float overcast)
+        {
+            SkyState s = SkyClock.At(hour, SkyClock.Look);
+            SkyPalette.Apply(ref s, overcast);
+            return s;
+        }
+        SkyState noon = SkyClock.At(13f, SkyClock.Look), deep = Painted(13f, 0f), grey = Painted(13f, 1f), night = Painted(1f, 0f);
+        Expect("a clear noon's zenith is a deeper blue", deep.Zenith.r < noon.Zenith.r * 0.6f && deep.Zenith.b > noon.Zenith.b * 0.8f, $"{deep.Zenith.r:0.00} {deep.Zenith.g:0.00} {deep.Zenith.b:0.00}");
+        Expect("a grey sky keeps its colours", Math.Abs(grey.Zenith.r - noon.Zenith.r) < 1e-5f && grey.Deep == 0f, "");
+        SkyState dark = SkyClock.At(1f, SkyClock.Look);
+        Expect("the night keeps its colours", Math.Abs(night.Zenith.b - dark.Zenith.b) < 1e-5f && night.Deep < 1e-4f, $"{night.Deep}");
+        SkyState low = Painted(16.6f, 0f);
+        Expect("a low sun is golden and noon is not", low.Golden > 0.8f && deep.Golden < 0.01f && low.CloudLit.r > low.CloudLit.b * 2f, $"{low.Golden:0.00} {deep.Golden:0.00}");
+    }
+
+    /// <summary>The grade as the sun breaks through, and nothing changed where there is nothing to break through.</summary>
+    private static void Grade()
+    {
+        SkyState noon = SkyClock.At(13f, SkyClock.Look), night = SkyClock.At(1f, SkyClock.Look);
+        float broken = SkyGrade.Patchy(0.4f, WeatherSky.Overcast(0.4f));
+        PostEffects.Grade plain = SkyGrade.For(noon, 0f, 0f);
+        PostEffects.Grade sun = SkyGrade.For(noon, 0f, 0f, 0f, broken), shadow = SkyGrade.For(noon, 0f, 0f, 1f, broken);
+        Expect("broken cloud: the sun breaking through lifts the picture", sun.Exposure > shadow.Exposure + 0.1f && sun.Contrast > shadow.Contrast
+            && sun.Saturation > shadow.Saturation && sun.Temperature > shadow.Temperature, $"{sun.Exposure:0.00} against {shadow.Exposure:0.00}");
+        PostEffects.Grade clear = SkyGrade.For(noon, 0f, 0f, 0f, SkyGrade.Patchy(0.05f, 0f));
+        Expect("a clear sky in full sun grades as before", Same(clear, plain), "");
+        PostEffects.Grade grey = SkyGrade.For(noon, 1f, 0f, 1f, SkyGrade.Patchy(1f, 1f)), greyPlain = SkyGrade.For(noon, 1f, 0f);
+        Expect("an overcast sky grades as before", Same(grey, greyPlain), "");
+        Expect("the night grades as before", Same(SkyGrade.For(night, 0f, 0f, 1f, broken), SkyGrade.For(night, 0f, 0f)), "");
+        Expect("broken cloud is most between a third and a half of the sky", SkyGrade.Patchy(0.4f, WeatherSky.Overcast(0.4f)) > 0.8f
+            && SkyGrade.Patchy(0.1f, 0f) < 0.05f && SkyGrade.Patchy(1f, WeatherSky.Overcast(1f)) < 0.05f, "");
+    }
+
+    /// <summary>
+    /// Writes what the cloud preview (tools/cloud-preview) needs to draw the sky as the game does: the cloud map's noise,
+    /// the 3D noise, and the sky's colours and light for each preview scene.
+    /// </summary>
+    private static void Dump(string dir, float[] big, float[] small)
+    {
+        System.IO.Directory.CreateDirectory(dir);
+        var map = new byte[Size * Size * 8];
+        Buffer.BlockCopy(big, 0, map, 0, Size * Size * 4);
+        Buffer.BlockCopy(small, 0, map, Size * Size * 4, Size * Size * 4);
+        System.IO.File.WriteAllBytes(System.IO.Path.Combine(dir, "map.f32"), map);
+        System.IO.File.WriteAllBytes(System.IO.Path.Combine(dir, "noise3d.u8"), CloudNoise.Field(CloudNoise.Size));
+        var scenes = new (string name, float hour, float cloud, float rain)[]
+        {
+            ("noon", 12.5f, 0.3f, 0f), ("partly-cloudy", 14f, 0.5f, 0f), ("golden-hour", 16.6f, 0.3f, 0f), ("overcast", 13f, 1f, 0.3f),
+        };
+        var json = new System.Text.StringBuilder("[\n");
+        for (int i = 0; i < scenes.Length; i++)
+        {
+            var sc = scenes[i];
+            SkyState s = SkyClock.At(sc.hour, SkyClock.Look);
+            var w = new WeatherState { Cloud = sc.cloud, Rain = sc.rain, Wind = 1f };
+            WeatherSky.Apply(ref s, w, WeatherSky.Lights(s.SunElevation, WeatherSky.Dusk(w)));
+            float o = WeatherSky.Overcast(sc.cloud);
+            SkyPalette.Apply(ref s, o);
+            Color sun = s.LightColour * s.LightIntensity;
+            SkyPalette.CloudAmbient(s, sun, out Color above, out Color below);
+            PostEffects.Grade g = SkyGrade.For(s, o, WeatherSky.Heavy(sc.rain), 0f, SkyGrade.Patchy(sc.cloud, o));
+            float haze = WeatherSky.Haze(s.Haze, w);
+            string C(Color c) => $"[{c.r:0.0000},{c.g:0.0000},{c.b:0.0000}]";
+            string V(Vector3 v) => $"[{v.x:0.0000},{v.y:0.0000},{v.z:0.0000}]";
+            json.Append($"{{\"name\":\"{sc.name}\",\"cloud\":{sc.cloud},\"overcast\":{o:0.0000},\"cover\":{CloudMap.CoverFor(sc.cloud):0.0000},")
+                .Append($"\"skyCover\":{WeatherSky.Cover(sc.cloud):0.0000},\"tiles\":{CloudMap.TilesFor(0.45f, o):0.00000000},")
+                .Append($"\"sunDir\":{V(s.LightDir)},\"sun\":{C(sun)},\"sunColour\":{C(s.SunElevation > -2f ? s.LightColour : Color.black)},")
+                .Append($"\"zenith\":{C(s.Zenith)},\"horizon\":{C(s.Horizon)},\"haze\":{C(s.Fog)},\"glow\":{C(s.Glow)},\"goldenGlow\":{C(SkyPalette.Glow(s))},")
+                .Append($"\"deep\":{s.Deep:0.0000},\"cloudLit\":{C(s.CloudLit)},\"cloudShade\":{C(s.CloudShade)},\"ground\":{C(s.AmbientGround)},")
+                .Append($"\"skyLight\":{C(above)},\"groundLight\":{C(below)},")
+                .Append($"\"grade\":[{g.Exposure:0.000},{g.Contrast:0.00},{g.Saturation:0.00},{g.Temperature:0.00},{g.Tint:0.00}],\"elevation\":{s.SunElevation:0.00},")
+                .Append($"\"hazeDistance\":{haze:0.0},\"hazeDensity\":{SkyClock.Density(haze):0.00000000}}}{(i + 1 < scenes.Length ? "," : "")}\n");
+        }
+        json.Append("]\n");
+        System.IO.File.WriteAllText(System.IO.Path.Combine(dir, "scenes.json"), json.ToString());
+    }
+
+    private static bool Same(PostEffects.Grade a, PostEffects.Grade b) =>
+        Math.Abs(a.Exposure - b.Exposure) < 1e-4f && Math.Abs(a.Contrast - b.Contrast) < 1e-3f && Math.Abs(a.Saturation - b.Saturation) < 1e-3f
+        && Math.Abs(a.Temperature - b.Temperature) < 1e-3f && Math.Abs(a.Tint - b.Tint) < 1e-3f;
+
+    /// <summary>Share of a 6 km square of ground more than half shaded by cloud, the sun overhead.</summary>
+    private static float Shaded(CloudMap map)
+    {
+        int shaded = 0, all = 0;
+        for (float x = -3000f; x < 3000f; x += 50f)
+            for (float z = -3000f; z < 3000f; z += 50f, all++)
+                if (map.At(x, z) > 0.5f) shaded++;
+        return (float)shaded / all;
+    }
+
+    private static void Expect(string what, bool ok, string detail)
+    {
+        if (!ok) failed++;
+        Console.WriteLine($"{(ok ? "ok  " : "FAIL")} {what}  {detail}");
+    }
+}

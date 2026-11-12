@@ -22,9 +22,22 @@ named in `trees.json`, each in `<folder>/<id>/<id>_1k.gltf`.
     cd tools/landscape && npm install
     node bake.js <poly haven folder> <bake folder>
     python3 -I pack.py <bake folder> ../../unity/Assets/Raceday/Resources/Landscape oak beech birch pine_a pine_b spruce_a spruce_b bush
+    python3 -I frames.py ../../unity/Assets/Raceday/Resources/Landscape oak beech birch pine_a pine_b spruce_a spruce_b bush
+
+`frames.py` writes `crop.bytes`, the leaves' bounds in every frame, which the shader cuts each quad down to.
 
 If a tree's size changes, copy its height, radius and middle from `<bake folder>/<name>.json` into
 `LandscapePlan.ModelHeight`, `LandscapePlan.ModelRadius` and `Landscape.CentreAbove`.
+
+## Cost
+
+    bash tools/landscape/check/run.sh --out <plan folder>
+    node cost.js <plan folder> [--step 20] [--no-crop] [--compare-crop]
+
+Counts, from the driver's seat every `--step` metres round the lap, the chunks the camera draws and the fragments
+the trees make per screen pixel: every fragment of every quad (each one samples the atlas), those that pass the alpha
+test, and with the trees' depth drawn first, the ones the lit pass tests and lights. Prints the mean and the worst
+views. `--compare-crop` instead counts the pixels where cutting the quads down changes the trees' outline.
 
 ## Previews
 

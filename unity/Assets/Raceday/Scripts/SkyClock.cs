@@ -43,6 +43,10 @@ namespace TarmacGauntlet.Raceday
         /// clear sky, earlier under cloud and rain (<see cref="WeatherSky.Lights"/>).
         /// </summary>
         public float Lights;
+        /// <summary>How far the clear day's deeper palette is on (<see cref="SkyPalette"/>), 0 to 1: none at night or under a grey sky.</summary>
+        public float Deep;
+        /// <summary>How golden the low sun's light is (<see cref="SkyPalette"/>), 0 to 1.</summary>
+        public float Golden;
     }
 
     /// <summary>

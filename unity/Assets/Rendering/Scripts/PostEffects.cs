@@ -10,7 +10,7 @@ namespace TarmacGauntlet.Rendering
     /// The scene's post-processing, on its global volume: the ACES tone curve with a colour grade the scene sets
     /// (<see cref="Set"/>), bloom at half resolution, and depth of field for a camera
     /// that asks for it each frame (<see cref="Focus"/>): the broadcast and replay cameras, never a driving view. Each follows its
-    /// graphics option. When a camera cuts to another shot, the temporal upscaler forgets the old one.
+    /// graphics option. <see cref="CameraCuts"/> clears the temporal upscaler's history when a camera cuts to another shot.
     /// </summary>
     [RequireComponent(typeof(Volume))]
     public sealed class PostEffects : MonoBehaviour
@@ -35,8 +35,6 @@ namespace TarmacGauntlet.Rendering
         /// </summary>
         private const float ToneExposure = 0.45f;
         private const float BloomThreshold = 1.2f, BloomIntensity = 0.5f, BloomScatter = 0.65f;
-        /// <summary>A camera that moves further than this in a frame, m, or turns further, degrees, has cut to another shot.</summary>
-        private const float CutMove = 8f, CutTurn = 30f;
         /// <summary>
         /// Depth of field: sharp to a little past the subject, then blurring over a stretch as long again as the subject is far,
         /// m. Through a lens narrower than <see cref="LongLens"/> degrees the blur is at its widest.
@@ -52,7 +50,6 @@ namespace TarmacGauntlet.Rendering
         /// <summary>Each camera that asked for depth of field: how far its subject is, m, and the frame it asked on.</summary>
         private readonly Dictionary<Camera, (float distance, int frame)> focus = new Dictionary<Camera, (float, int)>();
         private Grade grade;
-        private readonly Dictionary<Camera, Pose> seen = new Dictionary<Camera, Pose>();
         private readonly List<Camera> gone = new List<Camera>();
 
         private void Awake()
@@ -125,17 +122,15 @@ namespace TarmacGauntlet.Rendering
             bloom.active = GraphicsOptions.Bloom.On;
         }
 
-        /// <summary>Before each camera draws: a cut clears the upscaler's history.</summary>
+        /// <summary>Before each camera draws: its bloom filtering and depth of field.</summary>
         private void Watch(ScriptableRenderContext context, Camera camera)
         {
             if (camera.cameraType != CameraType.Game) return;
-            var now = new Pose(camera.transform.position, camera.transform.rotation);
-            bool cut = seen.TryGetValue(camera, out Pose before)
-                && ((now.position - before.position).sqrMagnitude > CutMove * CutMove || Quaternion.Angle(now.rotation, before.rotation) > CutTurn);
-            seen[camera] = now;
-            if (cut) camera.GetUniversalAdditionalCameraData().resetHistory = true;
+            // Ultra filters the bloom's upsampling bicubically, so the glow round small lights stays round.
+            bool fine = QualityLevels.Level >= 3;
+            if (bloom.highQualityFiltering.value != fine) bloom.highQualityFiltering.Override(fine);
             Depth(camera);
-            if (seen.Count > 8) Forget();
+            if (focus.Count > 8) Forget();
         }
 
         /// <summary>Depth of field for this camera if it asked this frame and the option is on, none otherwise.</summary>
@@ -155,9 +150,6 @@ namespace TarmacGauntlet.Rendering
 
         private void Forget()
         {
-            gone.Clear();
-            foreach (Camera c in seen.Keys) if (c == null) gone.Add(c);
-            foreach (Camera c in gone) seen.Remove(c);
             gone.Clear();
             foreach (Camera c in focus.Keys) if (c == null) gone.Add(c);
             foreach (Camera c in gone) focus.Remove(c);

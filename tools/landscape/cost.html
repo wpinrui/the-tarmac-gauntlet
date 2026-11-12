@@ -1,0 +1,326 @@
+<!doctype html>
+<html><head><meta charset="utf-8"></head><body style="margin:0"><script>
+// Counts what the trees cost the graphics card from a camera: the chunks Unity would draw (frustum and LOD as a
+// LODGroup picks), and the fragments their impostor quads make, as Resources/Landscape/Impostor.shader places them.
+// Runs in Unity's frame. The ground is drawn first for depth only, as the game draws it before the trees.
+'use strict';
+const KINDS = ['oak', 'beech', 'birch', 'pine_a', 'pine_b', 'spruce_a', 'spruce_b', 'bush'];
+const FRAMES = 8, BASE = 1024, CUTOFF = 0.5;
+let gl, progTree, progGround, chunks, ground, quad, crop, atlas, fb, W, H;
+
+const VS_TREE = `#version 300 es
+  precision highp float;
+  uniform float radius[8], centreAbove[8];
+  uniform mat4 vp; uniform vec3 cam; uniform int useCrop; uniform vec2 band; uniform highp sampler2D crop;
+  in vec2 corner; in vec4 a; in vec4 b;   // a: foot xyz, scale; b: squash, yaw, kind
+  out vec3 vAtlas;
+  vec3 Turn(vec3 v, float t) { float c = cos(t), s = sin(t); return vec3(c * v.x + s * v.z, v.y, -s * v.x + c * v.z); }
+  vec3 Flip(vec3 v) { return vec3(v.x, v.y, -v.z); }
+  void main() {
+    int k = int(b.z + 0.5); float scale = a.w, squash = b.x, yaw = b.y;
+    vec3 centre = a.xyz + vec3(0.0, centreAbove[k] * scale * squash, 0.0);
+    float r = radius[k] * scale;
+    float F = ${FRAMES}.0;
+    vec3 local = Flip(Turn(cam - centre, -yaw));
+    local.y = max(local.y, 0.0);
+    vec3 d = local / (abs(local.x) + abs(local.y) + abs(local.z) + 1e-5);
+    vec2 frame = clamp(floor((vec2(d.x + d.z, d.x - d.z) * 0.5 + 0.5) * (F - 1.0) + 0.5), 0.0, F - 1.0);
+    vec2 g = frame / (F - 1.0) * 2.0 - 1.0;
+    float px = (g.x + g.y) * 0.5, pz = (g.x - g.y) * 0.5;
+    vec3 D = normalize(vec3(px, max(1.0 - abs(px) - abs(pz), 0.0), pz));
+    vec3 up = abs(D.y) > 0.999 ? vec3(0.0, 0.0, -1.0) : vec3(0.0, 1.0, 0.0);
+    vec3 R = normalize(cross(up, D)), U = cross(D, R);
+    vec2 at = corner * 0.5 + 0.5;
+    if (useCrop == 1) {
+      vec4 c = texelFetch(crop, ivec2(int(frame.x + frame.y * F), k), 0);
+      at = mix(c.xy, c.zw, at);
+    }
+    vec2 q = at * 2.0 - 1.0;
+    vec3 world = Turn(Flip((q.x * R + q.y * U) * r), yaw);
+    world.y *= squash;
+    vAtlas = vec3((frame + at) / F, b.z);
+    gl_Position = vp * vec4(centre + world, 1.0);
+    float far = distance(cam, centre);
+    if (far < band.x || far >= band.y) gl_Position = vec4(0.0);   // only trees this far from the camera
+  }`;
+const FS_TREE = `#version 300 es
+  precision highp float; precision highp sampler2DArray;
+  uniform sampler2DArray atlas; uniform int alphaTest;
+  in vec3 vAtlas; out vec4 o;
+  void main() {
+    if (alphaTest == 1 && texture(atlas, vAtlas).r < ${CUTOFF}) discard;
+    o = vec4(1.0);
+  }`;
+const VS_GROUND = `#version 300 es
+  uniform mat4 vp; in vec3 p; void main() { gl_Position = vp * vec4(p, 1.0); }`;
+const FS_GROUND = `#version 300 es
+  precision highp float; out vec4 o; void main() { o = vec4(0.0); }`;
+
+function program(vs, fs) {
+  const p = gl.createProgram();
+  for (const [type, src] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) {
+    const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    gl.attachShader(p, s);
+  }
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  return p;
+}
+
+const fetchBin = async u => new Uint8Array(await (await fetch(u)).arrayBuffer());
+const loadImage = u => new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = u; });
+
+/** Alpha mipmaps that keep the leaves' coverage, as Unity's importer does (mipMapsPreserveCoverage). */
+function coverageMips(alpha, size) {
+  const levels = [alpha];
+  let coverage = 0;
+  for (let i = 0; i < alpha.length; i++) coverage += alpha[i] >= 128;
+  coverage /= alpha.length;
+  let box = Float32Array.from(alpha, v => v / 255);
+  for (let s = size >> 1; s >= 1; s >>= 1) {
+    const next = new Float32Array(s * s);
+    for (let y = 0; y < s; y++) for (let x = 0; x < s; x++) {
+      const i = 2 * y * 2 * s + 2 * x;
+      next[y * s + x] = (box[i] + box[i + 1] + box[i + 2 * s] + box[i + 2 * s + 1]) / 4;
+    }
+    box = next;
+    const sorted = Float32Array.from(box).sort();
+    const at = sorted[Math.min(sorted.length - 1, Math.max(0, Math.floor((1 - coverage) * sorted.length)))];
+    const gain = at > 0 ? CUTOFF / at : 1;
+    levels.push(Uint8Array.from(box, v => Math.min(255, Math.round(v * gain * 255))));
+  }
+  return levels;
+}
+
+window.setup = async (planDir, w, h) => {
+  W = w; H = h;
+  const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h; document.body.appendChild(canvas);
+  gl = canvas.getContext('webgl2', { antialias: false });
+  if (!gl.getExtension('EXT_color_buffer_float')) throw new Error('no float render targets');
+  progTree = program(VS_TREE, FS_TREE); progGround = program(VS_GROUND, FS_GROUND);
+
+  // Atlas alpha, one layer a kind.
+  const levels = Math.log2(BASE) + 1;
+  atlas = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D_ARRAY, atlas);
+  gl.texStorage3D(gl.TEXTURE_2D_ARRAY, levels, gl.R8, BASE, BASE, KINDS.length);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+  const cv = document.createElement('canvas'); cv.width = cv.height = BASE;
+  const cx = cv.getContext('2d', { willReadFrequently: true });
+  for (let k = 0; k < KINDS.length; k++) {
+    const img = await loadImage(`/atlas/${KINDS[k]}_colour.png`);
+    cx.clearRect(0, 0, BASE, BASE);
+    // Upside down, so row 0 is the bottom, as Unity's texture coordinates count.
+    cx.save(); cx.translate(0, BASE); cx.scale(1, -1); cx.drawImage(img, 0, 0, BASE, BASE); cx.restore();
+    const rgba = cx.getImageData(0, 0, BASE, BASE).data;
+    const alpha = new Uint8Array(BASE * BASE);
+    for (let i = 0; i < alpha.length; i++) alpha[i] = rgba[i * 4 + 3] >= 128 ? 255 : 0;
+    coverageMips(alpha, BASE).forEach((m, l) => gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, l, 0, 0, k, BASE >> l, BASE >> l, 1, gl.RED, gl.UNSIGNED_BYTE, m));
+  }
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+  // Crop rectangles.
+  const cb = await fetchBin('/atlas/crop.bytes');
+  crop = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, crop);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, FRAMES * FRAMES, KINDS.length, 0, gl.RGBA, gl.UNSIGNED_BYTE, cb);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+  // Chunks.
+  const f = new Float32Array((await fetchBin(`/plan/${planDir}/chunks.bin`)).buffer);
+  chunks = [];
+  const all = [];
+  const radius = window.RADIUS, above = window.ABOVE;
+  for (let o = 0; o < f.length;) {
+    const nNear = f[o], nFar = f[o + 1]; o += 2;
+    const parts = [];
+    for (const n of [nNear, nFar]) {
+      const lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9], first = all.length / 8;
+      for (let i = 0; i < n; i++, o += 10) {
+        const k = f[o + 6], r = radius[k] * f[o + 3];
+        all.push(f[o], f[o + 1], f[o + 2], f[o + 3], f[o + 4], f[o + 5], k, 0);
+        for (let j = 0; j < 3; j++) { lo[j] = Math.min(lo[j], f[o + j] - r); hi[j] = Math.max(hi[j], f[o + j] + r + (j === 1 ? r : 0)); }
+      }
+      parts.push({ first, count: n, lo, hi });
+    }
+    const lo = parts[0].lo.map((v, j) => Math.min(v, parts[1].lo[j])), hi = parts[0].hi.map((v, j) => Math.max(v, parts[1].hi[j]));
+    chunks.push({ near: parts[0], far: parts[1], centre: lo.map((v, j) => (v + hi[j]) / 2), size: Math.max(...hi.map((v, j) => v - lo[j])) });
+  }
+  const treeBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, treeBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(all), gl.STATIC_DRAW);
+  quad = { vao: gl.createVertexArray(), buf: treeBuf };
+  gl.bindVertexArray(quad.vao);
+  const cornerBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, cornerBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1]), gl.STATIC_DRAW);
+  const lc = gl.getAttribLocation(progTree, 'corner'); gl.enableVertexAttribArray(lc); gl.vertexAttribPointer(lc, 2, gl.FLOAT, false, 0, 0);
+  quad.la = gl.getAttribLocation(progTree, 'a'); quad.lb = gl.getAttribLocation(progTree, 'b');
+  for (const l of [quad.la, quad.lb]) { gl.enableVertexAttribArray(l); gl.vertexAttribDivisor(l, 1); }
+
+  // Ground.
+  const circuit = await (await fetch('/circuit.json')).json();
+  const t = circuit.terrain, raw = atob(t.heightsCm);
+  const gp = new Float32Array(t.countX * t.countZ * 3);
+  for (let z = 0, i = 0; z < t.countZ; z++) for (let x = 0; x < t.countX; x++, i++) {
+    gp[i * 3] = t.originX + x * t.spacing; gp[i * 3 + 2] = t.originZ + z * t.spacing;
+    gp[i * 3 + 1] = t.baseHeight + (raw.charCodeAt(2 * i) | (raw.charCodeAt(2 * i + 1) << 8)) / 100;
+  }
+  const gi = new Uint32Array((t.countX - 1) * (t.countZ - 1) * 6);
+  for (let z = 0, n = 0; z < t.countZ - 1; z++) for (let x = 0; x < t.countX - 1; x++) {
+    const i = z * t.countX + x; gi.set([i, i + t.countX, i + 1, i + 1, i + t.countX, i + t.countX + 1], n); n += 6;
+  }
+  ground = { vao: gl.createVertexArray(), count: gi.length };
+  gl.bindVertexArray(ground.vao);
+  const gb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, gb); gl.bufferData(gl.ARRAY_BUFFER, gp, gl.STATIC_DRAW);
+  const lp = gl.getAttribLocation(progGround, 'p'); gl.enableVertexAttribArray(lp); gl.vertexAttribPointer(lp, 3, gl.FLOAT, false, 0, 0);
+  const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, gi, gl.STATIC_DRAW);
+  gl.bindVertexArray(null);
+
+  // Count target.
+  fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  const ct = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, ct); gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32F, w, h);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, ct, 0);
+  const db = gl.createRenderbuffer(); gl.bindRenderbuffer(gl.RENDERBUFFER, db); gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT32F, w, h);
+  gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, db);
+  gl.getExtension('EXT_float_blend');
+  return { chunks: chunks.length, trees: all.length / 8 };
+};
+
+function viewProjection(p, q, fov, aspect) {
+  const f = norm(sub(q, p)), r = norm(cross([0, 1, 0], f)), u = cross(f, r);
+  const n = 0.3, far = 8000, t = 1 / Math.tan(fov * Math.PI / 360);
+  // Rows of the view matrix: right, up, back (GL looks down -z).
+  const V = [r, u, f.map(v => -v)];
+  const P = [[t / aspect, 0, 0, 0], [0, t, 0, 0], [0, 0, -(far + n) / (far - n), -2 * far * n / (far - n)], [0, 0, -1, 0]];
+  const M = [];
+  for (let i = 0; i < 4; i++) {
+    const row = [0, 0, 0, 0];
+    for (let j = 0; j < 3; j++) for (let c = 0; c < 3; c++) row[c] += P[i][j] * V[j][c];
+    row[3] = P[i][3];
+    for (let j = 0; j < 3; j++) row[3] -= P[i][j] * dot(V[j], p);
+    M.push(row);
+  }
+  return M;
+}
+const sub = (a, b) => a.map((v, i) => v - b[i]), dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const norm = a => { const l = Math.hypot(...a); return a.map(v => v / l); };
+const columnMajor = M => new Float32Array([0, 1, 2, 3].flatMap(c => M.map(row => row[c])));
+
+function inFrustum(M, lo, hi) {
+  const pts = [];
+  for (let i = 0; i < 8; i++) {
+    const x = i & 1 ? hi[0] : lo[0], y = i & 2 ? hi[1] : lo[1], z = i & 4 ? hi[2] : lo[2];
+    pts.push(M.map(r => r[0] * x + r[1] * y + r[2] * z + r[3]));
+  }
+  for (let a = 0; a < 3; a++) for (const s of [1, -1]) if (pts.every(c => s * c[a] > c[3])) return false;
+  return true;
+}
+
+/**
+ * One view: p the camera, q where it looks, fov the vertical field of view, lodBias as Unity's quality setting,
+ * farAt the screen height below which a chunk draws its far version. Returns counts per screen pixel.
+ */
+window.measure = (p, q, fov, opts) => {
+  const { lodBias = 1, farAt = 0.25, useCrop = 1, band = [0, 1e9], batch = 64 } = opts;
+  const M = viewProjection(p, q, fov, W / H), vp = columnMajor(M);
+  const tan = Math.tan(fov * Math.PI / 360);
+  const draws = [];
+  for (const c of chunks) {
+    const dist = Math.hypot(...sub(c.centre, p));
+    const rel = c.size * 0.5 / (dist * tan) * lodBias;
+    const part = rel >= farAt ? c.near : c.far;
+    if (!part.count || !inFrustum(M, part.lo, part.hi)) continue;
+    draws.push({ part, dist, near: part === c.near });
+  }
+  draws.sort((a, b) => a.dist - b.dist);
+  const quads = draws.reduce((s, d) => s + d.part.count, 0);
+
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fb); gl.viewport(0, 0, W, H);
+  const pass = (alphaTest, depthWrite, colour, depthFunc, countFirst = false) => {
+    gl.useProgram(progTree);
+    gl.uniformMatrix4fv(gl.getUniformLocation(progTree, 'vp'), false, vp);
+    gl.uniform3fv(gl.getUniformLocation(progTree, 'cam'), p);
+    gl.uniform1i(gl.getUniformLocation(progTree, 'useCrop'), useCrop);
+    gl.uniform2fv(gl.getUniformLocation(progTree, 'band'), band);
+    gl.uniform1i(gl.getUniformLocation(progTree, 'alphaTest'), alphaTest);
+    gl.uniform1fv(gl.getUniformLocation(progTree, 'radius'), window.RADIUS);
+    gl.uniform1fv(gl.getUniformLocation(progTree, 'centreAbove'), window.ABOVE);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D_ARRAY, atlas); gl.uniform1i(gl.getUniformLocation(progTree, 'atlas'), 0);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, crop); gl.uniform1i(gl.getUniformLocation(progTree, 'crop'), 1);
+    gl.depthMask(depthWrite); gl.depthFunc(depthFunc); gl.colorMask(colour, colour, colour, colour);
+    gl.bindVertexArray(quad.vao); gl.bindBuffer(gl.ARRAY_BUFFER, quad.buf);
+    for (const d of draws) {
+      gl.vertexAttribPointer(quad.la, 4, gl.FLOAT, false, 32, d.part.first * 32);
+      gl.vertexAttribPointer(quad.lb, 4, gl.FLOAT, false, 32, d.part.first * 32 + 16);
+      if (countFirst) {
+        // Count each batch's fragments that pass the depth already drawn, then draw its depth: a batch stands for the
+        // trees in flight together, which cannot hide each other from the coarse depth test.
+        for (let b = 0; b < d.part.count; b += batch) {
+          const k = Math.min(batch, d.part.count - b), at = (d.part.first + b) * 32;
+          gl.vertexAttribPointer(quad.la, 4, gl.FLOAT, false, 32, at);
+          gl.vertexAttribPointer(quad.lb, 4, gl.FLOAT, false, 32, at + 16);
+          gl.uniform1i(gl.getUniformLocation(progTree, 'alphaTest'), 0);
+          gl.depthMask(false); gl.colorMask(true, true, true, true); gl.enable(gl.BLEND);
+          gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, k);
+          gl.uniform1i(gl.getUniformLocation(progTree, 'alphaTest'), 1);
+          gl.depthMask(true); gl.colorMask(false, false, false, false);
+          gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, k);
+        }
+        continue;
+      }
+      gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, d.part.count);
+    }
+  };
+  const groundDepth = () => {
+    gl.useProgram(progGround); gl.uniformMatrix4fv(gl.getUniformLocation(progGround, 'vp'), false, vp);
+    gl.colorMask(false, false, false, false); gl.depthMask(true); gl.depthFunc(gl.LESS);
+    gl.bindVertexArray(ground.vao); gl.drawElements(gl.TRIANGLES, ground.count, gl.UNSIGNED_INT, 0);
+  };
+  const begin = () => {
+    gl.colorMask(true, true, true, true); gl.depthMask(true);
+    gl.clearColor(0, 0, 0, 0); gl.clearDepth(1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.enable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE); groundDepth();
+    gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
+  };
+  const read = () => {
+    const px = new Float32Array(W * H * 4); gl.readPixels(0, 0, W, H, gl.RGBA, gl.FLOAT, px);
+    let sum = 0, covered = 0, worst = 0;
+    for (let i = 0; i < px.length; i += 4) { sum += px[i]; if (px[i] > 0) covered++; if (px[i] > worst) worst = px[i]; }
+    return { layers: sum / (W * H), covered: covered / (W * H), worst };
+  };
+  // Every fragment of every quad in front of the ground: what the alpha test alone pays for.
+  begin(); pass(0, false, true, gl.LEQUAL); const raster = read();
+  // Those that pass the alpha test: the lit fragments if the depth test waits until after the shader.
+  begin(); pass(1, false, true, gl.LEQUAL); const leaves = read();
+  // Those that pass the alpha test and the depth test at the time, in draw order: the lit fragments if it comes first.
+  begin(); pass(1, true, true, gl.LESS); const early = read();
+  // A depth-only pass first, then the lit pass against it: what reaches the lighting, and every fragment it tests.
+  begin(); gl.disable(gl.BLEND); pass(1, true, false, gl.LESS); gl.enable(gl.BLEND);
+  pass(0, false, true, gl.LEQUAL); const primedRaster = read();
+  gl.clear(gl.COLOR_BUFFER_BIT); pass(1, false, true, gl.LEQUAL); const primedLit = read();
+  // The depth pass's fragments in front of the depth drawn before their chunk: what it pays for when the coarse depth
+  // test throws away the hidden ones before the shader runs, as it may on hardware that has one.
+  begin(); pass(1, true, false, gl.LEQUAL, true); const depthFront = read();
+  gl.bindVertexArray(null);
+  return {
+    chunks: draws.length, nearChunks: draws.filter(d => d.near).length, quads,
+    raster: raster.layers, leaves: leaves.layers, early: early.layers,
+    primedRaster: primedRaster.layers, depthFront: depthFront.layers, primedLit: primedLit.layers, covered: early.covered, worstPixel: raster.worst,
+  };
+};
+/** Pixels where the trees' outline differs with the quads cut down and without, per screen pixel. */
+window.cropDiff = (p, q, fov, opts) => {
+  const masks = [0, 1].map(c => {
+    window.measure(p, q, fov, { ...opts, useCrop: c });
+    // measure leaves the depth-primed lit count in the target: any count is a tree pixel.
+    const px = new Float32Array(W * H * 4); gl.readPixels(0, 0, W, H, gl.RGBA, gl.FLOAT, px);
+    const m = new Uint8Array(W * H); for (let i = 0; i < m.length; i++) m[i] = px[i * 4] > 0;
+    return m;
+  });
+  let diff = 0, trees = 0;
+  for (let i = 0; i < masks[0].length; i++) { diff += masks[0][i] !== masks[1][i]; trees += masks[0][i]; }
+  return { diff: diff / (W * H), trees: trees / (W * H) };
+};
+window.ready = true;
+</script></body></html>

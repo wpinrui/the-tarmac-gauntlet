@@ -37,6 +37,9 @@ namespace TarmacGauntlet.Raceday
             public string model;
             public int size;
             public string @base;
+            // The finish where the base colour shows, for a livery with a finish.png: red, green and blue the shares
+            // of smoothness, clear coat and metal. Empty: a livery without one.
+            public string finish;
             public Panel[] panels;
             public NumberBox[] numbers;
         }
@@ -57,6 +60,7 @@ namespace TarmacGauntlet.Raceday
         private static Shader shader;
         private static readonly Dictionary<string, (Texture2D Png, DigitFile File)> Digits = new Dictionary<string, (Texture2D, DigitFile)>();
         private static readonly Dictionary<string, (LiveryFile File, Texture2D Atlas)> Loaded = new Dictionary<string, (LiveryFile, Texture2D)>();
+        private static readonly Dictionary<string, Texture2D> Finishes = new Dictionary<string, Texture2D>();
 
         /// <summary>
         /// Paints the model in the livery at liveryPath, numbered. False, leaving the model as it
@@ -123,6 +127,13 @@ namespace TarmacGauntlet.Raceday
             var mat = new Material(shader) { name = CarPaint.PaintMaterial + " (livery)" };
             mat.SetTexture("_Atlas", atlas);
             if (ColorUtility.TryParseHtmlString(file.@base, out Color baseColour)) mat.SetColor("_Base", baseColour);
+            // A finish map gives the paint its smoothness, clear coat and metal by the pixel: rust, bare metal, tape.
+            Texture2D finish = LoadFinish(liveryPath, file);
+            if (finish != null && ColorUtility.TryParseHtmlString(file.finish, out Color finishBase))
+            {
+                mat.SetTexture("_Finish", finish);
+                mat.SetVector("_FinishBase", new Vector4(finishBase.r, finishBase.g, finishBase.b, 1));
+            }
             foreach (Panel p in file.panels)
             {
                 int k = Array.IndexOf(Views, p.view);
@@ -163,6 +174,15 @@ namespace TarmacGauntlet.Raceday
                 mat.SetFloat("_DigitStep", digitFile.step > 0 ? digitFile.step : advance);
             }
             return mat;
+        }
+
+        /// <summary>The livery's finish.png, loaded once; null for a livery without one.</summary>
+        private static Texture2D LoadFinish(string liveryPath, LiveryFile file)
+        {
+            if (Finishes.TryGetValue(liveryPath, out Texture2D cached)) return cached;
+            Texture2D made = string.IsNullOrEmpty(file.finish) ? null : LoadTexture(liveryPath + "/finish.png");
+            Finishes[liveryPath] = made;
+            return made;
         }
 
         /// <summary>The number's digits, most significant first, for the shader. 0 or less draws none.</summary>

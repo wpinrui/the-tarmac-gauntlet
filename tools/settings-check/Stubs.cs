@@ -40,6 +40,20 @@ namespace UnityEngine
 
     public struct Resolution { public int width, height; }
 
+    public struct Vector4
+    {
+        public float x, y, z, w;
+        public Vector4(float x, float y, float z, float w) { this.x = x; this.y = y; this.z = z; this.w = w; }
+    }
+
+    public class Shader : Object
+    {
+        public static readonly Dictionary<int, Vector4> Globals = new Dictionary<int, Vector4>();
+        private static readonly Dictionary<string, int> ids = new Dictionary<string, int>();
+        public static int PropertyToID(string name) => ids.TryGetValue(name, out int id) ? id : ids[name] = ids.Count + 1;
+        public static void SetGlobalVector(int id, Vector4 v) => Globals[id] = v;
+    }
+
     public enum FullScreenMode { ExclusiveFullScreen, FullScreenWindow, MaximizedWindow, Windowed }
 
     /// <summary>A 1920 x 1080 monitor. A launch opens borderless at full size, as if Unity remembered nothing.</summary>
@@ -83,7 +97,11 @@ namespace UnityEngine
             if (!loaded.TryGetValue(path, out Object o))
             {
                 o = new T { name = path };
-                if (o is Rendering.Universal.UniversalRendererData r) r.rendererFeatures.Add(new Rendering.Universal.ScreenSpaceAmbientOcclusion());
+                if (o is Rendering.Universal.UniversalRendererData r)
+                {
+                    r.rendererFeatures.Add(new Rendering.Universal.ScreenSpaceAmbientOcclusion());
+                    r.rendererFeatures.Add(new Rendering.Universal.ScreenSpaceShadows());
+                }
                 loaded[path] = o;
             }
             return (T)o;
@@ -135,6 +153,9 @@ namespace UnityEngine.Rendering.Universal
     }
 
     public class ScreenSpaceAmbientOcclusion : ScriptableRendererFeature { }
+
+    /// <summary>URP's own is internal; the game finds it by its type's name.</summary>
+    public class ScreenSpaceShadows : ScriptableRendererFeature { }
 
     public class UniversalRendererData : Object
     {

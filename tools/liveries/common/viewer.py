@@ -70,12 +70,17 @@ for (const [k, m] of Object.entries(MATS)) {
 function liveryMaterial(lv) {
   const tex = new THREE.TextureLoader().load(lv.atlas);
   tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 8;
-  const m = new THREE.MeshStandardMaterial({ name: 'body', color: 0xffffff, metalness: 0.1, roughness: 0.28 });
+  // A livery with a finish map takes its smoothness, clear coat and metal from it, as the game does.
+  const fin = lv.finish ? new THREE.TextureLoader().load(lv.finish) : null;
+  const m = fin ? new THREE.MeshPhysicalMaterial({ name: 'body', color: 0xffffff, metalness: 0.1, roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.04 })
+    : new THREE.MeshStandardMaterial({ name: 'body', color: 0xffffff, metalness: 0.1, roughness: 0.28 });
   const P = Object.fromEntries(lv.panels.map(p => [p.view, p]));
   const v4 = a => new THREE.Vector4(...a);
   m.onBeforeCompile = sh => {
     sh.uniforms.uAtlas = { value: tex };
     sh.uniforms.uBase = { value: new THREE.Color(lv.base).convertSRGBToLinear() };
+    sh.uniforms.uFinish = { value: fin };
+    sh.uniforms.uFinishBase = { value: new THREE.Color(lv.finishBase || '#ffffff') };
     // The race number, drawn as the game's shader draws it.
     const boxes = (lv.numbers || []).slice(0, 4);
     const D = lv.digits || DIGITS || { cell: 0, padX: 0, pad: 0, height: 1, advance: [1], w: 1, h: 1 };
@@ -93,7 +98,7 @@ function liveryMaterial(lv) {
       sh.uniforms[`uA_${n}`] = { value: v4(P[n].a) }; sh.uniforms[`uB_${n}`] = { value: v4(P[n].b) };
     }
     sh.vertexShader = 'varying vec3 vLp; varying vec3 vLn;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvLp = position; vLn = normal;');
-    sh.fragmentShader = `varying vec3 vLp; varying vec3 vLn; uniform sampler2D uAtlas; uniform vec3 uBase;
+    sh.fragmentShader = `varying vec3 vLp; varying vec3 vLn; uniform sampler2D uAtlas; uniform vec3 uBase; uniform sampler2D uFinish; uniform vec3 uFinishBase;
 uniform vec4 uA_left, uB_left, uA_right, uB_right, uA_top, uB_top, uA_front, uB_front, uA_rear, uB_rear;
 uniform sampler2D uDigits; uniform vec4 uNumBox[4]; uniform vec3 uNumInk[4]; uniform vec3 uNumEdge[4]; uniform float uNumBoxes; uniform vec4 uNumDigits; uniform vec4 uNumWidth;
 uniform vec4 uDigitCell; uniform float uDigitHeight, uDigitAdvance, uDigitStep;
@@ -120,6 +125,16 @@ vec3 lvNumber(vec2 q, vec3 art) {
   }
   return art;
 }
+vec3 lvFin(vec4 a, vec4 b, vec3 p) { vec2 uv = vec2(dot(a.xyz, p) + a.w, dot(b.xyz, p) + b.w); return texture2D(uFinish, vec2(uv.x, 1.0 - uv.y)).rgb; }
+// Shares of smoothness, clear coat and metal, weighted as the colour is.
+vec3 finish(vec3 p, vec3 n) {
+  vec3 k = pow(abs(n), vec3(6.0));
+  bool inward = n.x * p.x < 0.0;
+  float wSide = inward ? 0.0 : k.x, wTop = n.y > 0.0 ? k.y : 0.0, wBase = (n.y < 0.0 ? k.y : 0.0) + (inward ? k.x : 0.0), wFront = n.z > 0.0 ? k.z : 0.0, wRear = n.z < 0.0 ? k.z : 0.0;
+  vec3 side = p.x > 0.0 ? lvFin(uA_left, uB_left, p) : lvFin(uA_right, uB_right, p);
+  vec3 f = side * wSide + lvFin(uA_top, uB_top, p) * wTop + uFinishBase * wBase + lvFin(uA_front, uB_front, p) * wFront + lvFin(uA_rear, uB_rear, p) * wRear;
+  return f / max(wSide + wTop + wBase + wFront + wRear, 1e-4);
+}
 vec3 lvTap(vec4 a, vec4 b, vec3 p) { vec2 uv = vec2(dot(a.xyz, p) + a.w, dot(b.xyz, p) + b.w); return lvNumber(uv, texture2D(uAtlas, vec2(uv.x, 1.0 - uv.y)).rgb); }
 vec3 livery(vec3 p, vec3 n) {
   vec3 k = pow(abs(n), vec3(6.0));
@@ -129,7 +144,10 @@ vec3 livery(vec3 p, vec3 n) {
   vec3 c = side * wSide + lvTap(uA_top, uB_top, p) * wTop + uBase * wBot + lvTap(uA_front, uB_front, p) * wFront + lvTap(uA_rear, uB_rear, p) * wRear;
   return c / max(wSide + wTop + wBot + wFront + wRear, 1e-4);
 }
-` + sh.fragmentShader.replace('#include <map_fragment>', 'diffuseColor.rgb = livery(vLp, normalize(vLn));');
+` + sh.fragmentShader.replace('#include <map_fragment>', 'diffuseColor.rgb = livery(vLp, normalize(vLn));')
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n' + (fin ? 'vec3 lvF = finish(vLp, normalize(vLn)); roughnessFactor = 1.0 - (1.0 - roughness) * lvF.r;' : ''))
+      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n' + (fin ? 'metalnessFactor *= lvF.b;' : ''))
+      .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n' + (fin ? 'material.clearcoat *= lvF.g;' : ''));
   };
   return m;
 }
@@ -271,8 +289,11 @@ def write(obj_path, html_path, title, liveries, number=None):
         d = Path(d)
         meta = json.loads((d / "livery.json").read_text())
         atlas = "data:image/png;base64," + base64.b64encode((d / "atlas.png").read_bytes()).decode()
+        finish = d / "finish.png"
         lvs.append({"name": name, "atlas": atlas, "base": meta["base"], "panels": meta["panels"],
-                    "size": meta["size"], "numbers": meta["numbers"], "number": number, "digits": _digits(d)})
+                    "size": meta["size"], "numbers": meta["numbers"], "number": number, "digits": _digits(d),
+                    "finish": "data:image/png;base64," + base64.b64encode(finish.read_bytes()).decode() if finish.exists() else None,
+                    "finishBase": meta.get("finish")})
     digits = _digits(DIGITS)
     html = (PAGE.replace("__TITLE__", title).replace("__OBJ__", obj).replace("__MATS__", json.dumps(_mtl(obj_path.with_suffix(".mtl"))))
             .replace("__DOORS__", json.dumps(doors)).replace("__LIVERIES__", json.dumps(lvs)).replace("__DIGITS__", json.dumps(digits)))

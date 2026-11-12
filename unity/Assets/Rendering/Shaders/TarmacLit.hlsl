@@ -1,5 +1,5 @@
-// Lighting for the game's own lit shaders, as URP Lit does it: the sun with its shadows, the other lights, the ambient
-// light, reflections and fog. Also the shadow caster and depth passes for shaders that move no vertices.
+// Lighting for the game's own lit shaders, as URP Lit does it: the sun with its shadows, the other lights and theirs, the
+// ambient light with the screen-space ambient occlusion, reflections and fog. Also the shadow caster and depth passes for shaders that move no vertices.
 #ifndef TARMAC_LIT_INCLUDED
 #define TARMAC_LIT_INCLUDED
 
@@ -96,13 +96,15 @@ half4 ShadeDielectric(float3 positionWS, half3 normalWS, float4 positionCS, half
     return c;
 }
 
-// A matte surface lit by the sun and its shadows and the ambient light, fogged: the built-in Lambert model with no
-// extra lights.
+// A matte surface lit by the sun and its shadows and the ambient light, both under the ambient occlusion, fogged: the
+// built-in Lambert model with no extra lights.
 half3 ShadeLambert(float3 positionWS, half3 normalWS, float4 positionCS, half fogFactor, half3 albedo)
 {
     InputData d = TarmacInputData(positionWS, normalWS, positionCS, fogFactor);
+    AmbientOcclusionFactor ao = CreateAmbientOcclusionFactor(d.normalizedScreenSpaceUV, 1);
     Light sun = GetMainLight(d.shadowCoord, d.positionWS, d.shadowMask);
-    half3 light = LightingLambert(sun.color * (sun.distanceAttenuation * sun.shadowAttenuation), sun.direction, d.normalWS) + d.bakedGI;
+    half3 lit = sun.color * (sun.distanceAttenuation * sun.shadowAttenuation * ao.directAmbientOcclusion);
+    half3 light = LightingLambert(lit, sun.direction, d.normalWS) + d.bakedGI * ao.indirectAmbientOcclusion;
     return MixFog(albedo * light, d.fogCoord);
 }
 

@@ -11,7 +11,7 @@ namespace TarmacGauntlet.Visuals
     {
         public readonly string Label;
         public readonly GraphicsOption[] Options;
-        /// <summary>The row's value at each quality level, Low to High.</summary>
+        /// <summary>The row's value at each quality level, Low to Ultra.</summary>
         private readonly int[] byLevel;
 
         internal GraphicsRow(string label, int[] byLevel, params GraphicsOption[] options)
@@ -42,7 +42,7 @@ namespace TarmacGauntlet.Visuals
             }
         }
 
-        /// <summary>Sets the row to its value at a quality level, 0 Low to 2 High.</summary>
+        /// <summary>Sets the row to its value at a quality level, 0 Low to 3 Ultra.</summary>
         public void ApplyQuality(int level) => Value = byLevel[Mathf.Clamp(level, 0, byLevel.Length - 1)];
     }
 }

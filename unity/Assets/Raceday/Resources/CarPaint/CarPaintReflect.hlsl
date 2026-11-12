@@ -32,19 +32,24 @@ CarReflectVaryings CarReflectVertex(CarReflectAttributes v)
     return o;
 }
 
-TarmacReflectOutput CarReflectFragment(CarReflectVaryings i)
+// What a clear coat of this much (0 to 1) reflects, as ShadeCarPaint draws it.
+TarmacReflectOutput CarCoatReflect(float3 positionWS, half3 normalWS, float4 positionCS, half fog, half coat)
 {
 #if defined(_CLEARCOAT)
-    half3 n = NormalizeNormalPerPixel(i.normalWS);
-    // The coat as ShadeCarPaint draws it.
-    half coat = FilteredSmoothness(CAR_COAT_SMOOTHNESS, n);
-    half NoV = saturate(dot(n, GetWorldSpaceNormalizeViewDir(i.positionWS)));
-    half roughness = PerceptualSmoothnessToPerceptualRoughness(coat);
+    half3 n = NormalizeNormalPerPixel(normalWS);
+    half smooth = FilteredSmoothness(CAR_COAT_SMOOTHNESS, n);
+    half NoV = saturate(dot(n, GetWorldSpaceNormalizeViewDir(positionWS)));
+    half roughness = PerceptualSmoothnessToPerceptualRoughness(smooth);
     // All the coat reflects of its probe, URP's share and the sheen ShadeCarPaint adds.
-    return TarmacReflect(i.positionWS, n, i.positionCS, i.fog, roughness, CarCoatEnvWeight(NoV, roughness));
+    return TarmacReflect(positionWS, n, positionCS, fog, roughness, CarCoatEnvWeight(NoV, roughness) * coat);
 #else
     return TarmacReflectNone();
 #endif
+}
+
+TarmacReflectOutput CarReflectFragment(CarReflectVaryings i)
+{
+    return CarCoatReflect(i.positionWS, i.normalWS, i.positionCS, i.fog, 1);
 }
 
 #endif

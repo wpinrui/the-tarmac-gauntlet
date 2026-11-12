@@ -8,19 +8,15 @@ namespace TarmacGauntlet.Raceday
     /// <summary>
     /// Builds the country round the circuit from <see cref="LandscapePlan"/> and <see cref="Horizon"/>:
     /// the fields' colours on the ground, the trees and hedges, and the hills out to the haze.
-    /// Trees are impostors (Resources/Landscape/Impostor.shader) in square chunks, one draw call each,
-    /// with a thinner far version past about 900 m that casts no shadow. Nothing here collides.
+    /// Trees are impostors (Resources/Landscape/Impostor.shader) in square chunks, each drawn twice: depth alone first,
+    /// then lit, so only the tree in front of each pixel is lit. Each has a thinner far version past about 900 m that
+    /// casts no shadow. Nothing here collides.
     /// </summary>
     public static class Landscape
     {
         private static readonly string[] Kinds = { "oak", "beech", "birch", "pine_a", "pine_b", "spruce_a", "spruce_b", "bush" };
-        /// <summary>Baked tree's middle above its foot, by kind, m (tools/landscape/trees.json).</summary>
-        private static readonly float[] CentreAbove = { 2.52f, 1.71f, 2.28f, 9.46f, 7.04f, 4.43f, 3.91f, 1.09f };
         /// <summary>Chunks switch to the far version below this share of the screen's height.</summary>
         private const float FarAt = 0.25f;
-        /// <summary>The far version keeps one tree in this many and grows each to cover for the rest.</summary>
-        private const int FarKeep = 3;
-        private const float FarGrow = 1.45f;
 
         public static void Build(Circuit circuit, CircuitBuilder builder, IReadOnlyList<StandFootprint> stands, CircuitMaterials materials, LandscapeLook look)
         {
@@ -86,7 +82,7 @@ namespace TarmacGauntlet.Raceday
         private static Texture2D Grain()
         {
             const int size = 128;
-            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { name = "Ground grain", wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear, anisoLevel = 8 };
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true, true) { name = "Ground grain", wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear, anisoLevel = 8 };
             var px = new Color32[size * size];
             float[] soft = CloudField.Fbm(size, 4, 3, 17);
             for (int i = 0; i < px.Length; i++)
@@ -103,40 +99,21 @@ namespace TarmacGauntlet.Raceday
 
         private static void Trees(LandscapePlan plan, Transform root)
         {
-            Material material = TreeMaterial();
-            if (material == null) return;
-            var chunks = new Dictionary<long, List<TreeSpot>>();
-            foreach (TreeSpot t in plan.Trees)
+            Material[] materials = TreeMaterials();
+            if (materials == null) return;
+            foreach (TreeChunk chunk in plan.Chunks())
             {
-                long key = ((long)Mathf.FloorToInt(t.Base.x / LandscapePlan.ChunkSize) << 32) ^ (uint)Mathf.FloorToInt(t.Base.z / LandscapePlan.ChunkSize);
-                if (!chunks.TryGetValue(key, out var list)) chunks[key] = list = new List<TreeSpot>();
-                list.Add(t);
-            }
-            foreach (var pair in chunks)
-            {
-                // Nearest the track first: the cameras are on or by the track, so those trees are
-                // usually in front, and the ones behind them fail the depth test before shading.
-                pair.Value.Sort((a, b) => plan.EdgeDistance(a.Base.x, a.Base.z).CompareTo(plan.EdgeDistance(b.Base.x, b.Base.z)));
                 var go = new GameObject("Trees") { isStatic = true };
                 go.transform.SetParent(root, false);
-                var far = new List<TreeSpot>();
-                for (int i = 0; i < pair.Value.Count; i++)
-                {
-                    if (i % FarKeep != 0) continue;
-                    TreeSpot t = pair.Value[i];
-                    t.Scale *= FarGrow;
-                    if (t.Kind == TreeKind.Bush) t.Squash /= FarGrow;   // wider, not taller
-                    far.Add(t);
-                }
-                Renderer near = Part(go.transform, "Near", pair.Value, material, true);
-                Renderer distant = Part(go.transform, "Far", far, material, false);
+                Renderer near = Part(go.transform, "Near", chunk.Near, materials, true);
+                Renderer distant = Part(go.transform, "Far", chunk.Far, materials, false);
                 LODGroup lod = go.AddComponent<LODGroup>();
                 lod.SetLODs(new[] { new LOD(FarAt, new[] { near }), new LOD(0.002f, new[] { distant }) });
                 lod.RecalculateBounds();
             }
         }
 
-        private static Renderer Part(Transform parent, string name, List<TreeSpot> trees, Material material, bool shadows)
+        private static Renderer Part(Transform parent, string name, List<TreeSpot> trees, Material[] materials, bool shadows)
         {
             var go = new GameObject(name) { isStatic = true };
             go.transform.SetParent(parent, false);
@@ -152,7 +129,7 @@ namespace TarmacGauntlet.Raceday
             {
                 int k = (int)t.Kind;
                 float radius = LandscapePlan.ModelRadius[k] * t.Scale;
-                var s = new Vector4(radius, CentreAbove[k] * t.Scale * t.Squash, t.Yaw, k);
+                var s = new Vector4(radius, LandscapePlan.CentreAbove[k] * t.Scale * t.Squash, t.Yaw, k);
                 // Halved, so the tint can lighten as well as darken; the shader doubles it.
                 Color32 tint = LandscapeLooks.Leaves(t.Kind, t.Hue) * (t.Shade * 0.5f);
                 int b = verts.Count;
@@ -175,21 +152,30 @@ namespace TarmacGauntlet.Raceday
             mesh.SetUVs(1, shape);
             mesh.SetUVs(2, squash);
             mesh.SetColors(colours);
+            // The same quads twice, one submesh for each material: depth, then lit.
+            mesh.subMeshCount = 2;
             mesh.SetTriangles(tris, 0, false);
+            mesh.SetTriangles(tris, 1, false);
             // The vertices all sit at the trees' feet; the quads reach out from there in the shader.
             mesh.bounds = new Bounds((lo + hi) * 0.5f, hi - lo);
             mesh.UploadMeshData(true);
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
             var r = go.AddComponent<MeshRenderer>();
-            r.sharedMaterial = material;
+            r.sharedMaterials = materials;
             r.shadowCastingMode = shadows ? ShadowCastingMode.On : ShadowCastingMode.Off;
             r.lightProbeUsage = LightProbeUsage.Off;
             r.reflectionProbeUsage = ReflectionProbeUsage.Off;
             return r;
         }
 
-        /// <summary>The impostor material, its atlases gathered into texture arrays, or null if they are missing.</summary>
-        private static Material TreeMaterial()
+        /// <summary>Queue of the trees' depth material: after the ground and other opaque things, before any lit tree.</summary>
+        private const int DepthQueue = (int)RenderQueue.AlphaTest - 1;
+
+        /// <summary>
+        /// The impostor materials, its atlases gathered into texture arrays: depth alone, drawn for every tree before
+        /// any is lit, then lit. Null if the shader or atlases are missing.
+        /// </summary>
+        private static Material[] TreeMaterials()
         {
             Shader shader = Resources.Load<Shader>("Landscape/Impostor");
             Texture2DArray colour = Layers("_colour"), normals = Layers("_normal");
@@ -198,12 +184,42 @@ namespace TarmacGauntlet.Raceday
                 Debug.LogWarning("Landscape: impostor shader or atlases missing, no trees.");
                 return null;
             }
-            var m = new Material(shader) { name = "Trees", enableInstancing = false };
-            m.SetTexture("_Atlas", colour);
-            m.SetTexture("_Normals", normals);
-            m.SetFloat("_Cutoff", 0.5f);
-            m.SetFloat("_Frames", 8f);
-            return m;
+            var lit = new Material(shader) { name = "Trees", enableInstancing = false };
+            lit.SetTexture("_Atlas", colour);
+            lit.SetTexture("_Normals", normals);
+            lit.SetTexture("_Crop", Crop());
+            lit.SetFloat("_Cutoff", 0.5f);
+            lit.SetFloat("_Frames", Frames);
+            var depth = new Material(lit) { name = "Trees depth", renderQueue = DepthQueue };
+            depth.SetShaderPassEnabled("UniversalForward", false);
+            depth.SetShaderPassEnabled("ShadowCaster", false);
+            depth.SetShaderPassEnabled("DepthOnly", false);
+            lit.SetShaderPassEnabled("SRPDefaultUnlit", false);
+            return new[] { depth, lit };
+        }
+
+        private const int Frames = 8;
+
+        /// <summary>
+        /// The leaves' bounds in each frame of each kind's atlas (Resources/Landscape/crop.bytes, from tools/landscape/frames.py),
+        /// a row a kind: left, bottom, right, top, 0 to 1 across the frame. Whole frames if the file is missing.
+        /// </summary>
+        private static Texture2D Crop()
+        {
+            int across = Frames * Frames;
+            var bytes = new byte[across * Kinds.Length * 4];
+            TextAsset file = Resources.Load<TextAsset>("Landscape/crop");
+            if (file != null && file.bytes.Length == bytes.Length) bytes = file.bytes;
+            else
+            {
+                Debug.LogWarning("Landscape: crop.bytes missing or the wrong size, trees drawn on whole frames.");
+                for (int i = 0; i < bytes.Length; i += 4) { bytes[i + 2] = 255; bytes[i + 3] = 255; }
+            }
+            var tex = new Texture2D(across, Kinds.Length, TextureFormat.RGBA32, false, true)
+                { name = "Tree crop", filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
+            tex.SetPixelData(bytes, 0);
+            tex.Apply(false, true);
+            return tex;
         }
 
         private static Texture2DArray Layers(string suffix)

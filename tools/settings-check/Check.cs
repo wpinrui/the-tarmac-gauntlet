@@ -20,10 +20,11 @@ internal static class Check
 {
     private static int failed;
 
-    // What "first" sets, each away from its default and from the High quality level's value.
+    // What "first" sets: Ultra, then every row away from its default (and from Ultra's value, but for the rows off by
+    // default, which Ultra turns on).
     private const int Mode = 2; // Windowed
     private static readonly Vector2Int Size = new Vector2Int(1280, 720);
-    private const int Quality = 2; // High
+    private const int Quality = 3; // Ultra
     private const bool VSync = false;
     private const float Volume = 0.35f;
     private const int RealLights = 17;
@@ -57,16 +58,22 @@ internal static class Check
                 Expect(row.Label, row.Value, Changed(row));
                 foreach (GraphicsOption o in row.Options) Expect(row.Label + ": " + o.Key, o.Value, Changed(row));
             }
-            var occlusion = (ScriptableRendererFeature)Resources.Load<UniversalRendererData>("Quality/Renderer").rendererFeatures[0];
-            Expect("ambient occlusion drawn as its option says", occlusion.isActive, GraphicsOptions.AmbientOcclusion.On);
+            foreach (string renderer in new[] { "Renderer", "RendererHigh", "RendererUltra" })
+                foreach (ScriptableRendererFeature f in Resources.Load<UniversalRendererData>("Quality/" + renderer).rendererFeatures)
+                {
+                    if (f is ScreenSpaceAmbientOcclusion)
+                        Expect(renderer + ": ambient occlusion drawn as its option says", f.isActive, GraphicsOptions.AmbientOcclusion.On);
+                    if (f is ScreenSpaceShadows)
+                        Expect(renderer + ": screen shadows drawn as their option says", f.isActive, GraphicsOptions.SoftShadows.On);
+                }
         }
         ScanForOtherWriters(args[2]);
         Console.WriteLine(failed == 0 ? $"settings-check {args[0]}: all passed" : $"settings-check {args[0]}: {failed} FAILED");
         return failed == 0 ? 0 : 1;
     }
 
-    /// <summary>A row's value that differs from its High value and its default: off for a toggle, a set count otherwise.</summary>
-    private static int Changed(GraphicsRow row) => row.IsToggle ? 0 : RealLights;
+    /// <summary>A row's value that differs from its default: the other one for a toggle, a set count otherwise.</summary>
+    private static int Changed(GraphicsRow row) => row.IsToggle ? 1 - row.Options[0].Default : RealLights;
 
     /// <summary>What a launch does before the first scene: the screen opens at its defaults and every boot hook runs.</summary>
     private static void Launch()

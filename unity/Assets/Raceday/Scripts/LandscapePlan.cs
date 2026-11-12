@@ -24,6 +24,12 @@ namespace TarmacGauntlet.Raceday
     }
 
     /// <summary>The kinds of tree, in the order of their impostor atlases.</summary>
+    /// <summary>A square of trees drawn as one mesh, near and far versions (<see cref="LandscapePlan.Chunks"/>).</summary>
+    public sealed class TreeChunk
+    {
+        public List<TreeSpot> Near, Far;
+    }
+
     public enum TreeKind { Oak, Beech, Birch, PineA, PineB, SpruceA, SpruceB, Bush }
 
     /// <summary>One tree or hedge bush: where it stands, how big it is and which way it faces.</summary>
@@ -82,6 +88,11 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Baked model sizes, from tools/landscape/trees.json: height and the radius of the impostor quad, m.</summary>
         public static readonly float[] ModelHeight = { 5.04f, 3.41f, 4.57f, 18.92f, 14.08f, 8.85f, 7.82f, 2.17f };
         public static readonly float[] ModelRadius = { 3.19f, 2.89f, 2.65f, 9.60f, 7.17f, 4.53f, 4.03f, 2.63f };
+        /// <summary>Baked tree's middle above its foot, by kind, m (tools/landscape/trees.json).</summary>
+        public static readonly float[] CentreAbove = { 2.52f, 1.71f, 2.28f, 9.46f, 7.04f, 4.43f, 3.91f, 1.09f };
+        /// <summary>A chunk's far version keeps one tree in this many and grows each to cover for the rest.</summary>
+        public const int FarKeep = 3;
+        public const float FarGrow = 1.45f;
 
         public readonly List<TreeSpot> Trees = new List<TreeSpot>();
         /// <summary>Land use on a grid <see cref="MapPerCell"/> times finer than the terrain's, row by row along x.</summary>
@@ -268,6 +279,42 @@ namespace TarmacGauntlet.Raceday
 
         /// <summary>How far a point is beyond the nearest armco, up to <see cref="FieldReach"/>, to within a map cell.</summary>
         public float EdgeDistance(float x, float z) => edge[Nearest(x, z)];
+
+        /// <summary>
+        /// The trees in their chunks, each with a near version and a thinner far one, nearest the track first: the
+        /// cameras are on or by the track, so those trees are usually in front, and the ones behind fail the depth test.
+        /// </summary>
+        public List<TreeChunk> Chunks()
+        {
+            var byKey = new Dictionary<long, List<TreeSpot>>();
+            var keys = new List<long>();
+            foreach (TreeSpot t in Trees)
+            {
+                long key = ((long)Mathf.FloorToInt(t.Base.x / ChunkSize) << 32) ^ (uint)Mathf.FloorToInt(t.Base.z / ChunkSize);
+                if (!byKey.TryGetValue(key, out var list)) { byKey[key] = list = new List<TreeSpot>(); keys.Add(key); }
+                list.Add(t);
+            }
+            var chunks = new List<TreeChunk>(keys.Count);
+            foreach (long key in keys)
+            {
+                List<TreeSpot> near = byKey[key];
+                var order = new float[near.Count];
+                for (int i = 0; i < near.Count; i++) order[i] = EdgeDistance(near[i].Base.x, near[i].Base.z);
+                TreeSpot[] sorted = near.ToArray();
+                Array.Sort(order, sorted);
+                near = new List<TreeSpot>(sorted);
+                var far = new List<TreeSpot>();
+                for (int i = 0; i < near.Count; i += FarKeep)
+                {
+                    TreeSpot t = near[i];
+                    t.Scale *= FarGrow;
+                    if (t.Kind == TreeKind.Bush) t.Squash /= FarGrow;   // wider, not taller
+                    far.Add(t);
+                }
+                chunks.Add(new TreeChunk { Near = near, Far = far });
+            }
+            return chunks;
+        }
 
         /// <summary>True where nothing may stand.</summary>
         public bool Kept(float x, float z)

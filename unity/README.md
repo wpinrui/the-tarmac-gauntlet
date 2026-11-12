@@ -22,14 +22,17 @@ The project renders with the Universal Render Pipeline. Each quality level has i
 | --- | --- | --- | --- |
 | Low | 1 cascade, 1024, 150 m | 67%, STP | STP |
 | Medium | 2 cascades, 2048, 250 m | 80%, STP | STP |
-| High | 4 cascades, 4096, 400 m | 100% | SMAA |
+| High | 4 cascades, 4096, 500 m | 100%, STP | STP |
+| Ultra | 4 cascades, 4096, 600 m | 100%, STP | STP |
 
 Medium is the level for an Intel Arc B390 at 1920 x 1200 and 60 fps, and the default. `QualityLevels.cs` puts the chosen
-level's asset in place as the game starts and gives every game camera post-processing and SMAA. ProjectSettings is not
-committed, so `Assets/Rendering/Editor/UsePipeline.cs` puts the Medium asset in the graphics settings whenever the editor
-loads. Materials made in code use URP Lit through `Assets/Rendering/Scripts/Lit.cs`, and the game's own lit shaders share
+level's asset in place as the game starts and gives every game camera post-processing and SMAA, which URP swaps for STP
+wherever STP runs. At 100% STP upscales nothing and works as temporal anti-aliasing. ProjectSettings is not
+committed, so `Assets/Rendering/Editor/UsePipeline.cs` puts the Medium asset in the graphics settings and sets Linear
+colour space whenever the editor loads, and the build sets Linear again. Textures made in code that hold data rather
+than colour (noise, normals, masks, lookups) are created linear. Materials made in code use URP Lit through `Assets/Rendering/Scripts/Lit.cs`, and the game's own lit shaders share
 `Assets/Rendering/Shaders/TarmacLit.hlsl`; the ones that move (car paint and carbon, liveries, pit crews, pit kit) also draw motion vectors
-(`TarmacMotion.hlsl`) so the upscaler follows them. The menus' frosted glass is `GlassBlurFeature` on
+(`TarmacMotion.hlsl`) so the upscaler follows them, and the crowd draws its own for its fans turning and bouncing. The menus' frosted glass is `GlassBlurFeature` on
 the renderer, beside URP's ambient occlusion at half resolution, after the opaque pass.
 
 `ScreenReflectionsFeature` on the renderer adds screen-space reflections before the transparent pass. A shader opts in
@@ -44,8 +47,9 @@ floodlight, and its smoothness varies along the lap from a polish map in the pat
 Each scene's global volume carries `PostEffects`: the ACES tone curve and a colour grade, half resolution bloom, and
 Gaussian depth of field for a camera that calls `PostEffects.Focus` that frame. The
 broadcast director does for every shot but the onboard; a replay camera should too. A driving view never does, so it is
-never blurred. The race grades for the time of day and the weather (`SkyGrade.cs`). A camera cut clears the
-upscaler's history. There is no motion blur. Colour grading, bloom, ambient occlusion, depth of field,
+never blurred. The race grades for the time of day and the weather (`SkyGrade.cs`). A camera cut, or a camera that
+did not draw last frame, clears the upscaler's history (`CameraCuts.cs`). The tarmac shimmer is drawn after the post
+effects, so the upscaler never smears it. There is no motion blur. Colour grading, bloom, ambient occlusion, depth of field,
 sky detail and the crowd each have a row in the graphics settings (`GraphicsOptions.cs`). URP's point and spot lights fall off with the square of the distance;
 `LightFalloff.Urp` turns an intensity set for the built-in pipeline into one as bright a third of the way out to its range.
 

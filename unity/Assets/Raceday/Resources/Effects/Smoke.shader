@@ -22,6 +22,10 @@ Shader "Hidden/TarmacGauntlet/Smoke"
             #pragma vertex vert
             #pragma fragment frag
             #include_with_pragmas "Assets/Rendering/Shaders/LitKeywords.hlsl"
+            // Smoke is see-through, and the sun's shadow is read per vertex. URP's screen-space shadows are a texture of
+            // the opaque scene, which a vertex can't read and which URP switches off before it draws see-through things.
+            // Marked transparent, URP reads the shadow map itself in every variant.
+            #define _SURFACE_TYPE_TRANSPARENT 1
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
