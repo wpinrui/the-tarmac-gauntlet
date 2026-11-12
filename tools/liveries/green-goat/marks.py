@@ -191,6 +191,8 @@ def decals():
     words("more", "bangers", "MORE! MORE! MORE!", G, 0.03, STICKER)
     words("overstim", "bangers", "OVERSTIMULATED", PK, 0.03, STICKER)
     words("protein", "bangers", "GOAT'S MILK PROTEIN", Y, 0.03, STICKER)
+    words("milk-sticker", "bangers", "GOAT'S MILK!", G, 0.03, STICKER)
+    words("limit-sticker", "bangers", "MILK THE LIMIT!", Y, 0.03, STICKER)
 
 
 if __name__ == "__main__":
