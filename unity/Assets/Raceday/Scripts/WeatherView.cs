@@ -25,7 +25,7 @@ namespace TarmacGauntlet.Raceday
         [NonSerialized] public Func<float> RaceSeconds;
         [NonSerialized] public CircuitMaterials Materials;
         [NonSerialized] public RaceCar[] Cars;
-        /// <summary>How far night has fallen, 0 to 1 (<see cref="SkyClock"/>): rain and spray catch the floodlights.</summary>
+        /// <summary>How far the circuit's lights are on, 0 to 1 (<see cref="TimeOfDay.Lights"/>): rain and spray catch the floodlights.</summary>
         [NonSerialized] public Func<float> Night;
 
         /// <summary>The weather now.</summary>

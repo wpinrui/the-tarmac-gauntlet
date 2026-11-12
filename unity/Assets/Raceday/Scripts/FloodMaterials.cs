@@ -29,7 +29,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Colour of the floodlights' light.</summary>
         public Color Tint => tint;
 
-        /// <summary>Lights the lenses and the pools for a night amount from <see cref="SkyClock"/>.</summary>
+        /// <summary>Lights the lenses and the pools for a darkness from <see cref="TimeOfDay.Lights"/>.</summary>
         public void Night(float night)
         {
             Lens.SetColor(EmissionId, tint * (NightLook.LensGlow * NightLook.On(night)));
