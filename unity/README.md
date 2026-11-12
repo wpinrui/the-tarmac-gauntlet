@@ -28,7 +28,7 @@ Medium is the level for an Intel Arc B390 at 1920 x 1200 and 60 fps, and the def
 level's asset in place as the game starts and gives every game camera post-processing and SMAA. ProjectSettings is not
 committed, so `Assets/Rendering/Editor/UsePipeline.cs` puts the Medium asset in the graphics settings whenever the editor
 loads. Materials made in code use URP Lit through `Assets/Rendering/Scripts/Lit.cs`, and the game's own lit shaders share
-`Assets/Rendering/Shaders/TarmacLit.hlsl`; the ones that move (cars, pit crews, pit kit) also draw motion vectors
+`Assets/Rendering/Shaders/TarmacLit.hlsl`; the ones that move (car paint and carbon, liveries, pit crews, pit kit) also draw motion vectors
 (`TarmacMotion.hlsl`) so the upscaler and the motion blur follow them. The menus' frosted glass is `GlassBlurFeature` on
 the renderer, beside URP's ambient occlusion at half resolution, after the opaque pass.
 
