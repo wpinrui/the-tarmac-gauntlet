@@ -14,6 +14,7 @@ namespace TarmacGauntlet.Simulation
         {
             { "f-01", "Assets/Art/Vehicles/NusaCarrier/NusaCarrier.obj" },
             { "e-07", "Assets/Art/Vehicles/LibertyFantasy/LibertyFantasy.obj" },
+            { "d-12", "Assets/Art/Vehicles/SeorakHoeori/SeorakHoeori.obj" },
             { "b-22", "Assets/Art/Vehicles/ArcherTachyon/ArcherTachyon.obj" },
             { "b-23", "Assets/Art/Vehicles/ArcherJetBlack/ArcherJetBlack.obj" },
             { "b-24", "Assets/Art/Vehicles/KaiserScream/KaiserScream.obj" },
