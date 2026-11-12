@@ -53,8 +53,8 @@ static class Check
         int n = circuit.Count;
 
         TrackTextures.Tarmac tarmac = TrackTextures.MakeTarmac(1);
-        Color[] road = TrackTextures.TarmacColour(tarmac, new Color(0.17f, 0.17f, 0.18f), 0.5f);
-        Color[] roadNormals = TrackTextures.TarmacNormals(tarmac, 1.2f);
+        Color[] road = TrackTextures.TarmacColour(tarmac, new Color(0.17f, 0.17f, 0.18f), 0.25f);
+        Color[] roadNormals = TrackTextures.TarmacNormals(tarmac, TrackTextures.TarmacBump);
         Color[] repairs = TrackTextures.Repairs(12), marks = TrackTextures.Marks(14);
         int ra = TrackTextures.RepairsAcross, rl = TrackTextures.RepairsAlong, mka = TrackTextures.MarksAcross, mkl = TrackTextures.MarksAlong;
         Color[] macro = TrackTextures.Macro(8);

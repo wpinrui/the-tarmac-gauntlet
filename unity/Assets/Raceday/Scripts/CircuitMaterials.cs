@@ -33,10 +33,10 @@ namespace TarmacGauntlet.Raceday
         {
             Shader track = Resources.Load<Shader>("TrackSurface/Track");
             TrackTextures.Tarmac tarmac = TrackTextures.MakeTarmac(1);
-            Texture2D normals = Texture("Tarmac normals", TrackTextures.TarmacNormals(tarmac, 1.2f), TrackTextures.TarmacSize, TrackTextures.TarmacSize, true);
+            Texture2D normals = Texture("Tarmac normals", TrackTextures.TarmacNormals(tarmac, TrackTextures.TarmacBump), TrackTextures.TarmacSize, TrackTextures.TarmacSize, true);
             Texture2D macro = Texture("Tarmac patches", TrackTextures.Macro(8), TrackTextures.MacroSize, TrackTextures.MacroSize, true);
-            Texture2D road = Texture("Asphalt", TrackTextures.TarmacColour(tarmac, new Color(0.17f, 0.17f, 0.18f), 0.5f), TrackTextures.TarmacSize, TrackTextures.TarmacSize, false);
-            Texture2D pit = Texture("Pit asphalt", TrackTextures.TarmacColour(tarmac, new Color(0.21f, 0.21f, 0.22f), 0.4f), TrackTextures.TarmacSize, TrackTextures.TarmacSize, false);
+            Texture2D road = Texture("Asphalt", TrackTextures.TarmacColour(tarmac, new Color(0.17f, 0.17f, 0.18f), 0.25f), TrackTextures.TarmacSize, TrackTextures.TarmacSize, false);
+            Texture2D pit = Texture("Pit asphalt", TrackTextures.TarmacColour(tarmac, new Color(0.21f, 0.21f, 0.22f), 0.2f), TrackTextures.TarmacSize, TrackTextures.TarmacSize, false);
             Texture2D repairs = Texture("Tarmac repairs", TrackTextures.Repairs(12), TrackTextures.RepairsAcross, TrackTextures.RepairsAlong, true);
             Asphalt = Track(track, "Asphalt", road, normals, macro, 0.25f, 0.35f, 1f);
             RoadEdge = Track(track, "Road edge", road, normals, macro, 0.25f, 0.35f, 1f);
