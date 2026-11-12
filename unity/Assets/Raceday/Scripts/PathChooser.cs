@@ -315,7 +315,16 @@ namespace TarmacGauntlet.Raceday
         private TrafficCar simMe;
         private int simAhead, simNextTurn;
         private float simMargin, simBrakes, simRiskWeight, simPassCost, simFreeSpeed;
-        private System.Action<int> simulateOne;
+        /// <summary>
+        /// The batch is shared out by hand on the thread pool's threads, not with Parallel.For, which made over a megabyte of
+        /// garbage a second of its own. The calling thread drives paths too, and waits only for helpers that joined in.
+        /// </summary>
+        private static readonly int Helpers = Mathf.Clamp(System.Environment.ProcessorCount - 1, 1, 7);
+        private readonly object simGate = new object();
+        private bool simOpen;
+        private int simWorking, simNext;
+        private System.Exception simError;
+        private System.Threading.WaitCallback simHelp;
         private System.Comparison<int> fartherFirst;
 
         /// <summary>A path from this plan's set, as if just made.</summary>
@@ -352,14 +361,57 @@ namespace TarmacGauntlet.Raceday
             simRiskWeight = riskWeight;
             simPassCost = passCost;
             simFreeSpeed = freeSpeed;
-            if (simulateOne == null) simulateOne = SimulateOne;
-            System.Threading.Tasks.Parallel.For(0, cands.Count, simulateOne);
+            simNext = -1;
+            simError = null;
+            lock (simGate)
+            {
+                simOpen = true;
+                simWorking = 1;
+            }
+            if (simHelp == null) simHelp = _ => Help();
+            int helpers = Mathf.Min(Helpers, cands.Count - 1);
+            for (int h = 0; h < helpers; h++) System.Threading.ThreadPool.UnsafeQueueUserWorkItem(simHelp, null);
+            DriveShare();
+            lock (simGate)
+            {
+                // Helpers that have not started yet are not waited for: they find the batch shut and leave.
+                simOpen = false;
+                simWorking--;
+                while (simWorking > 0) System.Threading.Monitor.Wait(simGate);
+            }
             simCands = null;
             simPilot = null;
+            if (simError != null) throw new System.AggregateException(simError);
         }
 
-        private void SimulateOne(int i) =>
-            Simulate(simPilot, simMe, simCands[i], simAhead, simNextTurn, simMargin, simBrakes, simRiskWeight, simPassCost, simFreeSpeed);
+        /// <summary>A worker thread joins the batch of paths being driven, if it is still open.</summary>
+        private void Help()
+        {
+            lock (simGate)
+            {
+                if (!simOpen) return;
+                simWorking++;
+            }
+            DriveShare();
+            lock (simGate)
+            {
+                if (--simWorking == 0) System.Threading.Monitor.PulseAll(simGate);
+            }
+        }
+
+        /// <summary>Drives paths from the batch until none are left.</summary>
+        private void DriveShare()
+        {
+            try
+            {
+                for (int i; System.Threading.Volatile.Read(ref simError) == null && (i = System.Threading.Interlocked.Increment(ref simNext)) < simCands.Count;)
+                    Simulate(simPilot, simMe, simCands[i], simAhead, simNextTurn, simMargin, simBrakes, simRiskWeight, simPassCost, simFreeSpeed);
+            }
+            catch (System.Exception e)
+            {
+                System.Threading.Interlocked.CompareExchange(ref simError, e, null);
+            }
+        }
 
         /// <summary>Picks a path if it is time to, and returns whether it did.</summary>
         public bool Plan(AiPilot pilot, TrafficCar me, IReadOnlyList<TrafficCar> field, float dt)
