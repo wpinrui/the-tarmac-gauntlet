@@ -44,7 +44,7 @@ MATERIALS = {
     "rim": ((0.58, 0.59, 0.61), 0.9, 1.0, None),
 }
 LAMPS = {"Headlights": ["lamp_head"], "Tail lights": ["lamp_tail"], "Brake lights": ["lamp_brake"]}
-GROUPS = {"roof": "Roof", "frontbadge": "Front badge", "rearbadge": "Rear badge", "name": "Name"}
+GROUPS = {"frontbadge": "Front badge", "rearbadge": "Rear badge", "name": "Name"}
 
 
 # ---------------------------------------------------------------- frames
@@ -352,8 +352,15 @@ def flip_y(g):
 
 
 # ---------------------------------------------------------------- shut lines
+DOOR_FRONT = [(0.70, 0.810), (0.785, 0.795), (0.808, 0.700)]   # the door's top front corner, cleaned
+
+
 def door_shape():
-    return soft(poly(R["door"]), 0.02)
+    """The reference's door less the step in its front edge: the top runs on to a rounded
+    corner and the front edge drops straight."""
+    pts = [p for p in R["door"] if not (p[0] > 0.6 and p[1] > 0.6)]
+    i = max(range(len(pts)), key=lambda j: pts[j][0] if pts[j][1] > 0.8 else -9) + 1
+    return soft(poly(pts[:i] + DOOR_FRONT + pts[i:]), 0.02)
 
 
 BONNET_MEET = 0.45    # the bonnet line meets the screen's base this far out from the centre
@@ -418,10 +425,8 @@ DOOR_OPEN = 62.0      # degrees the door swings out
 
 
 def door_outline():
-    """The left door seen from the side: inside its shut line, with the mirror on its front top
-    corner."""
-    m = R["mirror"]
-    return unary_union([door_shape(), box(m["x_back"] - 0.03, BELT - 0.04, m["x_front"] + 0.02, m["z1"] + 0.03)])
+    """The left door seen from the side, inside its shut line. The mirror is a part of its own."""
+    return door_shape()
 
 
 def prism_y(name, g, y0, y1, mat="interior"):
@@ -442,7 +447,7 @@ def prism_y(name, g, y0, y1, mat="interior"):
 
 
 def _door_top(grow, sgn=1):
-    """The door top and mirror, straight through from the cockpit's edge outwards."""
+    """The door top, straight through from the cockpit's edge outwards."""
     g = biggest(door_outline().intersection(box(-5, DOOR_TOP, 5, 5)).buffer(grow, join_style=2))
     return [prism_y("door_top", g, (COCKPIT_Y - 0.01 - grow) * sgn, 1.4 * sgn)]
 
@@ -459,14 +464,13 @@ def door_hinge(sgn=1):
 
 
 def door(ref, shell, sgn=1):
-    """Cut the left (sgn 1) or right (sgn -1) door free of the body; its card and mirror glass
-    go with it. Returns the door's pieces. The exact boolean now and then drops the door's skin
+    """Cut the left (sgn 1) or right (sgn -1) door free of the body; its card goes with it. Returns the door's pieces. The exact boolean now and then drops the door's skin
     on a near coincident face: then the cut is undone and tried again with the gap a hair wider."""
     import bpy
     side = "l" if sgn > 0 else "r"
     o = door_outline()
     regions = [(door_shape().intersection(box(-5, -1, 5, DOOR_TOP + 0.01)), DOOR_WALL)]
-    roles = {f"mirror_glass_{side}": "mirror", f"door_card_{side}": "card"}
+    roles = {f"door_card_{side}": "card"}
     keep = shell.data.copy()
     for k in range(5):
         pieces = blend.free_door(ref, side_fr(sgn), regions, DOOR_GAP + 0.00007 * k, shell, [], roles, o,
@@ -477,7 +481,7 @@ def door(ref, shell, sgn=1):
             return pieces
         print(f"door_{side}: skin lost, trying again")
         for ob in pieces[1:]:
-            ob.name = ob.name.replace(f"door_{side}_", "").replace("mirror", f"mirror_glass_{side}").replace("card", f"door_card_{side}")
+            ob.name = ob.name.replace(f"door_{side}_", "").replace("card", f"door_card_{side}")
         bpy.data.objects.remove(d)
         shell.data = keep.copy()
     raise RuntimeError(f"door_{side} would not cut free")
@@ -651,77 +655,162 @@ def rear_parts(ref, out):
 
 
 # ---------------------------------------------------------------- hard top
-# The reference is an open roadster: the hard top is our own. It runs from the screen's header
-# back onto the fairings behind the seats, with glass in the doors up to it and a small rear
-# window between the fairings.
-TOP_X = (-0.42, 0.40)          # the roof's rear edge, and its front edge at the header
-TOP_Z = (1.045, 1.150, 1.122)  # centre height at the rear, the crest, the header
-TOP_W = (0.56, 0.50)           # half width at the rear (the fairings' outsides) and the header
-TOP_CROWN = (0.035, 0.022)     # the edges sit this much lower than the centre
-TOP_T = 0.008                  # roof thickness
+# The reference is an open roadster with two fairings behind the seats: here the fairings go
+# and a hard top of our own takes their place. One surface runs from the screen's header over
+# the cabin and sweeps down onto the deck, with glass in the doors up to it and a rear window
+# in the sweep. Every piece is cut from that one surface, so they meet edge to edge.
+TOP_X = (-0.56, -0.32, 0.40)    # the sweep's foot on the deck, the cabin's back, the header
+TOP_Z = (1.085, 1.150, 1.122)   # roof centre height at the cabin's back, the crest, the header
+TOP_W = (0.60, 0.56, 0.50)      # half width of the roof's edge at the foot, the cabin's back, the header
+TOP_CROWN = (0.035, 0.022)      # the edges sit this much lower than the centre, back and front
+TOP_ROUND = 0.045               # the roof's edge rounds over this far
+TOP_T = 0.010                   # thickness of the roof and the sweep
+SILL = (0.70, BELT - 0.015)     # where the side meets the door top: half width, height
 PILLAR = ((0.80, 0.70, 0.80), (0.55, 0.61, 0.97))   # the screen's side edge: its foot, its middle
-SILL = 0.70                    # door glass half width at the door top
 GLASS_T = 0.004
-REAR_GLASS = (-0.55, 0.20)     # the rear window's foot, and its half width
+REAR_WINDOW = (0.30, 0.04)      # the rear window's half width, and the margin round it
 
 
-def _top_z(s):
-    """Roof centre height, s 0 at the rear edge to 1 at the header."""
-    zr, zc, zf = TOP_Z
-    return (1 - s) ** 2 * zr + 2 * s * (1 - s) * (2 * zc - (zr + zf) / 2) + s ** 2 * zf
+def _roof_centre(x):
+    """Roof centre height: a curve over the cabin, then an easing fall to the deck."""
+    xf, xb, xh = TOP_X
+    zb, zc, zh = TOP_Z
+    if x >= xb:
+        s = (x - xb) / (xh - xb)
+        return (1 - s) ** 2 * zb + 2 * s * (1 - s) * (2 * zc - (zb + zh) / 2) + s ** 2 * zh
+    u = (x - xf) / (xb - xf)
+    foot = body.z_top(xf) - 0.012
+    slope = 2 * (2 * zc - (zb + zh) / 2 - zb) / (xh - xb)       # the cabin roof's slope at its back
+    return foot + (zb - foot) * (3 * u * u - 2 * u ** 3) + slope * (xb - xf) * (u ** 3 - u * u)
 
 
-def _top_at(s, v):
-    """A point on the roof's top: s rear to front, v -1 right to 1 left."""
-    x = TOP_X[0] + (TOP_X[1] - TOP_X[0]) * s
-    w = TOP_W[0] + (TOP_W[1] - TOP_W[0]) * s
-    c = TOP_CROWN[0] + (TOP_CROWN[1] - TOP_CROWN[0]) * s
-    return np.array([x, w * v, _top_z(s) - c * v * v])
+def _deck_drop(x, y):
+    """How far the skin's top at half width y sits below its top centre, at x."""
+    h = body.half(body.at(body.CV, x))
+    top = h[int(np.argmax(h[:, 0])):]                          # outermost point up to the top centre
+    return body.z_top(x) - float(np.interp(y, top[::-1, 0], top[::-1, 1]))
 
 
-def _sheet(name, grid, t, mat, normal):
-    """A grid of points (rows, cols, 3) made a closed sheet t thick, pushed along -normal."""
-    rings = [np.vstack([row, (row - t * normal(row))[::-1]]) for row in grid]
-    v, f = geom.close_rings(rings)
-    return blend.make(name, v, f, mat)
+def _lerp3(x, vals):
+    xf, xb, xh = TOP_X
+    if x >= xb:
+        return vals[1] + (vals[2] - vals[1]) * (x - xb) / (xh - xb)
+    return vals[0] + (vals[1] - vals[0]) * (x - xf) / (xb - xf)
+
+
+def _section(x, n_side=10, n_round=6, n_top=29):
+    """One cross section of the top's left half and right half: from the left sill up the
+    side, round the edge, over the crown and down to the right sill. Returns (points, k0, k1):
+    the side runs to k0 on the left and from k1 on the right."""
+    zc = _roof_centre(x)
+    xf, xb, xh = TOP_X
+    a = np.clip((x - xf) / (xb - xf), 0, 1)                  # 0 at the foot, 1 at the cabin
+    w = _lerp3(x, TOP_W)
+    crown = TOP_CROWN[0] + (TOP_CROWN[1] - TOP_CROWN[0]) * max(0.0, (x - xb) / (xh - xb))
+    crown = crown * a + _deck_drop(xf, TOP_W[0]) * (1 - a)    # the foot follows the deck's crown
+    sill = np.array(SILL)
+    edge = np.array([w, zc - crown])
+    side = sill - edge
+    q0 = edge + side / np.linalg.norm(side) * min(TOP_ROUND, 0.45 * np.linalg.norm(side))
+    v1 = 1 - TOP_ROUND / w
+    q1 = np.array([w * v1, zc - crown * v1 * v1])
+    left = [sill + (q0 - sill) * t for t in np.linspace(0, 1, n_side)]
+    left += [(1 - t) ** 2 * q0 + 2 * t * (1 - t) * edge + t ** 2 * q1 for t in np.linspace(0, 1, n_round)[1:]]
+    top = [np.array([w * v, zc - crown * v * v]) for v in np.linspace(v1, -v1, n_top)[1:-1]]
+    half = np.array(left)
+    pts = np.vstack([half, top, (half * [-1, 1])[::-1]])
+    k0 = n_side - 1
+    return np.column_stack([np.full(len(pts), x), pts]), k0, len(pts) - 1 - k0
+
+
+def _slab(name, outer, t, mat, centre_z=0.80):
+    """A grid of points (rows, cols, 3) on the outside, made a closed solid t thick inwards:
+    the outside, the inside and four edge strips."""
+    g = np.asarray(outer, float)
+    n = np.cross(np.gradient(g, axis=0), np.gradient(g, axis=1))
+    n /= np.linalg.norm(n, axis=2, keepdims=True) + 1e-12
+    rel = g.copy()
+    rel[..., 0] = 0
+    rel[..., 2] -= centre_z
+    flip = np.sign(np.sum(n * rel, axis=2, keepdims=True))
+    n *= np.where(flip == 0, 1, flip)
+    inner = g - t * n
+    R_, C = g.shape[:2]
+    verts = np.vstack([g.reshape(-1, 3), inner.reshape(-1, 3)])
+    off = R_ * C
+    idx = lambda i, j: i * C + j
+    faces = []
+    for i in range(R_ - 1):
+        for j in range(C - 1):
+            q = (idx(i, j), idx(i + 1, j), idx(i + 1, j + 1), idx(i, j + 1))
+            faces.append(q)
+            faces.append(tuple(off + k for k in q[::-1]))
+    border = [idx(0, j) for j in range(C)] + [idx(i, C - 1) for i in range(1, R_)] + \
+             [idx(R_ - 1, j) for j in range(C - 2, -1, -1)] + [idx(i, 0) for i in range(R_ - 2, 0, -1)]
+    for a_, b_ in zip(border, border[1:] + border[:1]):
+        faces.append((b_, a_, a_ + off, b_ + off))
+    ob = blend.make(name, verts, faces, mat)
+    _outward(ob)
+    return ob
+
+
+def _outward(ob):
+    import bmesh
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(ob.data)
+    bm.free()
 
 
 def hard_top(mat):
-    """The roof in mat, the door glass (it swings with the doors) and the rear window."""
-    S, V = np.linspace(0, 1, 40), np.linspace(-1, 1, 41)
-    grid = np.array([[_top_at(s, v) for v in V] for s in S])
-    up = lambda row: np.tile([0.0, 0.0, 1.0], (len(row), 1))
-    obs = [_sheet("roof", grid, TOP_T, mat, up)]
+    """The roof and sweep in mat, the door glass (it swings with the doors) and the rear window."""
+    xf, xb, xh = TOP_X
+    xs = np.concatenate([np.linspace(xf, xb, 26)[:-1], np.linspace(xb, xh, 40)])
+    secs = [_section(x) for x in xs]
+    grid = np.array([s[0] for s in secs])
+    k0, k1 = secs[0][1], secs[0][2]
+    ib = 25                                                    # the cabin's back
+    obs = []
 
-    # the door glass: a patch between the door top, the roof's edge, the screen's side edge
-    # and a straight rear edge
+    # the sides of the sweep, behind the doors
+    obs.append(_slab("top_side_l", grid[:ib + 1, :k0 + 1], TOP_T, mat))
+    obs.append(_slab("top_side_r", grid[:ib + 1, k1:], TOP_T, mat))
+
+    # the cap, with the rear window let into the sweep
+    cap = grid[:, k0:k1 + 1]
+    hw, m = REAR_WINDOW
+    ys = cap[ib // 2, :, 1]
+    j0, j1 = int(np.argmin(np.abs(ys - hw))), int(np.argmin(np.abs(ys + hw)))
+    i0 = int(np.argmin(np.abs(xs - (xf + m)))) + 1
+    i1 = int(np.argmin(np.abs(xs - (xb - m))))
+    obs.append(_slab("roof", cap[i1:], TOP_T, mat))
+    obs.append(_slab("top_tail", cap[:i0 + 1], TOP_T, mat))
+    obs.append(_slab("top_rear_l", cap[i0:i1 + 1, :j0 + 1], TOP_T, mat))
+    obs.append(_slab("top_rear_r", cap[i0:i1 + 1, j1:], TOP_T, mat))
+    obs.append(_slab("rear_glass", cap[i0:i1 + 1, j0:j1 + 1], GLASS_T, "glass"))
+
+    # the door glass: between the door top, the roof's edge, the screen's side edge and the
+    # cabin's back, a patch whose top and back are the cap's and the sweep's own edges
+    cab = grid[ib:, :k0 + 1]                                  # rows over x, columns sill to edge
+    top_pts, rear_pts = cab[:, -1], cab[0]
+    xt = top_pts[:, 0]
+    top = lambda u: np.array([np.interp(xb + (xh - xb) * u, xt, top_pts[:, c]) for c in range(3)])
+    lo, mid = np.array(PILLAR[0]), np.array(PILLAR[1])
+    hi = top(1.0)
+    ctrl = 2 * mid - (lo + hi) / 2
+    foot = rear_pts[0]
+    lo = np.array([lo[0], foot[1], foot[2]])
+    bottom = lambda u: foot + (lo - foot) * u
+    front = lambda t: (1 - t) ** 2 * lo + 2 * t * (1 - t) * ctrl + t ** 2 * hi
+    T = np.linspace(0, 1, len(rear_pts))
+    rear = lambda t: np.array([np.interp(t, T, rear_pts[:, c]) for c in range(3)])
+    U = np.linspace(0, 1, 48)
+    patch = np.array([[(1 - t) * bottom(u) + t * top(u) + (1 - u) * rear(t) + u * front(t)
+                       - ((1 - u) * (1 - t) * foot + u * (1 - t) * lo + (1 - u) * t * top(0.0) + u * t * hi)
+                       for u in U] for t in T])
     for sgn, side in ((1, "l"), (-1, "r")):
-        top = lambda u: _top_at(u, 1) - [0, 0.004, TOP_T]
-        lo, mid = np.array(PILLAR[0]), np.array(PILLAR[1])
-        hi = top(1.0)
-        ctrl = 2 * mid - (lo + hi) / 2
-        foot = np.array([CABIN_BACK, SILL, lo[2]])
-        bottom = lambda u: foot + (lo - foot) * u
-        front = lambda t: (1 - t) ** 2 * lo + 2 * t * (1 - t) * ctrl + t ** 2 * hi
-        rear = lambda t: foot + (top(0.0) - foot) * t
-        rows = []
-        for t in np.linspace(0, 1, 24):
-            rows.append([(1 - t) * bottom(u) + t * top(u) + (1 - u) * rear(t) + u * front(t)
-                         - ((1 - u) * (1 - t) * foot + u * (1 - t) * lo + (1 - u) * t * top(0.0) + u * t * hi)
-                         for u in np.linspace(0, 1, 40)])
-        grid = np.array(rows) * [1, sgn, 1]
-        out = lambda row, sgn=sgn: np.tile([0.0, sgn, 0.0], (len(row), 1))
-        obs.append(_sheet(f"door_{side}_glass", grid, GLASS_T, "glass", out))
-
-    x0, hw = REAR_GLASS
-    z0 = body.z_top(x0) + 0.004
-    rows = []
-    for t in np.linspace(0, 1, 12):
-        x = TOP_X[0] + (x0 - TOP_X[0]) * t
-        zt = _top_z(0.0) - TOP_T
-        rows.append(np.array([[x, y, zt + (z0 - zt) * t] for y in np.linspace(-hw, hw, 9)]))
-    back = lambda row: np.tile([1.0, 0.0, 0.0], (len(row), 1))
-    obs.append(_sheet("rear_glass", np.array(rows), GLASS_T, "glass", back))
+        obs.append(_slab(f"door_{side}_glass", patch * [1, sgn, 1], GLASS_T, "glass"))
     return obs
 
 
@@ -888,7 +977,7 @@ PANEL_T = 0.0035      # the rear panel stands proud by this much: badges on it s
 
 
 def options(ref):
-    """Roof, badge and name options, named opt_<group>_<n>_<i>. Badges and names lie flat
+    """Badge and name options, named opt_<group>_<n>_<i>. Badges and names lie flat
     on their panels."""
     bdg, nm = badge_shape(), name_shape()
     up = (0, 0, 1)
@@ -898,9 +987,6 @@ def options(ref):
         for i, ob in enumerate(objs):
             ob.name = f"opt_{group}_{n}_{i}"
             out.append(ob)
-    # roof: the hard top, 1 black, 2 body coloured
-    add("roof", 1, hard_top("carbon"))
-    add("roof", 2, hard_top("body"))
     # front badge: 1 on the bonnet's front edge (the reference), 2 low on the nose
     bz = float(np.array(R["intake_mid"])[:, 1].max())
     add("frontbadge", 1, _flat(ref, bdg, 0.055, front_fr(), 0, 0.615, up, "fb", 0.0012, BADGE_T, "chrome"))

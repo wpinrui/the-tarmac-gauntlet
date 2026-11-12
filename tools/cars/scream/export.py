@@ -1,6 +1,6 @@
 """Builds the Kaiser Scream in Blender and writes KaiserScream.obj and .mtl.
 
-Run: python3 export.py out            every roof, badge and name option, for the viewer
+Run: python3 export.py out            every badge and name option, for the viewer
      python3 export.py <dir> --game   only Ivan's picks, Unity axes
 """
 import sys
@@ -107,11 +107,12 @@ def build(game=False):
     print("cockpit cut")
     cut(shell, cutters)
     print("openings cut, hollows dropped:", blend.drop_voids(shell))
-    for m in parts.mirrors():
-        join(shell, m)
     mcut, mglass = parts.mirror_recess()
-    cut(shell, mcut)
-    out += mglass
+    for m, c, g in zip(parts.mirrors(), mcut, mglass):
+        side = m.name[-1]
+        blend.boolean(m, c, "DIFFERENCE")
+        m.name, g.name = f"door_{side}_mirror", f"door_{side}_mirror_glass"
+        out += [m, g]
     ecut, pipes = parts.exhaust()
     cut(shell, ecut)
     out += pipes
@@ -120,6 +121,7 @@ def build(game=False):
     print("grooves cut")
 
     out += parts.interior()
+    out += parts.hard_top("body")
     print("body faces", len(shell.data.polygons))
     doors = []
     for sgn in (1, -1):

@@ -195,15 +195,16 @@ def polar(segs, zc, th):
 
 # ---------------------------------------------------------------- body sections
 def shell(sp, m):
-    """The painted skin and the windscreen: body, nose, tail, engine deck, doors, bonnet and
-    the two fairings behind the seats. No mirrors and no wing: they are built on their own."""
+    """The painted skin and the windscreen: body, nose, tail, engine deck, doors and bonnet.
+    No fairings behind the seats: the hard top takes their place. No mirrors and no wing: they are built on their own."""
     cs = sorted(comps(sp(m[PAINT])), key=lambda c: -len(c))
     diffuser = max(comps(sp(m["diffuzer"])), key=len)
     return np.vstack([cs[i] for i in SKIN] + [sp(m["material"]), diffuser])
 
 
-SKIN = (0, 1, 2, 3, 6, 7, 8, 9, 12, 13)     # pieces of the paint mesh, by size (6: the wing, flush with the deck)
-DECK = (-1.75, -0.50)      # the engine deck: open grilles in the model, a plain deck here
+SKIN = (0, 1, 2, 3, 6, 7, 8, 9)     # pieces of the paint mesh, by size (6: the wing, flush with the deck)
+DECK = (-1.75, -0.30)      # the engine deck and the cabin's back: open grilles and the fairings
+                           # behind the seats in the model, a plain deck under the hard top here
 DECK_Y = 0.62              # out to this half width
 BRIDGE = [(-0.80, -0.38, 0.28, 0.78)]     # (x0, x1, z0, z1): recesses the skin spans over
 
@@ -424,7 +425,7 @@ def measure(path):
         "tail": ring(tail), "rear_panel": ring(panel), "diffuser": ring(diffuser), "exhaust": pipes,
         "deck": ring(deck), "grille": ring(grille),
         "mirror": mirror,
-        "picks": {"roof": 1, "frontbadge": 1, "rearbadge": 1, "name": 1},
+        "picks": {"frontbadge": 1, "rearbadge": 1, "name": 1},
     }
 
 
