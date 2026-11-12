@@ -5,7 +5,7 @@ for measurements only. Its shapes are taken and scaled to the 2005 car's publish
 every outline is simplified and every section smoothed hard.
   - body sections: the outer skin cut across at stations along the car, read as a radius at
     even angles round a centre point, so every station has the same number of points;
-  - lamps, intakes, shut lines, glass, mirror, wing and exhaust: outlines of the matching meshes,
+  - lamps, intakes, shut lines, glass, mirror and exhaust: outlines of the matching meshes,
     seen from the side, front, rear or top, or as 3D loops for the head lamps.
 The model sits rolled a few degrees, so it is first levelled on its four wheel centres. It is then
 scaled so its wheelbase is the published 2730 mm, with each axle one published tyre radius
@@ -202,7 +202,7 @@ def shell(sp, m):
     return np.vstack([cs[i] for i in SKIN] + [sp(m["material"]), diffuser])
 
 
-SKIN = (0, 1, 2, 3, 6, 7, 8, 9, 12, 13)     # pieces of the paint mesh, by size (6: the wing, lowered)
+SKIN = (0, 1, 2, 3, 6, 7, 8, 9, 12, 13)     # pieces of the paint mesh, by size (6: the wing, flush with the deck)
 DECK = (-1.75, -0.50)      # the engine deck: open grilles in the model, a plain deck here
 DECK_Y = 0.62              # out to this half width
 BRIDGE = [(-0.80, -0.38, 0.28, 0.78)]     # (x0, x1, z0, z1): recesses the skin spans over
@@ -396,13 +396,10 @@ def measure(path):
     diffuser = biggest(project(dz[0][dz[0][:, :, 0].mean(1) < -2.0], 1, 2))
     pipes = [disc(c) for c in pieces("exhaustchrome") if c[:, :, 1].mean() > 0]
 
-    # top: the engine deck lid, its two grilles, the wing (lowered, as the model has it)
+    # top: the engine deck lid, its two grilles
     deck = biggest(project(paint[3], 0, 1))
     grilles = [biggest(project(c, 0, 1)) for c in pieces("ENGINEgrill")[:2]]
     grille = [g for g in grilles if g.centroid.y > 0][0]
-    wing = paint[6]
-    wv = wing.reshape(-1, 3)
-    i0, i1 = wv[:, 0].argmax(), wv[:, 0].argmin()
 
     # the door mirror: its housing and glass on the left
     mv = left(paint[4]).reshape(-1, 3)
@@ -426,9 +423,8 @@ def measure(path):
         "intake_side": ring(intake_side), "fog": fog, "bonnet": ring(bonnet),
         "tail": ring(tail), "rear_panel": ring(panel), "diffuser": ring(diffuser), "exhaust": pipes,
         "deck": ring(deck), "grille": ring(grille),
-        "wing": {"plan": ring(project(wing, 0, 1)), "front": r4(wv[i0, [0, 2]]), "back": r4(wv[i1, [0, 2]])},
         "mirror": mirror,
-        "picks": {"roof": 1, "wing": 1, "frontbadge": 1, "rearbadge": 1, "name": 1},
+        "picks": {"roof": 1, "frontbadge": 1, "rearbadge": 1, "name": 1},
     }
 
 

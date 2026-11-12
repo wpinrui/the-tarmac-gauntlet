@@ -1,5 +1,5 @@
 """The Scream's parts: cockpit, screen, lamps, intakes, grilles, mirrors, exhaust, rear panel,
-diffuser, wing, roof panels, interior, wheels, badge and name. Every shape and size here is the
+diffuser, roof panels, interior, wheels, badge and name. Every shape and size here is the
 Scream's own, from rows.json, kept plain and smooth. Runs inside Blender's Python module, called
 by export.py."""
 import json
@@ -44,7 +44,7 @@ MATERIALS = {
     "rim": ((0.58, 0.59, 0.61), 0.9, 1.0, None),
 }
 LAMPS = {"Headlights": ["lamp_head"], "Tail lights": ["lamp_tail"], "Brake lights": ["lamp_brake"]}
-GROUPS = {"roof": "Roof", "wing": "Wing", "frontbadge": "Front badge", "rearbadge": "Rear badge", "name": "Name"}
+GROUPS = {"roof": "Roof", "frontbadge": "Front badge", "rearbadge": "Rear badge", "name": "Name"}
 
 
 # ---------------------------------------------------------------- frames
@@ -356,13 +356,16 @@ def door_shape():
     return soft(poly(R["door"]), 0.02)
 
 
+BONNET_MEET = 0.45    # the bonnet line meets the screen's base this far out from the centre
+SCREEN_GAP = -0.008   # and runs this far under the screen's trim
+BONNET_EASE = 4       # points of the lid's rear corners the bend replaces
+
+
 def bonnet_path():
-    """The bonnet shut line in plan: out of the windscreen's lower corners, onto the lid's rear
-    corners, forward along the wings and round the nose. The lid runs back to the screen, so
-    the line has no rear edge."""
+    """The bonnet shut line in plan: out of the windscreen's base inboard of its corners, bending
+    out to the lid's rear corners, forward along the wings and round the nose. The lid runs back
+    to the screen, so the line has no rear edge."""
     o, _g, _t = screen_shapes()
-    c = np.array(o.exterior.coords)
-    corner = c[np.argmax(c[:, 0] + c[:, 1])]                       # the left lower corner
     b = soft(poly(R["bonnet"]), 0.04).buffer(-0.004)
     ring = geom.resample(np.array(b.exterior.coords), 0.01)[:-1]
     i_l = int(np.argmax(ring[:, 1] - ring[:, 0]))                   # the lid's rear corners
@@ -373,21 +376,26 @@ def bonnet_path():
     a_ = walk(i_l, i_r)
     idx = a_ if i_f in a_ else walk(i_r, i_l)[::-1]
     path = ring[idx]
-    start = np.array([corner[0], corner[1] - 0.012])
-    end = start * [1, -1]
-    return np.vstack([start, path, end])
+    # from the lid's rear corner the line bends inboard and meets the screen's base square on
+    edge = o.buffer(SCREEN_GAP).exterior
+    hit = edge.intersection(LineString([(-5, BONNET_MEET), (5, BONNET_MEET)]))
+    meet = np.array([max(q.x for q in getattr(hit, "geoms", [hit])), BONNET_MEET])
+    k = BONNET_EASE                                                 # round the lid's corner
+    path = path[k:len(path) - k]
+    p0 = path[0]
+    side = p0 - path[4]
+    ctrl = p0 + side / np.linalg.norm(side) * 0.25 * np.linalg.norm(meet - p0)
+    t = np.linspace(0, 1, 24)[:, None]
+    bend = ((1 - t) ** 2 * meet + 2 * t * (1 - t) * ctrl + t ** 2 * p0)[:-1]
+    return np.vstack([bend, path, bend[::-1] * [1, -1]])
 
 
 def deck_loop():
     return np.array(soft(poly(R["deck"]), 0.05).buffer(-0.004).simplify(0.002).exterior.coords)[:-1]
 
 
-def wing_plan():
-    return soft(poly(R["wing"]["plan"]), 0.02)
-
-
 def grooves(ref):
-    """Shut lines as V grooves to cut: doors, bonnet, engine deck lid, wing."""
+    """Shut lines as V grooves to cut: doors, bonnet, engine deck lid."""
     obs = []
     d = np.array(door_shape().exterior.coords)[:-1]
     d = geom.resample(np.vstack([d, d[:1]]), 0.01)
@@ -399,8 +407,6 @@ def grooves(ref):
         obs.append(blend.groove(ref, f"g_door_{side}", path, side_fr(sgn)))
     obs.append(blend.groove(ref, "g_bonnet", bonnet_path(), top_fr()))
     obs.append(blend.groove(ref, "g_deck", deck_loop(), top_fr(), closed=True))
-    w = np.array(wing_plan().buffer(-0.004).exterior.coords)[:-1]
-    obs.append(blend.groove(ref, "g_wing", w, top_fr(), closed=True))
     return obs
 
 
@@ -644,62 +650,78 @@ def rear_parts(ref, out):
         out += blend.lay(ref, f"diffuser_fin_{i}", fin, fr, 0.0034, 0.05, "grille", 0.006, along_ray=True)
 
 
-# ---------------------------------------------------------------- wing
-WING_T = 0.022        # thickest
-WING_LIFT = 0.10      # raised, it stands this much higher at its leading edge
-WING_TILT = 0.035     # and its trailing edge this much higher again
+# ---------------------------------------------------------------- hard top
+# The reference is an open roadster: the hard top is our own. It runs from the screen's header
+# back onto the fairings behind the seats, with glass in the doors up to it and a small rear
+# window between the fairings.
+TOP_X = (-0.42, 0.40)          # the roof's rear edge, and its front edge at the header
+TOP_Z = (1.045, 1.150, 1.122)  # centre height at the rear, the crest, the header
+TOP_W = (0.56, 0.50)           # half width at the rear (the fairings' outsides) and the header
+TOP_CROWN = (0.035, 0.022)     # the edges sit this much lower than the centre
+TOP_T = 0.008                  # roof thickness
+PILLAR = ((0.80, 0.70, 0.80), (0.55, 0.61, 0.97))   # the screen's side edge: its foot, its middle
+SILL = 0.70                    # door glass half width at the door top
+GLASS_T = 0.004
+REAR_GLASS = (-0.55, 0.20)     # the rear window's foot, and its half width
 
 
-def wing_raised():
-    """The wing raised as it stands at speed: the lowered wing's plan lifted on two black
-    struts, its tail tipped up. The deck it leaves shows black."""
-    a = R["wing"]
-    plan = wing_plan()
-    (xf, zf), (xb, zb) = a["front"], a["back"]
-    chord = lambda x: zf + WING_LIFT + (zb - zf + WING_TILT) * (x - xf) / (xb - xf)
-    ymax = plan.bounds[3] - 0.004
-    rings, n = [], 24
-    for y in np.linspace(-ymax, ymax, 41):
-        seg = plan.intersection(LineString([(-5, y), (5, y)]))
-        if seg.is_empty:
-            continue
-        x0, _a, x1, _b = seg.bounds
-        s = np.linspace(0, 1, n)
-        xs = x1 + (x0 - x1) * s
-        th = WING_T * np.clip(np.sqrt(4 * s * (1 - s)), 0.25, 1)
-        base = chord(xs) - WING_T / 2
-        top = np.column_stack([xs, np.full(n, y), base + th])
-        bot = np.column_stack([xs, np.full(n, y), base + (WING_T - th) * 0.35])
-        rings.append(np.vstack([bot, top[::-1][1:-1]]))
+def _top_z(s):
+    """Roof centre height, s 0 at the rear edge to 1 at the header."""
+    zr, zc, zf = TOP_Z
+    return (1 - s) ** 2 * zr + 2 * s * (1 - s) * (2 * zc - (zr + zf) / 2) + s ** 2 * zf
+
+
+def _top_at(s, v):
+    """A point on the roof's top: s rear to front, v -1 right to 1 left."""
+    x = TOP_X[0] + (TOP_X[1] - TOP_X[0]) * s
+    w = TOP_W[0] + (TOP_W[1] - TOP_W[0]) * s
+    c = TOP_CROWN[0] + (TOP_CROWN[1] - TOP_CROWN[0]) * s
+    return np.array([x, w * v, _top_z(s) - c * v * v])
+
+
+def _sheet(name, grid, t, mat, normal):
+    """A grid of points (rows, cols, 3) made a closed sheet t thick, pushed along -normal."""
+    rings = [np.vstack([row, (row - t * normal(row))[::-1]]) for row in grid]
     v, f = geom.close_rings(rings)
-    obs = [blend.make("wing", v, f, "body")]
-    xm = (xf + xb) / 2
+    return blend.make(name, v, f, mat)
+
+
+def hard_top(mat):
+    """The roof in mat, the door glass (it swings with the doors) and the rear window."""
+    S, V = np.linspace(0, 1, 40), np.linspace(-1, 1, 41)
+    grid = np.array([[_top_at(s, v) for v in V] for s in S])
+    up = lambda row: np.tile([0.0, 0.0, 1.0], (len(row), 1))
+    obs = [_sheet("roof", grid, TOP_T, mat, up)]
+
+    # the door glass: a patch between the door top, the roof's edge, the screen's side edge
+    # and a straight rear edge
     for sgn, side in ((1, "l"), (-1, "r")):
-        y = 0.30 * sgn
-        zt = float(chord(xm)) - WING_T / 2 + 0.004
-        zd = body.z_top(xm) - 0.03
-        obs.append(_rbox(f"wing_strut_{side}", xm - 0.05, xm + 0.05, y - 0.008, y + 0.008, zd, zt, r=0.006, mat="trim"))
-    return obs
+        top = lambda u: _top_at(u, 1) - [0, 0.004, TOP_T]
+        lo, mid = np.array(PILLAR[0]), np.array(PILLAR[1])
+        hi = top(1.0)
+        ctrl = 2 * mid - (lo + hi) / 2
+        foot = np.array([CABIN_BACK, SILL, lo[2]])
+        bottom = lambda u: foot + (lo - foot) * u
+        front = lambda t: (1 - t) ** 2 * lo + 2 * t * (1 - t) * ctrl + t ** 2 * hi
+        rear = lambda t: foot + (top(0.0) - foot) * t
+        rows = []
+        for t in np.linspace(0, 1, 24):
+            rows.append([(1 - t) * bottom(u) + t * top(u) + (1 - u) * rear(t) + u * front(t)
+                         - ((1 - u) * (1 - t) * foot + u * (1 - t) * lo + (1 - u) * t * top(0.0) + u * t * hi)
+                         for u in np.linspace(0, 1, 40)])
+        grid = np.array(rows) * [1, sgn, 1]
+        out = lambda row, sgn=sgn: np.tile([0.0, sgn, 0.0], (len(row), 1))
+        obs.append(_sheet(f"door_{side}_glass", grid, GLASS_T, "glass", out))
 
-
-def wing_well(ref):
-    return blend.lay(ref, "wing_well", wing_plan().buffer(-0.008), top_fr(), 0.0006, 0.0016, "trim", 0.01)
-
-
-# ---------------------------------------------------------------- roof panels
-ROOF_Y = 0.60         # the panels' half width
-ROOF_SEAM = 0.004     # half the gap down the middle
-
-
-def roof_panels(ref, mat):
-    """The two roof panels fitted: from the screen header back to the bulkhead, laid on the
-    roof line the body would have, with a seam down the middle."""
-    xh = plane_x(body.z_top(R["screen"]["x_top"])) - 0.002
-    shp = soft(box(CABIN_BACK + 0.012, -ROOF_Y, xh, ROOF_Y), 0.06)
-    obs = []
-    for sgn in (1, -1):
-        half = shp.intersection(box(-5, ROOF_SEAM, 5, 5) if sgn > 0 else box(-5, -5, 5, -ROOF_SEAM))
-        obs += blend.lay(ref, f"roof_{'l' if sgn > 0 else 'r'}", half, top_fr(), -0.006, 0.0, mat, 0.015)
+    x0, hw = REAR_GLASS
+    z0 = body.z_top(x0) + 0.004
+    rows = []
+    for t in np.linspace(0, 1, 12):
+        x = TOP_X[0] + (x0 - TOP_X[0]) * t
+        zt = _top_z(0.0) - TOP_T
+        rows.append(np.array([[x, y, zt + (z0 - zt) * t] for y in np.linspace(-hw, hw, 9)]))
+    back = lambda row: np.tile([1.0, 0.0, 0.0], (len(row), 1))
+    obs.append(_sheet("rear_glass", np.array(rows), GLASS_T, "glass", back))
     return obs
 
 
@@ -866,7 +888,7 @@ PANEL_T = 0.0035      # the rear panel stands proud by this much: badges on it s
 
 
 def options(ref):
-    """Roof, wing, badge and name options, named opt_<group>_<n>_<i>. Badges and names lie flat
+    """Roof, badge and name options, named opt_<group>_<n>_<i>. Badges and names lie flat
     on their panels."""
     bdg, nm = badge_shape(), name_shape()
     up = (0, 0, 1)
@@ -876,22 +898,20 @@ def options(ref):
         for i, ob in enumerate(objs):
             ob.name = f"opt_{group}_{n}_{i}"
             out.append(ob)
-    # roof: 1 open as the reference, 2 black panels, 3 body coloured panels
-    add("roof", 2, roof_panels(ref, "carbon"))
-    add("roof", 3, roof_panels(ref, "body"))
-    # wing: 1 down as the reference (part of the deck), 2 raised
-    add("wing", 2, wing_raised() + wing_well(ref))
+    # roof: the hard top, 1 black, 2 body coloured
+    add("roof", 1, hard_top("carbon"))
+    add("roof", 2, hard_top("body"))
     # front badge: 1 on the bonnet's front edge (the reference), 2 low on the nose
     bz = float(np.array(R["intake_mid"])[:, 1].max())
     add("frontbadge", 1, _flat(ref, bdg, 0.055, front_fr(), 0, 0.615, up, "fb", 0.0012, BADGE_T, "chrome"))
     add("frontbadge", 2, _flat(ref, bdg, 0.055, front_fr(), 0, bz + 0.05, up, "fb", 0.0012, BADGE_T, "chrome"))
     # rear badge: 1 on the black panel between the exhausts (the reference's plate), 2 high on
-    # the tail under the wing
+    # the top of the tail
     pb = panel_shape().bounds
     add("rearbadge", 1, _flat(ref, bdg, 0.06, rear_fr(), 0, (pb[1] + pb[3]) / 2 + 0.03, up, "rb",
                               PANEL_T + 0.0005, PANEL_T + BADGE_T, "chrome"))
     add("rearbadge", 2, _flat(ref, bdg, 0.06, rear_fr(), 0, 0.665, up, "rb", 0.0012, BADGE_T, "chrome"))
-    # name: 1 under the wing right of centre (the reference), 2 on the black panel, low
+    # name: 1 on the top of the tail right of centre (the reference), 2 on the black panel, low
     cap = 0.028
     add("name", 1, _flat(ref, nm, cap, rear_fr(), -0.30, 0.665, up, "nm", 0.0012, NAME_T, "chrome"))
     add("name", 2, _flat(ref, nm, cap, rear_fr(), 0, pb[1] + 0.03, up, "nm", PANEL_T + 0.0005, PANEL_T + NAME_T, "chrome"))

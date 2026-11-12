@@ -1,6 +1,6 @@
 """Builds the Kaiser Scream in Blender and writes KaiserScream.obj and .mtl.
 
-Run: python3 export.py out            every roof, wing, badge and name option, for the viewer
+Run: python3 export.py out            every roof, badge and name option, for the viewer
      python3 export.py <dir> --game   only Ivan's picks, Unity axes
 """
 import sys
