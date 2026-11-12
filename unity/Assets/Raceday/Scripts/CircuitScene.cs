@@ -13,7 +13,7 @@ namespace TarmacGauntlet.Raceday
     /// the race for the career and settles it at the flag. Start picks how the race starts: from the
     /// grid at once, behind the pace car, or from the pit lane, where the cars queue in the fast lane
     /// and leave three seconds apart, moving up to the pit exit line (<see cref="PitLaneStart"/>). The pit lane start fast forwards
-    /// until the car ahead of the player's is about to leave. In the editor and development builds Tab opens the debug menu (<see cref="DebugMenu"/>), whose race set-up (<see cref="DebugSettings"/>) picks the start, the weather, the start hour, the field and your car. Delete hands the player's car to you and
+    /// until the car ahead of the player's is about to leave. In the editor and development builds Tab opens the debug menu (<see cref="DebugMenu"/>), whose race set-up (<see cref="DebugSettings"/>) picks the start, the weather, the start hour, the field and your car. You drive your own car from the green when you start the race, and Delete hands it to the AI and
     /// back. = rides with the car behind the one you watch, - with the car ahead, and P with the next car making a pit stop. F steps
     /// the race through normal speed, 4x and 16x while the AI drives your car, and ends the pit lane
     /// start's fast forward. Cars away from the camera glide without physics (<see cref="PhysicsRange"/>).
@@ -53,6 +53,9 @@ namespace TarmacGauntlet.Raceday
         /// <summary>True while the race fast forwards to your next stint.</summary>
         private bool stintSkip;
         private string lastDriver;
+        /// <summary>True once the race has handed you the wheel at the start.</summary>
+        private bool handedOver;
+        private RaceTower raceTower;
 
         private const string PlayerCar = "a-29";
         private const string PaceCarModel = "c-19";
@@ -189,6 +192,7 @@ namespace TarmacGauntlet.Raceday
             // Run on its own the scene is for AI testing, so it starts on the chase camera.
             if (!career) views.StartInChase();
             RaceTower tower = Tower(circuit, racing, field, teams, watched, starter);
+            raceTower = tower;
             views.Tower = tower;
             if (player >= 0 && TeamColour(setup.Game, grid[player].TeamId) is Color own) tower.Colours[player] = own;
             view.Fit(Complex, tower.Colours, pits.Garages);
@@ -346,7 +350,11 @@ namespace TarmacGauntlet.Raceday
         {
             if (keys == null || ai == null) return;
             if (director.Finished) return;   // the race summary is up, at normal speed
-            if (keys.Pressed(KeyCode.Delete)) ai.enabled = !ai.enabled;
+            if (keys.Pressed(KeyCode.Delete))
+            {
+                ai.enabled = !ai.enabled;
+                handedOver = true;   // your call from here on
+            }
             if (keys.Pressed(KeyCode.F))
             {
                 if (skipping) skipping = false;
@@ -354,6 +362,7 @@ namespace TarmacGauntlet.Raceday
                 else speed = (speed + 1) % Speeds.Length;
             }
             if (keys.Pressed(KeyCode.N) && CanSkip()) stintSkip = true;
+            TakeTheStart();
             Stints();
             // Fast forward is for watching: taking the wheel drops back to normal speed.
             if (!ai.enabled)
@@ -391,6 +400,24 @@ namespace TarmacGauntlet.Raceday
         /// you in is over and the car is back on track: you take the wheel. A stop that puts a teammate in
         /// while you drive gives the car to the AI once you have driven out of the pit lane.
         /// </summary>
+        /// <summary>
+        /// When you start the race in your own car, you drive it from the green, or from the pit exit after a pit lane
+        /// start. The AI only has it for the formation lap and the queue. Delete still hands it back and forth.
+        /// </summary>
+        private void TakeTheStart()
+        {
+            if (handedOver || playerIndex < 0) return;
+            if (day.Cars[playerIndex].Driver.Id != RaceEntry.PlayerCharacterDriverId)
+            {
+                handedOver = true;   // a teammate starts: the AI drives until your stint
+                return;
+            }
+            bool green = raceTower.Racing == null || raceTower.Racing();
+            if (!green || racingCars[playerIndex].InPitLane) return;
+            handedOver = true;
+            ai.enabled = false;
+        }
+
         private void Stints()
         {
             if (playerIndex < 0) return;
