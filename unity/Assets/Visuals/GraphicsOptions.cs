@@ -47,6 +47,18 @@ namespace TarmacGauntlet.Visuals
         /// <summary>A blur along the camera's own movement.</summary>
         public static readonly GraphicsOption MotionBlur = Toggle("settings.motionblur", "Motion blur", true);
 
+        /// <summary>
+        /// Depth of field on the broadcast cameras (and any replay camera that asks for it): the background past the car on screen
+        /// blurs, more through a long lens. Never while driving. Changes live.
+        /// </summary>
+        public static readonly GraphicsOption DepthOfField = Toggle("settings.dof", "Depth of field", true);
+
+        /// <summary>The race sky drawn with more care: haze at the horizon, a halo round the sun, finer and better lit clouds. Changes live.</summary>
+        public static readonly GraphicsOption SkyDetail = Toggle("settings.skydetail", "Sky detail", true);
+
+        /// <summary>The fans in the grandstands, each one flat card turned to the camera. Changes live.</summary>
+        public static readonly GraphicsOption Crowd = Toggle("settings.crowd", "Crowd", true);
+
         /// <summary>Grain and bumps in the tarmac and kerbs, and broad patches across the tarmac.</summary>
         public static readonly GraphicsOption TarmacDetail = Toggle("settings.tarmacdetail", "Tarmac detail", true);
 

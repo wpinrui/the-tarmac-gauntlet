@@ -344,8 +344,8 @@ static class Check
     }
 
     /// <summary>
-    /// One mesh as base64: positions as 2 cm steps in int16, triangles as uint32, and for the crowd each corner's palette
-    /// entry. Corners at the same spot with the same normal are one vertex, so the preview's flat normals come out right.
+    /// One mesh as base64: positions as 2 cm steps in int16, triangles as uint32, and for the crowd each corner's shirt
+    /// colour, so each fan's card shows flat in it. Corners at the same spot with the same normal are one vertex, so the preview's flat normals come out right.
     /// The id is a hash of the contents, so the same mesh is stored once.
     /// </summary>
     static (string id, object blob) Encode(string name, MeshKit kit, Vector3 origin)
@@ -368,7 +368,7 @@ static class Check
                 j = pos.Count / 3;
                 index[key] = j;
                 pos.Add(checked((short)key.Item1)); pos.Add(checked((short)key.Item2)); pos.Add(checked((short)key.Item3));
-                if (crowd) col.Add((byte)(Mathf.FloorToInt(uv[i].y * CrowdPalette.Height) * CrowdPalette.Width + Mathf.FloorToInt(uv[i].x * CrowdPalette.Width)));
+                if (crowd) col.Add((byte)CrowdCard.Shirt(uv[i]));
             }
             idx.Add(j);
         }
