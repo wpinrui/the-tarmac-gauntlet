@@ -31,8 +31,6 @@ namespace TarmacGauntlet.Raceday
         private const float SmokeRange = 220f, HazeRange = 70f;
         /// <summary>Real seconds between choosing the cars nearest the camera, and between reading the quality level.</summary>
         private const float PickEvery = 0.3f, LevelEvery = 1f;
-        /// <summary>A tyre sliding less than this makes no smoke.</summary>
-        private const float SmokeFrom = 0.25f;
         /// <summary>Puffs a second from one fully sliding tyre at speed.</summary>
         private const float SmokeRate = 38f;
         /// <summary>A wheel squeezed past this share of its travel at speed scrapes the car's floor on the track.</summary>
@@ -53,6 +51,8 @@ namespace TarmacGauntlet.Raceday
         private readonly List<(float, int)> byDistance = new List<(float, int)>();
         /// <summary>Puffs and sparks owed to each car's corners, carried over between frames so slow rates still emit.</summary>
         private float[] smokeOwed, sparkOwed, hazeOwed;
+        /// <summary>Seconds each car's tyres have kept sliding (<see cref="TyreSmoke.Step"/>).</summary>
+        private float[] smokeHeld;
         /// <summary>Each car's disc temperatures, front then rear, °C, and its glowing discs once it has had any.</summary>
         private float[] discHeat;
         private Discs[] discs;
@@ -144,6 +144,7 @@ namespace TarmacGauntlet.Raceday
             if (smokeOwed == null || smokeOwed.Length != n * 4)
             {
                 smokeOwed = new float[n * 4];
+                smokeHeld = new float[n * 4];
                 sparkOwed = new float[n * 4];
                 hazeOwed = new float[n];
                 discHeat = new float[n * 2];
@@ -223,7 +224,7 @@ namespace TarmacGauntlet.Raceday
                 if (smoking)
                 {
                     float skid = car.Skid(w, out Vector3 contact, out Vector3 normal);
-                    float amount = SkyClock.Smooth(SmokeFrom, 1f, skid) * dryness;
+                    float amount = TyreSmoke.Step(ref smokeHeld[k], skid, dt) * dryness;
                     if (amount > 0f)
                     {
                         // A wheel spinning on the spot smokes too, so the rate never falls to nothing at a standstill.

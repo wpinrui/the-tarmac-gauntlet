@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Runs the brake discs' heat for every car outside Unity and checks they glow when they should. Run through run.sh. -->
+  <!-- Runs the brake discs' heat for every car outside Unity and checks they glow when they should, and that tyres smoke only on a held slide. Run through run.sh. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
@@ -11,6 +11,7 @@
   <ItemGroup>
     <Compile Include="Check.cs;Stubs.cs;../circuit/geometry-check/UnityStubs.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/BrakeHeat.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/TyreSmoke.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/CarSpec.cs" />
     <Compile Include="../../unity/Assets/Simulation/**/*.cs" />
   </ItemGroup>

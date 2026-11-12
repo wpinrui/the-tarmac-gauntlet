@@ -60,8 +60,45 @@ internal static class Check
         }
         Expect("the glow only brightens as the disc heats", brighter, "");
 
+        Smoke();
+
         Console.WriteLine(failed == 0 ? "effects-check: all passed" : $"effects-check: {failed} FAILED");
         return failed == 0 ? 0 : 1;
+    }
+
+    /// <summary>Tyre smoke: never from a blip on a straight, always from a held lockup or wheelspin.</summary>
+    private static void Smoke()
+    {
+        // A wheel skipping over a bump: full slide for a few frames, then grip, again and again down a straight.
+        float held = 0f, most = 0f;
+        for (int f = 0; f < 600; f++)
+            most = Math.Max(most, TyreSmoke.Step(ref held, f % 30 < 4 ? 0.85f : 0f, Dt));
+        Expect("a wheel skipping over bumps on a straight never smokes", most == 0f, $"smoke {most:0.00}");
+
+        held = 0f;
+        most = 0f;
+        for (int f = 0; f < 600; f++) most = Math.Max(most, TyreSmoke.Step(ref held, TyreSmoke.From * 0.95f, Dt));
+        Expect("a tyre just under the threshold never smokes", most == 0f, $"smoke {most:0.00}");
+
+        held = 0f;
+        float first = -1f, end = 0f;
+        for (int f = 0; f < 60; f++)
+        {
+            end = TyreSmoke.Step(ref held, 0.85f, Dt);
+            if (end > 0f && first < 0f) first = f * Dt;
+        }
+        Expect("a held wheelspin smokes once it has lasted", first >= TyreSmoke.Hold - Dt && first <= TyreSmoke.Hold + 2f * Dt, $"first at {first:0.000} s");
+        Expect("a hard slide smokes thickly", end > 0.6f, $"smoke {end:0.00}");
+        Expect("grip stops the smoke at once", TyreSmoke.Step(ref held, 0f, Dt) == 0f && held == 0f, $"held {held:0.00}");
+
+        held = 0f;
+        float lighter = 0f, harder = 0f;
+        for (int f = 0; f < 30; f++) lighter = TyreSmoke.Step(ref held, 0.5f, Dt);
+        held = 0f;
+        for (int f = 0; f < 30; f++) harder = TyreSmoke.Step(ref held, 0.9f, Dt);
+        Expect("a harder slide smokes more", harder > lighter && lighter > 0f, $"{lighter:0.00} then {harder:0.00}");
+        held = 0f;
+        Expect("a long frame of slide counts in full", TyreSmoke.Step(ref held, 1f, 0.5f) == 1f, "");
     }
 
     private static void Straight(CarSpec spec, ref float front, ref float rear, float speed, float seconds)
