@@ -15,6 +15,7 @@ namespace TarmacGauntlet.Simulation
             { "e-07", "Assets/Art/Vehicles/LibertyFantasy/LibertyFantasy.obj" },
             { "b-22", "Assets/Art/Vehicles/ArcherTachyon/ArcherTachyon.obj" },
             { "b-23", "Assets/Art/Vehicles/ArcherJetBlack/ArcherJetBlack.obj" },
+            { "b-24", "Assets/Art/Vehicles/KaiserScream/KaiserScream.obj" },
         };
 
         private static readonly Dictionary<CarClass, string> ByClass = new Dictionary<CarClass, string>
