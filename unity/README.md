@@ -100,8 +100,9 @@ the car and the driver's seat. `V` puts the broadcast on, and `V` or `C` takes i
 camera. While you are not driving your own car, the car camera is yours to move and still rides along with the car. Hold
 the right mouse button and drag to look, `W` `A` `S` `D` move, `Q` and `E` go down and up, `Shift` is 5x faster and the
 wheel changes speed. On the TV camera the drag orbits the car and the wheel zooms, within each shot. Switching camera or
-car, or taking the wheel, puts the view back. The settings menu's Camera group sets the chase, bonnet and bumper cameras'
-field of view, position and tilt (`Visuals/CameraPresets.cs`). On the broadcast the director (`BroadcastDirector.cs`) picks
+car, or taking the wheel, puts the view back. Camera in the race's pause menu sets the chase, bonnet and bumper cameras'
+field of view, position and tilt (`Visuals/CameraPresets.cs`), with the race seen through the camera being tuned beside the
+panel, changing as each slider moves. On the broadcast the director (`BroadcastDirector.cs`) picks
 the story once a real second: a car stopped off the track, a fight for a class lead, any fight within a class under
 0.5 s, your car, a class leader's stop or yours, a car rejoining, the leader. It cuts between trackside, pan,
 helicopter, onboard and pit lane shots.

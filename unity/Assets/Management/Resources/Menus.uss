@@ -314,6 +314,8 @@
 .slider-value { width: 32px; font-size: 15px; -unity-text-align: middle-right; }
 .slider-value.wide { width: 46px; }
 .settings-reset { width: 250px; height: 36px; }
+.side { align-items: flex-end; justify-content: center; padding-right: 32px; }
+.camera-settings { width: 460px; }
 .settings-reset > .ghost-label { font-size: 14px; letter-spacing: 1.1px; }
 
 /* Skill points: pips for the points left, then each skill between a minus and a plus */

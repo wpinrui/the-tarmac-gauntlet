@@ -80,5 +80,11 @@ namespace TarmacGauntlet.Visuals
             new Vector2(-2f, 2f), new Vector2(0f, 3f), new Vector2(-3f, 4f));
 
         public static readonly IReadOnlyList<CameraPreset> All = new[] { Chase, Bonnet, Bumper };
+
+        /// <summary>The preset being tuned in the race's camera settings: the race camera shows exactly it while set.</summary>
+        public static CameraPreset Preview;
+
+        /// <summary>The preset the race camera is on, or null on the TV camera or the broadcast.</summary>
+        public static CameraPreset InUse;
     }
 }
