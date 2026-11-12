@@ -59,6 +59,21 @@ namespace TarmacGauntlet.Visuals
         /// <summary>Marks a sliding or spinning tyre leaves on the track during the race.</summary>
         public static readonly GraphicsOption SkidMarks = Toggle("settings.skidmarks", "Skid marks", true);
 
+        /// <summary>A wet track darkens, shines with the reflections and dries first along the racing line. Off, it only darkens and shines evenly. Changes live.</summary>
+        public static readonly GraphicsOption WetTrack = Toggle("settings.wettrack", "Wet track", true);
+
+        /// <summary>Water standing in the road's dips and along the edge its camber drains to. Needs the wet track. Changes live.</summary>
+        public static readonly GraphicsOption Puddles = Toggle("settings.puddles", "Puddles", true);
+
+        /// <summary>Raindrops ringing the puddles and the water on the track. Needs the wet track. Changes live.</summary>
+        public static readonly GraphicsOption RainRipples = Toggle("settings.rainripples", "Rain ripples", true);
+
+        /// <summary>Water thrown up behind the cars nearest the camera on a wet track. Changes live.</summary>
+        public static readonly GraphicsOption Spray = Toggle("settings.spray", "Spray", true);
+
+        /// <summary>A fine mist hanging in the air behind fast cars on a wet track. Changes live.</summary>
+        public static readonly GraphicsOption SprayMist = Toggle("settings.spraymist", "Spray mist", true);
+
         /// <summary>The Team HQ lit by its bake: lamp light, daylight and every bounce. Off, live lamps and a flat ambient light.</summary>
         public static readonly GraphicsOption BakedLighting = Toggle("settings.hqbakedlighting", "Baked lighting", true);
 
