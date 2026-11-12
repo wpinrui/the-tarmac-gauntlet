@@ -28,8 +28,9 @@ The project renders with the Universal Render Pipeline. Each quality level has i
 Medium is the level for an Intel Arc B390 at 1920 x 1200 and 60 fps, and the default. `QualityLevels.cs` puts the chosen
 level's asset in place as the game starts and gives every game camera post-processing and SMAA, which URP swaps for STP
 wherever STP runs. At 100% STP upscales nothing and works as temporal anti-aliasing. ProjectSettings is not
-committed, so `Assets/Rendering/Editor/UsePipeline.cs` puts the Medium asset in the graphics settings whenever the editor
-loads. Materials made in code use URP Lit through `Assets/Rendering/Scripts/Lit.cs`, and the game's own lit shaders share
+committed, so `Assets/Rendering/Editor/UsePipeline.cs` puts the Medium asset in the graphics settings and sets Linear
+colour space whenever the editor loads, and the build sets Linear again. Textures made in code that hold data rather
+than colour (noise, normals, masks, lookups) are created linear. Materials made in code use URP Lit through `Assets/Rendering/Scripts/Lit.cs`, and the game's own lit shaders share
 `Assets/Rendering/Shaders/TarmacLit.hlsl`; the ones that move (car paint and carbon, liveries, pit crews, pit kit) also draw motion vectors
 (`TarmacMotion.hlsl`) so the upscaler follows them, and the crowd draws its own for its fans turning and bouncing. The menus' frosted glass is `GlassBlurFeature` on
 the renderer, beside URP's ambient occlusion at half resolution, after the opaque pass.

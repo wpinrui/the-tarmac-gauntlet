@@ -255,7 +255,7 @@ namespace TarmacGauntlet.Raceday
         private Texture2D CloudTexture()
         {
             const int size = CloudSize;
-            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { name = "Cloud noise", wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear };
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true, true) { name = "Cloud noise", wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear };
             var px = new Color32[size * size];
             float[] big = bigCloud = CloudField.Fbm(size, 4, 5, 11), small = smallCloud = CloudField.Fbm(size, 8, 4, 29);
             for (int i = 0; i < px.Length; i++)

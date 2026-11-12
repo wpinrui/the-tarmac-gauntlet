@@ -82,7 +82,7 @@ namespace TarmacGauntlet.Raceday
         private static Texture2D Grain()
         {
             const int size = 128;
-            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { name = "Ground grain", wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear, anisoLevel = 8 };
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true, true) { name = "Ground grain", wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear, anisoLevel = 8 };
             var px = new Color32[size * size];
             float[] soft = CloudField.Fbm(size, 4, 3, 17);
             for (int i = 0; i < px.Length; i++)
