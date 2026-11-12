@@ -129,24 +129,41 @@ def slash(a, b, w0, w1, bend=0.0, n=24):
 
 
 # --- Parts ----------------------------------------------------------------------------------
-def milk_sides(lv, door_cap=0.05):
-    """Milk poured over the roof, drips down both sides, none crossing a door shut line."""
+def milk_sides(lv, door_cap=0.05, span=(2.45, -2.35), ramp=0.3):
+    """Milk poured over the roof, drips down both sides, none crossing a door shut line. With a
+    span shorter than the car, the pour thins out over ramp metres at each end, up off the side."""
     rng = random.Random(7)
-    line = lambda z: shoulder(z) - 0.06
+    zf, zr = span
+
+    def line(z):
+        t = min(1.0, (zf - z) / ramp, (z - zr) / ramp) if span != (2.45, -2.35) else 1.0
+        t = max(0.0, t)
+        return shoulder(z) + 0.06 - 0.12 * (t * t * (3 - 2 * t))
     walls = [(a + 0.035, a - 0.035) for a in DOOR]
-    for poly in drips(line, 2.45, -2.35, rng, 0.3, skip=walls,
+    for poly in drips(line, zf, zr, rng, 0.3, skip=walls,
                       short=[(0.25, -0.4, door_cap), (0.8, 0.25, door_cap if door_cap < 0.05 else 0.3),
                              (1.75, 0.98, 0.06), (-0.95, -1.75, 0.05)]):
         lv.side_poly(poly, M)
 
 
-def milk_top(lv, splat_col=G):
-    """The top all milk, with splats, clear of the bonnet and roof logos."""
-    lv.band_x(-1.2, 1.2, M, views=("top",))
+def milk_top(lv, splat_col=G, span=None, bonnet=1.55):
+    """The top all milk, with splats, clear of the bonnet and roof logos. With a span (front z,
+    rear z), the milk covers only that much of the length and drips toward the nose and tail."""
+    if span is None:
+        lv.band_x(-1.2, 1.2, M, views=("top",))
+        z_lo, z_hi = -2.0, 2.2
+    else:
+        rng = random.Random(5)
+        zf, zr = span
+        for edge, sign in ((zf, -1), (zr, 1)):
+            # drips() hangs down its y; here y runs from the edge out toward that end of the car.
+            for poly in drips(lambda x: 0.0, 1.15, -1.15, rng, 0.22):
+                lv.poly("top", [(x, 0, edge + sign * y) for x, y in poly], M)
+        z_lo, z_hi = zr + 0.15, zf - 0.15
     splat = random.Random(3)
-    for _ in range(14):
-        z, x, r = splat.uniform(-2.0, 2.2), splat.uniform(-0.75, 0.75), splat.uniform(0.02, 0.06)
-        if abs(z - 1.55) < 0.45 or abs(z - 0.1) < 0.35:
+    for _ in range(18):
+        z, x, r = splat.uniform(z_lo, z_hi), splat.uniform(-0.75, 0.75), splat.uniform(0.02, 0.06)
+        if abs(z - bonnet) < 0.4 or abs(z - 0.1) < 0.35:
             continue
         lv.poly("top", [(x + b, 0, z + a) for a, b in disc(0, 0, r)], splat_col)
 
@@ -220,8 +237,8 @@ def stickers(lv):
     side_mark_at(lv, "drop", -1.5, 0.78, 0.13, -12)
 
 
-def logos_top(lv, team="team", tail="goats-milk", tail_h=0.07, bolts=False):
-    lv.mark("top", MARKS / "roundel.svg", (0, 0, 1.55), 0.72, rotate=-90)
+def logos_top(lv, team="team", tail="goats-milk", tail_h=0.07, bolts=False, bonnet=(1.55, 0.72)):
+    lv.mark("top", MARKS / "roundel.svg", (0, 0, bonnet[0]), bonnet[1], rotate=-90)
     lv.mark("top", MARKS / f"{team}.svg", (0, 0, 0.12), 0.42, rotate=-90)
     lv.mark("top", MARKS / f"{tail}.svg", (0, 0, -1.97), tail_h, rotate=90)
     if bolts:
@@ -262,17 +279,22 @@ def overload(views):
     return lv
 
 
+# Milk Riot: the milk takes the middle two thirds of the car's length, Overload the nose and tail.
+RIOT_SPAN = (2.38 - 4.61 / 6, -2.23 + 4.61 / 6)
+RIOT_BONNET = (1.3, 0.56)
+
+
 def milk_riot(views):
-    """Overload's black, halftone, slashes and stickers, with Spilt Milk's pour over the roof."""
+    """Overload's black, halftone, slashes and stickers, with Spilt Milk's pour over the middle
+    two thirds of the car. The nose and tail are all Overload."""
     lv = Livery(views, K)
-    halftone(lv, G, top=False)
-    milk_sides(lv, door_cap=0.04)
-    slashes(lv, top=False)
-    milk_top(lv, PK)
-    milk_ends(lv)
+    halftone(lv, G)
+    milk_sides(lv, door_cap=0.04, span=RIOT_SPAN)
+    slashes(lv)
+    milk_top(lv, PK, span=RIOT_SPAN, bonnet=RIOT_BONNET[0])
     cartoon_number(lv)
     stickers(lv)
-    logos_top(lv, "team", "overstim", 0.09, bolts=True)
+    logos_top(lv, "team", "overstim", 0.09, bolts=True, bonnet=RIOT_BONNET)
     lv.mark("front", MARKS / "goat-sticker.svg", (0, 0.47, 0), 0.22)
     lv.mark("rear", MARKS / "protein.svg", (0, 0.575, 0), 0.06)
     return lv
