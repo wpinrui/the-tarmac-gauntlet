@@ -183,14 +183,14 @@ namespace TarmacGauntlet.Management
             overlay = Overlay.None;
             Unfreeze();
             GameSession.Close();
-            SceneManager.LoadScene(RaceSummaryScreen.HubScene);
+            SceneLoader.Load(RaceSummaryScreen.HubScene);
         }
 
         // Keys come through IMGUI events, so this works with either of Unity's input systems.
         private void OnGUI()
         {
             Event ev = Event.current;
-            if (ev.type != EventType.KeyDown || root == null) return;
+            if (ev.type != EventType.KeyDown || root == null || SceneLoader.Loading) return;
             if (MenuDropdown.Key(ev.keyCode))
             {
                 ev.Use();

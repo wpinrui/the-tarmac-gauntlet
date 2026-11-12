@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using TarmacGauntlet.Career;
+using TarmacGauntlet.Rendering;
 using TarmacGauntlet.Simulation;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using UnityEngine.UIElements;
 using static TarmacGauntlet.Management.MenuKit;
 
@@ -127,7 +127,7 @@ namespace TarmacGauntlet.Management
             RaceWeekend.Begin(game);
             GameSession.DropRace();
             GameSession.Flush();
-            SceneManager.LoadScene(RacedayScene);
+            SceneLoader.Load(RacedayScene);
         }
     }
 }

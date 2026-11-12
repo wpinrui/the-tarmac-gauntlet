@@ -8,7 +8,6 @@ using TarmacGauntlet.Rendering;
 using TarmacGauntlet.Simulation;
 using TarmacGauntlet.TeamHq;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using UnityEngine.UIElements;
 using static TarmacGauntlet.Management.MenuKit;
 
@@ -564,7 +563,7 @@ namespace TarmacGauntlet.Management
             if (GameSession.SavedRace() is RaceSave race)
             {
                 RaceWeekend.Resume(race);
-                SceneManager.LoadScene(LineupPanel.RacedayScene);
+                SceneLoader.Load(LineupPanel.RacedayScene);
                 return;
             }
             EnterGame();
