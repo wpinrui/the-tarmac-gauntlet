@@ -35,6 +35,7 @@ namespace TarmacGauntlet.Simulation
             { "Team Seorak", "Assets/Art/Liveries/TeamSeorak" },
             { "Gravel Trap Racing", "Assets/Art/Liveries/GravelTrapRacing" },
             { "Ironbark Racing", "Assets/Art/Liveries/IronbarkRacing" },
+            { "Poseidon Racing", "Assets/Art/Liveries/PoseidonRacing" },
             { "North Star Racing", "Assets/Art/Liveries/NorthStarRacing" },
         };
 
