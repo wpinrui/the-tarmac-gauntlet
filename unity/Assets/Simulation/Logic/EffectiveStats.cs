@@ -6,23 +6,25 @@ namespace TarmacGauntlet.Simulation
     /// <summary>Port of simulation/effectiveStats.ts.</summary>
     public static class EffectiveStats
     {
-        // Age reduces all stats gradually. 2% per year, capped at 50% (reached at age 25).
-        private const double AgePenaltyPerYear = 0.02;
-        private const double MaxAgePenalty = 0.5;
+        // Age wears stats gradually: 0.4% per year, capped at 10% (reached at age 25).
+        private const double AgePenaltyPerYear = 0.004;
+        private const double MaxAgePenalty = 0.1;
 
-        // Prevents pitStopTime from reaching infinity when condition approaches 0.
-        private const double MinCombinedMultiplier = 0.1;
+        // Condition wears stats linearly: a car at 0% condition loses 20%, one at 30% loses 14%.
+        private const double MaxConditionPenalty = 0.2;
 
         /// <summary>
         /// Returns the effective stats for a car at a given age and condition.
         ///
         /// Calculation chain (per stat):
         ///   1. Start with base value; use potential if the relevant upgrade pack is installed.
-        ///   2. Multiply by the age fraction (1 - agePenalty), capped.
-        ///   3. Multiply by condition fraction (condition / 100).
+        ///   2. Subtract the age penalty and the condition penalty from 1. Together they take at most 30%,
+        ///      so an old wreck is clearly slower but can still race.
+        ///   3. Multiply each stat by that.
         ///
         /// pitStopTime is inverted (lower = better), so the combined multiplier is applied as a
         /// divisor instead: lower condition and greater age both increase the pit stop duration.
+        /// fuelCapacity is the size of the tank, which wear does not change.
         ///
         /// Upgrade pack to stat mapping (GDD §3):
         ///   Power Pack    : power, fuelEfficiency
@@ -48,9 +50,8 @@ namespace TarmacGauntlet.Simulation
 
             // Step 2: combined multiplier from age and condition
             double agePenalty = Math.Min(MaxAgePenalty, instance.Age * AgePenaltyPerYear);
-            double ageFraction = 1 - agePenalty;
-            double conditionFraction = instance.Condition / 100;
-            double combined = conditionFraction * ageFraction;
+            double conditionPenalty = MaxConditionPenalty * (1 - Math.Max(0, Math.Min(100, instance.Condition)) / 100);
+            double combined = 1 - agePenalty - conditionPenalty;
 
             // Step 3: apply to each stat
             return new CarStats
@@ -62,8 +63,8 @@ namespace TarmacGauntlet.Simulation
                 Comfort = comfort * combined,
                 Reliability = reliability * combined,
                 // pitStopTime is inverted: degraded cars take longer in the pits.
-                PitStopTime = pitStopTime / Math.Max(MinCombinedMultiplier, combined),
-                FuelCapacity = fuelCapacity * combined,
+                PitStopTime = pitStopTime / combined,
+                FuelCapacity = fuelCapacity,
             };
         }
     }
