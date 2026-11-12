@@ -8,8 +8,9 @@ namespace TarmacGauntlet.Rendering
 {
     /// <summary>
     /// The scene's post-processing, on its global volume: the ACES tone curve with a colour grade the scene sets
-    /// (<see cref="Set"/>), bloom at half resolution and motion blur from the camera's own movement. Each follows its graphics
-    /// option. When a camera cuts to another shot, the temporal upscaler forgets the old one and that frame has no blur.
+    /// (<see cref="Set"/>), bloom at half resolution, motion blur from the camera's own movement, and depth of field for a camera
+    /// that asks for it each frame (<see cref="Focus"/>): the broadcast and replay cameras, never a driving view. Each follows its
+    /// graphics option. When a camera cuts to another shot, the temporal upscaler forgets the old one and that frame has no blur.
     /// </summary>
     [RequireComponent(typeof(Volume))]
     public sealed class PostEffects : MonoBehaviour
@@ -37,6 +38,11 @@ namespace TarmacGauntlet.Rendering
         private const float BlurIntensity = 0.35f, BlurClamp = 0.05f;
         /// <summary>A camera that moves further than this in a frame, m, or turns further, degrees, has cut to another shot.</summary>
         private const float CutMove = 8f, CutTurn = 30f;
+        /// <summary>
+        /// Depth of field: sharp to a little past the subject, then blurring over a stretch as long again as the subject is far,
+        /// m. Through a lens narrower than <see cref="LongLens"/> degrees the blur is at its widest.
+        /// </summary>
+        private const float FocusMargin = 0.15f, FocusPad = 2f, FocusFalloff = 1.5f, FocusFalloffPad = 10f, LongLens = 12f, WideLens = 45f;
 
         private VolumeProfile profile;
         private Tonemapping tone;
@@ -44,6 +50,9 @@ namespace TarmacGauntlet.Rendering
         private WhiteBalance balance;
         private Bloom bloom;
         private MotionBlur blur;
+        private DepthOfField dof;
+        /// <summary>Each camera that asked for depth of field: how far its subject is, m, and the frame it asked on.</summary>
+        private readonly Dictionary<Camera, (float distance, int frame)> focus = new Dictionary<Camera, (float, int)>();
         private Grade grade;
         private readonly Dictionary<Camera, Pose> seen = new Dictionary<Camera, Pose>();
         private readonly List<Camera> gone = new List<Camera>();
@@ -68,6 +77,9 @@ namespace TarmacGauntlet.Rendering
             blur.quality.Override(MotionBlurQuality.Low);
             blur.intensity.Override(BlurIntensity);
             blur.clamp.Override(BlurClamp);
+            dof = profile.Add<DepthOfField>();
+            dof.mode.Override(DepthOfFieldMode.Gaussian);
+            dof.active = false;
 
             Volume volume = GetComponent<Volume>();
             volume.isGlobal = true;
@@ -90,6 +102,16 @@ namespace TarmacGauntlet.Rendering
             RenderPipelineManager.beginCameraRendering -= Watch;
             if (Current == this) Current = null;
             Destroy(profile);
+        }
+
+        /// <summary>
+        /// Asks for depth of field on this camera this frame, focused on a subject this far away, m. Call it every frame the camera
+        /// should have it, after placing the camera: a camera that stops asking is sharp again.
+        /// </summary>
+        public static void Focus(Camera camera, float distance)
+        {
+            if (Current == null || camera == null) return;
+            Current.focus[camera] = (Mathf.Max(distance, 0.5f), Time.frameCount);
         }
 
         /// <summary>Grades the picture from now on.</summary>
@@ -123,7 +145,23 @@ namespace TarmacGauntlet.Rendering
             seen[camera] = now;
             if (cut) camera.GetUniversalAdditionalCameraData().resetHistory = true;
             blur.intensity.Override(cut ? 0f : BlurIntensity);
+            Depth(camera);
             if (seen.Count > 8) Forget();
+        }
+
+        /// <summary>Depth of field for this camera if it asked this frame and the option is on, none otherwise.</summary>
+        private void Depth(Camera camera)
+        {
+            bool on = GraphicsOptions.DepthOfField.On && focus.TryGetValue(camera, out var f) && f.frame == Time.frameCount;
+            dof.active = on;
+            if (!on) return;
+            float d = focus[camera].distance;
+            float start = d * (1f + FocusMargin) + FocusPad;
+            dof.gaussianStart.Override(start);
+            dof.gaussianEnd.Override(start + d * FocusFalloff + FocusFalloffPad);
+            float lens = Mathf.InverseLerp(WideLens, LongLens, camera.fieldOfView);
+            dof.gaussianMaxRadius.Override(Mathf.Lerp(0.6f, 1.5f, lens));
+            dof.highQualitySampling.Override(QualityLevels.Level >= 2);
         }
 
         private void Forget()
@@ -131,6 +169,9 @@ namespace TarmacGauntlet.Rendering
             gone.Clear();
             foreach (Camera c in seen.Keys) if (c == null) gone.Add(c);
             foreach (Camera c in gone) seen.Remove(c);
+            gone.Clear();
+            foreach (Camera c in focus.Keys) if (c == null) gone.Add(c);
+            foreach (Camera c in gone) focus.Remove(c);
         }
     }
 }

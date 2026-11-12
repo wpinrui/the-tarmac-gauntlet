@@ -67,7 +67,8 @@ namespace TarmacGauntlet.Raceday
     /// Grandstands on the main straight opposite the pits and at the big corners, a modest seated crowd and catch
     /// fencing behind the armco in front of them. Everything is placed from the circuit data: each stand sits a
     /// walkway behind the furthest armco along its stretch, its tiers following the ground. Nothing here is solid,
-    /// so racing never touches it. The crowd is one mesh per area, each fan a few boxes coloured from a palette.
+    /// so racing never touches it. The crowd is one mesh per area, each fan one card (<see cref="CrowdCard"/>) that the crowd
+    /// shader turns to the camera and draws a seated fan on, two triangles a fan.
     /// </summary>
     public sealed class Grandstands
     {
@@ -632,26 +633,22 @@ namespace TarmacGauntlet.Raceday
                         {
                             float chance = site.Fill * rowShare * (0.25f + 1.5f * Clump(a));
                             if (rng.NextDouble() >= chance) continue;
-                            Fan(a + (float)(rng.NextDouble() - 0.5) * 0.06f, u, v, h, rng);
+                            Fan(a + (float)(rng.NextDouble() - 0.5) * 0.06f, u, v, rng);
                         }
                     }
                 }
             }
 
-            /// <summary>One seated fan facing the track: legs, body and head, coloured from the crowd palette.</summary>
-            private void Fan(float a, float u, float v, float seat, System.Random rng)
+            /// <summary>One seated fan facing the track: a card standing on the tread, its look packed into its UVs.</summary>
+            private void Fan(float a, float u, float v, System.Random rng)
             {
-                Vector3 along = Along(a), o = Out(a);
-                Vector3 toTrack = -o;
-                Vector2 shirt = CrowdPalette.Uv(0, rng.Next(CrowdPalette.Shirts.Length));
-                Vector2 skin = CrowdPalette.Uv(1, rng.Next(CrowdPalette.Skins.Length));
-                Vector2 legs = CrowdPalette.Uv(2, rng.Next(CrowdPalette.Trousers.Length));
+                Vector3 toTrack = -Out(a);
+                int shirt = rng.Next(CrowdPalette.Shirts.Length);
+                int skin = rng.Next(CrowdPalette.Skins.Length);
+                int legs = rng.Next(CrowdPalette.Trousers.Length);
                 float lean = (float)(rng.NextDouble() - 0.5) * 0.06f;
-                float tall = 0.56f + (float)rng.NextDouble() * 0.1f;
-                Block(s.crowd, P(a, u + 0.31f, (v + seat + 0.1f) * 0.5f), along, toTrack, new Vector3(0.36f, seat + 0.1f - v, 0.44f), legs, false, true, false);
-                Vector3 body = P(a + lean, u + 0.6f, seat + tall * 0.5f);
-                Block(s.crowd, body, along, toTrack, new Vector3(0.42f, tall, 0.26f), shirt, true);
-                Block(s.crowd, body + Vector3.up * (tall * 0.5f + 0.12f) + toTrack * 0.02f, along, toTrack, new Vector3(0.19f, 0.22f, 0.21f), skin, true);
+                float tall = (float)rng.NextDouble();
+                CrowdCard.Add(s.crowd, P(a + lean, u + CrowdCard.Depth, v), toTrack, shirt, skin, legs, tall, s.Fans);
                 s.Fans++;
             }
 
@@ -723,7 +720,38 @@ namespace TarmacGauntlet.Raceday
     }
 
     /// <summary>
-    /// The crowd's colours: one row of the palette texture each for shirts, skin and trousers. Mostly plain
+    /// One fan as a card: a quad standing on the tread, facing the track, that the crowd shader (Resources/Crowd) turns
+    /// towards the camera and draws a seated fan on. Each corner's UV packs the corner and the fan's look in whole numbers:
+    /// x is the corner across (0 or 1) plus twice (shirt + 8 trousers), y the corner up plus twice (skin + 8 (height + 16 seed)).
+    /// </summary>
+    public static class CrowdCard
+    {
+        /// <summary>The card's size, m: wide enough for arms waved out, tall enough for arms up.</summary>
+        public const float Width = 0.62f, Height = 1.55f;
+        /// <summary>How far the card stands behind the front of its tread, m: through the fan's knees.</summary>
+        public const float Depth = 0.45f;
+        /// <summary>Steps of height a fan's sitting height is kept to.</summary>
+        public const int Heights = 16;
+
+        /// <summary>A fan's card. <paramref name="tall"/> is 0 for the shortest fan to 1 for the tallest.</summary>
+        public static void Add(MeshKit kit, Vector3 foot, Vector3 toTrack, int shirt, int skin, int legs, float tall, int id)
+        {
+            Vector3 right = Vector3.Cross(Vector3.up, toTrack).normalized;
+            int height = Mathf.Clamp(Mathf.FloorToInt(tall * Heights), 0, Heights - 1);
+            int seed = (int)(((uint)id * 2654435761u) >> 28);
+            float x = 2f * (shirt + 8 * legs), y = 2f * (skin + 8 * (height + Heights * seed));
+            Vector3 Corner(int cx, int cy) => foot + right * ((cx - 0.5f) * Width) + Vector3.up * (cy * Height);
+            Vector2 Uv(int cx, int cy) => new Vector2(x + cx, y + cy);
+            kit.Triangle(Corner(0, 0), Corner(0, 1), Corner(1, 0), toTrack, toTrack, toTrack, Uv(0, 0), Uv(0, 1), Uv(1, 0));
+            kit.Triangle(Corner(1, 0), Corner(0, 1), Corner(1, 1), toTrack, toTrack, toTrack, Uv(1, 0), Uv(0, 1), Uv(1, 1));
+        }
+
+        /// <summary>The shirt colour of the fan whose card has this UV, an index into <see cref="CrowdPalette.Shirts"/>.</summary>
+        public static int Shirt(Vector2 uv) => Mathf.FloorToInt(uv.x * 0.5f + 0.01f) % 8;
+    }
+
+    /// <summary>
+    /// The crowd's colours: one row of the palette texture each for shirts, skin, trousers and hair. Mostly plain
     /// summer clothes, with a few brighter shirts.
     /// </summary>
     public static class CrowdPalette
@@ -744,10 +772,15 @@ namespace TarmacGauntlet.Raceday
             new Color(0.2f, 0.27f, 0.4f), new Color(0.13f, 0.14f, 0.16f), new Color(0.62f, 0.56f, 0.42f), new Color(0.32f, 0.38f, 0.5f),
             new Color(0.42f, 0.42f, 0.4f),
         };
+        public static readonly Color[] Hair =
+        {
+            new Color(0.08f, 0.06f, 0.05f), new Color(0.24f, 0.15f, 0.08f), new Color(0.45f, 0.3f, 0.16f), new Color(0.72f, 0.6f, 0.38f),
+            new Color(0.55f, 0.55f, 0.55f), new Color(0.13f, 0.1f, 0.08f),
+        };
 
-        /// <summary>The middle of one texel: row 0 shirts, 1 skin, 2 trousers.</summary>
+        /// <summary>The middle of one texel: row 0 shirts, 1 skin, 2 trousers, 3 hair.</summary>
         public static Vector2 Uv(int row, int column) => new Vector2((column + 0.5f) / Width, (row + 0.5f) / Height);
 
-        public static Color[] Row(int row) => row == 0 ? Shirts : row == 1 ? Skins : Trousers;
+        public static Color[] Row(int row) => row == 0 ? Shirts : row == 1 ? Skins : row == 2 ? Trousers : Hair;
     }
 }
