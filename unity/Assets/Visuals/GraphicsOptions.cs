@@ -109,6 +109,12 @@ namespace TarmacGauntlet.Visuals
         /// <summary>The air shimmering over far tarmac on a hot, sunny day. Changes live.</summary>
         public static readonly GraphicsOption TarmacShimmer = Toggle("settings.tarmacshimmer", false);
 
+        /// <summary>
+        /// Sharp reflections of what is on screen in the wet track, its puddles and the cars' clear coat, traced through the
+        /// depth buffer. Where a ray finds nothing the reflection probes show instead. Changes live.
+        /// </summary>
+        public static readonly GraphicsOption ScreenReflections = Toggle("settings.ssr", false);
+
         /// <summary>The Team HQ lit by its bake: lamp light, daylight and every bounce. Off, live lamps and a flat ambient light.</summary>
         public static readonly GraphicsOption BakedLighting = Toggle("settings.hqbakedlighting", true);
 
@@ -120,7 +126,8 @@ namespace TarmacGauntlet.Visuals
 
         private static readonly int[] OffAtLow = { 0, 1, 1 };
         private static readonly int[] AlwaysOn = { 1, 1, 1 };
-        private static readonly int[] OnFromHigh = { 0, 0, 1 };
+        /// <summary>Low, Medium, High, and Ultra once there is one.</summary>
+        private static readonly int[] OnFromHigh = { 0, 0, 1, 1 };
 
         /// <summary>The settings menu's rows, in menu order. Every option is in one.</summary>
         public static readonly IReadOnlyList<GraphicsRow> Rows = new[]
@@ -133,6 +140,7 @@ namespace TarmacGauntlet.Visuals
             new GraphicsRow("Rain effects", OffAtLow, WetTrack, Puddles, RainRipples, Spray, SprayMist),
             new GraphicsRow("Smoke and sparks", OffAtLow, TyreSmoke, Sparks),
             new GraphicsRow("Heat haze", OnFromHigh, ExhaustHaze, TarmacShimmer),
+            new GraphicsRow("Screen-space reflections", OnFromHigh, ScreenReflections),
             new GraphicsRow("Sky detail", OffAtLow, SkyDetail),
             new GraphicsRow("Crowd", AlwaysOn, Crowd),
             new GraphicsRow("HQ lighting", AlwaysOn, BakedLighting, BakedReflections, Wear),
