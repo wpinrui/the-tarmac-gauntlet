@@ -81,10 +81,11 @@ def build(game=False):
     print("laid", len(out), "parts,", len(cutters), "cutters")
 
     arch, tubs = parts.arches()
-    v, f = body.cavity(R["screen"]["x_base"] - 0.05, R["rear_glass"]["x_base"] + 0.17, parts.FLOOR)
+    v, f = body.cavity(R["screen"]["x_base"] - 0.05, R["rear_glass"]["x_base"] + 0.17, parts.FLOOR, tubs=parts.tub_drums())
     cab = blend.make("cabin", v, f, "interior")
+    blend.relax(cab, voxel=0.02, iters=2)      # even cells, so the loft's end caps cannot upset the cut
     for t in tubs:
-        blend.boolean(cab, t, "DIFFERENCE")
+        bpy.data.objects.remove(t)
     cut(shell, arch)
     cut(shell, [cab])
     print("cabin cut")

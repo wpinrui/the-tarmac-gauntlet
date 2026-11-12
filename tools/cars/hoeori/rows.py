@@ -196,7 +196,7 @@ MIRROR = {"y0": -0.36, "y1": -0.19, "w0": 0.82, "w1": 0.975, "z0": 0.875, "z1": 
 # Gill on the front wing behind the arch (side render), a slim slanted vent.
 GILL = [(-0.985, 0.812), (-0.95, 0.828), (-0.73, 0.832), (-0.72, 0.818), (-0.74, 0.806), (-0.95, 0.796)]
 # Rear wing on the boot (side and rear renders): blade chord, height and half span.
-WING = {"y0": 1.72, "y1": 2.01, "z0": 0.950, "z1": 0.975, "span": 0.70, "post_w": 0.47}
+WING = {"y0": 1.72, "y1": 2.01, "z0": 0.988, "z1": 1.000, "span": 0.70, "post_w": 0.47}
 
 data = {
     "name": "SeorakHoeori",
@@ -234,7 +234,7 @@ data = {
     "gill": side(GILL),
     "wing": {"x_front": X(WING["y0"]), "x_back": X(WING["y1"]), "z0": Z(WING["z0"]), "z1": Z(WING["z1"]),
              "span": H(WING["span"]), "post_w": H(WING["post_w"])},
-    "picks": {"frontbadge": 1, "rearbadge": 1, "name": 1, "wing": 1},
+    "picks": {"frontbadge": 1, "rearbadge": 1, "name": 1, "wing": 1},     # Ivan's picks, 2026-11-12
 }
 # belt line z = k x + c in build space
 _bx = np.array([X(y) for y in (-0.6, 0.6)]); _bz = np.array([Z(belt(y)) for y in (-0.6, 0.6)])

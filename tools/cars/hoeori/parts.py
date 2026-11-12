@@ -145,11 +145,11 @@ def headlamps(ref, cutters, out):
         strip = max(getattr(strip, "geoms", [strip]), key=lambda g: g.area)
         g = (lambda q: q) if sgn > 0 else flip
         cutters += blend.lay(ref, f"cut_head_{side}", g(shp), fr, -0.045, 0.006, "housing", 0.008, along_ray=True)
-        out += blend.lay(ref, f"head_back_{side}", g(shp.buffer(-0.002)), fr, -0.044, -0.04, "housing", 0.008, along_ray=True)
-        out += blend.lay(ref, f"head_reflector_{side}", g(cup.difference(cup.buffer(-0.012))), fr, -0.039, -0.03,
+        out += blend.lay(ref, f"head_back_{side}", g(shp.buffer(-0.002)), fr, -0.042, -0.038, "housing", 0.008, along_ray=True)
+        out += blend.lay(ref, f"head_reflector_{side}", g(cup.difference(cup.buffer(-0.012))), fr, -0.0372, -0.03,
                          "reflector", 0.004, along_ray=True)
-        out += blend.lay(ref, f"lamp_head_{side}0", g(cup.buffer(-0.013)), fr, -0.034, -0.03, "lamp_head", 0.005, along_ray=True)
-        out += blend.lay(ref, f"lamp_head_{side}1", g(soft(strip, 0.004)), fr, -0.034, -0.03, "lamp_head", 0.005, along_ray=True)
+        out += blend.lay(ref, f"lamp_head_{side}0", g(cup.buffer(-0.013)), fr, -0.0372, -0.033, "lamp_head", 0.005, along_ray=True)
+        out += blend.lay(ref, f"lamp_head_{side}1", g(soft(strip, 0.004)), fr, -0.0372, -0.033, "lamp_head", 0.005, along_ray=True)
         out += blend.lay(ref, f"head_glass_{side}", g(shp.buffer(-0.002)), fr, -0.0055, -0.0025, "head_glass", 0.008, along_ray=True)
 
 
@@ -203,9 +203,9 @@ def front_parts(ref, cutters, out):
         cutters += blend.lay(ref, f"cut_fog_{side}", g(pocket), fr, -0.04, 0.006, "grille", 0.008, along_ray=True)
         out += blend.lay(ref, f"fog_back_{side}", g(pocket.buffer(-0.002)), fr, -0.039, -0.035, "grille", 0.008, along_ray=True)
         lamp = Point(fx, fz).buffer(fr_r, 40)
-        out += blend.lay(ref, f"fog_ring_{side}", g(lamp.buffer(0.006).difference(lamp)), fr, -0.034, -0.022, "reflector",
+        out += blend.lay(ref, f"fog_ring_{side}", g(lamp.buffer(0.007).difference(lamp.buffer(0.001))), fr, -0.034, -0.022, "reflector",
                          0.004, along_ray=True)
-        out += blend.lay(ref, f"lamp_head_fog_{side}", g(lamp), fr, -0.034, -0.026, "lamp_head", 0.005, along_ray=True)
+        out += blend.lay(ref, f"lamp_head_fog_{side}", g(lamp), fr, -0.033, -0.026, "lamp_head", 0.005, along_ray=True)
 
 
 def gills(ref, out):
@@ -218,9 +218,9 @@ def gills(ref, out):
 def rear_parts(ref, out):
     fr = rear_fr()
     val = half_shape(R["valance"])
-    out += blend.lay(ref, "valance", val, fr, -0.001, 0.004, "trim", 0.012, along_ray=True)
+    out += blend.lay(ref, "valance", val, fr, -0.003, 0.004, "trim", 0.012, along_ray=True)
     rain = poly(R["rain"] + [[-p[0], p[1]] for p in R["rain"][1:][::-1]])
-    out += blend.lay(ref, "lamp_rain", soft(rain, 0.002), fr, 0.003, 0.007, "lamp_rain", 0.004, along_ray=True)
+    out += blend.lay(ref, "lamp_rain", soft(rain, 0.002), fr, 0.0045, 0.0085, "lamp_rain", 0.004, along_ray=True)
     out += exhausts(ref)
 
 
@@ -495,6 +495,12 @@ def arches():
     return cut, tubs
 
 
+def tub_drums():
+    """The wheel tubs as (x, z, r, y_in) for keeping them out of the cabin."""
+    yc = W["outer_y"] - W["width"] / 2
+    return [(x, W["r"], W["arch_r"] + 0.03, yc + 0.10 - 0.31) for x in (W["front_x"], W["rear_x"])]
+
+
 # ---------------------------------------------------------------- rear wing
 def wing():
     """A blade across the boot on two posts: thin, its trailing edge lifted a little."""
@@ -575,18 +581,19 @@ def interior():
     x0 = R["screen"]["x_base"] - 0.05
     belt_z = belt(0.0)
     obs = [_loft("firewall", x0 - 0.010, x0 - 0.004, lambda x: box(-0.8, FLOOR + 0.002, 0.8, 3), n=2),
-           _loft("dash", x0 - 0.0125, 0.30, lambda x: box(-0.8, belt_z - 0.13, 0.8, belt_z - 0.13 + 0.14 * (1 - (x0 - x) / 0.6) + 0.04), n=10)]
+           _loft("dash", x0 - 0.0125, 0.16, lambda x: box(-0.8, belt_z - 0.30, 0.8, belt_z - 0.13 + 0.14 * (1 - (x0 - x) / 0.6) + 0.04), n=10,
+                 gap=0.045)]
     bc = R["b_shut"]
     for sgn, side in ((1, "l"), (-1, "r")):
         clip = lambda x, s=sgn: (box(0.3, FLOOR + 0.06, 1.2, belt(x) - 0.02) if s > 0 else box(-1.2, FLOOR + 0.06, -0.3, belt(x) - 0.02)).intersection(
-            body.inside(x, 0.035 + 0.003)).difference(body.inside(x, 0.035 + 0.022))
-        obs.append(_loft(f"door_card_{side}", bc + 0.04, R["front_door"][1][0] - 0.04, clip, n=10))
+            body.inside(x, 0.035 + 0.008)).difference(body.inside(x, 0.035 + 0.026))
+        obs.append(_loft(f"door_card_{side}", bc + 0.04, R["front_door"][1][0] - 0.12, clip, n=10))   # clear of the dash as it swings
         yc = 0.36 * sgn
         obs.append(_rbox(f"seat_base_{side}", -0.52, -0.04, yc - 0.22, yc + 0.22, FLOOR + 0.002, FLOOR + 0.16))
         obs.append(_rbox(f"seat_back_{side}", -0.66, -0.54, yc - 0.21, yc + 0.21, FLOOR + 0.161, FLOOR + 0.66, lean=0.28))
         obs.append(_rbox(f"headrest_{side}", -0.80, -0.70, yc - 0.12, yc + 0.12, FLOOR + 0.661, FLOOR + 0.76, r=0.035, lean=0.12))
-    obs.append(_rbox("bench_base", -1.02, -0.78, -0.40, 0.40, FLOOR + 0.04, FLOOR + 0.18))
-    obs.append(_rbox("bench_back", -1.14, -1.04, -0.40, 0.40, FLOOR + 0.181, FLOOR + 0.48, lean=0.45))
+    obs.append(_rbox("bench_base", -1.02, -0.78, -0.40, 0.40, FLOOR + 0.002, FLOOR + 0.18))
+    obs.append(_rbox("bench_back", -1.08, -0.98, -0.40, 0.40, FLOOR + 0.181, FLOOR + 0.48, lean=0.45))
     obs.append(steering())
     xm = R["screen"]["x_top"] - 0.03
     roof_in = body.inside(xm, 0.035).bounds[3]
@@ -748,7 +755,7 @@ def options(ref):
     lid_lo = L["z0"] + 0.07
     for k, style in ((0, "chrome"), (1, "colour")):
         # front: on the nose between the lamps, above the grille (the reference), or on the bonnet's nose
-        add("frontbadge", 1 + k, badge(ref, style, 0.07, front_fr(), 0, (top_z + head_z) / 2 + 0.01, up, "fb"))
+        add("frontbadge", 1 + k, badge(ref, style, 0.07, front_fr(), 0, (top_z + head_z) / 2 + 0.045, up, "fb"))
         add("frontbadge", 3 + k, badge(ref, style, 0.06, top_fr(), NOSE - 0.15, 0, fwd, "fb"))
         # rear: high on the lid's middle (the reference), or low on it
         add("rearbadge", 1 + k, badge(ref, style, 0.06, rear_fr(), 0, lid_hi, up, "rb"))

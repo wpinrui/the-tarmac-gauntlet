@@ -106,8 +106,21 @@ def section_poly(x):
 def even(ring, n):
     """n points round a closed loop by arc length, starting at its lowest middle point."""
     ring = np.asarray(ring, float)
-    k = int(np.argmin(np.abs(ring[:, 0]) + 10 * (ring[:, 1] - ring[:, 1].min())))
-    ring = np.roll(ring, -k, axis=0)
+    # start exactly where the outline crosses the centre line lowest, so every ring starts at
+    # the same place and neighbouring rings never twist against each other
+    nxt = np.roll(ring, -1, axis=0)
+    cross = np.nonzero((ring[:, 0] <= 0) & (nxt[:, 0] > 0) | (ring[:, 0] >= 0) & (nxt[:, 0] < 0))[0]
+    if len(cross):
+        zc = []
+        for i in cross:
+            t = ring[i, 0] / (ring[i, 0] - nxt[i, 0]) if ring[i, 0] != nxt[i, 0] else 0.0
+            zc.append((ring[i, 1] + t * (nxt[i, 1] - ring[i, 1]), i, t))
+        _z, i, t = min(zc)
+        start = ring[i] + t * (nxt[i] - ring[i])
+        ring = np.vstack([[start], np.roll(ring, -(i + 1), axis=0)])
+    else:
+        k = int(np.argmin(np.abs(ring[:, 0]) + 10 * (ring[:, 1] - ring[:, 1].min())))
+        ring = np.roll(ring, -k, axis=0)
     ring = np.vstack([ring, ring[:1]])
     s = np.concatenate([[0], np.cumsum(np.linalg.norm(np.diff(ring, axis=0), axis=1))])
     t = np.linspace(0, s[-1], n, endpoint=False)
@@ -157,11 +170,16 @@ def z_top(x, y=0.0):
     return float(hit.bounds[3]) if not hit.is_empty else 0.0
 
 
-def cavity(x0, x1, floor, inset=0.035, n=40):
-    """The inside of the body between x0 and x1, above floor, as a closed solid to cut away."""
+def cavity(x0, x1, floor, inset=0.035, n=40, tubs=()):
+    """The inside of the body between x0 and x1, above floor, as a closed solid to cut away.
+    tubs: wheel tubs (x, z, r, y_in) kept out of it, each a round drum outboard of y_in."""
     rings = []
     for x in np.linspace(x0, x1, n):
         inner = inside(x, inset).intersection(box(-3, floor, 3, 5))
+        for xc, zc, r, y_in in tubs:
+            if abs(x - xc) < r:
+                top = zc + np.sqrt(r * r - (x - xc) ** 2)
+                inner = inner.difference(box(y_in, -1, 3, top)).difference(box(-3, -1, -y_in, top))
         if inner.geom_type != "Polygon":
             inner = max(getattr(inner, "geoms", [inner]), key=lambda g: g.area)
         if inner.area < 1e-3:
