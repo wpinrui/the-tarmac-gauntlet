@@ -35,7 +35,7 @@ namespace TarmacGauntlet.Simulation
             new AiTeamEntry { Name = "Ferreyra Motorsport", Descriptor = "long way to go, willing to drive it", Nationality = "ar", ModelId = "f-05", CarClass = CarClass.F },
             new AiTeamEntry { Name = "Pemberton Motorsport", Descriptor = "family name on the door, heart on the sleeve", Nationality = "gb", ModelId = "f-06", CarClass = CarClass.F },
             new AiTeamEntry { Name = "Basecamp Autosport", Descriptor = "starting from the bottom, climbing up", Nationality = "ca", ModelId = "f-06", CarClass = CarClass.F },
-            new AiTeamEntry { Name = "Cornerstone Racing", Descriptor = "building something from nothing", Nationality = "ar", ModelId = "f-02", CarClass = CarClass.F },
+            new AiTeamEntry { Name = "Mendoza Racing", Descriptor = "building something from nothing", Nationality = "ar", ModelId = "f-02", CarClass = CarClass.F },
             // CLASS E: 20 teams
             new AiTeamEntry { Name = "Dockyard Racing", Descriptor = "from slipway to fast lane", Nationality = "sg", ModelId = "e-07", CarClass = CarClass.E },
             new AiTeamEntry { Name = "Whitfield & Sons", Descriptor = "father-and-sons operation since forever", Nationality = "gb", ModelId = "e-08", CarClass = CarClass.E },
