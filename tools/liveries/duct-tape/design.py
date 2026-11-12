@@ -1,4 +1,4 @@
-"""Duct Tape Dynamics on the Nusa Carrier: an American shitbox, olive green once, now about 85% rust.
+"""Duct Tape Dynamics on the Nusa Carrier: an American shitbox, olive green once, now about 65% rust.
 The race number is brushed on in white by hand, a little crooked and not where it is on the other
 side. A hole in the bonnet is patched with black gaffer tape. Independent, so no maker's logo.
 The rust, paint and tape are rasters drawn here in the car's own metres; the finish layer makes the
@@ -39,7 +39,7 @@ INK = "#efece3"
 BASE = "#4a2512"
 
 WHEELS = ((1.25, 0.31), (-1.33, 0.31))
-PAINT_SHARE = 0.15
+PAINT_SHARE = 0.35
 # Finishes, as shares of the livery shader's smoothness, clear coat and metal.
 F_RUST = (0.12, 0.0, 0.0)
 F_PAINT = (0.55, 0.3, 0.0)
@@ -141,7 +141,7 @@ def paint_view(view, meta, seed):
     a, b, y = grid(view, meta)
     body = body_mask(view)
     s = survival(view, a, b, y, seed)
-    share = {"top": 0.17, "left": PAINT_SHARE, "right": PAINT_SHARE, "front": 0.1, "rear": 0.1}[view]
+    share = {"top": 0.4, "left": PAINT_SHARE, "right": PAINT_SHARE, "front": 0.3, "rear": 0.3}[view]
     cut = np.quantile(s[body], 1 - share) if body.any() else 1.0
     # Paint where the survival clears the cut; a ragged rim of primer where it peels.
     rag = (fbm(a, b, 0.02, seed + 9, 3) - 0.5) * 0.05
