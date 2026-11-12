@@ -55,7 +55,7 @@ helicopter, onboard and pit lane shots. While you drive, the TV view is your onb
 
 The director's shots carry the broadcast graphics (`BroadcastGraphics.cs`): a battle strip with the gap in a
 fight, a driver strip the first time a car is on air in a stint, a pit timer with fuel, tyres and driver
-change lit as each is done, and the track map during helicopter shots. `M` toggles the map.
+change lit as each is done, and the track map during helicopter shots, or always with Track map on in the settings.
 
 `T` opens live timing while the AI drives your car (`LiveTiming.cs`), with the race at 16x behind it: every
 car in race order by class, your car's onboard and the track map, its driver, fuel, tyres and condition with
@@ -86,9 +86,9 @@ cars out cleanly (`run.sh pitstart` for the same with a line per car). `StandInC
 it in step when those change.
 
 Driving: left and right arrows steer, up accelerates, down brakes (hold it at a standstill to
-reverse). `M` toggles automatic and manual; `A` and `Z` shift up and down and also switch to manual. The
-bottom right shows speed in km/h and the gear, blue in automatic and white in manual. `H`
-toggles steering help. Anti-lock brakes are always on. `R` puts the car back on track, which you
+reverse). The settings menu picks an automatic or manual gearbox; in manual `A` and `Z` shift up and down. The
+bottom right shows speed in km/h and the gear, blue in automatic and white in manual. Steering help
+is a setting too. Anti-lock brakes are always on. `R` puts the car back on track, which you
 need after a hard hit on a barrier. `C` cycles the chase, bonnet and bumper views, the free camera and the follow camera.
 
 The car's physics come from its game stats (`Raceday/Scripts/CarSpec.cs`): Power sets the engine,

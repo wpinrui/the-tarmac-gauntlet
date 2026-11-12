@@ -277,7 +277,6 @@ namespace TarmacGauntlet.Raceday
             graphics.Circuit = circuit;
             graphics.Player = player;
             graphics.Tower = tower;
-            graphics.Keys = keys;
             if (testing)
             {
                 debug = new GameObject("Debug menu").AddComponent<DebugMenu>();

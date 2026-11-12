@@ -6,8 +6,8 @@ namespace TarmacGauntlet.Raceday
     /// <summary>
     /// A drivable car: raycast suspension, a simple tyre model with a friction circle, engine and
     /// gearbox, brakes with anti-lock, downforce and drag. Arrows steer, accelerate and brake,
-    /// A and Z shift up and down (and switch to manual), M toggles automatic and manual, H toggles steering help
-    /// and R puts the car back on track. 1, 2 and 3 pick the Conserve, Normal and Push engine maps.
+    /// A and Z shift up and down in manual, and R puts the car back on track. The gearbox and steering help come
+    /// from the settings menu (<see cref="DriveSettings"/>). 1, 2 and 3 pick the Conserve, Normal and Push engine maps.
     /// It burns fuel and wears its tyres through <see cref="Supplies"/>, and the pit lane limiter cuts its
     /// power above <see cref="SpeedLimit"/>.
     /// </summary>
@@ -40,7 +40,7 @@ namespace TarmacGauntlet.Raceday
         public bool Limiting => !float.IsPositiveInfinity(SpeedLimit);
 
         public bool Automatic { get; private set; } = true;
-        public bool SteeringHelp { get; private set; } = true;
+        public bool SteeringHelp => DriveSettings.SteeringHelp;
         public bool Crashed { get; private set; }
         /// <summary>
         /// True while the car has no physics: far from the camera an AI car glides along its path and
@@ -124,6 +124,7 @@ namespace TarmacGauntlet.Raceday
         private void Update()
         {
             if (Spec == null || Keys == null || AiDriving || Asleep) return;
+            Automatic = DriveSettings.Automatic;
             bool on = InputEnabled && !Crashed;
             float left = on && Keys.Held(KeyCode.LeftArrow) ? 1f : 0f;
             float right = on && Keys.Held(KeyCode.RightArrow) ? 1f : 0f;
@@ -134,10 +135,8 @@ namespace TarmacGauntlet.Raceday
             if (InputEnabled)
             {
                 if (Keys.Pressed(KeyCode.R)) ResetToTrack();
-                if (Keys.Pressed(KeyCode.H)) SteeringHelp = !SteeringHelp;
-                if (Keys.Pressed(KeyCode.M)) Automatic = !Automatic;
-                if (Keys.Pressed(KeyCode.A)) Shift(+1);
-                if (Keys.Pressed(KeyCode.Z)) Shift(-1);
+                if (!Automatic && Keys.Pressed(KeyCode.A)) Shift(+1);
+                if (!Automatic && Keys.Pressed(KeyCode.Z)) Shift(-1);
                 if (Supplies != null)
                 {
                     if (Keys.Pressed(KeyCode.Alpha1)) Supplies.Map = EngineMap.Conserve;
@@ -171,7 +170,6 @@ namespace TarmacGauntlet.Raceday
 
         private void Shift(int direction)
         {
-            Automatic = false;
             int next = Mathf.Clamp(Gear + direction, 0, Spec.Gears.Length);
             if (next == 0 && Vector3.Dot(Velocity, transform.forward) > 1f) return;
             if (next != Gear) shiftTimer = ShiftTime;

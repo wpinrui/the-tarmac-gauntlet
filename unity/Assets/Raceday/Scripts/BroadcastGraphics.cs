@@ -12,7 +12,7 @@ namespace TarmacGauntlet.Raceday
     /// right, runs while a stop is on air, with its fuel, tyres and driver change lit as each is done.
     /// The bottom graphics share one baseline, keep right of the timing tower, and the driver strip and
     /// pit timer rise above the battle strip rather than sit over it.
-    /// The track map, right, shows during helicopter shots, and on M. Laid out on a 1920 by 1080 screen.
+    /// The track map, right, shows during helicopter shots, and always with Track map on in the settings. Laid out on a 1920 by 1080 screen.
     /// </summary>
     public sealed class BroadcastGraphics : MonoBehaviour
     {
@@ -29,7 +29,6 @@ namespace TarmacGauntlet.Raceday
         public Circuit Circuit;
         public int Player = -1;
         public RaceTower Tower;
-        public KeyboardState Keys;
 
         /// <summary>The driver strip shows this long, real seconds.</summary>
         private const float StripTime = 6f;
@@ -46,7 +45,6 @@ namespace TarmacGauntlet.Raceday
         private float stripUntil;
         private int pairFront = -1, pairBack = -1;
         private float lastGap, gapAt, trend;
-        private bool showMap;
 
         private float k, offset;
         private Font bold, semiBold, regular;
@@ -78,7 +76,6 @@ namespace TarmacGauntlet.Raceday
 
         private void Update()
         {
-            if (Keys != null && Keys.Pressed(KeyCode.M)) showMap = !showMap;
             if (Director == null || !Director.OnAir) return;
             // A new story: name the driver the first time their car is on air in a stint.
             if (Director.Stories != stories)
@@ -130,7 +127,7 @@ namespace TarmacGauntlet.Raceday
             Rect battle = Director.Other >= 0 ? Battle(s, Director.Other) : Rect.zero;
             if (strip >= 0 && Time.unscaledTime < stripUntil && Cars[strip] != null) DriverStrip(strip, battle);
             if (Director.Stopping) PitTimer(s, battle);
-            if (showMap || Director.Helicopter) Map();
+            if (DriveSettings.TrackMap || Director.Helicopter) Map();
         }
 
         /// <summary>The space kept between graphics, px on the layout.</summary>
