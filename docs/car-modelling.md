@@ -47,7 +47,7 @@ When there is no model, use orthographic drawings only, never perspective photos
 body.py lofts the outer skin from rows.json, in pure numpy.
 Build space is metres: x forward from mid wheelbase, y left, z up from the ground.
 The skin splits into pieces: body, doors, bonnet, boot or engine cover, glass.
-Every door that opens is its own closed shell, cut from the body along its shut line, named `door_l` or `door_r`. The opening it leaves gets jamb faces in the interior material.
+Every door that opens is its own closed shell, cut from the body along its shut line, named `door_l` or `door_r`. The door's edges and the jambs of the opening it leaves are painted in `body`, like a real car.
 Every piece is a closed shell with thickness. Shut lines are V grooves.
 A bonnet shut line starts at the windscreen's base, inboard of its lower corners. It bends out to the bonnet's rear corners, then runs forward along the panels it meets, such as the lamps and the wings, then across the nose. The bonnet reaches back to the windscreen, so its line has no rear edge.
 Wheel arches step round at even angles.
@@ -64,7 +64,7 @@ Door mirrors get a separate recessed glass part.
 Every car is left-hand drive: the driver's seat and wheel sit on the left, because the pit lane is on the left. Both doors open, so the car stays symmetrical.
 Lay each window's glass, black band and cutter along that window's own normal, never along the car's axes. A shallow window projected from straight behind or above stretches its band.
 Rebuild each window outline from plain fits: one even curve for each long edge and a straight line for each side. A measured outline carries the reference's waves into the band.
-Every inner face uses an interior material.
+Every other inner face uses an interior material.
 Paint every car amber, whatever colour the reference car is.
 The paint material is named `body`, so the game can respray it.
 
@@ -78,13 +78,13 @@ No real brand or sponsor graphics.
 ## 7. Show Ivan the direction first
 export.py builds the pieces with Blender's Python module (`pip install bpy`) and exports OBJ and MTL. It prints the triangle count for information only.
 publish.py writes the orbitable viewer with a wireframe toggle and a toggle for each lamp group.
-Before publishing, render close-ups of the nose, the pillars, the mirrors, the shut lines and the open doors, and fix what looks wrong.
-Publish the viewer as an Artifact and show Ivan.
+Publish the viewer as an Artifact and show Ivan at once.
 Run no checks until Ivan confirms the direction.
 
 ## 8. Check, then fix
 After Ivan confirms the direction, run check.py. It finds open or inward shells, floating parts, intersecting pairs and z-fighting.
 check.py also runs with every door open.
+Close-ups come before posting: the nose, the shut lines, the lamps.
 A pillar shut line runs down the pillar's middle, so each door shows the same width of black.
 Black window trim is one even band, with no jump at a shut line.
 Fix only the hits Ivan could see. Ignore hits hidden inside other parts or on options he did not pick. Then show Ivan the fixed version. He must say ok before it goes in.
