@@ -1,0 +1,12 @@
+laid 64 parts, 16 cutters
+cut arch.002: open edges 0 -> 3
+cabin cut
+openings cut, hollows dropped: 0
+grooves cut
+door cut free: door_l 22344
+door cut free: door_r 22403
+triangles 771764
+Writing to out/ToraGiga.obj
+OBJ export of 'ToraGiga.obj' took 644.68 ms
+Info: File exported successfully
+wrote out/ToraGiga.obj
