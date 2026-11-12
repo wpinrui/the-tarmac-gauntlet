@@ -142,6 +142,8 @@ namespace TarmacGauntlet.Raceday
         private float myBrakes = 10f;
         /// <summary>T3: seconds ahead within which a car ahead is followed as if it may brake at its hardest.</summary>
         private static readonly float HardAhead = Knob("HARDAHEAD", 2f);
+        private static readonly float PredGap = Knob("PREDGAP", 0.4f), PredBrake = Knob("PREDBRAKE", 0.5f), PredWhere = Knob("PREDWHERE", 0f);
+        private bool predQueue;
         private float diveSpeed;
         /// <summary>T20: how far under the outside car's speed a car diving at it brakes to, m/s.</summary>
         /// <summary>How far ahead the outside car must be, as a share of a car length, before the inside car has no claim: its nose short of the other's middle.</summary>
@@ -336,6 +338,8 @@ namespace TarmacGauntlet.Raceday
             float here = Mathf.Repeat(me.Distance, lap);
             lapLength = lap;
             Gather(c, me, field);
+            predQueue = PredGap > 0f && (PredWhere == 0f || PredWhere == 1f && me.Distance < lap || PredWhere == 2f && !FreeStretch(pilot)
+                || PredWhere == 3f && (me.Distance < lap || !FreeStretch(pilot)));
             Predict(c, me, NextTurn(c, here));
 
             // What the cars around ask of this one, from where they are now.
@@ -1117,6 +1121,14 @@ namespace TarmacGauntlet.Raceday
                         {
                             v = Mathf.Min(v, ov[f, s]);
                             d = Mathf.Min(d, od[j, s - 1] + v * Tick);
+                        }
+                        // A queue: it keeps its own gap to the car ahead of it, slowing for it as its brakes allow,
+                        // instead of running at its line's speed until it touches (the first-corner chain).
+                        else if (predQueue && g > -0.5f * CarL && g < 80f && Mathf.Abs(ol[f, s] - lat) < CarW)
+                        {
+                            float room = g - CarL - 1f - PredGap * ov[f, s];
+                            float vf = ov[f, s], vmax = Mathf.Sqrt(Mathf.Max(vf * vf + 2f * Mathf.Max(o.Braking, 5f) * PredBrake * Mathf.Max(room, 0f), 0f));
+                            if (vmax < v) { v = vmax; d = Mathf.Min(d, od[j, s - 1] + v * Tick); }
                         }
                     }
                     od[j, s] = d;
