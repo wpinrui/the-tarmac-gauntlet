@@ -18,8 +18,7 @@ namespace TarmacGauntlet.Raceday
         {
             float e = s.SunElevation;
             float grey = Mathf.Clamp01(Mathf.Max(overcast, rain));
-            // The sun from just below the horizon to 18 degrees up, gone behind a grey sky.
-            float golden = SkyClock.Smooth(-2f, 3f, e) * (1f - SkyClock.Smooth(6f, 18f, e)) * (1f - grey);
+            float golden = Golden(e, grey);
             // The sun from 8 degrees below the horizon to just above it.
             float blue = SkyClock.Smooth(-8f, -3f, e) * (1f - SkyClock.Smooth(-1f, 2f, e));
             float night = s.Night;
@@ -29,14 +28,18 @@ namespace TarmacGauntlet.Raceday
             float sunny = (1f - Mathf.Clamp01(shade)) * Mathf.Clamp01(patchy) * day;
             return new PostEffects.Grade
             {
-                // The tone curve presses the dark down: the night is lifted a little so the floodlit track still reads.
-                Exposure = 0.25f * night + 0.12f * sunny - 0.04f * shaded,
+                // The tone curve presses the dark down: the night is lifted so the floodlit track and the verges read.
+                Exposure = 1f * night + 0.12f * sunny - 0.04f * shaded,
                 Contrast = 8f + 4f * golden + 6f * night - 10f * grey + 5f * sunny - 6f * shaded,
                 Saturation = 6f + 10f * golden - 6f * blue - 22f * night - 18f * grey + 5f * sunny - 7f * shaded,
                 Temperature = 14f * golden - 10f * blue - 8f * night - 6f * grey + 4f * sunny - 4f * shaded,
                 Tint = 3f * golden - 2f * blue,
             };
         }
+
+        /// <summary>How golden the low sun is, 0 to 1: from just below the horizon to 18 degrees up, gone behind a grey sky.</summary>
+        public static float Golden(float sunElevation, float grey) =>
+            SkyClock.Smooth(-2f, 3f, sunElevation) * (1f - SkyClock.Smooth(6f, 18f, sunElevation)) * (1f - Mathf.Clamp01(grey));
 
         /// <summary>
         /// How broken the cloud is, 0 to 1, for this share of the sky under cloud and this overcast: none in a clear sky with

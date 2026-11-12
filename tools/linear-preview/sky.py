@@ -67,22 +67,38 @@ def misty(hour):
     return math.exp(-d * d)
 
 
-def grade(s):
+def golden(e):
+    """SkyGrade.Golden under a clear sky."""
+    return sm(-2, 3, e) * (1 - sm(6, 18, e))
+
+
+def grade(s, night_exposure=None):
     e = s["e"]
-    golden = sm(-2, 3, e) * (1 - sm(6, 18, e))
+    golden_ = golden(e)
     blue = sm(-8, -3, e) * (1 - sm(-1, 2, e))
     night = s["night"]
-    return dict(exposure=0.45 + 0.25 * night, contrast=8 + 4 * golden + 6 * night,
-                saturation=6 + 10 * golden - 6 * blue - 22 * night, temperature=14 * golden - 10 * blue - 8 * night,
-                tint=3 * golden - 2 * blue)
+    return dict(exposure=0.45 + (EXPOSURE_NIGHT if night_exposure is None else night_exposure) * night, contrast=8 + 4 * golden_ + 6 * night,
+                saturation=6 + 10 * golden_ - 6 * blue - 22 * night, temperature=14 * golden_ - 10 * blue - 8 * night,
+                tint=3 * golden_ - 2 * blue)
+
+
+# SkyGrade's night exposure: 1, and 0.25 while the game drew in Gamma.
+EXPOSURE_NIGHT = 1.0
+EXPOSURE_NIGHT_GAMMA = 0.25
+ALBEDO = 0.35  # LinearLight.Albedo
+
+
+def ambient(c):
+    """LinearLight.Ambient, as linear light."""
+    return lin(np.asarray(c) * ALBEDO) / lin(ALBEDO)
 
 
 def match(colour, gamma_intensity, ambient, facing):
     """LinearLight.Match."""
     if gamma_intensity <= 0: return 0.0
     facing = min(max(facing, 0.05), 1)
-    a = lin(ambient) @ LUMA
-    want = lin(np.asarray(colour) * gamma_intensity * facing + ambient) @ LUMA - a
+    a = lin(np.asarray(ambient) * ALBEDO) @ LUMA
+    want = (lin((np.asarray(colour) * gamma_intensity * facing + ambient) * ALBEDO) @ LUMA - a) / lin(ALBEDO)
     per = facing * (lin(colour) @ LUMA)
     return max(want, 0) / per if per > 1e-6 else 0.0
 
