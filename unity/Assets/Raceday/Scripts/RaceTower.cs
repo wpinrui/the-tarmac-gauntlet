@@ -6,7 +6,8 @@ using UnityEngine;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// The TV timing tower in the top left corner. A tab on top counts down the race time left. Under
+    /// The TV timing tower in the top left corner. A tab on top counts down the race time left, and a
+    /// dimmer tab beside it shows the time of day. Under
     /// it, one row per car: position, a slash in the team's colour, team name, class badge and fake laps
     /// completed (<see cref="Standings"/>). Class leaders have their position on a red block, and the
     /// player's row is white. It shows every class leader and the four cars either side of the player,
@@ -69,7 +70,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Race seconds since the start, on the race clock.</summary>
         public float RaceTime => clock * TimeCompression;
         private Font bold, semiBold;
-        private GUIStyle clockStyle, posStyle, teamStyle, badgeStyle, gapStyle, headerStyle;
+        private GUIStyle clockStyle, hourStyle, posStyle, teamStyle, badgeStyle, gapStyle, headerStyle;
         private int styledFor = -1;
         private Texture2D slash, lead;
         private string[] positions;
@@ -131,6 +132,10 @@ namespace TarmacGauntlet.Raceday
             var tab = new Rect(x, y, tabWidth, TabHeight * u);
             Fill(tab, TabColour, new Vector4(Radius * u, Radius * u, 0f, 0f));
             GUI.Label(tab, time, clockStyle);
+            string hour = TimeOfDayText;
+            var hourTab = new Rect(tab.xMax + BodyPad * u, y, hourStyle.CalcSize(new GUIContent(hour)).x + 2f * TabPad * u, TabHeight * u);
+            Fill(hourTab, TabColour, new Vector4(Radius * u, Radius * u, 0f, 0f));
+            Text(hourTab, hour, hourStyle, HeaderText);
             y = tab.yMax;
 
             int breaks = 0;
@@ -203,6 +208,17 @@ namespace TarmacGauntlet.Raceday
         /// <summary>The race time left, as the tab on top shows it.</summary>
         public string TimeLeft => Clock();
 
+        /// <summary>The local time of day on the race clock, in 12-hour notation, as the tab beside the countdown shows it.</summary>
+        public string TimeOfDayText
+        {
+            get
+            {
+                int m = Mathf.FloorToInt(TimeOfDay.StartHour * 60f + RaceTime / 60f) % (24 * 60);
+                int h = m / 60, h12 = h % 12 == 0 ? 12 : h % 12;
+                return $"{h12}:{m % 60:00} {(h < 12 ? "AM" : "PM")}";
+            }
+        }
+
         private string Clock()
         {
             float left = Mathf.Max(0f, RaceLength - clock * TimeCompression);
@@ -231,6 +247,7 @@ namespace TarmacGauntlet.Raceday
             styledFor = key;
             fitted.Clear();
             clockStyle = Make(bold, 1.3f * u, TextAnchor.MiddleCenter);
+            hourStyle = Make(semiBold, 1.3f * u, TextAnchor.MiddleCenter);
             posStyle = Make(semiBold, 1.05f * u, TextAnchor.MiddleRight);
             teamStyle = Make(bold, 0.98f * u, TextAnchor.MiddleLeft);
             badgeStyle = Make(bold, 0.9f * u, TextAnchor.MiddleCenter);
