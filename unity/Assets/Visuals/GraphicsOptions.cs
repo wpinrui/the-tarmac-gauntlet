@@ -58,10 +58,10 @@ namespace TarmacGauntlet.Visuals
         /// <summary>The fans in the grandstands, each one flat card turned to the camera. Changes live.</summary>
         public static readonly GraphicsOption Crowd = Toggle("settings.crowd", true);
 
-        /// <summary>Grain and bumps in the tarmac and kerbs, and broad patches across the tarmac.</summary>
+        /// <summary>Grain and bumps in the tarmac and kerbs, broad patches across the tarmac, and its sealed cracks and patch repairs.</summary>
         public static readonly GraphicsOption TarmacDetail = Toggle("settings.tarmacdetail", true);
 
-        /// <summary>A darker band of rubber laid down along the racing line.</summary>
+        /// <summary>A darker band of rubber laid down along the racing line, and rubber marks from locked and spinning tyres about it.</summary>
         public static readonly GraphicsOption RubberedLine = Toggle("settings.rubberedline", true);
 
         /// <summary>Rubber, chips and dust on the kerbs.</summary>

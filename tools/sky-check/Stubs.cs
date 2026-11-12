@@ -15,6 +15,7 @@ namespace UnityEngine
         public Color(float r, float g, float b, float a = 1f) { this.r = r; this.g = g; this.b = b; this.a = a; }
         public static Color operator +(Color p, Color q) => new Color(p.r + q.r, p.g + q.g, p.b + q.b, p.a + q.a);
         public static Color operator *(Color p, float d) => new Color(p.r * d, p.g * d, p.b * d, p.a * d);
+        public float grayscale => 0.299f * r + 0.587f * g + 0.114f * b;
         public override string ToString() => $"({r:0.00} {g:0.00} {b:0.00})";
     }
     public static class Mathf
@@ -25,6 +26,8 @@ namespace UnityEngine
         public static float Sin(float v) => (float)Math.Sin(v);
         public static float Cos(float v) => (float)Math.Cos(v);
         public static float Asin(float v) => (float)Math.Asin(v);
+        public static float Max(float a, float b) => a > b ? a : b;
+        public static float Exp(float v) => (float)Math.Exp(v);
         public static float Repeat(float t, float l) => Clamp(t - (float)Math.Floor(t / l) * l, 0, l);
     }
 }

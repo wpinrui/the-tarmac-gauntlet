@@ -67,6 +67,8 @@ namespace TarmacGauntlet.Management.Editor
             // ProjectSettings is not in the repository, so this is set here: the collector clears garbage a little each
             // frame instead of stopping the game to clear it all at once.
             PlayerSettings.gcIncremental = true;
+            // A release build only records CPU and GPU frame times for the FPS counter with this on.
+            PlayerSettings.enableFrameTimingStats = true;
             if (Directory.Exists(BuildFolder)) Directory.Delete(BuildFolder, true);
             BuildReport report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
             {
