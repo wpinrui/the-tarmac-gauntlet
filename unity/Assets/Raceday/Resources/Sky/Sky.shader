@@ -30,6 +30,7 @@ Shader "Hidden/TarmacGauntlet/Sky"
             #pragma fragment frag
             #pragma multi_compile_local _ _SKY_DETAIL
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
 
             TEXTURE2D(_CloudTex);
             SAMPLER(sampler_CloudTex);
