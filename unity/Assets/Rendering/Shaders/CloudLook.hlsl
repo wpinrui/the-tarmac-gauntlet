@@ -10,7 +10,7 @@
 #define TG_CLOUD_DECK_LOWERS 300.0
 
 // How much of the sky the clouds may take: soft, so the 3D noise draws each cloud's edge.
-#define TG_CLOUD_COVER_FLOOR 0.25
+#define TG_CLOUD_COVER_FLOOR 0.31
 #define TG_CLOUD_COVER_SLOPE 2.5
 
 // The 3D noise's periods, m: each cloud's shape (and, far off, the larger, flatter shapes they merge into), the billows
@@ -33,6 +33,9 @@
 #define TG_CLOUD_FRAY 0.1
 #define TG_CLOUD_DENSITY 3.0
 #define TG_CLOUD_CUT 0.06
+// How thick a cloud's shape must get before it shows at all: the tips of the noise that only just clear the cover would
+// be scraps a few pixels across.
+#define TG_CLOUD_SHAPE_CUT 0.18
 #define TG_CLOUD_EXTINCTION 0.04
 
 // The overcast deck's periods, m: how its underside rolls and where it is thick or thin.

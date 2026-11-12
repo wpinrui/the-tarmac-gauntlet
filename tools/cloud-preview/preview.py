@@ -182,6 +182,7 @@ class Clouds:
         hf = hi / (1 - 0.65 * fi)
         prof = saturate(hf / 0.06) * (1 - smoothstep(C["TOP_ROUNDS"], 1.0, hf) * (1 - 0.6 * o)) * (hf < 1)
         di = saturate((bigs * prof - (1 - cov)) / np.maximum(cov, 1e-3)) * cov
+        di = saturate((di - C["SHAPE_CUT"]) / (1 - C["SHAPE_CUT"]))
         if o > 0:
             roll = self.noise(pi / C["DECK_ROLL_PERIOD"], 1)
             lump = smoothstep(0.05, 0.95, 0.75 * self.noise(pi / C["DECK_LUMP_PERIOD"] + 0.37, 0)

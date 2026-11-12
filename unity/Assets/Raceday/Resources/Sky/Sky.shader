@@ -1,7 +1,8 @@
 // The race's sky: a zenith to horizon gradient that pales over the lower half of the sky, a band of haze in the fog's
 // colour at the horizon so the far trees fade into the same air, the sunset glow towards the sun, the sun and moon,
 // stars at night and two layers of drifting cloud. Every colour comes from TimeOfDay each frame.
-// Under weather (_Overcast) the clouds grow, soften and close into a grey deck with broad darker patches.
+// Under weather (_Overcast) the clouds grow, soften and close into a grey deck with broad darker patches. On a clear day
+// (_Deep) the haze at the horizon is thinner, and a low sun warms the sky towards it (_GoldenGlow).
 //
 // With _SKY_DETAIL (the Sky detail graphics option) the sky is drawn with more care, still in one pass with no
 // volumetrics: the air round
@@ -36,6 +37,10 @@ Shader "Hidden/TarmacGauntlet/Sky"
             float4 _SunDir, _MoonDir;
             float4 _CloudOffset;   // xy the big layer, zw the small one
             float _Cover, _Night, _CloudScale, _Overcast;
+            // The clear day's palette (SkyPalette): how far it is on, which thins the horizon's haze, and the warm glow
+            // towards a low sun laid over that haze.
+            float _Deep;
+            float4 _GoldenGlow;
             float _TgVolumetricClouds;
 
             struct Attributes
@@ -104,13 +109,17 @@ Shader "Hidden/TarmacGauntlet/Sky"
                 // is only high up, and the sky pales through the lower half towards the horizon.
                 float air = exp(-max(up, 0.0) * 3.2);
                 float3 sky = lerp(_Zenith.rgb, _Horizon.rgb, air);
-                // A low band of haze in the fog's colour, so the far trees and the sky meet in one colour.
-                float haze = exp(-abs(up) * 10.0);
+                // A low band of haze in the fog's colour, so the far trees and the sky meet in one colour: thinner and
+                // fainter on a clear day, so the sky's blue comes down to it.
+                float haze = exp(-abs(up) * (10.0 + 14.0 * _Deep));
+                float hazeShows = 0.85 * (1.0 - 0.75 * _Deep);
+                float golden = towards * towards * towards * towards * exp(-max(up, 0.0) * 4.0);
             #if defined(_SKY_DETAIL)
                 float band = exp(-max(up, 0.0) * 6.5);
                 sky += _Glow.rgb * (towards * towards * towards * band);
-                sky = lerp(sky, _Haze.rgb, haze * 0.85);
+                sky = lerp(sky, _Haze.rgb, haze * hazeShows);
                 sky = lerp(sky, _Ground.rgb, saturate(-up * 6.0) * (1.0 - haze * 0.6));
+                sky += _GoldenGlow.rgb * golden;
 
                 // The sun's halo and a broad glow round it, stronger through the thicker air low down.
                 float scatter = Scatter(cs, 0.8) * 0.55 + Scatter(cs, 0.55) * 0.05;
@@ -124,8 +133,9 @@ Shader "Hidden/TarmacGauntlet/Sky"
             #else
                 float band = h * h * h * h * h * h;
                 sky += _Glow.rgb * (towards * towards * towards * band);
-                sky = lerp(sky, _Haze.rgb, haze * 0.85);
+                sky = lerp(sky, _Haze.rgb, haze * hazeShows);
                 sky = lerp(sky, _Ground.rgb, saturate(-up * 6.0) * (1.0 - haze * 0.6));
+                sky += _GoldenGlow.rgb * golden;
                 sky += _SunColor.rgb * (pow(saturate(cs), 12.0) * 0.18 + pow(saturate(cs), 400.0) * 0.6) * above;
                 float disc = smoothstep(0.99985, 0.99992, cs) * above;
                 float3 discCol = _SunColor.rgb * 3.0;

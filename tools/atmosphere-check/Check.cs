@@ -89,6 +89,8 @@ public static class Check
         }
         Noise();
         Grade();
+        Look();
+        Palette();
 
         Console.WriteLine(failed == 0 ? "All atmosphere checks pass" : $"{failed} atmosphere checks FAILED");
         return failed == 0 ? 0 : 1;
@@ -121,6 +123,59 @@ public static class Check
             double a = inner / innerCount, b = face / faceCount;
             Expect($"3D noise {name} wraps without a seam", b < a * 1.25, $"{b:0.0} across the faces against {a:0.0} inside");
         }
+    }
+
+    /// <summary>
+    /// The volumetric clouds' constants: CloudLook.hlsl holds them, the shader includes it and the cloud preview reads it,
+    /// so the CPU's copies must agree with it, and every period of the 3D noise must divide where the wind's drift wraps.
+    /// </summary>
+    private static void Look()
+    {
+        string dir = AppContext.BaseDirectory;
+        while (dir != null && !System.IO.Directory.Exists(System.IO.Path.Combine(dir, "unity", "Assets"))) dir = System.IO.Path.GetDirectoryName(dir);
+        if (dir == null) { Expect("CloudLook.hlsl is found", false, "no unity/Assets above " + AppContext.BaseDirectory); return; }
+        string shaders = System.IO.Path.Combine(dir, "unity", "Assets", "Rendering", "Shaders");
+        var look = new System.Collections.Generic.Dictionary<string, float>();
+        foreach (string file in new[] { "CloudCover.hlsl", "CloudLook.hlsl" })
+            foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(
+                System.IO.File.ReadAllText(System.IO.Path.Combine(shaders, file)), @"^#define TG_CLOUD_(\w+)\s+(-?[\d.]+)\s*$", System.Text.RegularExpressions.RegexOptions.Multiline))
+                look[m.Groups[1].Value] = float.Parse(m.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
+        void Same(string name, float cpu)
+        {
+            bool has = look.TryGetValue(name, out float v);
+            Expect($"TG_CLOUD_{name} matches the CPU's", has && Math.Abs(v - cpu) < 1e-4f, has ? $"{v} in the shader, {cpu} on the CPU" : "missing");
+        }
+        Same("BASE", CloudMap.Base);
+        Same("HIGH_STEPS", CloudLook.HighSteps);
+        Same("ULTRA_STEPS", CloudLook.UltraSteps);
+        Same("REPEAT", CloudLook.Repeat);
+        bool divides = true;
+        string odd = "";
+        foreach (var kv in look)
+            if (kv.Key.EndsWith("_PERIOD"))
+            {
+                double r = CloudLook.Repeat / kv.Value;
+                if (Math.Abs(r - Math.Round(r)) > 1e-4) { divides = false; odd += $" {kv.Key} {kv.Value}"; }
+            }
+        Expect("every 3D noise period divides where the drift wraps, so the clouds never jump", divides, odd);
+    }
+
+    /// <summary>The clear day's palette: deeper by day, untouched at night and under a grey sky, golden only with the sun low.</summary>
+    private static void Palette()
+    {
+        SkyState Painted(float hour, float overcast)
+        {
+            SkyState s = SkyClock.At(hour, SkyClock.Look);
+            SkyPalette.Apply(ref s, overcast);
+            return s;
+        }
+        SkyState noon = SkyClock.At(13f, SkyClock.Look), deep = Painted(13f, 0f), grey = Painted(13f, 1f), night = Painted(1f, 0f);
+        Expect("a clear noon's zenith is a deeper blue", deep.Zenith.r < noon.Zenith.r * 0.6f && deep.Zenith.b > noon.Zenith.b * 0.8f, $"{deep.Zenith.r:0.00} {deep.Zenith.g:0.00} {deep.Zenith.b:0.00}");
+        Expect("a grey sky keeps its colours", Math.Abs(grey.Zenith.r - noon.Zenith.r) < 1e-5f && grey.Deep == 0f, "");
+        SkyState dark = SkyClock.At(1f, SkyClock.Look);
+        Expect("the night keeps its colours", Math.Abs(night.Zenith.b - dark.Zenith.b) < 1e-5f && night.Deep < 1e-4f, $"{night.Deep}");
+        SkyState low = Painted(16.6f, 0f);
+        Expect("a low sun is golden and noon is not", low.Golden > 0.8f && deep.Golden < 0.01f && low.CloudLit.r > low.CloudLit.b * 2f, $"{low.Golden:0.00} {deep.Golden:0.00}");
     }
 
     /// <summary>The grade as the sun breaks through, and nothing changed where there is nothing to break through.</summary>

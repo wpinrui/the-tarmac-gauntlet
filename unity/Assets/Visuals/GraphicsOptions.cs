@@ -68,13 +68,13 @@ namespace TarmacGauntlet.Visuals
         public static readonly GraphicsOption SunRays = Toggle("settings.sunrays", true);
 
         /// <summary>Real clouds in the race sky, lit towards the sun, in place of the painted ones. Changes live.</summary>
-        public static readonly GraphicsOption VolumetricClouds = Toggle("settings.volumetricclouds.off", false);
+        public static readonly GraphicsOption VolumetricClouds = Toggle("settings.volumetricsky.clouds", false);
 
         /// <summary>A low mist the sun shines through in shafts and the floodlights light in beams. Changes live.</summary>
-        public static readonly GraphicsOption VolumetricFog = Toggle("settings.volumetricfog.off", false);
+        public static readonly GraphicsOption VolumetricFog = Toggle("settings.volumetricsky.fog", false);
 
         /// <summary>A faint lens flare across the screen from the sun. Changes live.</summary>
-        public static readonly GraphicsOption LensFlare = Toggle("settings.lensflare.off", false);
+        public static readonly GraphicsOption LensFlare = Toggle("settings.volumetricsky.lensflare", false);
 
         /// <summary>The fans in the grandstands, each one flat card turned to the camera. Changes live.</summary>
         public static readonly GraphicsOption Crowd = Toggle("settings.crowd", true);
@@ -163,9 +163,8 @@ namespace TarmacGauntlet.Visuals
             new GraphicsRow("Heat haze", OnFromHigh, ExhaustHaze, TarmacShimmer),
             new GraphicsRow("Screen-space reflections", OnFromHigh, ScreenReflections),
             new GraphicsRow("Sky detail", OffAtLow, SkyDetail, SunRays),
-            // Off at every level, and saved under new keys so a game that had it on starts with it off, while the volumetric
-            // clouds are reworked against an offline preview.
-            new GraphicsRow("Volumetric sky", new[] { 0, 0, 0, 0 }, VolumetricClouds, VolumetricFog, LensFlare),
+            // Saved under new keys, so a game that saved it off while the clouds were reworked takes its level's setting.
+            new GraphicsRow("Volumetric sky", OnFromHigh, VolumetricClouds, VolumetricFog, LensFlare),
             new GraphicsRow("Crowd", AlwaysOn, Crowd),
             new GraphicsRow("HQ lighting", AlwaysOn, BakedLighting, BakedReflections, Wear),
         };
