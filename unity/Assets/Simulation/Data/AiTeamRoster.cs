@@ -48,7 +48,7 @@ namespace TarmacGauntlet.Simulation
             new AiTeamEntry { Name = "Overtime Racing", Descriptor = "day jobs fund the weekend habit", Nationality = "au", ModelId = "e-10", CarClass = CarClass.E },
             new AiTeamEntry { Name = "Vogel Racing", Descriptor = "German-founded privateer with discipline", Nationality = "de", ModelId = "e-11", CarClass = CarClass.E },
             new AiTeamEntry { Name = "Harrow Motorsport", Descriptor = "west London outfit, punching up", Nationality = "gb", ModelId = "e-07", CarClass = CarClass.E },
-            new AiTeamEntry { Name = "Caldwell Racing", Descriptor = "veteran driver turned team owner", Nationality = "at", ModelId = "e-08", CarClass = CarClass.E },
+            new AiTeamEntry { Name = "Leitner Motorsport", Descriptor = "veteran driver turned team owner", Nationality = "at", ModelId = "e-08", CarClass = CarClass.E },
             new AiTeamEntry { Name = "Half Tank Racing", Descriptor = "never quite enough fuel budget", Nationality = "id", ModelId = "e-09", CarClass = CarClass.E },
             new AiTeamEntry { Name = "Blackthorn Racing", Descriptor = "thorny, stubborn, hard to pass", Nationality = "ae", ModelId = "e-10", CarClass = CarClass.E },
             new AiTeamEntry { Name = "Cóndor Racing", Descriptor = "Colombian-founded, passionate about racing", Nationality = "co", ModelId = "e-11", CarClass = CarClass.E },
