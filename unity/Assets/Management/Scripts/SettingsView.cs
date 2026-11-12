@@ -8,7 +8,7 @@ using static TarmacGauntlet.Management.MenuKit;
 
 namespace TarmacGauntlet.Management
 {
-    /// <summary>The settings panel, the same from the main menu, the hub's Escape menu and the race's pause menu: graphics, then audio.</summary>
+    /// <summary>The settings panel, the same from the main menu, the hub's Escape menu and the race's pause menu: graphics, race, then audio.</summary>
     internal static class SettingsView
     {
         /// <summary>Fills the settings panel, emptying it first.</summary>
@@ -27,7 +27,13 @@ namespace TarmacGauntlet.Management
                 v => Mathf.RoundToInt(v * most).ToString(CultureInfo.InvariantCulture)));
             settingsPanel.Add(graphics);
 
-            VisualElement audio = SettingsGroup(1);
+            VisualElement race = SettingsGroup(1);
+            race.Add(Stepper("Gearbox", new[] { "Manual", "Automatic" }, GameSettings.Automatic ? 1 : 0, i => GameSettings.Automatic = i == 1));
+            race.Add(Stepper("Steering help", new[] { "Off", "On" }, GameSettings.SteeringHelp ? 1 : 0, i => GameSettings.SteeringHelp = i == 1));
+            race.Add(Stepper("Track map", new[] { "Off", "On" }, GameSettings.TrackMap ? 1 : 0, i => GameSettings.TrackMap = i == 1));
+            settingsPanel.Add(race);
+
+            VisualElement audio = SettingsGroup(2);
             audio.Add(Slider("Volume", GameSettings.Volume, v => GameSettings.Volume = v));
             settingsPanel.Add(audio);
         }
