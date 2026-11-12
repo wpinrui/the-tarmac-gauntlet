@@ -4,7 +4,7 @@ namespace TarmacGauntlet.Raceday
 {
     /// <summary>
     /// Synthesises what one car's tyres sound like on what they roll over, sample by sample: the squeal and scrub of a
-    /// slide on tarmac, the buzz of kerb ridges, gravel grains crunching and stones pinging off the floor, the swish and
+    /// slide on tarmac, the rumble of kerb ridges, gravel grinding, the swish and
     /// thump of grass, and a faint road roar. Every layer follows its inputs smoothly, so a slide grows into a squeal and
     /// a wheel dropping off the kerb fades its rumble rather than cutting it.
     ///
@@ -13,9 +13,8 @@ namespace TarmacGauntlet.Raceday
     /// </summary>
     public sealed class TyreSynth
     {
-        private const float RidgeSpacing = 0.4f;   // m between a kerb's ridges
-        private const int MaxGrains = 24;
-        private const int MaxPings = 6;
+        private const float RidgeSpacing = 0.75f;   // m between a kerb's ridges, on average
+        private const int MaxGrains = 64;
 
         /// <summary>How hard the tyres slide on tarmac or a kerb, 0 to 1, the hardest of the four (<see cref="CarController.Skid"/>).</summary>
         public float Slide;
@@ -30,7 +29,7 @@ namespace TarmacGauntlet.Raceday
 
         private readonly float fs;
         private readonly float squealPitch, roarLevel;
-        private readonly float lp6000, lp180, lp260, lp350, lpRoarSpan, lp600;
+        private readonly float lp2500, lp6000, lp180, lp260, lp350, lpRoarSpan, lp600;
         private uint seed;
 
         // Smoothed inputs.
@@ -40,19 +39,15 @@ namespace TarmacGauntlet.Raceday
         private float drift, driftTarget, driftTimer, warble, warbleTarget, chirp;
         private float r1Low, r1Band, r2Low, r2Band, r3Low, r3Band, scrubLow, scrubBand, squealLow;
 
-        // Kerb: one thump per ridge into the body's resonance, and the rattle on top.
-        private double ridgePhase;
-        private float thump, slap, click, carcassLow, carcassBand, thumpLow, thumpBand, rattleLow, rattleBand, rattle2Low, rattle2Band;
+        // Kerb: uneven hits from the front and rear tyres, each a thud and a rattle.
+        private readonly float hitDecay;
+        private float frontGap, rearGap = 0.5f, frontHit, rearHit, thudLow, thud2, rattleLow, rattleBand;
 
-        // Gravel: short grains of noise, the roar of the car ploughing, stones pinging off the floor.
+        // Gravel: dense grains of noise that blur into a grind, and the roar of the car ploughing.
         private struct Grain { public int Left; public float Amp, Decay; }
         private readonly Grain[] grains = new Grain[MaxGrains];
         private int grainCount;
-        private float grainOwed, roughLow, roughBand, crunchLow, crunchBand, crunch2Low, crunch2Band, ploughLow, plough2;
-        private struct Ping { public double Phase; public float Step, Amp, Decay; }
-        private readonly Ping[] pings = new Ping[MaxPings];
-        private int pingCount;
-        private float pingOwed;
+        private float grainOwed, roughLow, roughBand, crunchLow, crunchBand, crunch2Low, crunch2Band, ploughLow, plough2, dullLow;
 
         // Grass: a rustle that comes and goes, and the thump of the ground's dips.
         private float rustleLow, rustleBand, swishLow, swishBand, rustleEnv, rustleTarget, rustleTimer, bump, bumpLow, bumpBand;
@@ -69,6 +64,8 @@ namespace TarmacGauntlet.Raceday
             squealPitch = Lerp(1150f, 760f, size) * (0.95f + 0.1f * Uniform());
             roarLevel = Lerp(0.8f, 1.2f, size);
             lp6000 = LowPassStep(6000f);
+            lp2500 = LowPassStep(2500f);
+            hitDecay = 1f - 160f / fs;
             lp180 = LowPassStep(180f);
             lp260 = LowPassStep(260f);
             lp350 = LowPassStep(350f);
@@ -86,7 +83,7 @@ namespace TarmacGauntlet.Raceday
             float tGround = Clamp(Grounded, 0f, 1f), tWet = Clamp(Wet, 0f, 1f);
 
             // Nothing to play and nothing still fading: silence, cheaply.
-            if (tSpeed < 0.3f && tSlide <= 0f && speed < 0.3f && slide < 0.001f && grainCount == 0 && pingCount == 0)
+            if (tSpeed < 0.3f && tSlide <= 0f && speed < 0.3f && slide < 0.001f && grainCount == 0)
             {
                 Array.Clear(output, 0, count);
                 return;
@@ -153,46 +150,50 @@ namespace TarmacGauntlet.Raceday
         private float Kerbs(float pace)
         {
             if (kerb < 0.001f) return 0f;
-            ridgePhase += speed / RidgeSpacing / fs;
-            if (ridgePhase >= 1.0)
-            {
-                ridgePhase -= Math.Floor(ridgePhase);
-                thump = 0.7f + 0.3f * Uniform();
-                slap = thump;
-                click = thump;
-            }
-            thump *= 1f - 400f / fs;
-            slap *= 1f - 150f / fs;
-            click *= 1f - 2500f / fs;
-            // The tyre's carcass rings as it hits each ridge: a harmonic buzz at the ridge rate.
-            float carcass = Band(click, 240f + 80f * pace, 2.5f, ref carcassLow, ref carcassBand);
-            float body = Band(thump * (1f + 0.3f * Noise()), 70f + 30f * pace, 3f, ref thumpLow, ref thumpBand);
-            // The tyre slaps each ridge too: a burst of mid noise in time with the thumps.
-            // The tyre slaps each ridge too, and the car rattles: mid noise in time with the thumps, which is what
-            // carries the rumble on small speakers.
-            float noise = Noise();
-            float rattle = Band(noise, 320f + 200f * pace, 1.5f, ref rattleLow, ref rattleBand)
-                           + 0.5f * Band(noise, 1100f + 400f * pace, 2f, ref rattle2Low, ref rattle2Band);
+            // Front and rear tyres each drum over the ridges. The ridges are never quite even and the tyres hop, so
+            // every gap is a little different: an even train of hits would be heard as a pitch, like an engine.
+            float rate = speed / RidgeSpacing / fs;
+            Hit(ref frontGap, ref frontHit, rate);
+            Hit(ref rearGap, ref rearHit, rate);
+            frontHit *= hitDecay;
+            rearHit *= hitDecay;
+
+            // Each hit is a burst of noise, not a ringing tone: a deep thud through the body and a rattle on top.
+            float burst = Noise() * frontHit + Noise() * rearHit;
+            thudLow += (burst - thudLow) * lp180;
+            thud2 += (thudLow - thud2) * lp180;
+            float rattle = Band(burst, 500f + 300f * pace, 0.7f, ref rattleLow, ref rattleBand);
             float level = kerb * Clamp(speed / 6f, 0f, 1f) * (0.5f + 0.5f * pace);
-            return (0.35f * body + 1.2f * carcass + 2.5f * rattle * slap * slap) * level;
+            return (6f * thud2 + 1.1f * rattle) * level;
+        }
+
+        /// <summary>Counts down to a tyre's next ridge and, on it, starts a hit of uneven strength.</summary>
+        private void Hit(ref float gap, ref float hit, float rate)
+        {
+            gap -= rate;
+            if (gap > 0f) return;
+            gap += 0.6f + 0.8f * Uniform();
+            hit = Math.Max(hit, 0.4f + 0.6f * Uniform());
         }
 
         private float Gravels(float pace)
         {
             float level = gravel * Clamp(speed / 3f, 0f, 1f);
-            if (level < 0.001f && grainCount == 0 && pingCount == 0) return 0f;
+            if (level < 0.001f && grainCount == 0) return 0f;
 
-            // Grains: each a tiny stone shifting under a tyre, a millisecond or two of noise. More of them the faster.
-            grainOwed += level * (600f + 4400f * pace) / fs;
+            // Grains: stones grinding against each other under the tyres, each a few milliseconds of noise. So many
+            // overlap at speed that they blur into a grind, and they are kept low and dull: bright, sparse grains
+            // sound like glass breaking.
+            grainOwed += level * (1500f + 6000f * pace) / fs;
             while (grainOwed >= 1f)
             {
                 grainOwed -= 1f;
                 if (grainCount < MaxGrains)
                     grains[grainCount++] = new Grain
                     {
-                        Left = (int)(fs * (0.001f + 0.004f * Uniform())),
-                        Amp = 0.3f + 0.7f * Uniform() * Uniform(),
-                        Decay = 1f - (300f + 900f * Uniform()) / fs,
+                        Left = (int)(fs * (0.003f + 0.008f * Uniform())),
+                        Amp = 0.2f + 0.8f * Uniform() * Uniform(),
+                        Decay = 1f - (150f + 350f * Uniform()) / fs,
                     };
             }
             float g = 0f;
@@ -203,36 +204,14 @@ namespace TarmacGauntlet.Raceday
                 grain.Amp *= grain.Decay;
                 if (--grain.Left <= 0) grains[i--] = grains[--grainCount];
             }
-            float crunch = Band(g, 2600f, 0.8f, ref crunchLow, ref crunchBand) + 0.7f * Band(g, 900f, 1.1f, ref crunch2Low, ref crunch2Band);
+            float crunch = Band(g, 1100f, 0.7f, ref crunchLow, ref crunchBand) + 0.9f * Band(g, 420f, 0.9f, ref crunch2Low, ref crunch2Band);
+            dullLow += (crunch - dullLow) * lp2500;
 
-            // The car ploughs through the bed: a deep, rough roar.
+            // The car ploughs through the bed: a deep, rough roar that surges as the bed piles up and gives.
             ploughLow += (Noise() - ploughLow) * lp180;
             plough2 += (ploughLow - plough2) * lp260;
-
-            // Stones flicked up ping off the floor and the arches.
-            pingOwed += level * (2f + 22f * pace) / fs;
-            if (pingOwed >= 1f)
-            {
-                pingOwed -= 1f;
-                if (pingCount < MaxPings)
-                    pings[pingCount++] = new Ping
-                    {
-                        Step = (2200f + 3800f * Uniform()) / fs,
-                        Amp = 0.1f + 0.25f * Uniform(),
-                        Decay = 1f - (60f + 90f * Uniform()) / fs,
-                    };
-            }
-            float p = 0f;
-            for (int i = 0; i < pingCount; i++)
-            {
-                ref Ping ping = ref pings[i];
-                ping.Phase += ping.Step;
-                p += ping.Amp * (float)Math.Sin(2.0 * Math.PI * ping.Phase);
-                ping.Amp *= ping.Decay;
-                if (ping.Amp < 0.002f) pings[i--] = pings[--pingCount];
-            }
-            float rough = Band(Noise(), 450f, 0.8f, ref roughLow, ref roughBand) * (0.5f + 0.5f * Math.Abs(plough2) * 8f);
-            return (0.95f * crunch + 0.9f * plough2 + 0.12f * rough) * level * (0.3f + 0.7f * pace) + p;
+            float rough = Band(Noise(), 450f, 0.8f, ref roughLow, ref roughBand) * (0.5f + 4f * Math.Abs(plough2));
+            return (0.6f * dullLow + 0.9f * plough2 + 0.12f * rough) * level * (0.3f + 0.7f * pace);
         }
 
         private float Grasses(float pace)
