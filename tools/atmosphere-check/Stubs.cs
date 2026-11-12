@@ -43,6 +43,7 @@ namespace UnityEngine
         public TextureWrapMode wrapMode;
         public FilterMode filterMode;
         public Texture3D(int w, int h, int d, TextureFormat f, bool mips) { }
+        public Texture3D(int w, int h, int d, Experimental.Rendering.GraphicsFormat f, Experimental.Rendering.TextureCreationFlags flags) { }
         public void SetPixels32(Color32[] px) { }
         public void Apply(bool mips, bool readOnly) { }
     }
@@ -75,4 +76,9 @@ namespace TarmacGauntlet.Rendering
             public float Exposure, Contrast, Saturation, Temperature, Tint;
         }
     }
+}
+namespace UnityEngine.Experimental.Rendering
+{
+    public enum GraphicsFormat { R8G8B8A8_UNorm }
+    public enum TextureCreationFlags { None }
 }

@@ -23,6 +23,8 @@ scene_json, out_dir, shot = sys.argv[1], sys.argv[2], sys.argv[3]
 SUN_G = float(sys.argv[4]) if len(sys.argv) > 4 else 1.25
 SUN_L = float(sys.argv[5]) if len(sys.argv) > 5 else 1.25
 LM_SCALE = float(sys.argv[6]) if len(sys.argv) > 6 else 1.0
+# HqLighting.Exposure: the Linear HQ's grade, on top of the post stack's own.
+EXPOSURE_L = float(sys.argv[7]) if len(sys.argv) > 7 else -0.3
 sys.argv = [sys.argv[0], scene_json]
 sys.path.insert(0, os.path.join(ROOT, "tools", "team-hq", "bake"))
 import bake  # noqa: E402
@@ -212,8 +214,8 @@ def main():
     r_l = alb * (lml + sun_irr * SUN_L * lin(colour)) + eml + gloss * SUN_L * lin(colour)
     np.save(os.path.join(out_dir, f"hq-{shot}-gamma.npy"), r_g.astype(np.float32))
     np.save(os.path.join(out_dir, f"hq-{shot}-linear.npy"), r_l.astype(np.float32))
-    for tag, r in (("gamma", r_g), ("linear", r_l)):
-        save(os.path.join(out_dir, f"hq-{shot}-{tag}.png"), frame(r, bloom=bloom(r)))
+    for tag, r, ev in (("gamma", r_g, 0.45), ("linear", r_l, 0.45 + EXPOSURE_L)):
+        save(os.path.join(out_dir, f"hq-{shot}-{tag}.png"), frame(r, exposure=ev, bloom=bloom(r, ev)))
     print("rendered", shot)
 
 
