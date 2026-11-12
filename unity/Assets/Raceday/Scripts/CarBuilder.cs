@@ -1,4 +1,5 @@
 using TarmacGauntlet.Simulation;
+using TarmacGauntlet.Visuals;
 using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
@@ -50,14 +51,7 @@ namespace TarmacGauntlet.Raceday
             return car;
         }
 
-        private static GameObject LoadModel(string path)
-        {
-#if UNITY_EDITOR
-            return UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(path);
-#else
-            return null;
-#endif
-        }
+        private static GameObject LoadModel(string path) => ArtLibrary.Load<GameObject>(path);
 
         /// <summary>
         /// Puts the model under the car and gives each wheel a pivot at its centre, so it can

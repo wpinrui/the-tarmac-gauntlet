@@ -17,3 +17,7 @@
 # dotnet test build output
 /dotnet/**/bin/
 /dotnet/**/obj/
+
+# Filled by the build menu just before each build
+/Assets/Visuals/Generated/
+/Assets/Visuals/Generated.meta

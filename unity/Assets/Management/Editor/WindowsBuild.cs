@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
+using TarmacGauntlet.Visuals;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
 
@@ -59,6 +60,8 @@ namespace TarmacGauntlet.Management.Editor
         {
             if (!UnityEditor.SceneManagement.EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return false;
             string[] scenes = EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => s.path).ToArray();
+            FillArtLibrary();
+            IncludeRuntimeShaders();
             if (Directory.Exists(BuildFolder)) Directory.Delete(BuildFolder, true);
             BuildReport report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
             {
@@ -74,6 +77,59 @@ namespace TarmacGauntlet.Management.Editor
             }
             EditorUtility.DisplayDialog("Build failed", $"The build {report.summary.result.ToString().ToLowerInvariant()} with {report.summary.totalErrors} errors. The Console has the details.", "OK");
             return false;
+        }
+
+        private const string ArtFolder = "Assets/Art";
+        private const string LibraryFolder = "Assets/Visuals/Generated/Resources";
+
+        /// <summary>
+        /// A built game has no asset database, so every asset under Assets/Art goes into the ArtLibrary resource,
+        /// which the game loads by path instead.
+        /// </summary>
+        private static void FillArtLibrary()
+        {
+            var entries = AssetDatabase.FindAssets("", new[] { ArtFolder })
+                .Select(AssetDatabase.GUIDToAssetPath)
+                .Where(path => !AssetDatabase.IsValidFolder(path))
+                .Select(path => new ArtLibrary.Entry { Path = path, Asset = AssetDatabase.LoadMainAssetAtPath(path) })
+                .Where(e => e.Asset != null && !(e.Asset is DefaultAsset))
+                .ToArray();
+            string assetPath = LibraryFolder + "/" + ArtLibrary.ResourceName + ".asset";
+            var library = AssetDatabase.LoadAssetAtPath<ArtLibrary>(assetPath);
+            if (library == null)
+            {
+                Directory.CreateDirectory(LibraryFolder);
+                AssetDatabase.Refresh();
+                library = ScriptableObject.CreateInstance<ArtLibrary>();
+                AssetDatabase.CreateAsset(library, assetPath);
+            }
+            library.Entries = entries;
+            EditorUtility.SetDirty(library);
+            AssetDatabase.SaveAssets();
+        }
+
+        /// <summary>
+        /// The game makes its materials and menu panels in code, so nothing in a scene references the Standard shader
+        /// or UI Toolkit's runtime shaders, and the build would leave them out. They go on the Always Included list.
+        /// </summary>
+        private static void IncludeRuntimeShaders()
+        {
+            string[] prefixes = { "Hidden/UIE-", "Hidden/TextCore/", "TextMeshPro/" };
+            Shader[] wanted = ShaderUtil.GetAllShaderInfo()
+                .Select(info => info.name)
+                .Where(name => name == "Standard" || prefixes.Any(prefix => name.StartsWith(prefix)) && !name.Contains("Editor"))
+                .Select(Shader.Find)
+                .Where(shader => shader != null)
+                .ToArray();
+            var settings = new SerializedObject(AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/GraphicsSettings.asset")[0]);
+            SerializedProperty list = settings.FindProperty("m_AlwaysIncludedShaders");
+            var have = Enumerable.Range(0, list.arraySize).Select(i => list.GetArrayElementAtIndex(i).objectReferenceValue).ToList();
+            foreach (Shader shader in wanted.Where(s => !have.Contains(s)))
+            {
+                list.InsertArrayElementAtIndex(list.arraySize);
+                list.GetArrayElementAtIndex(list.arraySize - 1).objectReferenceValue = shader;
+            }
+            if (settings.ApplyModifiedPropertiesWithoutUndo()) AssetDatabase.SaveAssets();
         }
 
         private static void Install()
