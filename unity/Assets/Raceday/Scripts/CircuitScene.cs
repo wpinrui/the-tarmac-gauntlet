@@ -13,7 +13,7 @@ namespace TarmacGauntlet.Raceday
     /// the race for the career and settles it at the flag. Start picks how the race starts: from the
     /// grid at once, behind the pace car, or from the pit lane, where the cars queue in the fast lane
     /// and leave three seconds apart, moving up to the pit exit line (<see cref="PitLaneStart"/>). The pit lane start fast forwards
-    /// until the car ahead of the player's is about to leave. In the editor and development builds Tab opens the debug menu (<see cref="DebugMenu"/>), whose race set-up (<see cref="DebugSettings"/>) picks the start, the weather and the start hour. Delete hands the player's car to you and
+    /// until the car ahead of the player's is about to leave. In the editor and development builds Tab opens the debug menu (<see cref="DebugMenu"/>), whose race set-up (<see cref="DebugSettings"/>) picks the start, the weather, the start hour, the field and your car. Delete hands the player's car to you and
     /// back. = rides with the car behind the one you watch, - with the car ahead, and P with the next car making a pit stop. F steps
     /// the race through normal speed, 4x and 16x while the AI drives your car, and ends the pit lane
     /// start's fast forward. Cars away from the camera glide without physics (<see cref="PhysicsRange"/>).
@@ -112,6 +112,7 @@ namespace TarmacGauntlet.Raceday
             var pits = new PitLane(circuit);
             bool career = RaceWeekend.Setup != null;
             RaceSetup setup = RaceWeekend.Setup ?? RaceWeekend.Begin(TestCareer());
+            if (testing) setup = DebugActions.Field(setup, DebugSettings.Field, DebugSettings.Car);
             day = new RaceDay(setup);
             IReadOnlyList<GridCar> grid = setup.Grid;
             int player = -1;

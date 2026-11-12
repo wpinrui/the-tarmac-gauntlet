@@ -10,7 +10,7 @@ namespace TarmacGauntlet.Raceday
     /// in a click: the speed of the race, from paused to 64x; jumps of the race clock to dusk, night, dawn, the last
     /// hour and the flag, or the race finished and settled at once; weather held over the circuit, from dry to
     /// flooded; the watched car refuelled, on new tyres, fixed, given an issue, its driver fresh or spent, called
-    /// in, retired or crashed out; and the race restarted with another start, kind of weather or start hour
+    /// in, retired or crashed out; and the race restarted with another start, kind of weather, start hour, field or car
     /// (<see cref="DebugSettings"/>), or thrown away for the Team HQ. Clean hides every on-screen graphic.
     /// </summary>
     public sealed class DebugMenu : MonoBehaviour
@@ -28,7 +28,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>The race speed the menu holds, or null to leave it to the race.</summary>
         public float? Speed { get; private set; }
 
-        private enum Page { Main, Issues }
+        private enum Page { Main, Issues, Cars }
 
         private const string HubScene = "TeamHq";
         private static readonly Color Chosen = new Color(0.3f, 1f, 0.4f);
@@ -89,7 +89,7 @@ namespace TarmacGauntlet.Raceday
             RaceWeather.Forced = sky >= 0 ? Skies[sky].State : (WeatherState?)null;
         }
 
-        /// <summary>Races again from the career as it was set up, with the menu's start, weather and start hour.</summary>
+        /// <summary>Races again from the career as it was set up, with the menu's start, weather, start hour, field and car.</summary>
         private void Restart()
         {
             if (Game != null) RaceWeekend.Begin(Game);
@@ -128,6 +128,7 @@ namespace TarmacGauntlet.Raceday
             {
                 case Page.Main: Main(gap); break;
                 case Page.Issues: Issues(); break;
+                case Page.Cars: Cars(); break;
             }
             GUILayout.EndScrollView();
             GUILayout.EndArea();
@@ -188,6 +189,15 @@ namespace TarmacGauntlet.Raceday
                         Restart();
                     }
                 GUILayout.EndHorizontal();
+                GUILayout.BeginHorizontal();
+                foreach ((int size, string name) in new[] { (1, "Alone"), (10, "10 cars"), (0, "Full") })
+                    if (Button(name, DebugSettings.Field == size))
+                    {
+                        DebugSettings.Field = size;
+                        Restart();
+                    }
+                if (Button("Car", DebugSettings.Car != null)) page = Page.Cars;
+                GUILayout.EndHorizontal();
             }
 
             if (supplies != null)
@@ -221,6 +231,21 @@ namespace TarmacGauntlet.Raceday
             if (Button("Restart")) Restart();
             if (Button("HQ")) Home();
             GUILayout.EndHorizontal();
+        }
+
+        /// <summary>Your car for the next races: any model, or your own.</summary>
+        private void Cars()
+        {
+            if (Button("Back")) page = Page.Main;
+            if (Button("Own car", DebugSettings.Car == null)) Pick(null);
+            foreach (CarModel m in CarModels.All)
+                if (Button($"{m.CarClass} {m.Name}", DebugSettings.Car == m.Id)) Pick(m.Id);
+        }
+
+        private void Pick(string modelId)
+        {
+            DebugSettings.Car = modelId;
+            Restart();
         }
 
         private void Issues()

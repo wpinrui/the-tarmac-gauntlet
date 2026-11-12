@@ -52,6 +52,33 @@ namespace TarmacGauntlet.Simulation.Tests
         }
 
         [Test]
+        public void AReadyMadeCareer()
+        {
+            var random = new Random(3);
+            GameState game = GameInit.InitializeGame(new NewGameOptions { TeamName = "Us" }, random.NextDouble);
+            game = DebugActions.Equip(DebugActions.ToYear(game, 5, random.NextDouble), CarClass.B, 3, 12, 2_000_000, 10);
+            PlayerTeam p = Player(game);
+            Assert.That(game.CurrentYear, Is.EqualTo(5));
+            Assert.That(CarModels.All.First(m => m.Id == p.Cars.Single().ModelId).CarClass, Is.EqualTo(CarClass.B));
+            Assert.That(game.Contracts.Count(c => c.TeamId == GameActions.PlayerTeamId), Is.EqualTo(3));
+            Assert.That(p.Budget, Is.EqualTo(2_000_000));
+            Assert.That(RaceWeekend.BuildSetup(game).Grid.Any(g => g.Player), Is.True);
+        }
+
+        [Test]
+        public void AFieldCutDownKeepsThePlayer()
+        {
+            RaceSetup full = RaceWeekend.BuildSetup(Career());
+            RaceSetup ten = DebugActions.Field(full, 10, "a-29");
+            Assert.That(ten.Grid, Has.Count.EqualTo(10));
+            GridCar me = ten.Grid.Single(g => g.Player);
+            Assert.That(me.Model.Id, Is.EqualTo("a-29"));
+            Assert.That(me.Car.ModelId, Is.EqualTo("a-29"));
+            Assert.That(DebugActions.Field(full, 1, null).Grid.Single().Player, Is.True);
+            Assert.That(DebugActions.Field(full, 0, null).Grid, Has.Count.EqualTo(full.Grid.Count));
+        }
+
+        [Test]
         public void TheCareerChanges()
         {
             GameState game = Career();
