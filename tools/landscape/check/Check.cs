@@ -142,6 +142,17 @@ public static class Check
                 Color tint = LandscapeLooks.Leaves(t.Kind, t.Hue) * t.Shade;
                 w.Write(t.Base.x); w.Write(t.Base.y); w.Write(t.Base.z); w.Write(t.Scale); w.Write(t.Squash); w.Write(t.Yaw); w.Write((float)t.Kind); w.Write(tint.r); w.Write(tint.g); w.Write(tint.b);
             }
+        // The trees in their chunks, in the order Landscape draws them: per chunk its near and far counts, then the trees.
+        using (var w = new BinaryWriter(File.Create(Path.Combine(dir, "chunks.bin"))))
+            foreach (TreeChunk chunk in plan.Chunks())
+            {
+                w.Write((float)chunk.Near.Count); w.Write((float)chunk.Far.Count);
+                foreach (TreeSpot t in chunk.Near.Concat(chunk.Far))
+                {
+                    Color tint = LandscapeLooks.Leaves(t.Kind, t.Hue) * t.Shade;
+                    w.Write(t.Base.x); w.Write(t.Base.y); w.Write(t.Base.z); w.Write(t.Scale); w.Write(t.Squash); w.Write(t.Yaw); w.Write((float)t.Kind); w.Write(tint.r); w.Write(tint.g); w.Write(tint.b);
+                }
+            }
         // The ground's colours and mowing, as Landscape.Fields makes them.
         GroundData g = circuit.Data.terrain;
         float cell = g.spacing / LandscapePlan.MapPerCell;

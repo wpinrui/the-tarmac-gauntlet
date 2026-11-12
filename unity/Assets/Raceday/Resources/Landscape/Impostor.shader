@@ -5,6 +5,13 @@
 // the quad faces the sun instead, so the shadow has the tree's outline seen from the sun; only
 // trees within _ShadowReach of the camera cast one.
 //
+// Each quad is cut down to the leaves' bounds in the frame it shows (_Crop, from tools/landscape/frames.py): most of a
+// whole frame is empty, and every fragment of it would still be sampled and thrown away.
+//
+// Woods seen across or along a slope stack many trees on each pixel. So the trees draw in two goes, as two materials
+// (Landscape.TreeMaterials): first depth alone (the "TreeDepth" pass, a cheap alpha test and nothing else), then the
+// lit pass with depth writes off, so the depth test runs before the shader and only the tree in front is lit.
+//
 // Per vertex: position is the foot of the trunk in world space; uv0 the quad corner (-1 to 1);
 // uv1 the quad's half size, the height of the tree's middle above its foot, its turn about the
 // vertical in radians and its kind; uv2.x a height squash for hedge bushes; colour half the leaf tint.
@@ -17,6 +24,7 @@ Shader "Hidden/TarmacGauntlet/Impostor"
         _Cutoff ("Alpha cutoff", Range(0, 1)) = 0.5
         _Frames ("Frames across", Float) = 8
         _ShadowReach ("Trees cast shadows this far from the camera, m", Float) = 160
+        _Crop ("Leaves' bounds in each frame, a row a kind", 2D) = "white" {}
     }
     SubShader
     {
@@ -32,6 +40,7 @@ Shader "Hidden/TarmacGauntlet/Impostor"
         SAMPLER(sampler_Atlas);
         TEXTURE2D_ARRAY(_Normals);
         SAMPLER(sampler_Normals);
+        TEXTURE2D(_Crop);
 
         CBUFFER_START(UnityPerMaterial)
             float _Cutoff;
@@ -91,7 +100,11 @@ Shader "Hidden/TarmacGauntlet/Impostor"
             float3 R = normalize(cross(up, D));
             float3 U = cross(D, R);
 
-            float3 offset = (v.uv0.x * R + v.uv0.y * U) * radius;
+            // The corner of the leaves' bounds in the frame, 0 to 1 across it.
+            float4 crop = LOAD_TEXTURE2D_LOD(_Crop, uint2(frame.x + frame.y * _Frames, v.uv1.w), 0);
+            float2 at = lerp(crop.xy, crop.zw, v.uv0.xy * 0.5 + 0.5);
+            float2 q = at * 2 - 1;
+            float3 offset = (q.x * R + q.y * U) * radius;
             // Back into Unity's frame and the tree's turn.
             float3 world = Turn(Flip(offset), yaw);
             world.y *= squash;
@@ -100,15 +113,53 @@ Shader "Hidden/TarmacGauntlet/Impostor"
             c.positionWS = centre + world;
             c.normalWS = Turn(Flip(D), yaw);
             c.tangentWS = Turn(Flip(R), yaw);
-            c.atlas = float3((frame + v.uv0.xy * 0.5 + 0.5) / _Frames, v.uv1.w);
+            c.atlas = float3((frame + at) / _Frames, v.uv1.w);
             return c;
+        }
+
+        // Depth alone, for TreeDepth and DepthOnly. The lit pass places the quad with the same Place, so its depth
+        // comes out the same and passes the LEqual test against what this wrote.
+        struct DepthVaryings
+        {
+            float4 positionCS : SV_POSITION;
+            float3 atlas : TEXCOORD0;
+        };
+
+        DepthVaryings DepthVert(Attributes v)
+        {
+            float3 centre = Centre(v);
+            Corner c = Place(v, centre, _WorldSpaceCameraPos - centre, v.uv1.x);
+            DepthVaryings o;
+            o.positionCS = TransformWorldToHClip(c.positionWS);
+            o.atlas = c.atlas;
+            return o;
+        }
+
+        half4 DepthFrag(DepthVaryings i) : SV_Target
+        {
+            clip(SAMPLE_TEXTURE2D_ARRAY(_Atlas, sampler_Atlas, i.atlas.xy, i.atlas.z).a - _Cutoff);
+            return 0;
         }
         ENDHLSL
 
         Pass
         {
+            Name "TreeDepth"
+            Tags { "LightMode" = "SRPDefaultUnlit" }
+            ZWrite On ZTest LEqual ColorMask 0
+
+            HLSLPROGRAM
+            #pragma vertex DepthVert
+            #pragma fragment DepthFrag
+            ENDHLSL
+        }
+
+        Pass
+        {
             Name "ForwardLit"
             Tags { "LightMode" = "UniversalForward" }
+            // Against the depth TreeDepth wrote: only the front tree's fragments pass, and they pass before the shader runs.
+            ZWrite Off ZTest LEqual
 
             HLSLPROGRAM
             #pragma vertex vert
@@ -209,31 +260,8 @@ Shader "Hidden/TarmacGauntlet/Impostor"
             ZWrite On ColorMask R
 
             HLSLPROGRAM
-            #pragma vertex vert
-            #pragma fragment frag
-            #include "Assets/Rendering/Shaders/TarmacLit.hlsl"
-
-            struct Varyings
-            {
-                float4 positionCS : SV_POSITION;
-                float3 atlas : TEXCOORD0;
-            };
-
-            Varyings vert(Attributes v)
-            {
-                float3 centre = Centre(v);
-                Corner c = Place(v, centre, _WorldSpaceCameraPos - centre, v.uv1.x);
-                Varyings o;
-                o.positionCS = TransformWorldToHClip(c.positionWS);
-                o.atlas = c.atlas;
-                return o;
-            }
-
-            half4 frag(Varyings i) : SV_Target
-            {
-                clip(SAMPLE_TEXTURE2D_ARRAY(_Atlas, sampler_Atlas, i.atlas.xy, i.atlas.z).a - _Cutoff);
-                return 0;
-            }
+            #pragma vertex DepthVert
+            #pragma fragment DepthFrag
             ENDHLSL
         }
     }
