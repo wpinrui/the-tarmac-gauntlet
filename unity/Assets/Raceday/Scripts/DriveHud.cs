@@ -1,3 +1,4 @@
+using TarmacGauntlet.Rendering;
 using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
@@ -41,6 +42,11 @@ namespace TarmacGauntlet.Raceday
         private const float CapHeight = 0.68f, Descent = 0.388f, LineHeight = 1.521f;
 
         private void OnGUI()
+        {
+            using (GammaGui.Begin()) DrawGui();
+        }
+
+        private void DrawGui()
         {
             if (Car == null || Hidden || DebugMenu.Bare || !Car.InputEnabled || Event.current.type != EventType.Repaint) return;
             float scale = Screen.height / 1080f;

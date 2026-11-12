@@ -78,7 +78,7 @@ Shader "TarmacGauntlet/Carbon"
 
                 float3 leanAxis = alongU ? dv : du;
                 float3 bent = normalize(n + leanAxis * ((across - 0.5) * WEAVE_LEAN * weave));
-                half3 albedo = lerp((WEAVE_DARK + WEAVE_LIGHT) * 0.5, lerp(WEAVE_DARK, WEAVE_LIGHT, crown), weave).xxx;
+                half3 albedo = GammaColour(lerp((WEAVE_DARK + WEAVE_LIGHT) * 0.5, lerp(WEAVE_DARK, WEAVE_LIGHT, crown), weave).xxx);
                 half3 normalWS = TransformObjectToWorldNormal(bent);
                 return ShadeCarPaint(i.positionWS, normalWS, i.positionCS, i.fog, albedo, 0, 0.7, i.positionOS);
             }

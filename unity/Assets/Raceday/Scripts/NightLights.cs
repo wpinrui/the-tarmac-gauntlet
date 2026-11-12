@@ -33,6 +33,8 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Real lights only go to floodlights and cars nearer the view than this, m.</summary>
         private const float FloodReach = 160f, HeadReach = 120f;
         private const float FloodIntensity = 2.5f, HeadIntensity = 3f, HeadRange = 70f, HeadCone = 55f;
+        /// <summary>How far ahead the headlamps mostly light the cars in front, m.</summary>
+        private const float HeadLights = 15f;
 
         private sealed class Slot
         {
@@ -40,16 +42,26 @@ namespace TarmacGauntlet.Raceday
             /// <summary>The floodlight or car the light is at, and the one it should move to; -1 for none.</summary>
             public int At = -1, Want = -1;
             public float Level;
+            /// <summary>How far from the light the things it lights mostly are, m: its brightness is matched there.</summary>
+            public float Lights;
         }
 
         /// <summary>The gantry's uplights are on only while the camera is this near the start line, m.</summary>
         private const float UplightReach = 350f;
         private const float UplightIntensity = 1.5f, UplightRange = 26f, UplightCone = 50f;
+        /// <summary>How far the uplights are from the gantry they light, m.</summary>
+        private const float UplightLights = 8f;
 
         /// <summary>The floodlights' beams in the volumetric mist come from the lamps nearer the camera than this, m.</summary>
         private const float BeamReach = 400f;
         /// <summary>How bright a beam lights the mist, and how far past its target it carries.</summary>
         private const float BeamStrength = 30000f, BeamCarry = 1.6f;
+        /// <summary>
+        /// The beams' strength was set in Gamma colour space, where the glow added to sRGB values. This keeps a beam
+        /// glowing at a fifth of white as bright in Linear; a brighter glow comes out a little dimmer and a fainter one a
+        /// little brighter, as linear light spreads it.
+        /// </summary>
+        private static readonly float BeamLinear = LinearLight.Linear(0.2f) / 0.2f;
 
         private Slot[] floods, heads;
         private readonly Vector4[] beamPos = new Vector4[Atmosphere.MostBeams], beamAim = new Vector4[Atmosphere.MostBeams];
@@ -120,7 +132,7 @@ namespace TarmacGauntlet.Raceday
         {
             if (floods == null) return;
             float on = NightLook.On(Mathf.Max(night, 0f));
-            Atmosphere.Beams(beamPos, beamAim, on > 0.001f ? beamCount : 0, NightLook.Flood * (on * BeamStrength));
+            Atmosphere.Beams(beamPos, beamAim, on > 0.001f ? beamCount : 0, NightLook.Flood.linear * (on * BeamStrength * BeamLinear));
             float step = Time.unscaledDeltaTime / Fade;
             foreach (Slot s in floods) Follow(s, step, on * FloodIntensity, PlaceFlood);
             foreach (Slot s in heads) Follow(s, step, on * HeadIntensity, PlaceHead);
@@ -128,7 +140,7 @@ namespace TarmacGauntlet.Raceday
             foreach (Light l in uplights)
             {
                 bool near = cam != null && (cam.transform.position - l.transform.position).sqrMagnitude < UplightReach * UplightReach;
-                l.intensity = LightFalloff.Urp(on * UplightIntensity, UplightRange);
+                l.intensity = LightFalloff.UrpLinear(l.color, on * UplightIntensity, UplightRange, UplightLights);
                 bool lit = near && on > 0.001f;
                 if (l.enabled != lit) l.enabled = lit;
             }
@@ -240,7 +252,7 @@ namespace TarmacGauntlet.Raceday
                 if (s.Light.enabled) s.Light.enabled = false;
                 return;
             }
-            s.Light.intensity = LightFalloff.Urp(full * s.Level, s.Light.range);
+            s.Light.intensity = s.Level * LightFalloff.UrpLinear(s.Light.color, full, s.Light.range, s.Lights);
             if (!s.Light.enabled) s.Light.enabled = true;
         }
 
@@ -251,6 +263,7 @@ namespace TarmacGauntlet.Raceday
             Transform t = s.Light.transform;
             t.SetPositionAndRotation(f.Position, Quaternion.LookRotation(f.Aim));
             s.Light.range = f.Reach * 1.6f + 10f;
+            s.Lights = f.Reach;
             s.Light.spotAngle = f.Cone;
             s.Light.innerSpotAngle = f.Cone * 0.6f;
             return true;
@@ -263,6 +276,7 @@ namespace TarmacGauntlet.Raceday
             Transform c = car.transform;
             s.Light.transform.SetPositionAndRotation(c.TransformPoint(car.Nose), c.rotation * Quaternion.Euler(4f, 0f, 0f));
             s.Light.range = HeadRange;
+            s.Lights = HeadLights;
             s.Light.spotAngle = HeadCone;
             s.Light.innerSpotAngle = HeadCone * 0.5f;
             return true;

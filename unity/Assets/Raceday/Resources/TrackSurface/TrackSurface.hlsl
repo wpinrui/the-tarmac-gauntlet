@@ -92,7 +92,7 @@ void TrackSurface(Varyings i, out half3 albedo, out float3 normal, out half smoo
         half broad = SAMPLE_TEXTURE2D(_Macro, sampler_Macro, w).r;
         half fine = SAMPLE_TEXTURE2D(_Macro, sampler_Macro, float2(w.y, -w.x) * 3.7 + 0.31).r;
         half patch = (broad * 0.65 + fine * 0.35) * 2 - 1;
-        albedo *= 1 + patch * _MacroStrength;
+        albedo *= GammaScale(1 + patch * _MacroStrength);
         smoothness *= 1 - patch * _MacroStrength * 0.5;
         float3 t = SAMPLE_TEXTURE2D(_BumpMap, sampler_BumpMap, uv).xyz * 2 - 1;
         t.xy *= _BumpScale;
@@ -110,11 +110,11 @@ void TrackSurface(Varyings i, out half3 albedo, out float3 normal, out half smoo
         // Relaid tarmac: mostly newer and darker than the road round it. Fresh, its open surface is matte; old,
         // the traffic has worn it smoother than the road.
         half relaid = repair.g * _RepairAmount;
-        albedo *= lerp(1, lerp(0.76, 1.1, repair.b), relaid);
+        albedo *= GammaScale(lerp(1, lerp(0.76, 1.1, repair.b), relaid));
         smoothness *= lerp(1, lerp(0.65, 1.25, repair.b), relaid);
         // Sealant: near-black bitumen, glossy and smooth over the grain.
         half seal = repair.r * _RepairAmount;
-        albedo = lerp(albedo, half3(0.03, 0.03, 0.033), seal * 0.75);
+        albedo = lerp(albedo, GammaColour(half3(0.03, 0.03, 0.033)), seal * 0.75);
         smoothness = lerp(smoothness, 0.5, seal);
         normal = normalize(lerp(normal, flat, seal * 0.8));
     #endif
@@ -136,7 +136,7 @@ void TrackSurface(Varyings i, out half3 albedo, out float3 normal, out half smoo
         half rubber = saturate(band * onLine.g * (0.5 + streak * 1.1));
         // Marks about the line, 8 m across it by 160 m along the lap, fewest where it holds least rubber.
         half marks = SAMPLE_TEXTURE2D(_Marks, sampler_Marks, float2(d / 8 + 0.5, m.y / 160)).r * saturate(onLine.g * 1.6 - 0.45);
-        albedo *= (1 - rubber * 0.7) * (1 - marks * 0.7);
+        albedo *= GammaScale((1 - rubber * 0.7) * (1 - marks * 0.7));
         // Laid rubber is satin: a soft sheen, neither the stone's glint nor matte.
         smoothness = lerp(smoothness, 0.4, saturate(rubber * 0.8 + marks * 0.7));
     #endif
@@ -170,7 +170,7 @@ void TrackSurface(Varyings i, out half3 albedo, out float3 normal, out half smoo
             puddle = smoothstep(0, 0.3, water - stands);
         }
 
-        albedo *= lerp(1, 1 - 0.55 * _Porosity, damp) * lerp(1, 0.8, puddle);
+        albedo *= GammaScale(lerp(1, 1 - 0.55 * _Porosity, damp) * lerp(1, 0.8, puddle));
         // The film is glossiest where the surface under it is smoothest.
         smoothness = lerp(smoothness, lerp(0.8, 0.88, _Porosity) + (worn - 0.5) * 0.06, film);
         smoothness = lerp(smoothness, 0.96, puddle);

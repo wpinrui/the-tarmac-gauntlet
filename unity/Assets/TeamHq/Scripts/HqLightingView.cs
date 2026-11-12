@@ -65,6 +65,9 @@ namespace TarmacGauntlet.TeamHq
             Apply();
         }
 
+        // After every Awake, so the scene's post-processing is up.
+        private void Start() => PostEffects.Current?.Set(new PostEffects.Grade { Exposure = HqLighting.Exposure });
+
         private void OnDestroy()
         {
             GraphicsOptions.BakedLighting.Changed -= OnOption;
@@ -112,7 +115,7 @@ namespace TarmacGauntlet.TeamHq
             Light sun = sunObject.AddComponent<Light>();
             sun.type = LightType.Directional;
             sun.color = ToColor(HqLighting.SunColour);
-            sun.intensity = HqLighting.SunIntensity;
+            sun.intensity = HqLighting.LiveSunIntensity;
             sun.shadows = LightShadows.Soft;
             sun.shadowStrength = 0.85f;
             sun.shadowNormalBias = 0.2f;

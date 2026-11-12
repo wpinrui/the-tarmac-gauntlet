@@ -114,6 +114,11 @@ namespace TarmacGauntlet.Raceday
 
         private void OnGUI()
         {
+            using (GammaGui.Begin()) DrawGui();
+        }
+
+        private void DrawGui()
+        {
             if (!open || RaceWeekend.Paused) return;
             float scale = Screen.height / 1080f;
             int size = Mathf.RoundToInt(18 * scale);

@@ -88,6 +88,18 @@ Shader "Hidden/TarmacGauntlet/Sky"
                 return saturate((radius - a) / px + 0.5);
             }
 
+            // The sky was made while the game rendered in Gamma colour space, mixing sRGB colours. In Linear the colours
+            // arrive in linear light, so they are taken back to sRGB, mixed just as before and the sky turned into linear
+            // light at the end: it looks as it did, glows and sun disc included.
+            float3 Srgb(float4 c)
+            {
+            #if defined(UNITY_COLORSPACE_GAMMA)
+                return c.rgb;
+            #else
+                return LinearToSRGB(max(c.rgb, 0.0));
+            #endif
+            }
+
             half4 frag(v2f i) : SV_Target
             {
                 float3 d = normalize(i.dir);
@@ -103,32 +115,32 @@ Shader "Hidden/TarmacGauntlet/Sky"
                 // How much air the view looks through, 1 at the horizon falling away smoothly overhead: the deep blue
                 // is only high up, and the sky pales through the lower half towards the horizon.
                 float air = exp(-max(up, 0.0) * 3.2);
-                float3 sky = lerp(_Zenith.rgb, _Horizon.rgb, air);
+                float3 sky = lerp(Srgb(_Zenith), Srgb(_Horizon), air);
                 // A low band of haze in the fog's colour, so the far trees and the sky meet in one colour.
                 float haze = exp(-abs(up) * 10.0);
             #if defined(_SKY_DETAIL)
                 float band = exp(-max(up, 0.0) * 6.5);
-                sky += _Glow.rgb * (towards * towards * towards * band);
-                sky = lerp(sky, _Haze.rgb, haze * 0.85);
-                sky = lerp(sky, _Ground.rgb, saturate(-up * 6.0) * (1.0 - haze * 0.6));
+                sky += Srgb(_Glow) * (towards * towards * towards * band);
+                sky = lerp(sky, Srgb(_Haze), haze * 0.85);
+                sky = lerp(sky, Srgb(_Ground), saturate(-up * 6.0) * (1.0 - haze * 0.6));
 
                 // The sun's halo and a broad glow round it, stronger through the thicker air low down.
                 float scatter = Scatter(cs, 0.8) * 0.55 + Scatter(cs, 0.55) * 0.05;
-                sky += _SunColor.rgb * scatter * (0.55 + 0.45 * air) * above;
+                sky += Srgb(_SunColor) * scatter * (0.55 + 0.45 * air) * above;
                 float rim;
                 float disc = Disc(cs, 0.0145, rim) * above;
                 // Limb darkening: the edge of the sun is a little darker and redder than its middle.
-                float3 discCol = _SunColor.rgb * (4.0 * (1.0 - 0.45 * rim * rim)) * lerp(float3(1, 1, 1), float3(1.0, 0.8, 0.65), rim * rim);
+                float3 discCol = Srgb(_SunColor) * (4.0 * (1.0 - 0.45 * rim * rim)) * lerp(float3(1, 1, 1), float3(1.0, 0.8, 0.65), rim * rim);
                 // Low down the sun sinks into the haze.
                 discCol *= saturate(up * 25.0 + 0.4);
             #else
                 float band = h * h * h * h * h * h;
-                sky += _Glow.rgb * (towards * towards * towards * band);
-                sky = lerp(sky, _Haze.rgb, haze * 0.85);
-                sky = lerp(sky, _Ground.rgb, saturate(-up * 6.0) * (1.0 - haze * 0.6));
-                sky += _SunColor.rgb * (pow(saturate(cs), 12.0) * 0.18 + pow(saturate(cs), 400.0) * 0.6) * above;
+                sky += Srgb(_Glow) * (towards * towards * towards * band);
+                sky = lerp(sky, Srgb(_Haze), haze * 0.85);
+                sky = lerp(sky, Srgb(_Ground), saturate(-up * 6.0) * (1.0 - haze * 0.6));
+                sky += Srgb(_SunColor) * (pow(saturate(cs), 12.0) * 0.18 + pow(saturate(cs), 400.0) * 0.6) * above;
                 float disc = smoothstep(0.99985, 0.99992, cs) * above;
-                float3 discCol = _SunColor.rgb * 3.0;
+                float3 discCol = Srgb(_SunColor) * 3.0;
             #endif
 
                 float3 p = d * 500.0;
@@ -157,23 +169,26 @@ Shader "Hidden/TarmacGauntlet/Sky"
                 float lit = saturate(0.55 + (n - Density(uv + sh * 0.03, o)) * 4.0 + (n - Density(uv + sh * 0.08, o)) * 2.5);
                 lit = lerp(lit, 1.0 - smoothstep(0.3, 0.75, n), o);
                 float thick = saturate((n - _Cover) / 0.35);
-                float3 cloud = lerp(_CloudShade.rgb, _CloudLit.rgb, lit * (1.0 - 0.3 * thick)) * (1.0 - 0.35 * o * smoothstep(0.3, 0.8, n));
+                float3 cloud = lerp(Srgb(_CloudShade), Srgb(_CloudLit), lit * (1.0 - 0.3 * thick)) * (1.0 - 0.35 * o * smoothstep(0.3, 0.8, n));
                 // Thin edges with the sun behind them shine.
                 float edge = saturate(c * (1.0 - c) * 4.0);
-                cloud += _SunColor.rgb * (pow(saturate(cs), 8.0) * edge * 1.4 + pow(saturate(cs), 6.0) * (1.0 - c) * 0.6) * above * (1.0 - o);
-                cloud = lerp(cloud, _Haze.rgb, haze * 0.8);
+                cloud += Srgb(_SunColor) * (pow(saturate(cs), 8.0) * edge * 1.4 + pow(saturate(cs), 6.0) * (1.0 - c) * 0.6) * above * (1.0 - o);
+                cloud = lerp(cloud, Srgb(_Haze), haze * 0.8);
             #else
                 float c = smoothstep(_Cover - 0.2 * o, _Cover + 0.18 + 0.1 * o, n) * smoothstep(0.0, 0.12, up);
                 float lit = saturate(0.55 + (n - Density(uv + sh * 0.035, o)) * 6.0);
                 lit = lerp(lit, 1.0 - smoothstep(0.3, 0.75, n), o);
-                float3 cloud = lerp(_CloudShade.rgb, _CloudLit.rgb, lit) * (1.0 - 0.35 * o * smoothstep(0.3, 0.8, n));
-                cloud += _SunColor.rgb * pow(saturate(cs), 6.0) * (1.0 - c) * 0.6 * above;
-                cloud = lerp(cloud, _Haze.rgb, haze * 0.8);
+                float3 cloud = lerp(Srgb(_CloudShade), Srgb(_CloudLit), lit) * (1.0 - 0.35 * o * smoothstep(0.3, 0.8, n));
+                cloud += Srgb(_SunColor) * pow(saturate(cs), 6.0) * (1.0 - c) * 0.6 * above;
+                cloud = lerp(cloud, Srgb(_Haze), haze * 0.8);
             #endif
 
                 c *= 1.0 - _TgVolumetricClouds;
                 float3 col = sky + (discCol * disc + 0.9 * star + float3(0.85, 0.88, 0.95) * moon * _Night) * (1.0 - c);
                 col = lerp(col, cloud, c);
+            #if !defined(UNITY_COLORSPACE_GAMMA)
+                col = SRGBToLinear(col);
+            #endif
                 return half4(col, 1.0);
             }
             ENDHLSL

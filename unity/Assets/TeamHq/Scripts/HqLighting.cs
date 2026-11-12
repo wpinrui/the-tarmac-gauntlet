@@ -21,6 +21,16 @@ namespace TarmacGauntlet.TeamHq
         public static readonly Vector3 SunDirection = new Vector3(6, -16, 24).normalized;
         public static readonly Vector3 SunColour = new Vector3(1f, 0.96f, 0.89f);
         public const float SunIntensity = 1.25f;
+        /// <summary>
+        /// The live sun in the game, in Linear colour space: its patches on the floor about as bright over the baked light
+        /// round them as they were in Gamma. The bake's bounce of the sun stays at <see cref="SunIntensity"/>.
+        /// </summary>
+        public const float LiveSunIntensity = 2.2f;
+        /// <summary>
+        /// The room's exposure against the race's, stops. In Linear the bake shows at its full strength, where Gamma
+        /// showed it darker; this keeps the room as bright on the whole while its shadows open up.
+        /// </summary>
+        public const float Exposure = -0.3f;
         public static readonly Vector3 WarmLamp = new Vector3(1f, 0.93f, 0.82f);
         public static readonly Vector3 WhiteLamp = new Vector3(1f, 1f, 1f);
 

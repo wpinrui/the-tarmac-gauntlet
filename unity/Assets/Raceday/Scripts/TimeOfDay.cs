@@ -42,6 +42,8 @@ namespace TarmacGauntlet.Raceday
         /// them, the reflection too, so a wet track reflecting the glowing night sky would shine white.
         /// </summary>
         private const float NightShine = 0.2f;
+        /// <summary>The sun's light is matched for Linear colour space on a surface turned at least this far towards it (cosine).</summary>
+        private const float MatchFacing = 0.3f;
         /// <summary>
         /// The low mist's density at the ground, per m: a trace on a clear afternoon, thick in the morning mist and the rain,
         /// and a little damp at night for the floodlights' beams. And how fast it thins with height, m.
@@ -193,7 +195,9 @@ namespace TarmacGauntlet.Raceday
             lamp.shadowStrength = shadows;
             lamp.transform.rotation = Quaternion.LookRotation(-s.LightDir);
             lamp.color = s.LightColour;
-            lamp.intensity = s.LightIntensity;
+            // The sky's light levels were set in Gamma colour space: matched for Linear on the level ground, or on a
+            // surface turned towards a low sun.
+            lamp.intensity = LinearLight.Match(s.LightColour, s.LightIntensity, s.AmbientSky, Mathf.Max(s.LightDir.y, MatchFacing));
             lamp.enabled = s.LightIntensity > 0.001f;
 
             RenderSettings.ambientSkyColor = s.AmbientSky;

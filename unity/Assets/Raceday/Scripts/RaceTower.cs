@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using TarmacGauntlet.Rendering;
 using TarmacGauntlet.Simulation;
 using UnityEngine;
 
@@ -142,6 +143,11 @@ namespace TarmacGauntlet.Raceday
         private static float Unit() => Screen.height / 1080f * 19.2f * Scale;
 
         private void OnGUI()
+        {
+            using (GammaGui.Begin()) DrawGui();
+        }
+
+        private void DrawGui()
         {
             if (Hidden || DebugMenu.Bare || Event.current.type != EventType.Repaint || rows.Count == 0) return;
             float u = Unit();

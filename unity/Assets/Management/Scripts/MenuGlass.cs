@@ -106,7 +106,7 @@ namespace TarmacGauntlet.Management
                 // Texture rows run bottom to top, so the top row is the screen's top edge.
                 var p = new Vector2(x / (n - 1f) - 0.5f, 0.5f - y / (n - 1f));
                 float k = Mathf.Clamp01(Vector2.Dot(p, dir) / halfLine * 0.5f + 0.5f);
-                px[y * n + x] = new Color(1, 1, 1, Mathf.Lerp(0.08f, 0f, Mathf.Clamp01(k / 0.6f)));
+                px[y * n + x] = UiBlend.Alpha(new Color(1, 1, 1, Mathf.Lerp(0.08f, 0f, Mathf.Clamp01(k / 0.6f))));
             }
             t.SetPixels32(px);
             t.Apply();
@@ -124,7 +124,7 @@ namespace TarmacGauntlet.Management
             {
                 float dx = Mathf.Min(x + 0.5f, n - x - 0.5f) / 32f, dy = Mathf.Min(y + 0.5f, n - y - 0.5f) / 32f;
                 float k = Mathf.SmoothStep(0, 1, Mathf.Clamp01(dx)) * Mathf.SmoothStep(0, 1, Mathf.Clamp01(dy));
-                px[y * n + x] = new Color(0, 0, 0, 0.35f * k);
+                px[y * n + x] = UiBlend.Alpha(new Color(0, 0, 0, 0.35f * k));
             }
             t.SetPixels32(px);
             t.Apply();

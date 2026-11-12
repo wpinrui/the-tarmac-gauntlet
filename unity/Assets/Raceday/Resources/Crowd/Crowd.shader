@@ -223,13 +223,13 @@ Shader "Hidden/TarmacGauntlet/Crowd"
                 c.raise = i.shape.y;
                 float part, inside;
                 Clip(c, i.local, part, inside);
-                float3 albedo = part < 0.5 ? float3(0.1, 0.09, 0.09)
+                float3 albedo = part < 0.5 ? GammaColour(half3(0.1, 0.09, 0.09))
                     : part < 1.5 ? Paint(2, i.look.z)
                     : part < 2.5 ? Paint(0, i.look.x)
                     : part < 3.5 ? Paint(1, i.look.y)
                     : Paint(3, i.look.w);
                 // Darker towards each part's edge, so it reads as round.
-                albedo *= lerp(0.7, 1.0, saturate(inside / 0.04));
+                albedo *= GammaScale(lerp(0.7, 1.0, saturate(inside / 0.04)));
                 half3 col = ShadeLambert(i.positionWS, i.normalWS, i.positionCS, i.fog, albedo);
                 col += albedo * _Glow.rgb;
                 return half4(col, 1);

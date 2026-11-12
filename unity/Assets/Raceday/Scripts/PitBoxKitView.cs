@@ -226,7 +226,9 @@ namespace TarmacGauntlet.Raceday
                         batch[n] = Matrix4x4.TRS(rest.Position, Quaternion.LookRotation(rest.Forward, Vector3.up), Vector3.one);
                     }
                     Color c = colours[car];
-                    batchColours[n] = new Vector4(c.r, c.g, c.b, 1f);
+                    // A vector array skips Unity's sRGB to linear conversion, so the team colour is converted here.
+                    Color l = c.linear;
+                    batchColours[n] = new Vector4(l.r, l.g, l.b, 1f);
                     if (++n == MaxBatch) { Flush(model, n); n = 0; }
                 }
             }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using TarmacGauntlet.Rendering;
 using TarmacGauntlet.Simulation;
 using TarmacGauntlet.TeamHq;
 using UnityEngine;
@@ -22,7 +23,7 @@ namespace TarmacGauntlet.Management
         private static readonly Color Paper = new Color32(0xf7, 0xf5, 0xef, 0xff);
         private static readonly Color Ink = new Color32(0x12, 0x12, 0x12, 0xff);
         private static readonly Color InkSoft = new Color32(0x4a, 0x4a, 0x48, 0xff);
-        private static readonly Color Hairline = new Color(0, 0, 0, 0.25f);
+        private static readonly Color Hairline = UiBlend.Alpha(new Color(0, 0, 0, 0.25f));
 
         private readonly VisualElement layer, page, sheet, close;
         private readonly Camera cam;

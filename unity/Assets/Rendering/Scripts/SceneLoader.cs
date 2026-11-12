@@ -1,4 +1,5 @@
 using System.Collections;
+using TarmacGauntlet.Rendering;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UIElements;
@@ -28,7 +29,7 @@ namespace TarmacGauntlet.Rendering
 
         private static readonly Color Background = new Color32(0x0c, 0x0e, 0x0e, 0xff);
         private static readonly Color Red = new Color32(0xe1, 0x06, 0x00, 0xff);
-        private static readonly Color Track = new Color(1f, 1f, 1f, 0.08f);
+        private static readonly Color Track = UiBlend.Alpha(new Color(1f, 1f, 1f, 0.08f));
 
         private static SceneLoader current;
         private static int holds;

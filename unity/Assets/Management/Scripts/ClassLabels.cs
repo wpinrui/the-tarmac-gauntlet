@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TarmacGauntlet.Rendering;
 using TarmacGauntlet.Simulation;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -69,7 +70,7 @@ namespace TarmacGauntlet.Management
                 chequer = new Texture2D(n, n, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Repeat, hideFlags = HideFlags.HideAndDontSave };
                 for (int y = 0; y < n; y++)
                 for (int x = 0; x < n; x++)
-                    chequer.SetPixel(x, y, (x + y) % 2 == 0 ? new Color(0, 0, 0, 0.9f) : new Color(1, 1, 1, 0.35f));
+                    chequer.SetPixel(x, y, UiBlend.Alpha((x + y) % 2 == 0 ? new Color(0, 0, 0, 0.9f) : new Color(1, 1, 1, 0.35f)));
                 chequer.Apply();
                 return chequer;
             }

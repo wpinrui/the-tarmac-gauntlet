@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using TarmacGauntlet.Rendering;
 using TarmacGauntlet.Simulation;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -16,7 +17,8 @@ namespace TarmacGauntlet.Management
     internal sealed class PositionChart : VisualElement
     {
         private const float Left = 34, Top = 8, Bottom = 22, Right = 6;
-        private static readonly Color Grid = new Color(1, 1, 1, 0.1f), Line = Color.white, Tick = new Color(1, 1, 1, 0.55f), Cursor = new Color(1, 1, 1, 0.35f);
+        private static readonly Color Grid = UiBlend.Alpha(new Color(1, 1, 1, 0.1f)), Line = Color.white, Tick = UiBlend.Alpha(new Color(1, 1, 1, 0.55f)),
+            Cursor = UiBlend.Alpha(new Color(1, 1, 1, 0.35f));
         private static readonly Color Fixed = new Color32(0xff, 0xb0, 0x20, 0xff), Unfixed = new Color32(0xff, 0x5a, 0x4f, 0xff), Outline = new Color(0.07f, 0.07f, 0.07f);
 
         /// <summary>The lap and position under the pointer, or 0 and 0 when it leaves.</summary>
@@ -106,6 +108,7 @@ namespace TarmacGauntlet.Management
             {
                 Color c = driverColour(s.DriverId);
                 c.a = 0.07f;
+                c = UiBlend.Alpha(c);
                 Box(p, X(PlayerLap(s.StartLap)), top, X(PlayerLap(s.EndLap)), bottom, c);
             }
 
