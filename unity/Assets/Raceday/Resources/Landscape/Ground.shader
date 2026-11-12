@@ -3,8 +3,9 @@
 // track where the grass is mown. All are made in code (Landscape.cs) and read by world position, so
 // the runoff and the ground beyond it match.
 //
-// The mowing map holds, per map point: the distance beyond the nearest road edge, m; 1 where the
-// grass is mown; and the way that road runs across the ground. Each stripe is mown the opposite way
+// The mowing map holds, per map point: the distance beyond the nearest road edge, m, wandering a
+// little as a mower's lines do; how plainly the stripes show, 0 where the grass is not mown; and
+// the way that road runs across the ground. Each stripe is mown the opposite way
 // to the next, so its grass leans along the road one way or the other: a stripe whose grass leans
 // away from the viewer looks lighter, one leaning towards them darker, and the stripes swap, fainter,
 // as the view turns round.
@@ -91,14 +92,16 @@ Shader "Hidden/TarmacGauntlet/Ground"
             {
                 float2 uv = (i.positionWS.xz - _Map.xy) * _Map.zw;
                 half3 fields = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv).rgb;
-                half3 albedo = fields * SAMPLE_TEXTURE2D(_Grain, sampler_Grain, i.positionWS.xz / 8).rgb * 2 * _BaseColor.rgb;
+                half grain = SAMPLE_TEXTURE2D(_Grain, sampler_Grain, i.positionWS.xz / 8).r;
+                half3 albedo = fields * grain * 2 * _BaseColor.rgb;
                 #if defined(_GROUND_STRIPES)
                     half4 mow = SAMPLE_TEXTURE2D(_Mowing, sampler_Mowing, uv);
-                    float d = mow.r / _StripeWidth;
+                    // The grain roughens the stripes' edges a little, as a mower's never are clean.
+                    float d = (mow.r + (grain - 0.5) * 1.5) / _StripeWidth;
                     float across = fwidth(d);
                     // A square wave, +1 on one stripe and -1 on the next, its edges softened over about a pixel.
                     float wave = clamp((abs(frac(d * 0.5) - 0.5) * 4 - 1) / max(across * 2, 0.08), -1, 1);
-                    // Gone where the stripes would be narrower than a couple of pixels, and off the mown grass.
+                    // Gone where the stripes would be narrower than a couple of pixels, faint where the mowing was careless, none off the mown grass.
                     half fade = saturate(mow.g) * saturate(1.5 - across * 2.5);
                     half2 along = mow.ba / max(length(mow.ba), 1e-3);
                     float2 view = i.positionWS.xz - _WorldSpaceCameraPos.xz;

@@ -280,19 +280,24 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>
-        /// The mowing at a map point: whether the grass there is mown, how far it is beyond the nearest road edge, m, and
-        /// which way that stretch of road runs, across the ground. Mowing stripes run along the road.
+        /// The mowing at a map point: how plainly its stripes show, 0 where the grass is not mown; how far it is beyond the
+        /// nearest road edge, m, as the mower's stripes measure it; and which way that stretch of road runs, across the
+        /// ground. Mowing stripes run along the road, but not perfectly: they wander, widen and narrow, and show plainly
+        /// in some stretches and hardly at all in others.
         /// </summary>
-        public bool Mowing(int i, out float fromRoad, out float alongX, out float alongZ)
+        public float Mowing(int i, out float fromRoad, out float alongX, out float alongZ)
         {
             int k = roadAt[i];
-            fromRoad = Mathf.Max(road[i], 0f);
+            float x = minX + (i % MapX) * cell, z = minZ + (i / MapX) * cell;
+            float wider = 1f + 0.3f * (Noise(x / 180f, z / 180f, 161) - 0.5f);
+            float wander = 3.2f * (Noise(x / 30f, z / 30f, 162) - 0.5f) + 1.2f * (Noise(x / 11f, z / 11f, 163) - 0.5f);
+            fromRoad = Mathf.Max(road[i], 0f) * wider + wander;
             alongX = alongZ = 0f;
-            if (k < 0) return false;
+            if (k < 0 || Map[i] != LandUse.Mown) return 0f;
             // Left is level and square to the road, so the road runs along (left.z, -left.x).
             alongX = c.Left[k].z;
             alongZ = -c.Left[k].x;
-            return Map[i] == LandUse.Mown;
+            return Mathf.Clamp(1.4f * Noise(x / 90f, z / 90f, 164) - 0.1f, 0.15f, 1f);
         }
 
         /// <summary>

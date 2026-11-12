@@ -44,15 +44,14 @@ namespace TarmacGauntlet.Raceday
             float cell = g.spacing / LandscapePlan.MapPerCell;
             var px = new Color32[plan.MapX * plan.MapZ];
             var mowing = new ushort[px.Length * 4];
-            ushort zero = Mathf.FloatToHalf(0f), one = Mathf.FloatToHalf(1f);
             for (int i = 0; i < px.Length; i++)
             {
                 int x = i % plan.MapX, z = i / plan.MapX;
                 Color col = LandscapeLooks.Field(plan.Map[i], g.originX + x * cell, g.originZ + z * cell) * (0.94f + 0.12f * CloudField.Hash(x, z, 91));
                 px[i] = col;
-                bool mown = plan.Mowing(i, out float fromRoad, out float alongX, out float alongZ);
+                float mown = plan.Mowing(i, out float fromRoad, out float alongX, out float alongZ);
                 mowing[i * 4] = Mathf.FloatToHalf(fromRoad);
-                mowing[i * 4 + 1] = mown ? one : zero;
+                mowing[i * 4 + 1] = Mathf.FloatToHalf(mown);
                 mowing[i * 4 + 2] = Mathf.FloatToHalf(alongX);
                 mowing[i * 4 + 3] = Mathf.FloatToHalf(alongZ);
             }

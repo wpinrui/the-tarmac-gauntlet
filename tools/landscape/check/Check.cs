@@ -154,8 +154,8 @@ public static class Check
                 fields[i * 3] = (byte)Math.Clamp(col.r * 255f + 0.5f, 0f, 255f);
                 fields[i * 3 + 1] = (byte)Math.Clamp(col.g * 255f + 0.5f, 0f, 255f);
                 fields[i * 3 + 2] = (byte)Math.Clamp(col.b * 255f + 0.5f, 0f, 255f);
-                bool mown = plan.Mowing(i, out float fromRoad, out float ax, out float az);
-                w.Write(fromRoad); w.Write(mown ? 1f : 0f); w.Write(ax); w.Write(az);
+                float mown = plan.Mowing(i, out float fromRoad, out float ax, out float az);
+                w.Write(fromRoad); w.Write(mown); w.Write(ax); w.Write(az);
             }
         File.WriteAllBytes(Path.Combine(dir, "fields.bin"), fields);
         File.WriteAllBytes(Path.Combine(dir, "map.bin"), Array.ConvertAll(plan.Map, u => (byte)u));
