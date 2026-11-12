@@ -45,6 +45,8 @@ namespace TarmacGauntlet.Raceday
         {
             public float cell, height, pad, padX;
             public float[] advance;
+            // How far apart digits sit, over their height; 0: their advance.
+            public float step;
         }
 
         private static readonly string[] Views = { "left", "right", "top", "front", "rear" };
@@ -150,6 +152,7 @@ namespace TarmacGauntlet.Raceday
                 mat.SetVector("_DigitCell", new Vector4(digitFile.cell, digitFile.padX, glyph, digitFile.pad));
                 mat.SetFloat("_DigitHeight", digitFile.height);
                 mat.SetFloat("_DigitAdvance", advance);
+                mat.SetFloat("_DigitStep", digitFile.step > 0 ? digitFile.step : advance);
             }
             return mat;
         }

@@ -56,6 +56,8 @@ Shader "TarmacGauntlet/Livery"
         // over their height.
         float4 _DigitCell;
         float _DigitHeight, _DigitAdvance;
+        // How far apart digits sit, over their height: their advance, or less for digits that overlap.
+        float _DigitStep;
 
         struct Input
         {
@@ -86,11 +88,12 @@ Shader "TarmacGauntlet/Livery"
             return tex2D(_Atlas, float2(uv.x, 1 - uv.y)).rgb;
         }
 
-        // The race number over the art at atlas uv q, in any box q falls in.
+        // The race number over the art at atlas uv q, in any box q falls in. Digits sit _DigitStep
+        // apart, which can be less than a digit's width: each digit is then laid over the one before.
         fixed3 Number(float2 q, fixed3 art)
         {
             float count = _NumDigits.w;
-            float width = count * _DigitAdvance;
+            float width = (count - 1) * _DigitStep + _DigitAdvance;
             [unroll]
             for (int i = 0; i < 4; i++)
             {
@@ -101,16 +104,21 @@ Shader "TarmacGauntlet/Livery"
                 float h = min(box.z, _NumWidth[i] / max(width, 1e-5));
                 float2 l = float2(c * d.x + s * d.y, -s * d.x + c * d.y) / max(h, 1e-5);
                 float x = l.x + width / 2;
-                float k = clamp(floor(x / _DigitAdvance), 0, 2);
-                float digit = k < 0.5 ? _NumDigits.x : (k < 1.5 ? _NumDigits.y : _NumDigits.z);
-                float gx = saturate((x - k * _DigitAdvance) / _DigitAdvance);
-                float2 g = float2(digit * _DigitCell.x + _DigitCell.y + gx * _DigitCell.z, _DigitCell.w + (saturate(l.y + 0.5)) * _DigitHeight);
-                float inside = step(abs(l.y), 0.5) * step(0, x) * step(x, width) * step(i + 0.5, _NumBoxes) * step(0.5, count);
+                float on = step(abs(l.y), 0.5) * step(i + 0.5, _NumBoxes);
                 // Gradients of the unbroken position, so the jump between digit cells keeps a sharp mip.
                 float2 flow = float2(x / _DigitAdvance * _DigitCell.z, -l.y * _DigitHeight);
-                // Digits are white, with any outline black: the face takes the ink, the outline the edge.
-                fixed4 t = tex2Dgrad(_Digits, float2(g.x, 1 - g.y), ddx(flow), ddy(flow));
-                art = lerp(art, lerp(_NumEdge[i].rgb, _NumInk[i].rgb, t.r), t.a * inside);
+                float gy = _DigitCell.w + saturate(l.y + 0.5) * _DigitHeight;
+                [unroll]
+                for (int k = 0; k < 3; k++)
+                {
+                    float digit = k == 0 ? _NumDigits.x : (k == 1 ? _NumDigits.y : _NumDigits.z);
+                    float gx = (x - k * _DigitStep) / _DigitAdvance;
+                    float inside = on * step(0, gx) * step(gx, 1) * step(k + 0.5, count);
+                    float2 g = float2(digit * _DigitCell.x + _DigitCell.y + saturate(gx) * _DigitCell.z, gy);
+                    // Digits are white, with any outline black: the face takes the ink, the outline the edge.
+                    fixed4 t = tex2Dgrad(_Digits, float2(g.x, 1 - g.y), ddx(flow), ddy(flow));
+                    art = lerp(art, lerp(_NumEdge[i].rgb, _NumInk[i].rgb, t.r), t.a * inside);
+                }
             }
             return art;
         }

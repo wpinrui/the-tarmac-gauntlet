@@ -8,7 +8,8 @@
 // centred in one shared advance, so the outlines of neighbours never overlap.
 //
 // Run: node digits.js                                              (the shared digits)
-//      node digits.js --font <ttf> --edge 0.09 --out <dir>         (a livery's own; edge in digit heights)
+//      node digits.js --font <ttf> --edge 0.09 --step 0.8 --out <dir>   (a livery's own; edge in digit
+//      heights, step how far apart digits sit as a share of their width, so they can overlap)
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
@@ -18,6 +19,7 @@ const flag = (k, d) => { const i = args.indexOf(k); return i < 0 ? d : args[i + 
 const OUT = flag('--out', path.join(__dirname, '../../../unity/Assets/Raceday/Resources/Livery'));
 const FONT = flag('--font', path.join(__dirname, '../../../unity/Assets/Raceday/Resources/Fonts/TitilliumWeb-Bold.ttf'));
 const EDGE = Number(flag('--edge', 0));
+const STEP = Number(flag('--step', 1));
 const H = 192;   // digit height in pixels
 const PAD = 8;   // clear border round each digit, so mip levels keep digits apart
 
@@ -56,7 +58,7 @@ function bake(font, H, PAD, edge) {
   await browser.close();
   fs.mkdirSync(OUT, { recursive: true });
   fs.writeFileSync(path.join(OUT, 'Digits.png'), Buffer.from(r.png.split(',')[1], 'base64'));
-  const meta = { cell: r.cell / r.width, height: r.tall / r.height, pad: PAD / r.height, padX: PAD / r.width, advance: r.advance };
+  const meta = { cell: r.cell / r.width, height: r.tall / r.height, pad: PAD / r.height, padX: PAD / r.width, advance: r.advance, ...(STEP !== 1 ? { step: +(r.advance[0] * STEP).toFixed(4) } : {}) };
   fs.writeFileSync(path.join(OUT, 'Digits.json'), JSON.stringify(meta, null, 1));
   console.log('baked digits', r.width, 'x', r.height, 'to', OUT);
 })();

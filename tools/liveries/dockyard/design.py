@@ -3,7 +3,7 @@ in tools, with the team's local diner on the tailgate. Writes one folder of pane
 under out/, and the logos it draws with under out/logos/.
 
 Run: node ../common/views.js ../../../unity/Assets/Art/Vehicles/LibertyFantasy/LibertyFantasy.obj out/views
-     node ../common/digits.js --font fonts/Shrikhand-Regular.ttf --edge 0.09 --out out/digits
+     node ../common/digits.js --font fonts/Shrikhand-Regular.ttf --edge 0.09 --step 0.8 --out out/digits
      python3 design.py
 """
 import math
@@ -22,10 +22,12 @@ livery.FONTS["Pacifico"] = HERE / "fonts" / "Pacifico-Regular.ttf"
 LOGOS = HERE / "out" / "logos"
 
 YELLOW = "#ffcc00"
-TOOL = "#ffdb4d"       # the yellow, 15% lighter
+TOOL = "#ffe680"       # the yellow, 25% lighter
 NAVY = "#152a4a"
 CREAM = "#fff4d6"
 INK = "#111214"
+RED = "#c92a22"
+CHALK = "#22302b"
 WHITE = "#ffffff"
 
 # Fantasy landmarks in OBJ metres: z along the car (+ nose), y up. Read off the true-scale views.
@@ -35,8 +37,13 @@ FRONT_AXLE, REAR_AXLE = 1.2445, -1.2445
 NUM_Z, NUM_Y, NUM_W, NUM_H = 0.18, 0.57, 0.66, 0.36
 # Bonnet: shut line at z 1.0, nose at 2.04, |x| under 0.7 clear of the headlamps.
 BONNET = (0.0, 0, 1.52)
-# Tailgate skin under the rear glass and badge: y 0.68 to 0.88, |x| under 0.3 clear of the script.
-TAILGATE = (0.0, 0.775, 0)
+# Tailgate skin under the rear glass: y 0.68 to 0.98, |x| 0.55 at the top narrowing to 0.46.
+# The badge (y 0.92) and the Fantasy script (x 0.37, y 0.86) sit on it.
+TAILGATE = (0.0, 0.83, 0)
+# Roof between the windscreen header and the spoiler: z -1.40 to 0.20, |x| under 0.52.
+ROOF = (0.0, 0, -0.60)
+# Rear bumper between the reflectors: y 0.50 to 0.66, |x| under 0.62.
+BUMPER = (0.0, 0.58, 0)
 
 
 # ---------------------------------------------------------------- tools
@@ -116,9 +123,9 @@ def team_logo(layout):
         return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 175">{art}</svg>'
     if layout == "beside":
         art = (_anchor(42, 104, 140, NAVY, 10, CREAM)
-               + word.replace('x="150"', 'x="186"').replace('font-size="46"', 'font-size="40"')
-               + bar.replace('x="30"', 'x="86"').replace('width="240"', 'width="200"').replace('x="150"', 'x="186"').replace('letter-spacing="13"', 'letter-spacing="10"'))
-        return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 30 300 145">{art}</svg>'
+               + word.replace('x="150"', 'x="204"').replace('font-size="46"', 'font-size="38"')
+               + bar.replace('x="30"', 'x="104"').replace('width="240"', 'width="200"').replace('x="150"', 'x="204"').replace('letter-spacing="13"', 'letter-spacing="10"'))
+        return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="-14 22 340 153">{art}</svg>'
     if layout == "behind":  # a big anchor with the wordmark across its shank
         art = (_anchor(150, 110, 230, NAVY, 9, CREAM) + word.replace('y="128"', 'y="104"')
                + bar.replace('y="140"', 'y="116"').replace('y="155"', 'y="131"'))
@@ -137,8 +144,8 @@ def diner_logo(scheme):
     s = {
         # bleached plank, navy script edged in cream, DINER cream on a navy tag
         "bleached": dict(wood="#dcc7a2", grain="#b89c74", edge=NAVY, script=NAVY, script_edge=CREAM, tag=NAVY, tag_ink=CREAM),
-        # dark plank, cream script, yellow DINER
-        "dark": dict(wood="#6e4529", grain="#8f6142", edge="#3e2615", script=CREAM, script_edge="#3e2615", tag="#3e2615", tag_ink=YELLOW),
+        # dark plank, cream script, red DINER
+        "dark": dict(wood="#6e4529", grain="#8f6142", edge="#3e2615", script=CREAM, script_edge="#3e2615", tag="#3e2615", tag_ink="#e8392c"),
         # mid plank, white script edged navy, DINER white on a red tag
         "tagged": dict(wood="#b88555", grain="#94653b", edge=NAVY, script=WHITE, script_edge=NAVY, tag="#c92a22", tag_ink=WHITE),
     }[scheme]
@@ -157,69 +164,151 @@ def logo_file(name, svg):
     return p
 
 
-# ---------------------------------------------------------------- shared marks
-def marks(lv, logo="hang", diner="bleached"):
-    lv.side_number(NUM_Z, NUM_Y, NUM_W, NUM_H, WHITE, edge=INK)
-    svg = team_logo(logo)
-    vb = [float(x) for x in svg.split('viewBox="')[1].split('"')[0].split()]
-    # 1.0 m across the bonnet, whatever the layout's shape
-    lv.mark("top", logo_file(f"team-{logo}", svg), BONNET, 1.0 * vb[3] / vb[2], rotate=90)
-    lv.mark("rear", logo_file(f"diner-{diner}", diner_logo(diner)), TAILGATE, 0.2)
+def _inner(svg):
+    """An SVG's viewBox and contents, to nest it in another."""
+    vb = svg.split('viewBox="')[1].split('"')[0]
+    return vb, svg.split(">", 1)[1].rsplit("</svg>", 1)[0]
 
 
-def shop_floor(views, logo="hang", diner="bleached"):
-    """Yellow all over, tools all over."""
+def _cup(x, y, s, col):
+    k = s / 100
+    return (f'<g transform="translate({x} {y}) scale({k})"><path d="M-30,-10 h60 v30 a30,30 0 0,1 -60,0z" fill="{col}"/>'
+            f'<path d="M30,0 a14,14 0 0,1 0,28" fill="none" stroke="{col}" stroke-width="7"/>'
+            f'<path d="M-12,-20 q-8,-12 0,-24 t0,-24 M8,-20 q-8,-12 0,-24 t0,-24" fill="none" stroke="{col}" stroke-width="5" stroke-linecap="round"/></g>')
+
+
+def _burger(x, y, s, bun, filling):
+    k = s / 100
+    return (f'<g transform="translate({x} {y}) scale({k})"><path d="M-34,-6 a34,26 0 0,1 68,0z" fill="{bun}"/>'
+            f'<rect x="-36" y="-2" width="72" height="9" rx="4" fill="{filling[0]}"/><rect x="-38" y="9" width="76" height="12" rx="6" fill="{filling[1]}"/>'
+            f'<path d="M-34,25 h68 a6,6 0 0,1 -6,10 h-56 a6,6 0 0,1 -6,-10z" fill="{bun}"/></g>')
+
+
+def diner_ad(style):
+    """The tailgate as an advert for the Driftwood Diner: a board cut to the tailgate's shape,
+    the plank in the middle under the badge, what they serve either side. Units are millimetres,
+    1100 by 300, centred on TAILGATE."""
+    vb, plank = _inner(diner_logo("dark"))
+    board = "M20,12 L1080,12 L1010,292 L90,292Z"
+    if style == "billboard":
+        ground, edge, ink, accent = CREAM, NAVY, NAVY, RED
+        left = _cup(240, 178, 76, NAVY)
+        right = _burger(870, 135, 100, "#e2a24a", ("#3f8f3a", "#6b3a22"))
+        lines_l = ("BOTTOMLESS", "COFFEE")
+        lines_r = ("ALL-DAY", "BREAKFAST")
+        foot = "PIER 9  HARBOUR ROAD"
+    else:  # chalkboard: the specials board on the counter
+        ground, edge, ink, accent = CHALK, "#8a5a34", CREAM, YELLOW
+        left = right = ""
+        lines_l = ("FRY-UP  6.50", "FISH & CHIPS  8.00")
+        lines_r = ("PIT CREW PIE  5.00", "COFFEE  FREE REFILLS")
+        foot = "OPEN 6AM TILL LATE"
+    def block(x, lines, y0, size):
+        return "".join(f'<text x="{x}" y="{y0 + i * size * 1.1}" text-anchor="middle" font-family="Barlow" font-size="{size}" '
+                       f'letter-spacing="{size * 0.08:.1f}" fill="{ink}">{t.replace("&", "&amp;")}</text>' for i, t in enumerate(lines))
+    if style == "billboard":
+        sides = block(240, lines_l, 232, 26) + block(870, lines_r, 214, 30)
+    else:
+        sides = block(240, lines_l, 190, 26) + block(870, lines_r, 160, 28)
+        sides += f'<text x="270" y="86" text-anchor="middle" font-family="Pacifico" font-size="40" fill="{accent}">Today</text>'
+        sides += f'<text x="870" y="96" text-anchor="middle" font-family="Pacifico" font-size="40" fill="{accent}">Specials</text>'
+    art = (f'<path d="{board}" fill="{ground}" stroke="{edge}" stroke-width="12" stroke-linejoin="round"/>'
+           f'<path d="M44,28 L1056,28 L994,276 L106,276Z" fill="none" stroke="{accent}" stroke-width="3"/>'
+           + left + right + sides
+           + f'<svg x="375" y="98" width="350" height="146" viewBox="{vb}">{plank}</svg>'
+           + f'<text x="550" y="266" text-anchor="middle" dominant-baseline="auto" font-family="Barlow" font-size="22" letter-spacing="6" fill="{accent}">{foot}</text>')
+    return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 300">{art}</svg>'
+
+
+def bumper_strip(style):
+    """A strip across the rear bumper finishing the advert, 1240 by 110 mm."""
+    ground, ink = (NAVY, CREAM) if style == "billboard" else (CHALK, CREAM)
+    line = "EAT LIKE A MECHANIC" if style == "billboard" else "PIER 9  HARBOUR ROAD"
+    art = (f'<rect x="0" y="0" width="1240" height="110" rx="14" fill="{ground}"/>'
+           f'<text x="620" y="56" text-anchor="middle" dominant-baseline="central" font-family="Alfa" font-size="58" letter-spacing="6" fill="{ink}">{line}</text>'
+           + "".join(f'<path d="M{x},55 l10,-22 10,22 -10,22z" fill="{YELLOW}"/>' for x in (40, 1180)))
+    return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 110">{art}</svg>'
+
+
+# ---------------------------------------------------------------- roof cranes
+# Each drawn 1600 by 1000 mm with the nose to the right, laid flat on the roof.
+def _outline(art, w=14):
+    """A decal cut with a cream edge: the art drawn fat in cream under itself."""
+    fat = art.replace(f'fill="{NAVY}"', f'fill="{CREAM}" stroke="{CREAM}" stroke-width="{w}" stroke-linejoin="round"')
+    fat = fat.replace(f'stroke="{NAVY}"', f'stroke="{CREAM}"')
+    return f'<g>{fat}</g><g>{art}</g>'
+
+
+def _truss(x0, x1, y, h, col, n):
+    """A lattice beam from x0 to x1, h tall, centred on y, with n bays."""
+    d = (x1 - x0) / n
+    zig = " ".join(f"M{x0 + i * d:.0f},{y + (h / 2 if i % 2 else -h / 2):.0f} L{x0 + (i + 1) * d:.0f},{y + (-h / 2 if i % 2 else h / 2):.0f}" for i in range(n))
+    return (f'<rect x="{x0}" y="{y - h / 2 - 7}" width="{x1 - x0}" height="14" fill="{col}"/>'
+            f'<rect x="{x0}" y="{y + h / 2 - 7}" width="{x1 - x0}" height="14" fill="{col}"/>'
+            f'<path d="{zig}" stroke="{col}" stroke-width="9" fill="none"/>')
+
+
+def _hook(x, y, s, col):
+    k = s / 100
+    return (f'<g transform="translate({x} {y}) scale({k})"><rect x="-14" y="-40" width="28" height="22" rx="4" fill="{col}"/>'
+            f'<path d="M0,-18 V8 A18,18 0 1,1 -18,26" fill="none" stroke="{col}" stroke-width="10" stroke-linecap="round"/></g>')
+
+
+def crane(kind):
+    if kind == "gantry":   # a quayside container crane, side on, its boom reaching for the nose
+        art = (_truss(120, 1560, 300, 70, NAVY, 18)
+               + f'<path d="M420,300 L540,80 L660,300 M540,80 L1500,265 M540,80 L180,280" stroke="{NAVY}" stroke-width="16" fill="none"/>'
+               + f'<path d="M500,335 L440,900 L490,900 L560,335Z M820,335 L880,900 L830,900 L760,335Z" fill="{NAVY}"/>'
+               + f'<rect x="440" y="560" width="440" height="34" fill="{NAVY}"/><rect x="380" y="890" width="560" height="26" fill="{NAVY}"/>'
+               + f'<rect x="1160" y="330" width="80" height="50" fill="{NAVY}"/><line x1="1200" y1="380" x2="1200" y2="600" stroke="{NAVY}" stroke-width="5"/>'
+               + _hook(1200, 640, 120, NAVY))
+    elif kind == "jib":    # a lattice jib down the middle of the roof, the hook hanging off the back
+        art = _truss(330, 1560, 500, 200, NAVY, 12) + _hook(250, 500, 300, NAVY).replace("translate(250 500)", "translate(250 500) rotate(90)")
+    elif kind == "skyline":  # three cranes along the harbour, standing on the car's right edge
+        def tower(x, h, reach, back):
+            top = 940 - h
+            return (_truss(x - 25, x + 25, 940 - h / 2, 50, NAVY, 1).replace(f'x="{x - 25}"', f'x="{x - 25}"')
+                    + f'<rect x="{x - 26}" y="{top}" width="52" height="{h}" fill="none" stroke="{NAVY}" stroke-width="12"/>'
+                    + f'<path d="' + " ".join(f"M{x - 26},{top + i * 52} L{x + 26},{top + (i + 1) * 52}" for i in range(int(h / 52))) + f'" stroke="{NAVY}" stroke-width="7"/>'
+                    + _truss(x - back, x + reach, top - 25, 50, NAVY, int((reach + back) / 55))
+                    + f'<path d="M{x},{top - 50} L{x},{top - 150} M{x},{top - 150} L{x + reach * 0.7},{top - 50} M{x},{top - 150} L{x - back},{top - 50}" stroke="{NAVY}" stroke-width="8"/>'
+                    + f'<rect x="{x - back}" y="{top}" width="70" height="60" fill="{NAVY}"/>'
+                    + f'<line x1="{x + reach * 0.8}" y1="{top}" x2="{x + reach * 0.8}" y2="{top + h * 0.45}" stroke="{NAVY}" stroke-width="5"/>'
+                    + _hook(x + reach * 0.8, top + h * 0.45 + 30, 70, NAVY))
+        art = tower(300, 560, 360, 160) + tower(820, 760, 520, 200) + tower(1360, 460, 200, 140)
+    elif kind == "hook":   # a cable from the windscreen to the spoiler, the hook on the end
+        art = (f'<line x1="1580" y1="500" x2="420" y2="500" stroke="{NAVY}" stroke-width="16"/>'
+               + _hook(400, 500, 380, NAVY).replace("translate(400 500)", "translate(400 500) rotate(90)"))
+    else:
+        raise ValueError(kind)
+    return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000">{_outline(art)}</svg>'
+
+
+# ---------------------------------------------------------------- the livery
+def shop_floor(views, ad="billboard", logo="beside", roof=None):
+    """Yellow all over, tools all over; the diner's advert across the back."""
     lv = Livery(views, YELLOW)
     for view in lv.views:
         tools(lv, view, seed=3)
-    marks(lv, logo, diner)
+    lv.side_number(NUM_Z, NUM_Y, NUM_W, NUM_H, WHITE, edge=INK)
+    svg = team_logo(logo)
+    vb = [float(x) for x in svg.split('viewBox="')[1].split('"')[0].split()]
+    # 1.0 m across the bonnet, whatever the layout's shape, reading from in front of the car
+    lv.mark("top", logo_file(f"team-{logo}", svg), BONNET, 1.0 * vb[3] / vb[2], rotate=-90)
+    lv.mark("rear", logo_file(f"ad-{ad}", diner_ad(ad)), TAILGATE, 0.30)
+    lv.mark("rear", logo_file(f"bumper-{ad}", bumper_strip(ad)), BUMPER, 0.11)
+    if roof:
+        lv.mark("top", logo_file(f"roof-{roof}", crane(roof)), ROOF, 1.0)
     return lv
-
-
-def waterline(views, logo="hang", diner="bleached"):
-    """A harbour tug: navy hull under a white boot stripe that runs along the sills and rises
-    into each bumper, a cream rope above it, tools on the yellow topsides only."""
-    lv = Livery(views, YELLOW)
-    mid = (NOSE + TAIL) / 2
-    wl = lambda z: 0.36 + 0.14 * ((z - mid) / ((NOSE - TAIL) / 2)) ** 4   # sill height, rising at the ends
-    end_wl = 0.50                                                               # across the bumpers
-    for view in ("left", "right"):
-        tools(lv, view, seed=7, keep=lambda u, v, view=view: -v > wl(u if view == "right" else -u) + 0.09)
-    tools(lv, "top", seed=7)
-    for view in ("front", "rear"):
-        tools(lv, view, seed=7, keep=lambda u, v: -v > end_wl + 0.09)
-    zs = [TAIL - 0.2 + i * (NOSE - TAIL + 0.4) / 80 for i in range(81)]
-    lv.side_poly([(z, wl(z)) for z in zs] + [(zs[-1], -0.2), (zs[0], -0.2)], NAVY)
-    lv.side_poly([(z, wl(z) + 0.035) for z in zs] + [(z, wl(z) - 0.005) for z in reversed(zs)], WHITE)
-    for view in ("front", "rear"):
-        lv.poly(view, [(-1.2, end_wl, 0), (1.2, end_wl, 0), (1.2, -0.2, 0), (-1.2, -0.2, 0)], NAVY)
-        lv.poly(view, [(-1.2, end_wl + 0.035, 0), (1.2, end_wl + 0.035, 0), (1.2, end_wl - 0.005, 0), (-1.2, end_wl - 0.005, 0)], WHITE)
-    rope(lv, wl, end_wl)
-    marks(lv, logo, diner)
-    return lv
-
-
-def rope(lv, wl, end_wl, lay=0.04):
-    """A twisted cream rope laid just above the boot stripe, all round the car."""
-    def strands(view, pts):
-        out = []
-        for (u0, v0), (u1, v1) in zip(pts, pts[1:]):
-            out.append(f'<path d="M{u0:.4f},{v0 + 0.012:.4f} L{u1:.4f},{v1 - 0.012:.4f}" stroke="{CREAM}" stroke-width="0.012" stroke-linecap="round"/>')
-        lv.art[view].append("".join(out))
-    n = int((NOSE - TAIL + 0.4) / lay)
-    for view in ("left", "right"):
-        strands(view, [lv.uv(view, lv._side(view, TAIL - 0.2 + i * lay, wl(TAIL - 0.2 + i * lay) + 0.06)) for i in range(n + 1)])
-    for view in ("front", "rear"):
-        strands(view, [lv.uv(view, (-1.2 + i * lay, end_wl + 0.06, 0)) for i in range(int(2.4 / lay) + 1)])
 
 
 OPTIONS = {
-    "shop-floor": lambda v: shop_floor(v),
-    "waterline": lambda v: waterline(v),
-    "shop-floor-beside": lambda v: shop_floor(v, logo="beside"),
-    "shop-floor-behind": lambda v: shop_floor(v, logo="behind"),
-    "shop-floor-dark": lambda v: shop_floor(v, diner="dark"),
-    "shop-floor-tagged": lambda v: shop_floor(v, diner="tagged"),
+    "billboard": lambda v: shop_floor(v, "billboard"),
+    "gantry": lambda v: shop_floor(v, "billboard", roof="gantry"),
+    "jib": lambda v: shop_floor(v, "billboard", roof="jib"),
+    "skyline": lambda v: shop_floor(v, "billboard", roof="skyline"),
+    "hook": lambda v: shop_floor(v, "billboard", roof="hook"),
+    "chalkboard": lambda v: shop_floor(v, "chalkboard"),
 }
 
 if __name__ == "__main__":

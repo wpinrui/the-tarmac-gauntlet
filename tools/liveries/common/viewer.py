@@ -88,7 +88,7 @@ function liveryMaterial(lv) {
     sh.uniforms.uNumWidth = { value: new THREE.Vector4(...[0, 1, 2, 3].map(i => boxes[i] ? boxes[i].w / lv.size : 0)) };
     sh.uniforms.uNumDigits = NUM;
     sh.uniforms.uDigitCell = { value: new THREE.Vector4(D.cell, D.padX, D.advance[0] * D.height * D.h / D.w, D.pad) };
-    sh.uniforms.uDigitHeight = { value: D.height }; sh.uniforms.uDigitAdvance = { value: D.advance[0] };
+    sh.uniforms.uDigitHeight = { value: D.height }; sh.uniforms.uDigitAdvance = { value: D.advance[0] }; sh.uniforms.uDigitStep = { value: D.step || D.advance[0] };
     for (const n of ['left', 'right', 'top', 'front', 'rear']) {
       sh.uniforms[`uA_${n}`] = { value: v4(P[n].a) }; sh.uniforms[`uB_${n}`] = { value: v4(P[n].b) };
     }
@@ -96,23 +96,27 @@ function liveryMaterial(lv) {
     sh.fragmentShader = `varying vec3 vLp; varying vec3 vLn; uniform sampler2D uAtlas; uniform vec3 uBase;
 uniform vec4 uA_left, uB_left, uA_right, uB_right, uA_top, uB_top, uA_front, uB_front, uA_rear, uB_rear;
 uniform sampler2D uDigits; uniform vec4 uNumBox[4]; uniform vec3 uNumInk[4]; uniform vec3 uNumEdge[4]; uniform float uNumBoxes; uniform vec4 uNumDigits; uniform vec4 uNumWidth;
-uniform vec4 uDigitCell; uniform float uDigitHeight, uDigitAdvance;
+uniform vec4 uDigitCell; uniform float uDigitHeight, uDigitAdvance, uDigitStep;
 vec3 lvNumber(vec2 q, vec3 art) {
-  float count = uNumDigits.w, width = count * uDigitAdvance;
+  float count = uNumDigits.w, width = (count - 1.0) * uDigitStep + uDigitAdvance;
   for (int i = 0; i < 4; i++) {
     vec4 box = uNumBox[i]; vec2 d = q - box.xy; float s = sin(box.w), c = cos(box.w);
     float h = min(box.z, uNumWidth[i] / max(width, 1e-5));
     vec2 l = vec2(c * d.x + s * d.y, -s * d.x + c * d.y) / max(h, 1e-5);
     float x = l.x + width / 2.0;
-    float k = clamp(floor(x / uDigitAdvance), 0.0, 2.0);
-    float digit = k < 0.5 ? uNumDigits.x : (k < 1.5 ? uNumDigits.y : uNumDigits.z);
-    float gx = clamp((x - k * uDigitAdvance) / uDigitAdvance, 0.0, 1.0);
-    vec2 g = vec2(digit * uDigitCell.x + uDigitCell.y + gx * uDigitCell.z, uDigitCell.w + clamp(l.y + 0.5, 0.0, 1.0) * uDigitHeight);
-    float inside = step(abs(l.y), 0.5) * step(0.0, x) * step(x, width) * step(float(i) + 0.5, uNumBoxes) * step(0.5, count);
+    float on = step(abs(l.y), 0.5) * step(float(i) + 0.5, uNumBoxes);
     vec2 smo = vec2(x / uDigitAdvance * uDigitCell.z, -l.y * uDigitHeight);
-    // Digits are white with any outline black: the face takes the ink, the outline the edge.
-    vec4 t = textureGrad(uDigits, vec2(g.x, 1.0 - g.y), dFdx(smo), dFdy(smo));
-    art = mix(art, mix(uNumEdge[i], uNumInk[i], t.r), t.a * inside);
+    float gy = uDigitCell.w + clamp(l.y + 0.5, 0.0, 1.0) * uDigitHeight;
+    // Digits sit uDigitStep apart, each laid over the one before where they overlap.
+    for (int k = 0; k < 3; k++) {
+      float digit = k == 0 ? uNumDigits.x : (k == 1 ? uNumDigits.y : uNumDigits.z);
+      float gx = (x - float(k) * uDigitStep) / uDigitAdvance;
+      float inside = on * step(0.0, gx) * step(gx, 1.0) * step(float(k) + 0.5, count);
+      vec2 g = vec2(digit * uDigitCell.x + uDigitCell.y + clamp(gx, 0.0, 1.0) * uDigitCell.z, gy);
+      // Digits are white with any outline black: the face takes the ink, the outline the edge.
+      vec4 t = textureGrad(uDigits, vec2(g.x, 1.0 - g.y), dFdx(smo), dFdy(smo));
+      art = mix(art, mix(uNumEdge[i], uNumInk[i], t.r), t.a * inside);
+    }
   }
   return art;
 }
