@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TarmacGauntlet.Visuals;
 using UnityEngine;
 
 namespace TarmacGauntlet.TeamHq
@@ -150,9 +151,7 @@ namespace TarmacGauntlet.TeamHq
             // Cars face the bay doors.
             Quaternion facing = Quaternion.Euler(0, 180, 0);
             GameObject prefab = null;
-#if UNITY_EDITOR
-            if (!string.IsNullOrEmpty(look.AssetPath)) prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(look.AssetPath);
-#endif
+            prefab = ArtLibrary.Load<GameObject>(look.AssetPath);
             if (prefab != null)
             {
                 GameObject car = Instantiate(prefab, transform);
