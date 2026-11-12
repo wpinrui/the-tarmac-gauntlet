@@ -58,9 +58,9 @@ namespace TarmacGauntlet.Simulation
             new AiTeamEntry { Name = "Sato Brothers Racing", Descriptor = "Japanese siblings building from scratch", Nationality = "jp", ModelId = "e-10", CarClass = CarClass.E },
             new AiTeamEntry { Name = "Yellow Flag Motorsport", Descriptor = "cautious but surprisingly consistent", Nationality = "fi", ModelId = "e-11", CarClass = CarClass.E },
             // CLASS D: 20 teams
-            new AiTeamEntry { Name = "Seorak Technica", Descriptor = "Seorak's rally-bred factory effort", Nationality = "kr", ModelId = "d-12", CarClass = CarClass.D },
+            new AiTeamEntry { Name = "Seorak Technica", Descriptor = "Seorak's rally-bred factory effort", Nationality = "us", ModelId = "d-12", CarClass = CarClass.D },
             new AiTeamEntry { Name = "Packet Loss Racing", Descriptor = "tech-money privateer, data-obsessed", Nationality = "us", ModelId = "d-13", CarClass = CarClass.D },
-            new AiTeamEntry { Name = "KNS Seorak", Descriptor = "Seorak's Southeast Asian satellite programme", Nationality = "my", ModelId = "d-14", CarClass = CarClass.D },
+            new AiTeamEntry { Name = "KNS Seorak", Descriptor = "Seorak's Southeast Asian satellite programme", Nationality = "kr", ModelId = "d-14", CarClass = CarClass.D },
             new AiTeamEntry { Name = "Poseidon Racing", Descriptor = "trident-bearing privateer with sharp ambitions", Nationality = "it", ModelId = "d-15", CarClass = CarClass.D },
             new AiTeamEntry { Name = "Virginia Motorsport", Descriptor = "French-founded privateer on the rise", Nationality = "fr", ModelId = "d-12", CarClass = CarClass.D },
             new AiTeamEntry { Name = "Insight Racing", Descriptor = "tech-backed team chasing efficiency gains", Nationality = "jp", ModelId = "d-13", CarClass = CarClass.D },
