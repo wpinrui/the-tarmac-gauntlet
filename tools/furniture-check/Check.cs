@@ -14,7 +14,11 @@
 //                            before the turn-in, off the road and in front of the barrier
 //   gantry over the line     the gantry spans the start line with its feet off the road and verge and its legs
 //                            clear of the pit wall, and its light box clears the road by at least 5 m
-//   cheap to draw            at most 120k triangles in all and 20k in any one mesh
+//   armco on posts           every armco run has its rails, through every bend, with a post at least every
+//                            4.5 m; rails, posts and catch fences stand behind the armco line, off every road and
+//                            runoff, and reach into the ground
+//   catch fences             behind every tyre wall, clear of the grandstands' own fences and the gantry's feet
+//   cheap to draw            at most 120k triangles in all and 20k in any one mesh, armco included
 //   race control             SC behind the pace car, red then green lights at the start, green panels on
 //                            the opening lap, yellow before a stopped car and green after it, clearing once
 //                            it goes, a crashed car flagged until recovered, nothing for a car in the pit lane
@@ -56,7 +60,10 @@ static class Check
         Posts(f);
         Boards(f);
         Gantry(f, built, track);
-        Budget(built);
+        var armco = new ArmcoBuilder(c, b.ArmcoRuns, footprints, f.GantryLeft, f.GantryRight);
+        Armco(armco);
+        CatchFences(armco, f);
+        Budget(built, armco);
         Flags(f);
         return failed ? 1 : 0;
     }
@@ -187,15 +194,146 @@ static class Check
         Report("gantry over the line", bad, $"span {l - r:F1} m, lowest light {lowest:F1} m over the road");
     }
 
-    static void Budget(FurnitureBuilder built)
+    static void Budget(FurnitureBuilder built, ArmcoBuilder armco)
     {
+        var armcoChunks = new[] { armco.Steel, armco.Fence, armco.FencePosts }.SelectMany(k => k.Indexed().Chunks(250f)).ToList();
         int total = built.Parts.Sum(p => p.Kit.Triangles.Count / 3) + built.Panels.Sum(p => p.Triangles.Count / 3)
-            + (built.RedLenses.Triangles.Count + built.GreenLenses.Triangles.Count) / 3;
-        int biggest = built.Parts.Max(p => p.Kit.Triangles.Count / 3);
+            + (built.RedLenses.Triangles.Count + built.GreenLenses.Triangles.Count) / 3 + armcoChunks.Sum(k => k.Triangles.Count / 3);
+        int biggest = built.Parts.Select(p => p.Kit).Concat(armcoChunks).Max(k => k.Triangles.Count / 3);
         var bad = new List<string>();
         if (total > 120000) bad.Add($"{total} triangles");
         if (biggest > 20000) bad.Add($"a mesh of {biggest} triangles");
         Report("cheap to draw", bad, $"{total} triangles in {built.Parts.Count + built.Panels.Count + 2} meshes, {built.Marshals.Count} marshals");
+    }
+
+    /// <summary>The nearest track sample to a point, in plan.</summary>
+    static int Nearest(Vector3 p)
+    {
+        int best = 0;
+        float bestD = float.MaxValue;
+        for (int k = 0; k < c.Count; k++)
+        {
+            float dx = c.Centre[k].x - p.x, dz = c.Centre[k].z - p.z, d = dx * dx + dz * dz;
+            if (d < bestD) { bestD = d; best = k; }
+        }
+        return best;
+    }
+
+    /// <summary>
+    /// How far a point stands in front of the runoff's outer edge (the armco line where there is armco) beside the nearest
+    /// stretch of track: above 0 is on the runoff. The edge is taken as straight between track samples, as laid.
+    /// </summary>
+    static float OnRunoff(Vector3 p)
+    {
+        int k = Nearest(p);
+        int side = Lateral(p, k) > 0 ? 0 : 1;
+        float sign = side == 0 ? 1f : -1f;
+        if (b.RunoffReach(side, k) <= 0f) return c.HalfWidth(k) - Math.Abs(Lateral(p, k));
+        Vector3 Edge(int j) => c.Centre[j] + c.Left[j] * (sign * (c.HalfWidth(j) + b.RunoffReach(side, j)));
+        float best = float.MaxValue, front = 0f;
+        for (int d = -2; d <= 1; d++)
+        {
+            int j0 = c.Wrap(k + d), j1 = c.Wrap(k + d + 1);
+            Vector3 a = Edge(j0), e = Edge(j1), ab = e - a;
+            ab.y = 0;
+            Vector3 ap = p - a;
+            ap.y = 0;
+            float t = Mathf.Clamp01(Vector3.Dot(ap, ab) / Math.Max(ab.sqrMagnitude, 1e-6f));
+            Vector3 off = ap - ab * t;
+            if (off.magnitude >= best) continue;
+            best = off.magnitude;
+            // Towards the road is the side of the edge the centreline lies on.
+            Vector3 perp = Vector3.Cross(Vector3.up, ab).normalized;
+            Vector3 toCentre = c.Centre[j0] - a;
+            toCentre.y = 0;
+            if (Vector3.Dot(perp, toCentre) < 0) perp = -perp;
+            front = Vector3.Dot(ap, perp);
+        }
+        return front;
+    }
+
+    static void Armco(ArmcoBuilder armco)
+    {
+        var bad = new List<string>();
+        if (armco.Rails.Count != b.ArmcoRuns.Count) bad.Add($"{b.ArmcoRuns.Count} armco runs but {armco.Rails.Count} with rails");
+        float length = 0f;
+        foreach (ArmcoRun run in b.ArmcoRuns)
+            for (int i = 1; i < run.Line.Length; i++) length += Flat(run.Line[i] - run.Line[i - 1]);
+        if (armco.Posts.Count * 4.5f < length) bad.Add($"{armco.Posts.Count} posts along {length:F0} m");
+        // Every bend of the line is kept: no point of it lies further than the tolerance off the rails.
+        for (int r = 0; r < Math.Min(armco.Rails.Count, b.ArmcoRuns.Count); r++)
+        {
+            Vector3[] rail = armco.Rails[r];
+            foreach (Vector3 p in b.ArmcoRuns[r].Line)
+            {
+                float off = float.MaxValue;
+                for (int i = 0; i + 1 < rail.Length; i++) off = Math.Min(off, ToSegment(p, rail[i], rail[i + 1]));
+                if (off > ArmcoBuilder.Tolerance + 0.005f) { bad.Add($"rails {off:F2} m off the armco line at {Where(p)}"); break; }
+            }
+        }
+        // Nothing of the steel on the runoff, sampled every few vertices; and the posts reach into the ground.
+        foreach (MeshKit kit in new[] { armco.Steel, armco.Fence, armco.FencePosts })
+        {
+            IReadOnlyList<Vector3> v = kit.Vertices;
+            for (int i = 0; i < v.Count; i += 7)
+            {
+                float over = OnRunoff(v[i]);
+                if (over > 0.02f) { bad.Add($"steel {over:F2} m onto the runoff at {Where(v[i])}"); break; }
+            }
+        }
+        foreach (Vector3 foot in armco.Posts)
+            if (foot.y - ArmcoBuilder.Footing > c.TerrainHeight(foot.x, foot.z) - 0.1f) { bad.Add($"post off the ground at {Where(foot)}"); break; }
+        Report("armco on posts", bad, $"{b.ArmcoRuns.Count} runs, {length / 1000f:F1} km, {armco.Posts.Count} posts, {armco.Steel.Triangles.Count / 3} triangles");
+    }
+
+    static void CatchFences(ArmcoBuilder armco, TrackFurniture f)
+    {
+        var bad = new List<string>();
+        // Every tyre wall has fencing behind it, except where a grandstand's own fence or the gantry stands.
+        foreach (ArmcoRun run in b.ArmcoRuns)
+            for (int i = 0; i < run.Line.Length; i++)
+            {
+                if (!run.Tyres[i]) continue;
+                int k = run.Samples[i];
+                if (InStand(run.Side, k * c.Step, ArmcoBuilder.StandGap + 1f)) continue;
+                if (Flat(run.Line[i] - f.GantryLeft) < ArmcoBuilder.GantryGap + 2f || Flat(run.Line[i] - f.GantryRight) < ArmcoBuilder.GantryGap + 2f) continue;
+                bool fenced = armco.Fences.Any(fc => fc.side == run.Side && fc.line.Any(q => Flat(q - run.Line[i]) < ArmcoBuilder.FenceBack + ArmcoBuilder.FencePostSpacing));
+                if (!fenced) { bad.Add($"tyre wall unfenced at {Where(run.Line[i])}"); break; }
+            }
+        int points = 0;
+        foreach (var (side, line) in armco.Fences)
+            foreach (Vector3 p in line)
+            {
+                points++;
+                int k = Nearest(p);
+                if (InStand(side, k * c.Step, 0f)) bad.Add($"fence in a grandstand's at {Where(p)}");
+                if (Flat(p - f.GantryLeft) < ArmcoBuilder.GantryGap - 0.5f || Flat(p - f.GantryRight) < ArmcoBuilder.GantryGap - 0.5f) bad.Add($"fence by the gantry at {Where(p)}");
+                if (Math.Abs(p.y - c.TerrainHeight(p.x, p.z)) > 0.05f) bad.Add($"fence off the ground at {Where(p)}");
+            }
+        Report("catch fences", bad, $"{armco.Fences.Count} fences, {points} posts");
+    }
+
+    static bool InStand(int side, float d, float margin)
+    {
+        foreach (StandFootprint s in footprints)
+            if (s.Side == side && Mathf.Repeat(d - (s.From - margin), c.Lap) <= Mathf.Repeat(s.To + margin - (s.From - margin), c.Lap)) return true;
+        return false;
+    }
+
+    static float Flat(Vector3 v) => (float)Math.Sqrt(v.x * v.x + v.z * v.z);
+
+    static float ToSegment(Vector3 p, Vector3 a, Vector3 bb)
+    {
+        Vector3 ab = bb - a;
+        float t = Mathf.Clamp01(Vector3.Dot(p - a, ab) / Math.Max(ab.sqrMagnitude, 1e-6f));
+        return (a + ab * t - p).magnitude;
+    }
+
+    static string Where(Vector3 p)
+    {
+        int k = Nearest(p);
+        float lat = Lateral(p, k);
+        return $"lap {k * c.Step:F0} m {Math.Abs(lat):F0} m {(lat > 0 ? "left" : "right")}";
     }
 
     static void Flags(TrackFurniture f)

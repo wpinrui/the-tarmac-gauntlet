@@ -279,25 +279,30 @@ namespace TarmacGauntlet.Raceday
             return blocked[i] || edge[i] < KeepClear + cell * 0.75f;
         }
 
+        /// <summary>Width of one mower pass, one stripe, m.</summary>
+        public const float StripeWidth = 5f;
+
         /// <summary>
-        /// The mowing at a map point: how plainly its stripes show, 0 where the grass is not mown; how far it is beyond the
-        /// nearest road edge, m, as the mower's stripes measure it; and which way that stretch of road runs, across the
-        /// ground. Mowing stripes run along the road, but not perfectly: they wander, widen and narrow, and show plainly
-        /// in some stretches and hardly at all in others.
+        /// The mowing at a map point: how far it is beyond the nearest road edge, m; how far out from the road the grass
+        /// is mown there, m, 0 where none is; how fresh the stripes are, 0.5 to 1; and which way that stretch of road
+        /// runs, across the ground. Stripes run nearly straight along the road, a pass at a time. Some stretches are mown a few
+        /// passes out and left long beyond, others all the way, and some were mown longer ago, so their stripes are faint.
         /// </summary>
-        public float Mowing(int i, out float fromRoad, out float alongX, out float alongZ)
+        public void Mowing(int i, out float fromRoad, out float reach, out float fresh, out float alongX, out float alongZ)
         {
             int k = roadAt[i];
             float x = minX + (i % MapX) * cell, z = minZ + (i / MapX) * cell;
-            float wider = 1f + 0.3f * (Noise(x / 180f, z / 180f, 161) - 0.5f);
-            float wander = 3.2f * (Noise(x / 30f, z / 30f, 162) - 0.5f) + 1.2f * (Noise(x / 11f, z / 11f, 163) - 0.5f);
-            fromRoad = Mathf.Max(road[i], 0f) * wider + wander;
-            alongX = alongZ = 0f;
-            if (k < 0 || Map[i] != LandUse.Mown) return 0f;
+            // Nearly straight: the passes drift a little either way over tens of metres, as a mower steered by eye does.
+            fromRoad = Mathf.Max(road[i], 0f) * (1f + 0.05f * (Noise(x / 200f, z / 200f, 166) - 0.5f))
+                + 1.6f * (Noise(x / 60f, z / 60f, 162) - 0.5f);
+            reach = fresh = alongX = alongZ = 0f;
+            if (k < 0 || Map[i] != LandUse.Mown) return;
             // Left is level and square to the road, so the road runs along (left.z, -left.x).
             alongX = c.Left[k].z;
             alongZ = -c.Left[k].x;
-            return Mathf.Clamp(1.4f * Noise(x / 90f, z / 90f, 164) - 0.1f, 0.15f, 1f);
+            float far = Noise(x / 220f, z / 220f, 165);
+            reach = far > 0.6f ? FieldReach * 2f : StripeWidth * (2 + Mathf.FloorToInt(far * 12f));
+            fresh = Mathf.Clamp(0.5f + 1.5f * (Noise(x / 130f, z / 130f, 164) - 0.35f), 0.5f, 1f);
         }
 
         /// <summary>
