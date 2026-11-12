@@ -44,7 +44,7 @@ namespace TarmacGauntlet.Raceday
         /// How steep the tarmac's normals stand its stones. Gentle: steeper, a low sun leaves each stone's far side
         /// black, and the road just ahead of the car turns to dark speckle.
         /// </summary>
-        public const float TarmacBump = 0.4f;
+        public const float TarmacBump = 0.65f;
 
         /// <summary>Tarmac's shape, shared by every tarmac: its height, and what lies at each pixel.</summary>
         public sealed class Tarmac

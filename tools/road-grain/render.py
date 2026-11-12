@@ -29,7 +29,7 @@ import sky as skyclock  # noqa: E402
 from post import lin, frame, save  # noqa: E402
 
 DEFAULTS = dict(quality="ultra", bump=1, ssao=1, shadow=1, contact=1, bump_scale=1.0, normal_strength=1.2, heading=215.0,
-                hour=15.1, tilt=0.0, width=1920, height=1080, along=0.0, probe="shared", crop=0.0, show="", speckle=0.5, binder=0.78)
+                hour=15.1, tilt=0.0, width=1920, height=1080, along=0.0, probe="shared", crop=0.0, show="", speckle=0.5, binder=0.78, full=0, eye=1.2, fov=70.0, offset=-1.5)
 # Quality levels: QualityLevels.Shadows (spread, filter taps, search taps, widest texels, contact reach, steps, far,
 # strength), the cascade's first split (distance x share) and URP's SSAO settings from the renderer.
 QUALITY = {
@@ -138,12 +138,12 @@ def main():
     road_r = np.cross(road_n, fwd)
     road_r /= np.linalg.norm(road_r)
     road_r = -road_r if road_r @ right < 0 else road_r
-    cam = np.array([0.0, EYE, 0.0]) + fwd * o["along"]
+    cam = np.array([0.0, o["eye"], 0.0]) + fwd * o["along"]
 
     # The lower half of the screen: pixel centres and their rays.
     top = H // 2 + 2
     ys, xs = np.mgrid[top:H, 0:W].astype(np.float64) + 0.5
-    tan_v = math.tan(math.radians(FOV) / 2)
+    tan_v = math.tan(math.radians(o["fov"]) / 2)
     aspect = W / H
 
     def ray(px, py):
@@ -252,12 +252,16 @@ def main():
     fog = np.exp(-s["density"] * dist)[..., None]
     colour = colour * fog + lin(s["fog"]) * 0.9 * (1 - fog)
     colour[~valid] = lin(s["horizon"])
+    if o["full"]:
+        colour = full_frame(o, s, colour, P, valid, cam, fwd, road_r, road_n, sun, sun_lin, amb, ray, W, H, top, dist)
 
     g = skyclock.grade(s)
     img = frame(colour, **g)
     if o["show"]:
         m = {"contact": contact, "shadow": shadow, "ao": 1 - ao}[o["show"]]
         img = np.repeat(m[..., None], 3, -1)
+    if o["full"]:
+        img = bonnet(img, W, H)
     if o["crop"] > 0:
         img = img[: int(img.shape[0] * o["crop"])]
     save(out, img)
@@ -265,6 +269,49 @@ def main():
                  contact_mean=float(contact[valid].mean()), shadow_min=float(shadow[valid].min()),
                  contact_min=float(contact[valid].min()), ao_max=float(ao[valid].max()))
     print(out, " ".join(f"{k}={v:.4f}" for k, v in stats.items()))
+
+
+def full_frame(o, s, road, P, valid, cam, fwd, road_r, road_n, sun, sun_lin, amb, ray, W, H, top, dist):
+    """The whole onboard frame: the sky with fair-weather cloud above the horizon, and either side of the 12 m road its
+    white edge lines and the grass."""
+    across = (P - cam) @ road_r - o["offset"]
+    grass_alb = lin(np.array([0.24, 0.36, 0.17]))
+    flat = np.clip(sun @ road_n, 0, 1)
+    w = 1 + 0.08 * np.sin(P[..., 0] * 3.1) * np.cos(P[..., 2] * 2.3)
+    grass = grass_alb * (sun_lin * flat + amb) * w[..., None]
+    line = lin(np.array([0.92, 0.92, 0.9])) * (sun_lin * flat + amb) * 0.8
+    edge = np.abs(across) > 6.0
+    out = np.where(edge[..., None], grass, road)
+    stripe = (np.abs(across) > 5.85) & (np.abs(across) <= 6.0)
+    out = np.where(stripe[..., None], line, out)
+    fog = np.exp(-s["density"] * dist)[..., None]
+    out = np.where(valid[..., None], np.where((edge | stripe)[..., None], out * fog + lin(s["fog"]) * 0.9 * (1 - fog), out), out)
+    ys, xs = np.mgrid[0:top, 0:W].astype(np.float64) + 0.5
+    d, _, _ = ray(xs, ys)
+    skyc = lin(skyclock.sky(s, d)) * 1.6
+    # Partly cloudy: soft fair-weather cumulus, lit from the sun's side.
+    patch, _ = textures.macro(21)
+    up = np.maximum(d[..., 1], 0.02)
+    cu, cv = d[..., 0] / up * 0.08 + 0.3, d[..., 2] / up * 0.08
+    c = bilinear(patch[..., None], cu * 256, cv * 256)[..., 0]
+    cover = np.clip((c - 0.52) / 0.12, 0, 1) * np.clip(d[..., 1] * 12, 0, 1)
+    cloud = lin(np.array([0.92, 0.93, 0.95])) * (1.5 + 0.4 * (d @ sun))[..., None]
+    skyc = skyc * (1 - cover[..., None]) + cloud * cover[..., None]
+    return np.concatenate([skyc, out], 0)
+
+
+def bonnet(img, W, H):
+    """The car's bonnet across the bottom of the frame, as the bonnet camera sees it."""
+    ys, xs = np.mgrid[0:img.shape[0], 0:W].astype(np.float64)
+    off = img.shape[0] - H
+    u = (xs - W / 2) / (W * 0.62)
+    crest = H * 0.885 - H * 0.04 * np.clip(1 - u * u, 0, 1) + off
+    m = ys > crest
+    shade = np.clip((ys - crest) / (H * 0.14), 0, 1)
+    paint = np.array([0.55, 0.36, 0.30]) * (0.75 + 0.25 * shade)[..., None]
+    img = img.copy()
+    img[m] = paint[m]
+    return img
 
 
 def environment(s, refl, trackside):
