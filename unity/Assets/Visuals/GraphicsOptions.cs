@@ -47,6 +47,15 @@ namespace TarmacGauntlet.Visuals
         public static readonly GraphicsOption AmbientOcclusion = Toggle("settings.ssao", true);
 
         /// <summary>
+        /// The sun's shadows worked out on the screen: soft edges that widen with the distance from what casts them, no seam
+        /// between cascades, and contact shadows for the fine detail the shadow map misses. Changes live.
+        /// </summary>
+        public static readonly GraphicsOption SoftShadows = Toggle("settings.softshadows", false);
+
+        /// <summary>Shadows from the real lights at night, the floodlights and headlamps near the camera. Read at the start of a race.</summary>
+        public static readonly GraphicsOption LightShadows = Toggle("settings.lightshadows", false);
+
+        /// <summary>
         /// Depth of field on the broadcast cameras (and any replay camera that asks for it): the background past the car on screen
         /// blurs, more through a long lens. Never while driving. Changes live.
         /// </summary>
@@ -124,16 +133,16 @@ namespace TarmacGauntlet.Visuals
         /// <summary>Oil, tyre marks and grime on the Team HQ's floor and walls.</summary>
         public static readonly GraphicsOption Wear = Toggle("settings.hqwear", true);
 
-        private static readonly int[] OffAtLow = { 0, 1, 1 };
-        private static readonly int[] AlwaysOn = { 1, 1, 1 };
-        /// <summary>Low, Medium, High, and Ultra once there is one.</summary>
+        private static readonly int[] OffAtLow = { 0, 1, 1, 1 };
         private static readonly int[] OnFromHigh = { 0, 0, 1, 1 };
+        private static readonly int[] AlwaysOn = { 1, 1, 1, 1 };
 
         /// <summary>The settings menu's rows, in menu order. Every option is in one.</summary>
         public static readonly IReadOnlyList<GraphicsRow> Rows = new[]
         {
-            new GraphicsRow("Real lights", new[] { 2, 6, 12 }, RealLights),
+            new GraphicsRow("Real lights", new[] { 2, 6, 12, 20 }, RealLights),
             new GraphicsRow("Post effects", OffAtLow, ColourGrading, Bloom, AmbientOcclusion),
+            new GraphicsRow("Shadow detail", OnFromHigh, SoftShadows, LightShadows),
             new GraphicsRow("Depth of field", OffAtLow, DepthOfField),
             new GraphicsRow("Car detail", OffAtLow, Clearcoat, PaintFlake, CarGlass, LampLenses, CarTrims, CarReflections, BrakeGlow),
             new GraphicsRow("Track detail", AlwaysOn, TarmacDetail, RubberedLine, KerbWear, SkidMarks, Mowing, ArmcoDetail),
@@ -146,7 +155,7 @@ namespace TarmacGauntlet.Visuals
             new GraphicsRow("HQ lighting", AlwaysOn, BakedLighting, BakedReflections, Wear),
         };
 
-        /// <summary>Sets every row to its value at a quality level, 0 Low to 2 High.</summary>
+        /// <summary>Sets every row to its value at a quality level, 0 Low to 3 Ultra.</summary>
         public static void ApplyQuality(int level)
         {
             foreach (GraphicsRow row in Rows) row.ApplyQuality(level);
