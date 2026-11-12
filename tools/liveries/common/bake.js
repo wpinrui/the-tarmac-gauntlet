@@ -1,6 +1,8 @@
 // Bakes a livery's five SVG panels into one PNG atlas and writes livery.json: where each view
 // sits in the atlas (for the projection) and where each race number goes, in atlas pixels.
-// Front and rear lie turned a quarter in the atlas so everything fits one square.
+// Front and rear lie turned a quarter in the atlas so everything fits one square. A livery with a
+// finish layer (<view>.finish.svg, from livery.py) also bakes finish.png in the same layout: red the
+// paint's smoothness, green its clear coat, blue its metal.
 //
 // Run: node bake.js <views dir> <livery dir> <out dir> [--size 2048] [--sample 8] [--guides] [--model <asset path>]
 //   --sample draws that number in every number box, --guides lays the views' part edges
@@ -85,9 +87,14 @@ function paint(size, pieces, numbers, sample, font) {
     guide: GUIDES ? uri(path.join(viewsDir, `${n}.png`), 'image/png') : null }));
   const font = uri(path.join(__dirname, '../../../unity/Assets/Raceday/Resources/Fonts/TitilliumWeb-Bold.ttf'), 'font/ttf');
   const png = await page.evaluate(([fn, ...a]) => eval('(' + fn + ')')(...a), [paint.toString(), SIZE, pieces, numbers, SAMPLE, font]);
-  await browser.close();
   fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(path.join(outDir, 'atlas.png'), Buffer.from(png.split(',')[1], 'base64'));
-  fs.writeFileSync(path.join(outDir, 'livery.json'), JSON.stringify({ model: MODEL, size: SIZE, ppm, base: marks.base, panels, numbers }, null, 1));
+  if (marks.finish) {
+    const fin = ORDER.map(n => ({ ...place[n], base: marks.finish, svg: uri(path.join(liveryDir, `${n}.finish.svg`), 'image/svg+xml'), guide: null }));
+    const finPng = await page.evaluate(([fn, ...a]) => eval('(' + fn + ')')(...a), [paint.toString(), SIZE, fin, [], null, font]);
+    fs.writeFileSync(path.join(outDir, 'finish.png'), Buffer.from(finPng.split(',')[1], 'base64'));
+  }
+  await browser.close();
+  fs.writeFileSync(path.join(outDir, 'livery.json'), JSON.stringify({ model: MODEL, size: SIZE, ppm, base: marks.base, ...(marks.finish ? { finish: marks.finish } : {}), panels, numbers }, null, 1));
   console.log('baked', outDir, `${SIZE}px at ${ppm} px/m`);
 })();

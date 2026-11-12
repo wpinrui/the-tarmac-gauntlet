@@ -99,9 +99,10 @@ half FilteredSmoothness(half smoothness, half3 normalWS)
     return 1 - sqrt(sqrt(saturate(roughness * roughness + spread)));
 }
 
-// The paint lit and fogged. flakePos is a point on the car that moves with it, in metres: the flakes sit there.
+// The paint lit and fogged. flakePos is a point on the car that moves with it, in metres: the flakes sit there. coat is
+// how much clear coat the paint has (0 for bare metal, rust or tape), flake how much of its flakes show; both 0 to 1.
 half4 ShadeCarPaint(float3 positionWS, half3 normalWS, float4 positionCS, half fogFactor, half3 albedo, half metallic,
-    half smoothness, float3 flakePos)
+    half smoothness, float3 flakePos, half coat, half flake)
 {
     InputData d = TarmacInputData(positionWS, normalWS, positionCS, fogFactor);
     SurfaceData s = (SurfaceData)0;
@@ -113,16 +114,16 @@ half4 ShadeCarPaint(float3 positionWS, half3 normalWS, float4 positionCS, half f
     s.alpha = 1;
 
 #if defined(_TARMAC_FLAKE)
-    s.metallic = max(s.metallic, CAR_FLAKE_METALLIC);
+    s.metallic = max(s.metallic, CAR_FLAKE_METALLIC * flake);
     // How many pixels a flake cell spans.
     float footprint = max(length(ddx(flakePos)), length(ddy(flakePos)));
     float pixels = CAR_FLAKE_CELL / max(footprint, 1e-6);
-    half flakes = smoothstep(CAR_FLAKE_SHOW_FROM, CAR_FLAKE_FULL_AT, pixels);
+    half flakes = smoothstep(CAR_FLAKE_SHOW_FROM, CAR_FLAKE_FULL_AT, pixels) * flake;
 #endif
 
 #if defined(_CLEARCOAT)
-    s.smoothness = min(s.smoothness, CAR_COAT_BASE_SMOOTHNESS);
-    s.clearCoatMask = 1;
+    s.smoothness = min(s.smoothness, lerp(s.smoothness, CAR_COAT_BASE_SMOOTHNESS, coat));
+    s.clearCoatMask = coat;
     s.clearCoatSmoothness = FilteredSmoothness(CAR_COAT_SMOOTHNESS, d.normalWS);
 #endif
     s.smoothness = FilteredSmoothness(s.smoothness, d.normalWS);
@@ -135,7 +136,7 @@ half4 ShadeCarPaint(float3 positionWS, half3 normalWS, float4 positionCS, half f
         half coatRoughness = PerceptualSmoothnessToPerceptualRoughness(s.clearCoatSmoothness);
         half3 r = reflect(-d.viewDirectionWS, d.normalWS);
         half3 env = GlossyEnvironmentReflection(r, d.positionWS, coatRoughness, 1, d.normalizedScreenSpaceUV);
-        c.rgb += CarCoatExtra(env, NoV, coatRoughness);
+        c.rgb += CarCoatExtra(env, NoV, coatRoughness) * coat;
     }
 #endif
 
@@ -151,6 +152,13 @@ half4 ShadeCarPaint(float3 positionWS, half3 normalWS, float4 positionCS, half f
 
     c.rgb = MixFog(c.rgb, d.fogCoord);
     return c;
+}
+
+// The paint with a full clear coat and all its flakes.
+half4 ShadeCarPaint(float3 positionWS, half3 normalWS, float4 positionCS, half fogFactor, half3 albedo, half metallic,
+    half smoothness, float3 flakePos)
+{
+    return ShadeCarPaint(positionWS, normalWS, positionCS, fogFactor, albedo, metallic, smoothness, flakePos, 1, 1);
 }
 
 #endif

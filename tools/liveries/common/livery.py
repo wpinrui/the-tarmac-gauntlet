@@ -23,13 +23,22 @@ def _font_css():
     return "".join(rules)
 
 
+def finish(smooth, coat, metal=1.0):
+    """A finish-layer colour: each a share (0 to 1) of the shader's smoothness, clear coat and metal."""
+    return "#%02x%02x%02x" % tuple(round(max(0.0, min(1.0, x)) * 255) for x in (smooth, coat, metal))
+
+
 class Livery:
-    def __init__(self, views_json, base):
+    def __init__(self, views_json, base, finish=None):
+        """finish: the paint's finish where nothing else is drawn on the finish layer, as
+        finish(smooth, coat, metal); None keeps the shader's own finish everywhere."""
         meta = json.loads(Path(views_json).read_text())
         self.ppm = meta["ppm"]
         self.views = meta["views"]
         self.base = base
+        self.finish_base = finish
         self.art = {v: [] for v in self.views}
+        self.fin = {v: [] for v in self.views}
         self.numbers = []
 
     # --- mapping -------------------------------------------------------------------------
@@ -88,6 +97,17 @@ class Livery:
             box["edge"] = edge
         self.numbers.append(box)
 
+    def image(self, view, png_uri, finish=False):
+        """A raster (data URI) laid over the whole panel, on the art or the finish layer."""
+        f = self.views[view]
+        layer = self.fin if finish else self.art
+        layer[view].append(f'<image x="{f["u0"]:.4f}" y="{f["v0"]:.4f}" width="{f["u1"] - f["u0"]:.4f}" '
+                           f'height="{f["v1"] - f["v0"]:.4f}" preserveAspectRatio="none" href="{png_uri}"/>')
+
+    def raw(self, view, svg, finish=False):
+        """SVG drawn in the panel's own units (metres on the view), on the art or the finish layer."""
+        (self.fin if finish else self.art)[view].append(svg)
+
     # --- helpers for art that repeats across views ----------------------------------------
     def side_poly(self, zy, fill):
         for view in ("left", "right"):
@@ -126,10 +146,24 @@ class Livery:
         out.append("</svg>")
         return "".join(out)
 
+    def finish_svg(self, view):
+        """The panel's finish layer as SVG: red the smoothness, green the clear coat, blue the
+        metal, each a share of the shader's own."""
+        f = self.views[view]
+        u0, v0, w, h = f["u0"], f["v0"], f["u1"] - f["u0"], f["v1"] - f["v0"]
+        return "".join([f'<svg xmlns="http://www.w3.org/2000/svg" width="{f["px"][0]}" height="{f["px"][1]}" '
+                        f'viewBox="{u0:.4f} {v0:.4f} {w:.4f} {h:.4f}">',
+                        f'<rect x="{u0}" y="{v0}" width="{w}" height="{h}" fill="{self.finish_base}"/>', *self.fin[view], "</svg>"])
+
     def write(self, out_dir, sample=None):
         out = Path(out_dir)
         out.mkdir(parents=True, exist_ok=True)
         for view in self.views:
             (out / f"{view}.svg").write_text(self.svg(view, sample))
-        (out / "numbers.json").write_text(json.dumps({"base": self.base, "numbers": self.numbers}, indent=1))
+            if self.finish_base:
+                (out / f"{view}.finish.svg").write_text(self.finish_svg(view))
+        marks = {"base": self.base, "numbers": self.numbers}
+        if self.finish_base:
+            marks["finish"] = self.finish_base
+        (out / "numbers.json").write_text(json.dumps(marks, indent=1))
         print("wrote", out)

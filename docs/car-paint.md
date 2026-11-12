@@ -49,7 +49,8 @@ A team with a livery wears it instead of the class paint. `CarBuilder.Spawn(mode
 - Each livery lives in `unity/Assets/Art/Liveries/<Team>/` as `atlas.png` and `livery.json`, baked from the team's folder in `tools/liveries/`.
 - The `TarmacGauntlet/Livery` shader (`Raceday/Resources/Livery/`) replaces the `body` material. It projects the five views (left, right, top, front, rear) onto the paint by which way each face points, and draws the team's race number into the livery's number boxes from `Digits.png`. Side faces turned in towards the middle of the car (vent walls, inner door skins) keep the base colour, so side art never shows on them back to front.
 - The race number is never painted into the art. It changes each season (`BaseTeam.RaceNumber`).
-- A livery can carry its own digits: `digits.js --font <ttf> --edge <outline> --step <spacing>` bakes `Digits.png` and `Digits.json` into the livery's folder. The face takes each number box's `ink` and the outline its `edge`; with `--step` under 1, digits sit closer and overlap. Without them the livery uses the shared digits.
+- A livery can carry a finish map, `finish.png`, in the atlas's layout: red is the share of the paint's smoothness, green its clear coat, blue its metal and flakes. Rust, bare metal and tape are matte this way (Duct Tape Dynamics). `livery.py` draws it as a second layer (`Livery(..., finish=finish(smooth, coat, metal))`, then `image` or `raw` with `finish=True`), and `bake.js` bakes it. Without one the paint is the plain livery paint.
+- A livery can carry its own digits: `digits.js --font <ttf> --edge <outline> --step <spacing>` bakes `Digits.png` and `Digits.json` into the livery's folder. The face takes each number box's `ink` and the outline its `edge`; with `--step` under 1, digits sit closer and overlap. `--brush` streaks the face with dry bristle gaps, for a number painted by hand. Without them the livery uses the shared digits.
 
 To make a livery:
 
