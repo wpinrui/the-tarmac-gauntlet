@@ -48,8 +48,10 @@ namespace TarmacGauntlet.Simulation
         public float Wear { get; init; }
         public int Map { get; init; }
         public bool PitRequested { get; init; }
-        public float? PitLitres { get; init; }
-        public bool PitTyres { get; init; } = true;
+        /// <summary>The next stop's plan: laps of fuel, new tyres or not, each null for the crew's call, and the repairs.</summary>
+        public int? PitLaps { get; init; }
+        public bool? PitTyres { get; init; }
+        public RepairMode PitRepairs { get; init; }
         /// <summary>Where a retired car stands and the way it faces, x y z.</summary>
         public float[]? Position { get; init; }
         public float[]? Forward { get; init; }

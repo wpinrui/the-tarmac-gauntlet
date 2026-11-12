@@ -64,13 +64,7 @@ namespace TarmacGauntlet.Raceday
             disc = RaceTower.Shape(1f, 1f, (x, y) => (x - 0.5f) * (x - 0.5f) + (y - 0.5f) * (y - 0.5f) < 0.25f);
             tyre = RaceTower.TyreIcon();
             fuel = RaceTower.FuelIcon();
-            helmet = RaceTower.Shape(1f, 1f, (x, y) =>
-            {
-                float d = Mathf.Sqrt((x - 0.5f) * (x - 0.5f) + (y - 0.42f) * (y - 0.42f));
-                bool shell = d < 0.44f && y > 0.12f;
-                bool visor = x > 0.46f && y > 0.36f && y < 0.56f;
-                return shell && !visor;
-            });
+            helmet = RaceTower.HelmetIcon();
             map = new TrackMap(Circuit, 300, 400, 20f, 5f);
         }
 

@@ -200,33 +200,15 @@ namespace TarmacGauntlet.Simulation
 
         /// <summary>
         /// The car stops in its box. The crew changes the tyres if the car wants them and a set is
-        /// left, puts in the next driver, and fixes every active issue the spares allow.
+        /// left, puts in the next driver, and fixes the active issues in <paramref name="fix"/> the spares
+        /// allow, or every one with no list.
         /// </summary>
-        public PitWork Pit(bool wantTyres)
+        public PitWork Pit(bool wantTyres, IReadOnlyList<string>? fix = null)
         {
             bool tyres = wantTyres && TyreSets > 0;
             int next = NextDriverIndex;
             string? nextId = next != DriverIndex ? Car.Lineup[next].Id : null;
-            PitStopResult work = PitStop.ExecutePitStop(
-                new PitStopContext
-                {
-                    PitStopTime = 0,
-                    FuelCapacity = 0,
-                    CurrentFuel = 0,
-                    CurrentTyreWear = 0,
-                    TyreSetsAvailable = 0,
-                    SparePartsAvailable = SpareParts,
-                    CurrentDriverId = Driver.Id,
-                    ActiveIssues = active,
-                    IssueTemplates = IssueTemplates.AllIssueTemplates,
-                    CrewSize = Car.CrewSize,
-                    EngineerSkill = Car.EngineerSkill,
-                },
-                new PitStopConfig
-                {
-                    NextDriverId = nextId,
-                    IssueIdsToFix = active.Select(i => i.TemplateId).ToArray(),
-                });
+            PitStopResult work = Work(nextId, fix);
 
             var fixedIds = active.Select(i => i.TemplateId).Except(work.ActiveIssues.Select(i => i.TemplateId)).ToArray();
             for (int i = 0; i < issues.Count; i++)
@@ -260,6 +242,31 @@ namespace TarmacGauntlet.Simulation
                 CrewMultiplier = PitStop.CrewMultiplier(Car.CrewSize, Car.EngineerSkill),
             };
         }
+
+        /// <summary>Seconds of driver change and repairs a stop would add now, scaled by the crew, as <see cref="Pit"/> would work them.</summary>
+        public double WorkSeconds(IReadOnlyList<string>? fix = null) =>
+            Work(NextDriverIndex != DriverIndex ? Car.Lineup[NextDriverIndex].Id : null, fix).Duration;
+
+        private PitStopResult Work(string? nextId, IReadOnlyList<string>? fix) => PitStop.ExecutePitStop(
+            new PitStopContext
+            {
+                PitStopTime = 0,
+                FuelCapacity = 0,
+                CurrentFuel = 0,
+                CurrentTyreWear = 0,
+                TyreSetsAvailable = 0,
+                SparePartsAvailable = SpareParts,
+                CurrentDriverId = Driver.Id,
+                ActiveIssues = active,
+                IssueTemplates = IssueTemplates.AllIssueTemplates,
+                CrewSize = Car.CrewSize,
+                EngineerSkill = Car.EngineerSkill,
+            },
+            new PitStopConfig
+            {
+                NextDriverId = nextId,
+                IssueIdsToFix = fix ?? active.Select(i => i.TemplateId).ToArray(),
+            });
 
         /// <summary>The stop just made is over: how long the car stood and how much fuel went in.</summary>
         public void PitDone(double seconds, double fuelAdded)
