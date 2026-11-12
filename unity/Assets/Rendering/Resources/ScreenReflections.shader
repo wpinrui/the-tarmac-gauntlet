@@ -57,6 +57,10 @@ Shader "Hidden/TarmacGauntlet/ScreenReflections"
 
         float3 WorldAt(float2 uv, float raw)
         {
+            // Only OpenGL keeps depth unreversed, and its clip space runs -1 to 1.
+            #if !UNITY_REVERSED_Z
+                raw = raw * 2 - 1;
+            #endif
             float4 p = mul(_SsrInvViewProj, float4(uv * 2 - 1, raw, 1));
             return p.xyz / p.w;
         }
@@ -141,9 +145,9 @@ Shader "Hidden/TarmacGauntlet/ScreenReflections"
                     float t = tStart + dt * (j + jitter);
                     float z = RayDepth(k0, k1, t);
                     float scene = LinearEyeDepth(RawDepth(RayUv(s0, s1, t)), _ZBufferParams);
-                    float near = min(zPrev, z), far = max(zPrev, z);
+                    float zFront = min(zPrev, z), zBack = max(zPrev, z);
                     // The ray has passed behind what the screen shows there, by no more than that thing is thick.
-                    if (far >= scene && near <= scene + _SsrThickness * (1 + scene * 0.02))
+                    if (zBack >= scene && zFront <= scene + _SsrThickness * (1 + scene * 0.02))
                     {
                         tHit = t;
                         break;
