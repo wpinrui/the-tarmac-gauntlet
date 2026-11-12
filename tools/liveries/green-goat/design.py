@@ -136,14 +136,26 @@ def milk_sides(lv, door_cap=0.05, span=(2.45, -2.35), ramp=0.3):
     zf, zr = span
 
     def line(z):
-        t = min(1.0, (zf - z) / ramp, (z - zr) / ramp) if span != (2.45, -2.35) else 1.0
-        t = max(0.0, t)
-        return shoulder(z) + 0.06 - 0.12 * (t * t * (3 - 2 * t))
+        if span == (2.45, -2.35):
+            return shoulder(z) - 0.06
+        t = max(0.0, min(1.0, (zf - z) / ramp, (z - zr) / ramp))
+        wob = 0.035 * math.sin(z * 9.0 + 1.3) + 0.02 * math.sin(z * 23.0)
+        return shoulder(z) + 0.06 - (0.12 + wob * (1 - t) * 4 * t) * (t * t * (3 - 2 * t))
     walls = [(a + 0.035, a - 0.035) for a in DOOR]
     for poly in drips(line, zf, zr, rng, 0.3, skip=walls,
                       short=[(0.25, -0.4, door_cap), (0.8, 0.25, door_cap if door_cap < 0.05 else 0.3),
                              (1.75, 0.98, 0.06), (-0.95, -1.75, 0.05)]):
         lv.side_poly(poly, M)
+
+
+def spill_edge(x, seed):
+    """How far a spill's edge sits in from its line across the car, at x: uneven, with two or
+    three tongues of milk running out past it."""
+    w = (0.07 * math.sin(2.1 * x + seed) + 0.04 * math.sin(5.3 * x + 2 * seed) + 0.02 * math.sin(11.0 * x + seed))
+    for c, r, d in ((math.sin(seed) * 0.7, 0.16, 0.22), (math.sin(seed * 3) * 0.8, 0.11, 0.15), (math.cos(seed * 2) * 0.5, 0.09, 0.12)):
+        if abs(x - c) < r:
+            w -= d * math.sqrt(1 - ((x - c) / r) ** 2)
+    return w + 0.05
 
 
 def milk_top(lv, splat_col=G, span=None, bonnet=1.55):
@@ -155,10 +167,14 @@ def milk_top(lv, splat_col=G, span=None, bonnet=1.55):
     else:
         rng = random.Random(5)
         zf, zr = span
-        for edge, sign in ((zf, -1), (zr, 1)):
+        # The milk between the two edges, then each edge as a spill: an uneven front with
+        # tongues running out toward the end of the car, and drips off it.
+        lv.poly("top", [(-1.2, 0, zf - 0.3), (1.2, 0, zf - 0.3), (1.2, 0, zr + 0.3), (-1.2, 0, zr + 0.3)], M)
+        for edge, sign, seed in ((zf, -1, 1.0), (zr, 1, 4.0)):
+            front = lambda x, s=seed: spill_edge(x, s)
             # drips() hangs down its y; here y runs from the edge out toward that end of the car.
-            for poly in drips(lambda x: 0.0, 1.15, -1.15, rng, 0.22):
-                lv.poly("top", [(x, 0, edge + sign * y) for x, y in poly], M)
+            for poly in drips(front, 1.15, -1.15, rng, 0.2):
+                lv.poly("top", [(x, 0, edge + sign * min(y, 0.3)) for x, y in poly], M)
         z_lo, z_hi = zr + 0.15, zf - 0.15
     splat = random.Random(3)
     for _ in range(18):
@@ -281,7 +297,7 @@ def overload(views):
 
 # Milk Riot: the milk takes the middle two thirds of the car's length, Overload the nose and tail.
 RIOT_SPAN = (2.38 - 4.61 / 6, -2.23 + 4.61 / 6)
-RIOT_BONNET = (1.3, 0.56)
+RIOT_BONNET = (1.55, 0.72)
 
 
 def milk_riot(views):
@@ -297,6 +313,16 @@ def milk_riot(views):
     logos_top(lv, "team", "overstim", 0.09, bolts=True, bonnet=RIOT_BONNET)
     lv.mark("front", MARKS / "goat-sticker.svg", (0, 0.47, 0), 0.22)
     lv.mark("rear", MARKS / "protein.svg", (0, 0.575, 0), 0.06)
+    # Word stickers plastered over the bare milk and the empty corners.
+    side_mark_at(lv, "milk-sticker", -1.2, 0.76, 0.1, -4)
+    side_mark_at(lv, "limit-sticker", -0.75, 0.25, 0.085, 3)
+    side_mark_at(lv, "overstim", -1.9, 0.3, 0.07, -6)
+    side_mark_at(lv, "more", 1.45, 0.72, 0.065, 5)
+    for x, rot in ((0.72, 180), (-0.72, 0)):
+        lv.mark("top", MARKS / "milk-sticker.svg", (x * 0.95, 0, 1.0), 0.11, rotate=rot + (4 if x > 0 else -4))
+        lv.mark("top", MARKS / "limit-sticker.svg", (x * 0.92, 0, -0.95), 0.09, rotate=rot)
+    lv.mark("top", MARKS / "more.svg", (0, 0, -0.36), 0.06, rotate=-90)
+    lv.mark("top", MARKS / "limit-sticker.svg", (0, 0, -1.63), 0.1, rotate=90)
     return lv
 
 
