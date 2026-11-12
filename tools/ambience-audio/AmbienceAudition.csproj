@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Renders the synthesised wind and wet-road hiss to WAV files outside Unity. Run through run.sh. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)../../out/ambience-audio/obj/</BaseIntermediateOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Audition.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/WindSynth.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/WetRoadSynth.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/AmbienceMix.cs" />
+  </ItemGroup>
+</Project>

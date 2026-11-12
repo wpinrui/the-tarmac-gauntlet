@@ -38,6 +38,12 @@ namespace TarmacGauntlet.Raceday
 
         /// <summary>Starts in the chase view instead of the broadcast, as the scene does run on its own for AI testing.</summary>
         public void StartInChase() => broadcast = false;
+        /// <summary>True while the broadcast has the camera.</summary>
+        public bool Broadcasting => broadcast;
+        /// <summary>True in the bonnet and bumper views, riding on the car.</summary>
+        public bool Onboard => !broadcast && (view == View.Bonnet || view == View.Bumper);
+        /// <summary>True in the chase view.</summary>
+        public bool Chasing => !broadcast && view == View.Chase;
         private Camera cam;
         private Vector3 chasePosition;
         private bool chaseSettled;

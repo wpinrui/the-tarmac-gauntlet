@@ -310,6 +310,17 @@ namespace TarmacGauntlet.Raceday
             director.Tower = tower;
             if (resumed) director.Resume(resume);
             RaceWeekend.Snapshot = Save;
+            // The crowd, PA, rain, thunder, countryside and wind round the race.
+            RaceAmbience ambience = new GameObject("Ambience").AddComponent<RaceAmbience>();
+            ambience.Circuit = circuit;
+            ambience.Stands = stands;
+            ambience.Cars = racing;
+            ambience.Tower = tower;
+            ambience.Director = director;
+            ambience.Cameras = views;
+            ambience.Broadcast = tv;
+            ambience.Sky = sky;
+            ambience.Thundery = weather.Kind == WeatherKind.Thundery;
             if (player >= 0)
             {
                 timing = new GameObject("Live timing").AddComponent<LiveTiming>();
