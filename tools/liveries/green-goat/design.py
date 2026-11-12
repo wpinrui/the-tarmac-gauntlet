@@ -259,8 +259,8 @@ def stickers(lv):
 
 def logos_top(lv, team="team", tail="goats-milk", tail_h=0.07, bolts=False, bonnet=(1.55, 0.72)):
     lv.mark("top", MARKS / "roundel.svg", (0, 0, bonnet[0]), bonnet[1], rotate=-90)
-    lv.mark("top", MARKS / f"{team}.svg", (0, 0, 0.12), 0.42, rotate=-90)
-    lv.mark("top", MARKS / f"{tail}.svg", (0, 0, -1.97), tail_h, rotate=90)
+    lv.mark("top", MARKS / f"{team}.svg", (0, 0, 0.1), 0.5, rotate=-90)
+    lv.mark("top", MARKS / f"{tail}.svg", (0, 0, -1.93), tail_h, rotate=90)
     if bolts:
         lv.mark("top", MARKS / "bolt.svg", (0.62, 0, 2.05), 0.22, rotate=-70)
         lv.mark("top", MARKS / "bolt.svg", (-0.62, 0, 2.05), 0.22, rotate=-110)
@@ -315,7 +315,7 @@ def milk_riot(views):
     milk_ends(lv)
     cartoon_number(lv)
     stickers(lv)
-    logos_top(lv, "team", "overstim", 0.09, bolts=True, bonnet=RIOT_BONNET)
+    logos_top(lv, "team", "overstim", 0.11, bonnet=RIOT_BONNET)
     lv.mark("front", MARKS / "goat-sticker.svg", (0, 0.47, 0), 0.22)
     lv.mark("rear", MARKS / "protein.svg", (0.1, 0.56, 0), 0.06, rotate=-8)
     # Stickers plastered over the bare milk and the empty corners, at jaunty angles.
@@ -326,11 +326,11 @@ def milk_riot(views):
     side_mark_at(lv, "flex", 1.2, 0.27, 0.15, -20)
     side_mark_at(lv, "bottle", -1.62, 0.6, 0.2, 16)
     # Top: a different decal in each spot, drawn from the whole pool.
-    for name, x, z, h, rot in (("milk-sticker", -0.6, 1.05, 0.14, 20), ("bolt", 0.62, 1.1, 0.36, 200),
-                               ("flex", 0.42, 1.95, 0.26, -30), ("goat-sticker", -0.45, 1.98, 0.26, -75),
-                               ("bubble", 0.0, -0.33, 0.15, -96), ("drop", 0.36, 0.28, 0.15, -60),
-                               ("limit-sticker", 0.62, -1.1, 0.08, 92), ("flex", -0.62, -1.1, 0.2, 70),
-                               ("bottle", 0.0, -1.66, 0.24, 95)):
+    # Each sits in a clear patch of paint: the wing tops beside the bonnet, the roof either side
+    # of the team logo, the strips of engine lid outside its vents. None crosses a shut line.
+    for name, x, z, h, rot in (("bolt", 0.74, 1.22, 0.36, 102), ("milk-sticker", -0.73, 1.2, 0.12, 6),
+                               ("flex", 0.44, 0.02, 0.25, -112), ("goat-sticker", -0.44, 0.02, 0.25, -70),
+                               ("limit-sticker", 0.6, -1.12, 0.09, 2), ("more", -0.6, -1.12, 0.08, 178)):
         lv.mark("top", MARKS / f"{name}.svg", (x, 0, z), h, rotate=rot)
     lv.mark("front", MARKS / "flex.svg", (0.68, 0.36, 0), 0.12, rotate=-15)
     lv.mark("rear", MARKS / "bottle.svg", (-0.7, 0.4, 0), 0.16, rotate=14)
