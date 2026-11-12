@@ -99,7 +99,8 @@ namespace TarmacGauntlet.Raceday
         private void Update()
         {
             if (entries == null) return;
-            if (Racing == null || Racing()) clock += Time.deltaTime;
+            bool racing = Racing == null || Racing();
+            if (racing) clock += Time.deltaTime;
             order.Clear();
             for (int i = 0; i < Cars.Length; i++)
             {
@@ -108,7 +109,7 @@ namespace TarmacGauntlet.Raceday
                 entries[i].Player = i == Player;
                 order.Add(entries[i]);
             }
-            Standings.Rank(order, Lap);
+            Standings.Rank(order, Lap, racing);
             Standings.Rows(order, Fit(), rows);
         }
 

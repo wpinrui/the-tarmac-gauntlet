@@ -42,10 +42,15 @@ namespace TarmacGauntlet.Raceday
         public static int FakeLaps(float distance, float lap) =>
             distance <= 0f ? 0 : (int)Math.Floor(distance / (lap * FakeLapShare));
 
-        /// <summary>Puts the cars in race order, furthest first, and fills in their positions and fake laps.</summary>
-        public static void Rank(List<Car> cars, float lap)
+        /// <summary>
+        /// Puts the cars in race order, furthest first, and fills in their positions and fake laps.
+        /// Before the start (<paramref name="racing"/> false) the order is the grid's, by Id, with no laps:
+        /// on the formation lap the cars run nose to tail and would swap places every frame.
+        /// </summary>
+        public static void Rank(List<Car> cars, float lap, bool racing = true)
         {
-            cars.Sort((a, b) => a.Distance != b.Distance ? b.Distance.CompareTo(a.Distance) : a.Id.CompareTo(b.Id));
+            if (racing) cars.Sort((a, b) => a.Distance != b.Distance ? b.Distance.CompareTo(a.Distance) : a.Id.CompareTo(b.Id));
+            else cars.Sort((a, b) => a.Id.CompareTo(b.Id));
             var inClass = new Dictionary<CarClass, int>();
             for (int i = 0; i < cars.Count; i++)
             {
@@ -53,7 +58,7 @@ namespace TarmacGauntlet.Raceday
                 c.Position = i + 1;
                 inClass.TryGetValue(c.Class, out int n);
                 c.ClassPosition = inClass[c.Class] = n + 1;
-                c.FakeLaps = FakeLaps(c.Distance, lap);
+                c.FakeLaps = racing ? FakeLaps(c.Distance, lap) : 0;
             }
         }
 
