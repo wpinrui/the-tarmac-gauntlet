@@ -92,7 +92,7 @@ namespace TarmacGauntlet.Management
             settingsPanel = glass.Make("settings");
             settingsLayer.Add(settingsPanel);
 
-            cameraLayer = Layer("side");
+            cameraLayer = Layer("right-edge");
             cameraPanel = glass.Make("settings", "camera-settings");
             cameraLayer.Add(cameraPanel);
             Render();
