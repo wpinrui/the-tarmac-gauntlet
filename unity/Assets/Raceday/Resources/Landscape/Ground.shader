@@ -93,7 +93,7 @@ Shader "Hidden/TarmacGauntlet/Ground"
                 float2 uv = (i.positionWS.xz - _Map.xy) * _Map.zw;
                 half3 fields = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv).rgb;
                 half grain = SAMPLE_TEXTURE2D(_Grain, sampler_Grain, i.positionWS.xz / 8).r;
-                half3 albedo = fields * grain * 2 * _BaseColor.rgb;
+                half3 albedo = fields * GammaScale(grain * 2) * _BaseColor.rgb;
                 #if defined(_GROUND_STRIPES)
                     half4 mow = SAMPLE_TEXTURE2D(_Mowing, sampler_Mowing, uv);
                     // The grain roughens the stripes' edges a touch, as cut grass is never quite clean.
@@ -107,7 +107,7 @@ Shader "Hidden/TarmacGauntlet/Ground"
                     half2 along = mow.ba / max(fresh, 1e-3);
                     float2 view = i.positionWS.xz - _WorldSpaceCameraPos.xz;
                     half lean = dot(view, along) / max(length(view), 1e-3);
-                    albedo *= 1 + _StripeContrast * wave * fade * (0.35 + 0.65 * lean);
+                    albedo *= GammaScale(1 + _StripeContrast * wave * fade * (0.35 + 0.65 * lean));
                 #endif
                 return ShadePbr(i.positionWS, i.normalWS, i.positionCS, i.fog, albedo, 0, _Smoothness);
             }

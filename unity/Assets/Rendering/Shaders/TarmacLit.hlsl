@@ -6,6 +6,36 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
+// Colours and multipliers written into the shaders while the game rendered in Gamma colour space, where they were sRGB
+// values and scaled sRGB values. In Linear a colour is turned into linear light, and a multiplier on a colour is raised
+// to the power 2.2, so each darkens or lightens what it touches as much as it did.
+half3 GammaColour(half3 c)
+{
+#if defined(UNITY_COLORSPACE_GAMMA)
+    return c;
+#else
+    return SRGBToLinear(c);
+#endif
+}
+
+half GammaScale(half f)
+{
+#if defined(UNITY_COLORSPACE_GAMMA)
+    return f;
+#else
+    return pow(max(f, 0.0), 2.2);
+#endif
+}
+
+half3 GammaScale(half3 f)
+{
+#if defined(UNITY_COLORSPACE_GAMMA)
+    return f;
+#else
+    return pow(max(f, 0.0), 2.2);
+#endif
+}
+
 // Set by URP while it draws a shadow map: the direction to a directional light, the position of any other.
 float3 _LightDirection;
 float3 _LightPosition;

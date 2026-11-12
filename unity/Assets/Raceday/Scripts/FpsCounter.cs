@@ -1,3 +1,4 @@
+using TarmacGauntlet.Rendering;
 using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
@@ -80,6 +81,11 @@ namespace TarmacGauntlet.Raceday
         private const float Gap = 8f, RowGap = 28f;
 
         private void OnGUI()
+        {
+            using (GammaGui.Begin()) DrawGui();
+        }
+
+        private void DrawGui()
         {
             if (Event.current.type != EventType.Repaint || DebugMenu.Bare) return;
             float k = Screen.height / 1080f;

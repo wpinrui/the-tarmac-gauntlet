@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TarmacGauntlet.Rendering;
 using TarmacGauntlet.Simulation;
 using UnityEngine;
 
@@ -60,6 +61,11 @@ namespace TarmacGauntlet.Raceday
         }
 
         private void OnGUI()
+        {
+            using (GammaGui.Begin()) DrawGui();
+        }
+
+        private void DrawGui()
         {
             if (!Open || !Usable || Event.current.type != EventType.Repaint) return;
             if (DebugMenu.Clean || Hud != null && (Hud.Hidden || !Hud.enabled)) return;

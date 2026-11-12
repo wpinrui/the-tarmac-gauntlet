@@ -202,7 +202,7 @@ Shader "Hidden/TarmacGauntlet/Impostor"
                 half3 normalTS = normalize(SAMPLE_TEXTURE2D_ARRAY(_Normals, sampler_Normals, i.atlas.xy, i.atlas.z).xyz * 2 - 1);
                 half3 bitangent = -cross(i.normalWS, i.tangentWS);
                 half3 normalWS = TransformTangentToWorld(normalTS, half3x3(i.tangentWS, bitangent, i.normalWS));
-                half3 col = ShadeLambert(i.positionWS, normalWS, i.positionCS, i.fog, c.rgb * i.color.rgb * 2);
+                half3 col = ShadeLambert(i.positionWS, normalWS, i.positionCS, i.fog, c.rgb * GammaScale(i.color.rgb * 2));
                 return half4(col, 1);
             }
             ENDHLSL

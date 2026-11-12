@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TarmacGauntlet.Rendering;
 using TarmacGauntlet.Simulation;
 using UnityEngine;
 
@@ -138,6 +139,11 @@ namespace TarmacGauntlet.Raceday
         }
 
         private void OnGUI()
+        {
+            using (GammaGui.Begin()) DrawGui();
+        }
+
+        private void DrawGui()
         {
             if (DebugMenu.Bare || entries == null || Driver == null || Supplies == null || Log == null) return;
             k = Screen.height / 1080f;

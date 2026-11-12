@@ -161,7 +161,8 @@ namespace TarmacGauntlet.Raceday
 
             float night = Night != null ? NightLook.On(Night()) : 0f;
             Color flood = NightLook.Flood * (0.3f * night);
-            Shader.SetGlobalVector(NightId, new Vector4(flood.r, flood.g, flood.b, 0f));
+            // Set as a colour so Unity converts it to linear light.
+            Shader.SetGlobalColor(NightId, flood);
 
             Glow(dt);
             if (dt <= 1e-5f) return;

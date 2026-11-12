@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TarmacGauntlet.Rendering;
 using TarmacGauntlet.Simulation;
 using UnityEngine;
 
@@ -106,6 +107,11 @@ namespace TarmacGauntlet.Raceday
             (Cars[front].Traffic.Distance - Cars[back].Traffic.Distance) / Mathf.Max(Cars[back].Traffic.Speed, 10f);
 
         private void OnGUI()
+        {
+            using (GammaGui.Begin()) DrawGui();
+        }
+
+        private void DrawGui()
         {
             if (Event.current.type != EventType.Repaint || Director == null || !Director.OnAir) return;
             if (Tower != null && Tower.Hidden || DebugMenu.Bare) return;

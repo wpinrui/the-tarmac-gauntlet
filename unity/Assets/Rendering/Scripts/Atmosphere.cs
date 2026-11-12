@@ -75,7 +75,8 @@ namespace TarmacGauntlet.Rendering
             Shader.SetGlobalColor(CloudShadeId, s.CloudShade);
             Shader.SetGlobalColor(SkyLightId, s.SkyLight);
             Shader.SetGlobalColor(GroundLightId, s.GroundLight);
-            Shader.SetGlobalVector(HazeId, new Vector4(s.Haze.r, s.Haze.g, s.Haze.b, s.HazeDensity));
+            Color haze = s.Haze.linear;
+            Shader.SetGlobalVector(HazeId, new Vector4(haze.r, haze.g, haze.b, s.HazeDensity));
             Shader.SetGlobalVector(MistId, new Vector4(s.MistDensity, Mathf.Max(s.MistHeight, 1f), s.Ground, 0f));
         }
 
@@ -89,7 +90,7 @@ namespace TarmacGauntlet.Rendering
         /// <summary>
         /// The floodlight beams to draw in the fog, up to <see cref="MostBeams"/>: each lens's position and the beam's reach,
         /// m, in <paramref name="positions"/>, its aim and the cosine of half its cone in <paramref name="aims"/>, and their
-        /// light, colour times strength, 0 for none.
+        /// light, colour times strength in linear light, 0 for none.
         /// </summary>
         public static void Beams(Vector4[] positions, Vector4[] aims, int count, Color light)
         {

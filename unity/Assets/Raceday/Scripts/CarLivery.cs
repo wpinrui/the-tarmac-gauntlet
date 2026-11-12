@@ -152,8 +152,9 @@ namespace TarmacGauntlet.Raceday
                 if (count == MaxBoxes) break;
                 boxes[count] = new Vector4(n.x / file.size, n.y / file.size, n.h / file.size, n.rotate * Mathf.Deg2Rad);
                 widths[count] = n.w / file.size;
-                inks[count] = ColorUtility.TryParseHtmlString(n.ink, out Color ink) ? (Vector4)ink : Vector4.one;
-                edges[count] = ColorUtility.TryParseHtmlString(n.edge, out Color edge) ? (Vector4)edge : inks[count];
+                // Vector arrays skip Unity's sRGB to linear conversion, so the number's colours are converted here.
+                inks[count] = ColorUtility.TryParseHtmlString(n.ink, out Color ink) ? (Vector4)ink.linear : Vector4.one;
+                edges[count] = ColorUtility.TryParseHtmlString(n.edge, out Color edge) ? (Vector4)edge.linear : inks[count];
                 count++;
             }
             mat.SetVectorArray("_NumBox", boxes);

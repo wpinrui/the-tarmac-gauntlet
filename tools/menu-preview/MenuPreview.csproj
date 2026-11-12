@@ -16,6 +16,7 @@
   <ItemGroup>
     <Compile Include="*.cs;Stubs/*.cs" />
     <Compile Include="$(ScriptsDir)/../../Visuals/*.cs" />
+    <Compile Include="$(ScriptsDir)/../../Rendering/Scripts/UiBlend.cs;$(ScriptsDir)/../../Rendering/Scripts/LinearLight.cs" />
     <Compile Include="$(ScriptsDir)/*.cs" Exclude="$(ScriptsDir)/HqDebugMenu.cs;$(ScriptsDir)/RacePauseMenu.cs;$(ScriptsDir)/MenuGlass.cs;$(ScriptsDir)/GarageBays.cs;$(ScriptsDir)/NewspaperView.cs;$(ScriptsDir)/PositionChart.cs" />
   </ItemGroup>
   <ItemGroup>
