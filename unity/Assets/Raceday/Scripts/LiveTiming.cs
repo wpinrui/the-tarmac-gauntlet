@@ -116,7 +116,7 @@ namespace TarmacGauntlet.Raceday
                 entries[i].Distance = Cars[i].Traffic.Distance;
                 order.Add(entries[i]);
             }
-            Standings.Rank(order, Lap);
+            Standings.Rank(order, Lap, Tower == null || Tower.Racing == null || Tower.Racing());
             shown.Clear();
             foreach (Standings.Car c in order) if (filter == null || c.Class == filter) shown.Add(c);
         }
