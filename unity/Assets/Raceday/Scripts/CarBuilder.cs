@@ -15,9 +15,11 @@ namespace TarmacGauntlet.Raceday
 
         /// <summary>
         /// A car of the given model, drawn with its class's 3D model. If that cannot be loaded it is a
-        /// plain box in the given paint. With no keys it can only be driven by the AI.
+        /// plain box in the given paint. With no keys it can only be driven by the AI. A team with a
+        /// livery for this model wears it, with its race number, instead of the paint.
         /// </summary>
-        public static CarController Spawn(string modelId, Circuit circuit, KeyboardState keys, Color? paint = null)
+        public static CarController Spawn(string modelId, Circuit circuit, KeyboardState keys, Color? paint = null,
+            string team = null, int raceNumber = 0)
         {
             CarSpec spec = CarSpec.For(modelId);
             var root = new GameObject(spec.Name);
@@ -25,7 +27,7 @@ namespace TarmacGauntlet.Raceday
 
             string modelPath = CarArt.ModelPath(modelId);
             GameObject model = string.IsNullOrEmpty(modelPath) ? null : LoadModel(modelPath);
-            Transform[] wheels = model != null ? AttachModel(root, model, modelPath, paint) : BuildBox(root, spec, paint ?? new Color(0.8f, 0.81f, 0.83f));
+            Transform[] wheels = model != null ? AttachModel(root, model, modelPath, paint, team, raceNumber) : BuildBox(root, spec, paint ?? new Color(0.8f, 0.81f, 0.83f));
 
             BoxCollider box = root.AddComponent<BoxCollider>();
             box.center = new Vector3(0f, 0.62f, 0.06f);
@@ -60,14 +62,17 @@ namespace TarmacGauntlet.Raceday
         /// <summary>
         /// Puts the model under the car and gives each wheel a pivot at its centre, so it can
         /// steer, spin and move with the suspension, and each opening door its hinge (CarDoors on
-        /// the model). With a paint, the body is resprayed in it.
+        /// the model). The team's livery goes on the body if it has one for this model; otherwise,
+        /// with a paint, the body is resprayed in it.
         /// Returns pivots front left, front right, rear left, rear right.
         /// </summary>
-        private static Transform[] AttachModel(GameObject root, GameObject prefab, string modelPath, Color? paint)
+        private static Transform[] AttachModel(GameObject root, GameObject prefab, string modelPath, Color? paint, string team, int raceNumber)
         {
             GameObject model = Object.Instantiate(prefab, root.transform, false);
             model.name = "Model";
-            if (paint.HasValue) CarPaint.Respray(model, paint.Value);
+            string livery = string.IsNullOrEmpty(team) ? null : CarArt.LiveryPath(team);
+            bool painted = livery != null && CarLivery.Apply(model, modelPath, livery, raceNumber);
+            if (!painted && paint.HasValue) CarPaint.Respray(model, paint.Value);
             foreach (Collider c in model.GetComponentsInChildren<Collider>()) Object.Destroy(c);
             foreach (Transform t in model.GetComponentsInChildren<Transform>()) t.gameObject.layer = IgnoreRaycastLayer;
             CarDoors.Attach(model, modelPath);

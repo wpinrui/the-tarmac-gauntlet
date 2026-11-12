@@ -129,7 +129,7 @@ namespace TarmacGauntlet.Raceday
                 bool mine = i == player;
                 string id = field[i];
                 Color paint = PaintFor(id);
-                CarController car = CarBuilder.Spawn(id, circuit, mine ? keys : null, paint);
+                CarController car = CarBuilder.Spawn(id, circuit, mine ? keys : null, paint, grid[i].TeamName, grid[i].RaceNumber);
                 if (pitLaneStart != null) car.PlaceAt(pitLaneStart.Place(i, out Vector3 forward), forward);
                 else
                 {

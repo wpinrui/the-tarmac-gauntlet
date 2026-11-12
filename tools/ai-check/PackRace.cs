@@ -17,7 +17,8 @@ static partial class Check
     {
         public int Seed;
         public float Lap1Hours, RestHours;
-        public int Lap1Contacts, RestContacts, Lap1Hard, RestHard, Lap1Multi, RestMulti, Lap1Offs, RestOffs, Piles, Stuck;
+        public int Lap1Contacts, RestContacts, Lap1Hard, RestHard, Lap1Multi, RestMulti, Lap1Offs, RestOffs, Piles, Stuck, Crashes, CrashCars;
+        public List<string> CrashList = new List<string>();
         public List<string> Multi = new List<string>(), PileList = new List<string>();
         /// <summary>Part-throttle seconds on the free stretch behind a slower car, with a lane beside open or not.</summary>
         public float HeldOpen, HeldShut, HeldFlat, Hours;
@@ -36,7 +37,7 @@ static partial class Check
         {
             Console.WriteLine($"seed {p.Seed}: lap 1 {Rate(p.Lap1Contacts, p.Lap1Hours)} contacts/car-hour ({p.Lap1Contacts}, {p.Lap1Hard} hard), {p.Lap1Multi} multi, {p.Lap1Offs} offs; "
                 + $"rest {Rate(p.RestContacts, p.RestHours)} ({p.RestContacts}, {p.RestHard} hard), {p.RestMulti} multi, {p.RestOffs} offs; {p.Piles} pile-ups, {p.Stuck} stuck");
-            if (Environment.GetEnvironmentVariable("PACK_LOG") == "1") foreach (string s in p.Multi.Concat(p.PileList)) Console.WriteLine("  " + s);
+            if (Environment.GetEnvironmentVariable("PACK_LOG") == "1") foreach (string s in p.Multi.Concat(p.PileList).Concat(p.CrashList)) Console.WriteLine("  " + s);
         }
         float hrs = results.Sum(p => p.Hours);
         Console.WriteLine($"HELD part-throttle behind a slower car on the free stretch: {results.Sum(p => p.HeldOpen) / hrs:0.0} s/car-hour with a lane beside open, {results.Sum(p => p.HeldShut) / hrs:0.0} with none; {results.Sum(p => p.HeldFlat) / hrs:0.0} of it with a legal flat-out path");
@@ -48,6 +49,7 @@ static partial class Check
         Console.WriteLine($"TOTAL lap1 {Rate(results.Sum(p => p.Lap1Contacts), h1)} c/h, hard {Rate(results.Sum(p => p.Lap1Hard), h1)}, multi {results.Sum(p => p.Lap1Multi)}, offs {results.Sum(p => p.Lap1Offs)}"
             + $" | rest {Rate(results.Sum(p => p.RestContacts), h2)} c/h, hard {Rate(results.Sum(p => p.RestHard), h2)}, multi {results.Sum(p => p.RestMulti)}, offs {results.Sum(p => p.RestOffs)}"
             + $" | piles {results.Sum(p => p.Piles)}, stuck {results.Sum(p => p.Stuck)}");
+        Console.WriteLine($"CRASHES {results.Sum(p => p.Crashes) / hrs * 100f:0.00} per 100 car-hours ({results.Sum(p => p.Crashes)}), {results.Sum(p => p.CrashCars) / (float)Math.Max(results.Sum(p => p.Crashes), 1):0.0} cars each");
     }
 
     static string Rate(int n, float hours) => (n / Math.Max(hours, 1e-3f)).ToString("0.0");
@@ -58,6 +60,8 @@ static partial class Check
         var piles = new PileWatch($"seed {seed} ");
         var busy = new Dictionary<Racer, bool>();
         var byName = new Dictionary<string, Racer>();
+        // Hard contacts and cars going off, for crashes: three or more cars at one spot within a few seconds.
+        var events = new List<(float T, float D, string Car, bool Off)>();
         int seen = 0;
         var held = new HeldWatch();
         var lap1 = new List<bool>();
@@ -68,15 +72,30 @@ static partial class Check
             foreach (Racer x in r.Racers)
             {
                 bool b = x.Rejoin.Busy;
-                if (b && !(busy.TryGetValue(x, out bool was) && was)) { if (x.Laps == 0) p.Lap1Offs++; else p.RestOffs++; }
+                if (b && !(busy.TryGetValue(x, out bool was) && was)) { if (x.Laps == 0) p.Lap1Offs++; else p.RestOffs++; events.Add((r.Time, Mod(x.Distance), r.Name(x), true)); }
                 busy[x] = b;
                 if (x.Laps == 0) p.Lap1Hours += Race.Dt / 3600f; else p.RestHours += Race.Dt / 3600f;
             }
             held.Step(r, p);
+            string tr = Environment.GetEnvironmentVariable("PACK_TRACE");
+            if (tr != null && (int)Math.Round(r.Time / Race.Dt) % 50 == 0 && byName.TryGetValue(tr, out Racer tx) && tx.Rejoin.Busy)
+                Console.WriteLine($"  TRACE {Race.Clock(r.Time)} {tr} {tx.Rejoin.State} cause {tx.Rejoin.Cause} ghost {tx.Ghost} lat {tx.Car.Lateral:0.0} past edge {tx.Rejoin.PastEdge:0.0} heading {tx.Rejoin.Heading:0} aim {tx.Rejoin.Aim:0.0} gap clear {tx.Rejoin.GapClear} coming {tx.Rejoin.Coming} yielding {tx.Rejoin.Yielding} {tx.Car.Speed * 3.6f:0} km/h at {Mod(tx.Distance):0} m");
             for (; seen < r.Contacts.Count; seen++)
             {
                 Contact c = r.Contacts[seen];
                 lap1.Add(byName[c.A].Laps == 0 || byName[c.B].Laps == 0);
+                if (c.Speed > 3f) { events.Add((c.Time, Mod(byName[c.A].Distance), c.A, false)); events.Add((c.Time, Mod(byName[c.B].Distance), c.B, false)); }
+                if (Environment.GetEnvironmentVariable("PACK_CONTACTS") != null)
+                {
+                    string Path(Racer x)
+                    {
+                        var ch = x.Craft.Chooser; var k = ch?.Chosen;
+                        if (k == null) return $"{r.Name(x)} no plan{(x.Ghost ? " ghost" : "")}{(x.Rejoin.Busy ? " rejoin" : "")}";
+                        return $"{r.Name(x)} {k.Pedal}{(k.Follow ? "F" : "")}{(k.Fixed ? "f" : "")}{(k.Delay > 0 ? "d" : "")} {k.Shift:0.0} {(k.Rejected ?? "ok")} {(x.Pilot.Index >= 0 && TarmacGauntlet.Raceday.PathChooser.FreeStretchAt(x.Pilot) ? "free" : "corner")} v{x.Car.Speed * 3.6f:0} lat{x.Car.Lateral:0.0}";
+                    }
+                    Racer xa = byName[c.A], xb = byName[c.B];
+                    Console.WriteLine($"  CONTACT {Race.Clock(c.Time)} {c.Speed:0.0} m/s gap {Gap(xb.Distance - xa.Distance):0.0} | {Path(xa)} | {Path(xb)}");
+                }
             }
             return false;
         }, minutes * 60f);
@@ -104,11 +123,29 @@ static partial class Check
             if (lap1[i]) p.Lap1Multi++; else p.RestMulti++;
             p.Multi.Add($"{cars.Count} cars at {cs[i].Where:0} m at {Race.Clock(cs[i].Time)}{(lap1[i] ? " (lap 1)" : "")}: {string.Join(" ", cars)}");
         }
+        // Crashes: hard contacts and offs joined when within 5 s and 40 m of one another, with three or more cars
+        // and at least one of them off the track. A crash, not traffic: what reads as a pile-up from the stands.
+        var group = new int[events.Count];
+        for (int i = 0; i < events.Count; i++) group[i] = i;
+        int Find(int i) { while (group[i] != i) i = group[i] = group[group[i]]; return i; }
+        for (int i = 0; i < events.Count; i++)
+            for (int j = i + 1; j < events.Count && events[j].T < events[i].T + 5f; j++)
+                if (Math.Abs(Gap(events[j].D - events[i].D)) < 40f) group[Find(j)] = Find(i);
+        foreach (var g in Enumerable.Range(0, events.Count).GroupBy(Find))
+        {
+            var cars = g.Select(i => events[i].Car).Distinct().ToList();
+            if (cars.Count < 3 || !g.Any(i => events[i].Off)) continue;
+            p.Crashes++; p.CrashCars += cars.Count;
+            var e0 = events[g.First()];
+            p.CrashList.Add($"CRASH {cars.Count} cars, {g.Count(i => events[i].Off)} off, at {e0.D:0} m at {Race.Clock(e0.T)}: {string.Join(" ", cars)}");
+        }
         held.Finish(race, p);
         p.Hours = race.Racers.Count * race.Time / 3600f;
         p.Piles = piles.PileUps.Count;
         p.PileList.AddRange(piles.PileUps.Select(x => "PILE " + x));
         p.Stuck = race.Racers.Count(x => x.StuckTime > 10f || x.Rejoin.Busy && x.RejoinTime > 30f);
+        foreach (Racer x in race.Racers.Where(x => x.StuckTime > 10f || x.Rejoin.Busy && x.RejoinTime > 30f))
+            Console.WriteLine($"  STUCK seed {seed} {race.Name(x)} stuck {x.StuckTime:0} s, rejoin {(x.Rejoin.Busy ? x.RejoinTime.ToString("0") + " s" : "no")}, ghost {x.Ghost}, at {Gap(x.Distance):0} m lap {x.Laps}, lateral {x.Car.Lateral:0.0} of {circuit.Data.width[Math.Max(x.Car.TrackIndex, 0)] / 2f:0.0}, speed {x.Car.Speed * 3.6f:0} km/h, track index {x.Car.TrackIndex}");
         return p;
     }
 }
@@ -225,20 +262,29 @@ static partial class Check
             int k = Math.Max(x.Car.TrackIndex, 0);
             float half = circuit.Data.width[k] / 2f, reach = Gap(ahead.Distance - x.Distance) + CarL;
             var taken = new List<(float lo, float hi)>();
+            // Only room it can get to: not past a car alongside it.
+            float left = -half, right = half, me = x.Car.Lateral;
             foreach (Racer y in r.Racers)
             {
                 if (y == x || y.Ghost) continue;
                 float d = Gap(y.Distance - x.Distance);
                 if (d > -CarL && d < reach) taken.Add((y.Car.Lateral - 0.5f * CarW, y.Car.Lateral + 0.5f * CarW));
+                if (Math.Abs(d) < CarL && y != ahead)
+                {
+                    if (y.Car.Lateral < me) left = Math.Max(left, y.Car.Lateral + 0.5f * CarW);
+                    else right = Math.Min(right, y.Car.Lateral - 0.5f * CarW);
+                }
             }
             taken.Sort((a, b) => a.lo.CompareTo(b.lo));
-            float at = -half, widest = 0f;
+            float at = left, widest = 0f;
             foreach (var t in taken)
             {
-                widest = Math.Max(widest, Math.Min(t.lo, half) - at);
+                if (t.hi <= left) continue;
+                if (t.lo >= right) break;
+                widest = Math.Max(widest, Math.Min(t.lo, right) - at);
                 at = Math.Max(at, t.hi);
             }
-            return Math.Max(widest, half - at);
+            return Math.Max(widest, right - at);
         }
 
         static bool Held(Race r, Racer x, out Racer ahead)
