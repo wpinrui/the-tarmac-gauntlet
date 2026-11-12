@@ -35,11 +35,14 @@ namespace TarmacGauntlet.TeamHq
     }
 }
 
-namespace TarmacGauntlet.Management
+namespace TarmacGauntlet.Rendering
 {
     [RequireComponent(typeof(Camera))]
     public sealed class GlassBackdrop : MonoBehaviour { }
+}
 
+namespace TarmacGauntlet.Management
+{
     public sealed class MenuGlass
     {
         public MenuGlass(VisualElement root) { }
