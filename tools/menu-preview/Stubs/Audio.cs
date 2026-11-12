@@ -7,6 +7,8 @@ namespace UnityEngine
     {
         public bool playOnAwake { get; set; }
         public bool ignoreListenerPause { get; set; }
+        public bool bypassListenerEffects { get; set; }
+        public float volume { get; set; } = 1;
         public float spatialBlend { get; set; }
         public float pitch { get; set; } = 1;
         public void PlayOneShot(AudioClip clip) { }

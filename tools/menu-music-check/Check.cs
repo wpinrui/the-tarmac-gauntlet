@@ -10,14 +10,16 @@ static class P {
     var mm = (MenuMusic)GameObject.Live.Single(); AudioSource src;
     src = (AudioSource)typeof(MenuMusic).GetField("source", System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Instance).GetValue(mm);
     Tick(1); Expect("a track starts as the HQ opens", src.isPlaying && src.Played.Count == 1);
-    Tick(30); Expect("fades in to the music level in 2 s", Math.Abs(src.volume - 0.7f) < 1e-4);
+    float level = TarmacGauntlet.Audio.Mix.Gain(TarmacGauntlet.Audio.SoundGroup.Music);
+    Tick(30); Expect("fades in to the music group's level in 2 s", level > 0 && Math.Abs(src.volume - level) < 1e-4);
+    Expect("plays past the listener's muffle", src.bypassListenerEffects);
     for (int k = 0; k < 19; k++) { src.isPlaying = false; Tick(21); }
     var order = src.Played.Select(c => c.name).ToList();
     Expect("20 tracks played, 2 s apart", order.Count == 20);
     bool decks = Enumerable.Range(0, 4).All(d => order.Skip(d * 5).Take(5).Distinct().Count() == 5);
     Expect("every track once per round of five", decks);
     Expect("never the same track twice running", order.Zip(order.Skip(1)).All(p => p.First != p.Second));
-    SceneLoader.Load(); Tick(4); Expect("fading out as a race starts loading", src.volume > 0 && src.volume < 0.7f);
+    SceneLoader.Load(); Tick(4); Expect("fading out as a race starts loading", src.volume > 0 && src.volume < level);
     Tick(5); Expect("silent and stopped 0.8 s after", src.volume == 0 && !src.isPlaying);
     SceneManager.Fire(new Scene { name = "Raceday" }); Tick(50); Expect("stays silent in the race", src.volume == 0 && !src.isPlaying && src.Played.Count == 20);
     SceneManager.Fire(new Scene { name = "TeamHq" }); Tick(1); Expect("a fresh track starts at once back in the HQ", src.isPlaying && src.Played.Count == 21);

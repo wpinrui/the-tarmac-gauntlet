@@ -70,7 +70,7 @@ namespace TarmacGauntlet.Raceday
             if (other.attachedRigidbody != null && other.attachedRigidbody.TryGetComponent(out ImpactAudio them))
             {
                 kind = HitKind.Car;
-                return GetInstanceID() < them.GetInstanceID();
+                return GetHashCode() < them.GetHashCode();
             }
             if (!other.TryGetComponent(out TrackSurface surface) || surface.Kind != SurfaceKind.Barrier) return false;
             if (other.name == "Tyre walls") kind = HitKind.Tyres;

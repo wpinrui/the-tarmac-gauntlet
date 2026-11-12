@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TarmacGauntlet.Audio;
 using TarmacGauntlet.Rendering;
 using UnityEngine;
 
@@ -8,18 +9,17 @@ namespace TarmacGauntlet.Raceday
     /// A car's tyres on what they roll over, synthesised live by a <see cref="TyreSynth"/> from the wheels' slide, the
     /// car's speed and the surface under each wheel. It sits on its own child of the car, so its filter never touches the
     /// engine's source. Like <see cref="EngineAudio"/>, the source plays a clip of constant ones that the synth multiplies,
-    /// so Unity places the sound in 3D. Only the cars nearest the listener play, as many as the quality level allows.
+    /// so Unity places the sound in 3D. Only the cars nearest the listener play, as many as the quality level's <see cref="RaceVoices"/>, in the
+    /// tyres' group of the <see cref="Mix"/>.
     /// </summary>
     public sealed class TyreAudio : MonoBehaviour
     {
         private const float Range = 150f;
-        /// <summary>Cars that play at each quality level, Low to Ultra.</summary>
-        private static readonly int[] Voices = { 2, 4, 6, 8 };
 
         private static readonly List<TyreAudio> all = new List<TyreAudio>();
         private static int rankedFrame = -1;
         private static float levelRead = float.NegativeInfinity;
-        private static int voices = Voices[1];
+        private static int voices = RaceVoices.TyresAt(1);
         private static AudioClip ones;
         private static AudioListener listener;
 
@@ -73,6 +73,7 @@ namespace TarmacGauntlet.Raceday
             if (synth == null) return;
             if (rankedFrame != Time.frameCount) Rank();
             if (!playing) return;
+            source.volume = Mix.Gain(SoundGroup.Tyres);
 
             float slide = 0f;
             int kerb = 0, gravel = 0, grass = 0, grounded = 0;
@@ -101,7 +102,7 @@ namespace TarmacGauntlet.Raceday
             if (Time.unscaledTime - levelRead > 1f)
             {
                 levelRead = Time.unscaledTime;
-                voices = Voices[Mathf.Clamp(QualityLevels.Level, 0, Voices.Length - 1)];
+                voices = RaceVoices.TyresAt(QualityLevels.Level);
             }
             if (listener == null) listener = FindFirstObjectByType<AudioListener>();
             if (listener == null) return;

@@ -36,8 +36,8 @@ namespace TarmacGauntlet.Raceday
     /// </summary>
     public static class AmbienceMix
     {
-        /// <summary>Low, Medium, High and Ultra. Medium leaves the engines' ten voices and the tyres' four room inside
-        /// Unity's 32 real voices.</summary>
+        /// <summary>Low, Medium, High and Ultra. Each fits the race's one voice budget with the engines, tyres and
+        /// recorded sounds (<see cref="RaceVoices"/>).</summary>
         public static readonly AmbienceBudget[] Budgets =
         {
             new AmbienceBudget(2, 1, 1, 1, 0),
