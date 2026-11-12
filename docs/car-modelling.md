@@ -51,7 +51,7 @@ Build space is metres: x forward from mid wheelbase, y left, z up from the groun
 The skin splits into pieces: body, doors, bonnet, boot or engine cover, glass.
 Every door that opens is its own closed shell, cut from the body along its shut line, named `door_l` or `door_r`. The opening it leaves gets jamb faces in the interior material.
 Every piece is a closed shell with thickness. Shut lines are V grooves.
-A bonnet shut line starts at the windscreen's lower corners. It runs forward along the panels it meets, such as the lamps and the wings, then across the nose. The bonnet reaches back to the windscreen, so its line has no rear edge.
+A bonnet shut line starts at the windscreen's base, inboard of its lower corners. It bends out to the bonnet's rear corners, then runs forward along the panels it meets, such as the lamps and the wings, then across the nose. The bonnet reaches back to the windscreen, so its line has no rear edge.
 Wheel arches step round at even angles.
 The bonnet crown narrows with the nose, so no beak forms at the centre.
 
