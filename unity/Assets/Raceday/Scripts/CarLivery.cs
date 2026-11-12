@@ -50,7 +50,7 @@ namespace TarmacGauntlet.Raceday
         private static Shader shader;
         private static Texture2D digits;
         private static DigitFile digitFile;
-        private static readonly Dictionary<string, Material> Loaded = new Dictionary<string, Material>();
+        private static readonly Dictionary<string, (LiveryFile File, Texture2D Atlas)> Loaded = new Dictionary<string, (LiveryFile, Texture2D)>();
 
         /// <summary>
         /// Paints the model in the livery at liveryPath, numbered. False, leaving the model as it
@@ -58,42 +58,52 @@ namespace TarmacGauntlet.Raceday
         /// </summary>
         public static bool Apply(GameObject model, string modelPath, string liveryPath, int number)
         {
-            Material livery = Load(liveryPath, modelPath);
-            if (livery == null) return false;
-            var painted = new Material(livery) { name = CarPaint.PaintMaterial + " (livery)" };
+            // Each car gets its own material, built whole: a copied material keeps only the
+            // properties its shader declares, so the projection vectors and number arrays would
+            // come out zero and the car would show the base colour alone.
+            Material painted = Build(liveryPath, modelPath);
+            if (painted == null) return false;
             SetNumber(painted, number);
+            // The shader projects in the car's own space, in metres. Each part's mesh space can carry
+            // the importer's scale or offset, so give every painted part its way into the car's
+            // space, taken now, with the doors shut.
+            Transform car = model.transform.parent != null ? model.transform.parent : model.transform;
             foreach (Renderer r in model.GetComponentsInChildren<Renderer>())
             {
                 Material[] mats = r.sharedMaterials;
+                Matrix4x4 toCar = car.worldToLocalMatrix * r.transform.localToWorldMatrix;
                 bool changed = false;
                 for (int i = 0; i < mats.Length; i++)
                 {
                     if (mats[i] == null || mats[i].name != CarPaint.PaintMaterial) continue;
                     mats[i] = painted;
                     changed = true;
+                    var block = new MaterialPropertyBlock();
+                    block.SetMatrix("_ToCar", toCar);
+                    r.SetPropertyBlock(block, i);
                 }
                 if (changed) r.sharedMaterials = mats;
             }
             return true;
         }
 
-        /// <summary>The livery's shared material, without a number; null if it cannot be used.</summary>
-        private static Material Load(string liveryPath, string modelPath)
+        /// <summary>The livery's file and atlas, loaded once; null file if it cannot be loaded.</summary>
+        private static (LiveryFile File, Texture2D Atlas) Load(string liveryPath)
         {
-            string key = liveryPath + "|" + modelPath;
-            if (Loaded.TryGetValue(key, out Material cached)) return cached;
-            Material made = Build(liveryPath, modelPath);
-            Loaded[key] = made;
+            if (Loaded.TryGetValue(liveryPath, out var cached)) return cached;
+            string json = LoadText(liveryPath + "/livery.json");
+            Texture2D atlas = LoadTexture(liveryPath + "/atlas.png");
+            LiveryFile file = string.IsNullOrEmpty(json) || atlas == null ? null : JsonUtility.FromJson<LiveryFile>(json);
+            var made = (file?.panels == null ? null : file, atlas);
+            Loaded[liveryPath] = made;
             return made;
         }
 
+        /// <summary>A material in the livery, without a number; null if it cannot be used on this model.</summary>
         private static Material Build(string liveryPath, string modelPath)
         {
-            string json = LoadText(liveryPath + "/livery.json");
-            Texture2D atlas = LoadTexture(liveryPath + "/atlas.png");
-            if (string.IsNullOrEmpty(json) || atlas == null) return null;
-            LiveryFile file = JsonUtility.FromJson<LiveryFile>(json);
-            if (file?.panels == null || file.model != modelPath) return null;
+            (LiveryFile file, Texture2D atlas) = Load(liveryPath);
+            if (file == null || file.model != modelPath) return null;
             if (shader == null) shader = Shader.Find("TarmacGauntlet/Livery");
             if (shader == null) return null;
 

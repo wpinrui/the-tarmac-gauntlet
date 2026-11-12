@@ -13,6 +13,16 @@ Shader "TarmacGauntlet/Livery"
         _Base ("Base colour", Color) = (1, 1, 1, 1)
         _Glossiness ("Smoothness", Range(0, 1)) = 0.8
         _Metallic ("Metallic", Range(0, 1)) = 0.1
+        [HideInInspector] _ALeft ("", Vector) = (0, 0, 0, 0)
+        [HideInInspector] _BLeft ("", Vector) = (0, 0, 0, 0)
+        [HideInInspector] _ARight ("", Vector) = (0, 0, 0, 0)
+        [HideInInspector] _BRight ("", Vector) = (0, 0, 0, 0)
+        [HideInInspector] _ATop ("", Vector) = (0, 0, 0, 0)
+        [HideInInspector] _BTop ("", Vector) = (0, 0, 0, 0)
+        [HideInInspector] _AFront ("", Vector) = (0, 0, 0, 0)
+        [HideInInspector] _BFront ("", Vector) = (0, 0, 0, 0)
+        [HideInInspector] _ARear ("", Vector) = (0, 0, 0, 0)
+        [HideInInspector] _BRear ("", Vector) = (0, 0, 0, 0)
     }
     SubShader
     {
@@ -51,12 +61,17 @@ Shader "TarmacGauntlet/Livery"
             float3 objNormal;
         };
 
+        // From the part's mesh space into the car's own space, metres, doors shut (set per part by CarLivery).
+        float4x4 _ToCar;
+
         void vert(inout appdata_full v, out Input o)
         {
             UNITY_INITIALIZE_OUTPUT(Input, o);
+            float3 p = mul(_ToCar, float4(v.vertex.xyz, 1)).xyz;
+            float3 n = mul((float3x3)_ToCar, v.normal);
             // Unity mirrors X on import; turn back to the OBJ's axes.
-            o.objPos = float3(-v.vertex.x, v.vertex.y, v.vertex.z);
-            o.objNormal = float3(-v.normal.x, v.normal.y, v.normal.z);
+            o.objPos = float3(-p.x, p.y, p.z);
+            o.objNormal = float3(-n.x, n.y, n.z);
         }
 
         float2 AtlasUv(float4 a, float4 b, float3 p)
