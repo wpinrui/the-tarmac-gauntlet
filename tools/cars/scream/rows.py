@@ -288,6 +288,16 @@ def sections(tris, arches):
     Rm = median_filter(Rm, size=(3, 5), mode="nearest")
     Rm = gaussian_filter(Rm, sigma=(1.6, 1.8), mode="nearest")      # smooth simple panels
     ZC = median_filter(ZC, size=5, mode="nearest")
+    (xf, _zf, af), (xr, _zr, ar) = sorted(arches, key=lambda a: -a[0])
+    i0, i1 = int(np.argmin(np.abs(X - (xf - af)))), int(np.argmin(np.abs(X - (xr + ar))))
+    low = th < 0                                       # the sill's bottom runs straight between the arches
+    zs = gaussian_filter(ZC, 1.5, mode="nearest")      # the centre heights body.py lofts with
+    za, zb = (np.nanmin(zs[i] + Rm[i, low] * np.sin(th[low])) for i in (i0, i1))
+    for i in range(i0 + 1, i1):
+        zl = za + (zb - za) * (X[i] - X[i0]) / (X[i1] - X[i0])
+        z = zs[i] + Rm[i] * np.sin(th)
+        under = low & (z < zl)
+        Rm[i, under] = (zl - zs[i]) / np.sin(th[under])
     return [dict(x=round(float(x), 4), zc=round(float(zc), 4), r=r4(r)) for x, zc, r in zip(X, ZC, Rm)]
 
 
