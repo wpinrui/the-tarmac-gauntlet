@@ -52,7 +52,7 @@ namespace TarmacGauntlet.Simulation
             new AiTeamEntry { Name = "Half Tank Racing", Descriptor = "never quite enough fuel budget", Nationality = "id", ModelId = "e-09", CarClass = CarClass.E },
             new AiTeamEntry { Name = "Blackthorn Racing", Descriptor = "thorny, stubborn, hard to pass", Nationality = "ae", ModelId = "e-10", CarClass = CarClass.E },
             new AiTeamEntry { Name = "Cóndor Racing", Descriptor = "Colombian-founded, passionate about racing", Nationality = "co", ModelId = "e-11", CarClass = CarClass.E },
-            new AiTeamEntry { Name = "Pit Lane Dreamers", Descriptor = "small team with big ambitions", Nationality = "br", ModelId = "e-07", CarClass = CarClass.E },
+            new AiTeamEntry { Name = "Guaporé Motorsport", Descriptor = "small team with big ambitions", Nationality = "br", ModelId = "e-07", CarClass = CarClass.E },
             new AiTeamEntry { Name = "Three Pedals Racing", Descriptor = "manual gearbox purists", Nationality = "de", ModelId = "e-08", CarClass = CarClass.E },
             new AiTeamEntry { Name = "Overpass Racing", Descriptor = "headquartered under a motorway bridge", Nationality = "my", ModelId = "e-09", CarClass = CarClass.E },
             new AiTeamEntry { Name = "Sato Brothers Racing", Descriptor = "Japanese siblings building from scratch", Nationality = "jp", ModelId = "e-10", CarClass = CarClass.E },
