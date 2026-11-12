@@ -17,6 +17,7 @@ namespace TarmacGauntlet.Raceday
         private const float Gravity = 9.81f;
         private const float HardHit = 18f;        // m/s into a barrier that ends your run until you reset
         private const float ShiftTime = 0.08f;
+        private const float LightWheel = 0.4f;    // share of its resting load under which a wheel skips, not spins
 
         public CarSpec Spec { get; private set; }
         public KeyboardState Keys;
@@ -383,7 +384,10 @@ namespace TarmacGauntlet.Raceday
                     {
                         fx = Mathf.Sign(fx) * cap * 0.9f;
                         fy *= 0.6f;
-                        w.Skid = Mathf.Max(w.Skid, 0.85f);   // wheelspin
+                        // Wheelspin, as hard as the drive overpowers the tyre. A wheel that has gone light over a bump
+                        // or kerb skips for an instant rather than spinning up, so it leaves no rubber.
+                        if (load > LightWheel * corner * Gravity)
+                            w.Skid = Mathf.Max(w.Skid, 0.85f * Mathf.Clamp01((Mathf.Abs(drive) / cap - 0.95f) / 0.5f));
                     }
                     float total = Mathf.Sqrt(fx * fx + fy * fy);
                     if (total > cap)

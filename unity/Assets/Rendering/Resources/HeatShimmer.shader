@@ -1,6 +1,6 @@
-// The air shimmering over far tarmac in the heat (HeatHazeFeature): the frame is redrawn moved by a small rising wobble,
-// strongest where the view runs low along the ground into the distance, and at the horizon past it. A near thing in
-// front of the shimmer is never pulled into it.
+// The air shimmering over far tarmac in the heat (HeatHazeFeature): after the post effects, the frame is redrawn moved by
+// a small rising wobble, strongest where the view runs low along the ground into the distance, and at the horizon past it.
+// A near thing in front of the shimmer is never pulled into it.
 Shader "Hidden/TarmacGauntlet/HeatShimmer"
 {
     SubShader
@@ -21,6 +21,7 @@ Shader "Hidden/TarmacGauntlet/HeatShimmer"
             float _ShimmerStrength;
             // x: distance the shimmer starts, m. y: distance it is strongest by, m. z: its reach, pixels on a screen 1080 high.
             float4 _ShimmerParams;
+            float4x4 _ShimmerInvViewProj;
 
             float RawDepth(float2 uv)
             {
@@ -37,7 +38,7 @@ Shader "Hidden/TarmacGauntlet/HeatShimmer"
                 #if !UNITY_REVERSED_Z
                 raw = lerp(UNITY_NEAR_CLIP_VALUE, 1, raw);
                 #endif
-                float3 world = ComputeWorldSpacePosition(uv, raw, UNITY_MATRIX_I_VP);
+                float3 world = ComputeWorldSpacePosition(uv, raw, _ShimmerInvViewProj);
                 float3 ray = world - _WorldSpaceCameraPos;
                 float dist = length(ray);
                 float3 dir = ray / max(dist, 1e-4);
