@@ -249,6 +249,8 @@ namespace TarmacGauntlet.Raceday
             carControllers = cars;
             if (resumed) PlaceSaved(resume, cars, racing, drivers, pits);
             new GameObject("Skid marks").AddComponent<SkidMarks>().Cars = cars;
+            CarEffects effects = new GameObject("Car effects").AddComponent<CarEffects>();
+            effects.Cars = cars;
             PhysicsRange range = new GameObject("Physics range").AddComponent<PhysicsRange>();
             range.Drivers = drivers;
             range.Player = ai.Car;
@@ -289,6 +291,7 @@ namespace TarmacGauntlet.Raceday
             rain.Materials = materials;
             rain.Cars = racing;
             rain.Night = () => sky.Lights;
+            effects.Night = () => sky.Lights;
             sky.Weather = () => RaceWeather.Forced ?? weather.At(tower.RaceTime);
             trackside.Cars = racing;
             trackside.Racing = tower.Racing;
