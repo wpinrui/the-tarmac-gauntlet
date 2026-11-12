@@ -11,12 +11,20 @@ internal static class Check
     private static int Main(string[] args)
     {
         var g = new HqGeometry();
+        if (args.Length == 2 && args[0] == "bake")
+        {
+            BakeScene.Write(g, args[1]);
+            Console.WriteLine($"lightmap {g.Lightmap.Width}x{g.Lightmap.Height}, signature {g.Lightmap.Signature}");
+            return 0;
+        }
         int fails = 0, tris = 0;
         void Fail(string m) { Console.WriteLine("FAIL " + m); fails++; }
         foreach (var kv in g.Parts)
         {
             HqPart p = kv.Value;
             if (p.Normals.Count != p.Vertices.Count || p.Uvs.Count != p.Vertices.Count) Fail(kv.Key + ": vertex, normal and uv counts differ");
+            if (HqLightmapLayout.Skip.Contains(kv.Key) ? p.Uv2s.Count != 0 : p.Uv2s.Count != p.Vertices.Count) Fail(kv.Key + ": lightmap coordinates missing");
+            foreach (Vector2 l in p.Uv2s) if (l.x <= 0 || l.x >= 1 || l.y <= 0 || l.y >= 1) { Fail(kv.Key + ": lightmap coordinates outside the lightmap"); break; }
             if (p.Triangles.Count == 0 || p.Triangles.Count % 3 != 0) Fail(kv.Key + ": bad triangle list");
             foreach (int t in p.Triangles) if (t < 0 || t >= p.Vertices.Count) { Fail(kv.Key + ": index out of range"); break; }
             foreach (Vector3 v in p.Vertices)
@@ -41,6 +49,14 @@ internal static class Check
             tris += p.Triangles.Count / 3;
         }
         if (g.Bays.Count != 4) Fail("expected four bays");
+        // Wear lies inside the building, over a surface, with a texture of its own.
+        foreach (var kv in g.Wear)
+        {
+            string tex = Path.Combine("..", "..", "..", "unity", "Assets", "TeamHq", "Resources", "Wear", kv.Key.Substring(HqGeometry.WearKey.Length) + ".png");
+            if (!File.Exists(tex)) Fail(kv.Key + ": no texture");
+            foreach (Vector3 v in kv.Value.Vertices)
+                if (Math.Abs(v.x) > HqGeometry.W / 2 + 0.01f || v.y < 0 || v.y > HqGeometry.H || Math.Abs(v.z) > HqGeometry.D / 2 + 0.01f) { Fail(kv.Key + ": outside the building"); break; }
+        }
         // Every placed prop must have its packed files, and stand inside the building.
         string props = Path.Combine("..", "..", "..", "unity", "Assets", "TeamHq", "Resources", "Props");
         foreach (HqProp pr in g.Props)

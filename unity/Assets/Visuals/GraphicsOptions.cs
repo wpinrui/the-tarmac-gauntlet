@@ -59,6 +59,15 @@ namespace TarmacGauntlet.Visuals
         /// <summary>Marks a sliding or spinning tyre leaves on the track during the race.</summary>
         public static readonly GraphicsOption SkidMarks = Toggle("settings.skidmarks", "Skid marks", true);
 
+        /// <summary>The Team HQ lit by its bake: lamp light, daylight and every bounce. Off, live lamps and a flat ambient light.</summary>
+        public static readonly GraphicsOption BakedLighting = Toggle("settings.hqbakedlighting", "Baked lighting", true);
+
+        /// <summary>The Team HQ's reflections from a baked probe per room. Off, one live probe drawn when the scene loads.</summary>
+        public static readonly GraphicsOption BakedReflections = Toggle("settings.hqbakedreflections", "Baked reflections", true);
+
+        /// <summary>Oil, tyre marks and grime on the Team HQ's floor and walls.</summary>
+        public static readonly GraphicsOption Wear = Toggle("settings.hqwear", "Wear", true);
+
         /// <summary>An option that is on or off.</summary>
         private static GraphicsOption Toggle(string key, string label, bool on) => Add(new GraphicsOption(key, label, on ? 1 : 0, 1));
 
