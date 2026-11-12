@@ -8,9 +8,9 @@ namespace TarmacGauntlet.Rendering
 {
     /// <summary>
     /// The scene's post-processing, on its global volume: the ACES tone curve with a colour grade the scene sets
-    /// (<see cref="Set"/>), bloom at half resolution, motion blur from the camera's own movement, and depth of field for a camera
+    /// (<see cref="Set"/>), bloom at half resolution, and depth of field for a camera
     /// that asks for it each frame (<see cref="Focus"/>): the broadcast and replay cameras, never a driving view. Each follows its
-    /// graphics option. When a camera cuts to another shot, the temporal upscaler forgets the old one and that frame has no blur.
+    /// graphics option. When a camera cuts to another shot, the temporal upscaler forgets the old one.
     /// </summary>
     [RequireComponent(typeof(Volume))]
     public sealed class PostEffects : MonoBehaviour
@@ -35,7 +35,6 @@ namespace TarmacGauntlet.Rendering
         /// </summary>
         private const float ToneExposure = 0.45f;
         private const float BloomThreshold = 1.2f, BloomIntensity = 0.5f, BloomScatter = 0.65f;
-        private const float BlurIntensity = 0.35f, BlurClamp = 0.05f;
         /// <summary>A camera that moves further than this in a frame, m, or turns further, degrees, has cut to another shot.</summary>
         private const float CutMove = 8f, CutTurn = 30f;
         /// <summary>
@@ -49,7 +48,6 @@ namespace TarmacGauntlet.Rendering
         private ColorAdjustments adjustments;
         private WhiteBalance balance;
         private Bloom bloom;
-        private MotionBlur blur;
         private DepthOfField dof;
         /// <summary>Each camera that asked for depth of field: how far its subject is, m, and the frame it asked on.</summary>
         private readonly Dictionary<Camera, (float distance, int frame)> focus = new Dictionary<Camera, (float, int)>();
@@ -72,11 +70,6 @@ namespace TarmacGauntlet.Rendering
             bloom.scatter.Override(BloomScatter);
             bloom.downscale.Override(BloomDownscaleMode.Half);
             bloom.highQualityFiltering.Override(false);
-            blur = profile.Add<MotionBlur>();
-            blur.mode.Override(MotionBlurMode.CameraOnly);
-            blur.quality.Override(MotionBlurQuality.Low);
-            blur.intensity.Override(BlurIntensity);
-            blur.clamp.Override(BlurClamp);
             dof = profile.Add<DepthOfField>();
             dof.mode.Override(DepthOfFieldMode.Gaussian);
             dof.active = false;
@@ -88,7 +81,6 @@ namespace TarmacGauntlet.Rendering
 
             GraphicsOptions.ColourGrading.Changed += Show;
             GraphicsOptions.Bloom.Changed += Show;
-            GraphicsOptions.MotionBlur.Changed += Show;
             RenderPipelineManager.beginCameraRendering += Watch;
             Set(grade);
             Show(null);
@@ -98,7 +90,6 @@ namespace TarmacGauntlet.Rendering
         {
             GraphicsOptions.ColourGrading.Changed -= Show;
             GraphicsOptions.Bloom.Changed -= Show;
-            GraphicsOptions.MotionBlur.Changed -= Show;
             RenderPipelineManager.beginCameraRendering -= Watch;
             if (Current == this) Current = null;
             Destroy(profile);
@@ -132,10 +123,9 @@ namespace TarmacGauntlet.Rendering
             adjustments.active = grading;
             balance.active = grading;
             bloom.active = GraphicsOptions.Bloom.On;
-            blur.active = GraphicsOptions.MotionBlur.On;
         }
 
-        /// <summary>Before each camera draws: a cut clears the upscaler's history and draws the frame without blur.</summary>
+        /// <summary>Before each camera draws: a cut clears the upscaler's history.</summary>
         private void Watch(ScriptableRenderContext context, Camera camera)
         {
             if (camera.cameraType != CameraType.Game) return;
@@ -144,7 +134,6 @@ namespace TarmacGauntlet.Rendering
                 && ((now.position - before.position).sqrMagnitude > CutMove * CutMove || Quaternion.Angle(now.rotation, before.rotation) > CutTurn);
             seen[camera] = now;
             if (cut) camera.GetUniversalAdditionalCameraData().resetHistory = true;
-            blur.intensity.Override(cut ? 0f : BlurIntensity);
             Depth(camera);
             if (seen.Count > 8) Forget();
         }

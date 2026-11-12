@@ -46,9 +46,6 @@ namespace TarmacGauntlet.Visuals
         /// <summary>Soft shadow in creases and where things meet the ground, worked out on the screen at half resolution.</summary>
         public static readonly GraphicsOption AmbientOcclusion = Toggle("settings.ssao", true);
 
-        /// <summary>A blur along the camera's own movement.</summary>
-        public static readonly GraphicsOption MotionBlur = Toggle("settings.motionblur", true);
-
         /// <summary>
         /// Depth of field on the broadcast cameras (and any replay camera that asks for it): the background past the car on screen
         /// blurs, more through a long lens. Never while driving. Changes live.
@@ -104,7 +101,7 @@ namespace TarmacGauntlet.Visuals
         public static readonly IReadOnlyList<GraphicsRow> Rows = new[]
         {
             new GraphicsRow("Real lights", new[] { 2, 6, 12 }, RealLights),
-            new GraphicsRow("Post effects", OffAtLow, ColourGrading, Bloom, AmbientOcclusion, MotionBlur),
+            new GraphicsRow("Post effects", OffAtLow, ColourGrading, Bloom, AmbientOcclusion),
             new GraphicsRow("Depth of field", OffAtLow, DepthOfField),
             new GraphicsRow("Car detail", OffAtLow, Clearcoat, PaintFlake, CarGlass, LampLenses, CarTrims, CarReflections),
             new GraphicsRow("Track detail", AlwaysOn, TarmacDetail, RubberedLine, KerbWear, SkidMarks),
