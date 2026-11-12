@@ -85,6 +85,7 @@ namespace TarmacGauntlet.Raceday
             /// <summary>Where the tyre last touched a paved surface, and how hard it slid there (0 when it gripped).</summary>
             public Vector3 Contact, ContactNormal;
             public float Skid;
+            public SurfaceKind Kind;
         }
 
         /// <summary>Wheel i's visual pivot, at its centre: 0 front left, 1 front right, 2 rear left, 3 rear right. Null with none.</summary>
@@ -106,6 +107,15 @@ namespace TarmacGauntlet.Raceday
             contact = w != null ? w.Contact : Vector3.zero;
             normal = w != null ? w.ContactNormal : Vector3.up;
             return w == null || Asleep || !w.Grounded ? 0f : w.Skid;
+        }
+
+        /// <summary>What wheel i stands on, and false in the air or with the car off physics.</summary>
+        public bool Ground(int i, out SurfaceKind kind)
+        {
+            Wheel w = wheels[i];
+            bool on = w != null && !Asleep && w.Grounded;
+            kind = on ? w.Kind : SurfaceKind.Tarmac;
+            return on;
         }
 
         /// <summary>
@@ -338,6 +348,7 @@ namespace TarmacGauntlet.Raceday
                 body.AddForceAtPosition(up * load, origin);
 
                 SurfaceKind kind = SurfaceOf(hit.collider);
+                w.Kind = kind;
                 float angle = w.Front ? steer : 0f;
                 Vector3 n = hit.normal;
                 Vector3 forward = Vector3.ProjectOnPlane(Quaternion.AngleAxis(angle * Mathf.Rad2Deg, up) * transform.forward, n).normalized;
