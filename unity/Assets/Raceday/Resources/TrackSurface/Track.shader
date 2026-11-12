@@ -1,12 +1,15 @@
-// The circuit's paved surfaces: the road, the pit lane and the kerbs. A grain texture with a normal map, both made in
-// code (TrackTextures.cs), with broad patches laid over it in world space so the 4 m tile never reads as a repeat. On
-// the road, a rubbered racing line: a map along the lap gives where the line runs across the road and how much rubber
-// lies on it, and the band is darkest under the two tyre tracks. The mesh has no tangents, so the normal map is turned
-// into the surface from the screen-space change of position and uv. In the wet (_TRACK_WET) the surface darkens as its
-// pores fill, water fills the grain and shines with the scene's reflection probes, the cars clear a drier line, and
-// puddles stand in the road's dips and at the edge its camber drains to, rippled by the rain. The water's depth and the
-// rain come from WeatherView as globals. The keywords _TRACK_DETAIL (normals and patches), _TRACK_RUBBER (the line)
-// and _TRACK_WET switch the parts on, so a part switched off costs nothing; puddles and ripples follow globals too.
+// The circuit's paved surfaces: the road, the pit lane and the kerbs. A fine grain texture with a normal map, both
+// made in code (TrackTextures.cs), with broad patches laid over it in world space so the 4 m tile never reads as a
+// repeat, and repairs laid along the road: sealed cracks and rectangles of relaid tarmac, each repeat of their tile
+// shifted and mirrored against the last. On the road, a rubbered racing line: a map along the lap gives where the line
+// runs across the road and how much rubber lies on it, the band is darkest under the two tyre tracks, and rubber marks
+// from locked and spinning tyres lie about it, most where the line holds most rubber. The mesh has no tangents, so the
+// normal map is turned into the surface from the screen-space change of position and uv. In the wet (_TRACK_WET) the
+// surface darkens as its pores fill, water fills the grain and shines with the scene's reflection probes, the cars
+// clear a drier line, and puddles stand in the road's dips and at the edge its camber drains to, rippled by the rain.
+// The water's depth and the rain come from WeatherView as globals. The keywords _TRACK_DETAIL (normals, patches and
+// repairs), _TRACK_RUBBER (the line and its marks) and _TRACK_WET switch the parts on, so a part switched off costs
+// nothing; puddles and ripples follow globals too.
 Shader "Hidden/TarmacGauntlet/Track"
 {
     Properties
@@ -18,6 +21,9 @@ Shader "Hidden/TarmacGauntlet/Track"
         [NoScaleOffset] _Macro ("Patches", 2D) = "gray" {}
         _MacroScale ("Metres per patch tile", Float) = 60
         _MacroStrength ("Patchiness", Range(0, 1)) = 0.5
+        [NoScaleOffset] _Repairs ("Sealed cracks, patches", 2D) = "black" {}
+        _RepairAmount ("How much repair shows", Range(0, 1)) = 0
+        [NoScaleOffset] _Marks ("Rubber marks about the line", 2D) = "black" {}
         [NoScaleOffset] _Line ("Racing line along the lap", 2D) = "black" {}
         _LineLength ("Lap length in uv metres", Float) = 1
         _UvMetres ("Metres per uv unit", Vector) = (4, 4, 0, 0)
@@ -39,6 +45,10 @@ Shader "Hidden/TarmacGauntlet/Track"
         SAMPLER(sampler_BumpMap);
         TEXTURE2D(_Macro);
         SAMPLER(sampler_Macro);
+        TEXTURE2D(_Repairs);
+        SAMPLER(sampler_Repairs);
+        TEXTURE2D(_Marks);
+        SAMPLER(sampler_Marks);
         TEXTURE2D(_Line);
         SAMPLER(sampler_Line);
         TEXTURE2D(_Pools);
@@ -62,6 +72,7 @@ Shader "Hidden/TarmacGauntlet/Track"
             half _BumpScale;
             float _MacroScale;
             half _MacroStrength;
+            half _RepairAmount;
             float _LineLength;
             float4 _UvMetres;
             half _Smoothness;
@@ -166,6 +177,25 @@ Shader "Hidden/TarmacGauntlet/Track"
                     float3 t = SAMPLE_TEXTURE2D(_BumpMap, sampler_BumpMap, uv).xyz * 2 - 1;
                     t.xy *= _BumpScale;
                     normal = Perturb(normal, i.positionWS, uv, normalize(t));
+
+                    // Repairs, 12 m across by 72 m along the road. Each repeat of the tile is shifted across and
+                    // mirrored by a hash of its number; its ends hold nothing, so no seam shows. Read with the
+                    // unshifted gradients, so the jump between repeats picks no wrong mip.
+                    float2 r = i.uv * _UvMetres.xy / float2(12, 72);
+                    float tile = floor(r.y);
+                    float2 hash = frac(float2(0.6180339, 0.7548776) * tile + float2(0.13, 0.41));
+                    float2 inTile = float2(r.x + hash.x, frac(r.y));
+                    inTile = lerp(inTile, float2(-inTile.x, 1 - inTile.y), step(0.5, hash.y));
+                    half3 repair = SAMPLE_TEXTURE2D_GRAD(_Repairs, sampler_Repairs, inTile, ddx(r), ddy(r)).rgb;
+                    // Relaid tarmac: mostly newer and darker than the road round it, a little smoother.
+                    half relaid = repair.g * _RepairAmount;
+                    albedo *= lerp(1, lerp(0.76, 1.1, repair.b), relaid);
+                    smoothness *= lerp(1, 1.1, relaid);
+                    // Sealant: near-black bitumen, glossy and smooth over the grain.
+                    half seal = repair.r * _RepairAmount;
+                    albedo = lerp(albedo, half3(0.03, 0.03, 0.033), seal * 0.75);
+                    smoothness = lerp(smoothness, 0.5, seal);
+                    normal = normalize(lerp(normal, flat, seal * 0.8));
                 #endif
 
                 #if _TRACK_RUBBER || _TRACK_WET
@@ -180,9 +210,11 @@ Shader "Hidden/TarmacGauntlet/Track"
                 #if _TRACK_RUBBER
                     // Streaks along the line, long in the direction of travel.
                     half streak = SAMPLE_TEXTURE2D(_Macro, sampler_Macro, float2(m.x * 0.45, m.y * 0.012)).g;
-                    half rubber = saturate(band * onLine.g * (0.45 + streak * 1.1));
-                    albedo *= 1 - rubber * 0.55;
-                    smoothness = saturate(smoothness + rubber * 0.08);
+                    half rubber = saturate(band * onLine.g * (0.5 + streak * 1.1));
+                    // Marks about the line, 8 m across it by 160 m along the lap, fewest where it holds least rubber.
+                    half marks = SAMPLE_TEXTURE2D(_Marks, sampler_Marks, float2(d / 8 + 0.5, m.y / 160)).r * saturate(onLine.g * 1.6 - 0.45);
+                    albedo *= (1 - rubber * 0.7) * (1 - marks * 0.7);
+                    smoothness = saturate(smoothness + rubber * 0.08 + marks * 0.06);
                 #endif
 
                 #if _TRACK_WET
