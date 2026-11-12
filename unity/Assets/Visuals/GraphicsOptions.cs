@@ -17,6 +17,18 @@ namespace TarmacGauntlet.Visuals
         /// <summary>Most real lights at night in the race: the rest of the night lighting is drawn glowing. Read at the start of a race.</summary>
         public static readonly GraphicsOption RealLights = Count("settings.reallights", "Real lights", 6, 24);
 
+        /// <summary>Grain and bumps in the tarmac and kerbs, and broad patches across the tarmac.</summary>
+        public static readonly GraphicsOption TarmacDetail = Toggle("settings.tarmacdetail", "Tarmac detail", true);
+
+        /// <summary>A darker band of rubber laid down along the racing line.</summary>
+        public static readonly GraphicsOption RubberedLine = Toggle("settings.rubberedline", "Rubbered line", true);
+
+        /// <summary>Rubber, chips and dust on the kerbs.</summary>
+        public static readonly GraphicsOption KerbWear = Toggle("settings.kerbwear", "Kerb wear", true);
+
+        /// <summary>Marks a sliding or spinning tyre leaves on the track during the race.</summary>
+        public static readonly GraphicsOption SkidMarks = Toggle("settings.skidmarks", "Skid marks", true);
+
         /// <summary>An option that is on or off.</summary>
         private static GraphicsOption Toggle(string key, string label, bool on) => Add(new GraphicsOption(key, label, on ? 1 : 0, 1));
 

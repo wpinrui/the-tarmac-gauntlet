@@ -81,6 +81,6 @@ namespace TarmacGauntlet.Raceday
 {
     public sealed class CircuitMaterials
     {
-        public UnityEngine.Material Asphalt, PitAsphalt, White, Yellow, Kerb, Verge, Grass, Gravel, Armco, Tyres, Concrete, Hatch, Terrain, GarageInside, Bollard;
+        public UnityEngine.Material Asphalt, RoadEdge, PitAsphalt, White, Yellow, Kerb, Verge, Grass, Gravel, Armco, Tyres, Concrete, Hatch, Terrain, GarageInside, Bollard;
     }
 }

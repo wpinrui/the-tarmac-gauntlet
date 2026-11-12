@@ -17,9 +17,9 @@ namespace TarmacGauntlet.Raceday
         /// <summary>
         /// A strip through rows of points. Every row has the same number of points, ordered
         /// from left to right as seen driving along the rows. UVs are metres across and along,
-        /// divided by the tile sizes.
+        /// divided by the tile sizes. With <paramref name="flipAcross"/>, across is measured from the right instead.
         /// </summary>
-        public void Strip(IList<Vector3[]> rows, float tileAcross, float tileAlong, bool doubleSided = false, System.Func<Vector3, Vector3> normalAt = null, System.Func<Vector3, Vector2> uvAt = null)
+        public void Strip(IList<Vector3[]> rows, float tileAcross, float tileAlong, bool doubleSided = false, System.Func<Vector3, Vector3> normalAt = null, System.Func<Vector3, Vector2> uvAt = null, bool flipAcross = false)
         {
             if (rows.Count < 2) return;
             int cols = rows[0].Length;
@@ -28,12 +28,14 @@ namespace TarmacGauntlet.Raceday
             for (int r = 0; r < rows.Count; r++)
             {
                 if (r > 0) along += Vector3.Distance(Mid(rows[r]), Mid(rows[r - 1]));
-                float across = 0;
+                float across = 0, width = 0;
+                if (flipAcross)
+                    for (int c = 1; c < cols; c++) width += Vector3.Distance(rows[r][c], rows[r][c - 1]);
                 for (int c = 0; c < cols; c++)
                 {
                     if (c > 0) across += Vector3.Distance(rows[r][c], rows[r][c - 1]);
                     vertices.Add(rows[r][c]);
-                    uvs.Add(uvAt != null ? uvAt(rows[r][c]) : new Vector2(across / tileAcross, along / tileAlong));
+                    uvs.Add(uvAt != null ? uvAt(rows[r][c]) : new Vector2((flipAcross ? width - across : across) / tileAcross, along / tileAlong));
                     Vector3 fwd = rows[Mathf.Min(r + 1, rows.Count - 1)][c] - rows[Mathf.Max(r - 1, 0)][c];
                     Vector3 side = rows[r][Mathf.Min(c + 1, cols - 1)] - rows[r][Mathf.Max(c - 1, 0)];
                     Vector3 n = Vector3.Cross(fwd, side);
