@@ -44,7 +44,7 @@ export const AI_TEAM_ROSTER: AiTeamEntry[] = [
   { name: "Dockyard Racing",              descriptor: "harbour-town mechanics turned racers", carClass: "E" },
   { name: "Whitfield & Sons",             descriptor: "father-and-sons operation since forever", carClass: "E" },
   { name: "Copper Lane Autosport",        descriptor: "named after the street they wrench on", carClass: "E" },
-  { name: "North Star Racing",            descriptor: "Scandinavian expats chasing points", carClass: "E" },
+  { name: "North Star Racing",            descriptor: "Steady as the pole star", carClass: "E" },
   { name: "Terrace Motorsport",           descriptor: "working-class fan-funded team", carClass: "E" },
   { name: "Gasworks Racing",              descriptor: "smells like petrol, runs like clockwork", carClass: "E" },
   { name: "Southgate Motorsport",         descriptor: "suburban team, real commitment", carClass: "E" },

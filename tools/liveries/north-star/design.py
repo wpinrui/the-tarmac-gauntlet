@@ -254,7 +254,7 @@ def frozen_option(views):
         lv.poly(view, [(x, 0.3 + 0.025 * math.sin(x * 9 + (view == "rear")), 0) for x in xs] + [(1.1, -0.1, 0), (-1.1, -0.1, 0)], SNOW)
     logos(lv, light=False)
     lv.mark("top", MARKS / "compass-night.svg", (0, 0, -0.65), 0.95, rotate=-90)
-    lv.mark("rear", MARKS / "tagline-night.svg", (0, 0.555, 0), 0.05)
+    lv.mark("rear", MARKS / "tagline-night.svg", (0, 0.47, 0), 0.04)
     numbers(lv, NIGHT, NIGHT)
     return lv
 
