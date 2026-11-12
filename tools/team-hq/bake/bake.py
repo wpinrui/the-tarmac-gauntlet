@@ -230,7 +230,7 @@ def lights(sc):
     so.rotation_quaternion = Vector(b(d[0:3])).to_track_quat("-Z", "Y")
     sc.collection.objects.link(so)
     points = []
-    for i, (x, y, z, intensity, r, g, bl) in enumerate(SCENE["lights"]):
+    for i, (x, y, z, intensity, r, g, bl, _) in enumerate(SCENE["lights"]):
         l = bpy.data.lights.new(f"lamp{i}", "POINT")
         l.color = tuple(to_linear([r, g, bl]))
         l.energy = intensity * POINT_SCALE
@@ -272,6 +272,10 @@ def bake_lightmap(sc, lit, glows, lamps, sun, points):
         bpy.ops.object.bake(type="DIFFUSE", use_clear=True)
         return np.array(img.pixels[:], dtype=np.float32).reshape(H, W, 4)[:, :, :3].copy()
 
+    def run_type(kind):
+        bpy.ops.object.bake(type=kind, use_clear=True)
+        return np.array(img.pixels[:], dtype=np.float32).reshape(H, W, 4)[:, :, :3].copy()
+
     # The sun is live in the game: bake only its bounce.
     keep = sun.energy
     for p in points: p.energy, p["e"] = 0, p.energy
@@ -287,19 +291,73 @@ def bake_lightmap(sc, lit, glows, lamps, sun, points):
     day = run(True)
     sun.energy = keep
     for p in points: p.energy = p["e"]
+    # Where each texel is, and how open it is, to match the live room below.
+    sc.cycles.samples = 1
+    pos = run_type("POSITION")[:, :, [0, 2, 1]]
+    sc.cycles.samples = 16 if QUICK else 128
+    sc.world.light_settings.distance = 1.0
+    ao = run_type("AO").mean(-1)
     for ob in lit: ob.select_set(False)
+    return match_live(bounce, lamp, day, pos, ao, glows)
 
-    # The live room is filled by a flat ambient light. The daylight takes its place, so it is scaled to leave the
-    # floor as bright on average as the flat fill and the live lamps leave it.
-    floor = next(np.array(p["uv2"]).reshape(-1, 2) for p in SCENE["parts"] if p["key"] == "floor")
-    (u0, v0), (u1, v1) = floor.min(0), floor.max(0)
-    area = (slice(int(v0 * H) + 1, int(v1 * H) - 1), slice(int(u0 * W) + 1, int(u1 * W) - 1))
-    fill = to_linear(FLAT_SKY).mean()
-    daylight = (fill + lamp[area].mean() - (bounce + lamp)[area].mean()) / max(day[area].mean(), 1e-6)
+
+def floor_texels(key, W, H):
+    """The lightmap texels a floor part covers."""
+    part = next(p for p in SCENE["parts"] if p["key"] == key)
+    uv = np.array(part["uv2"]).reshape(-1, 2) * [W, H]
+    mask = np.zeros((H, W), bool)
+    for t in np.array(part["t"]).reshape(-1, 3):
+        (x0, y0), (x1, y1), (x2, y2) = uv[t]
+        u0, u1 = int(min(x0, x1, x2)), int(math.ceil(max(x0, x1, x2)))
+        v0, v1 = int(min(y0, y1, y2)), int(math.ceil(max(y0, y1, y2)))
+        gx, gy = np.meshgrid(np.arange(u0, u1) + 0.5, np.arange(v0, v1) + 0.5)
+        d = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2)
+        a = ((y1 - y2) * (gx - x2) + (x2 - x1) * (gy - y2)) / d
+        c = ((y2 - y0) * (gx - x2) + (x0 - x2) * (gy - y2)) / d
+        mask[v0:v1, u0:u1] |= (a >= 0) & (c >= 0) & (a + c <= 1)
+    return mask
+
+
+def live_floor(pos):
+    """What the live room shows on a floor at these places: the flat ambient fill and the lamps with URP's falloff."""
+    out = np.tile(to_linear(FLAT_SKY), (len(pos), 1))
+    for x, y, z, intensity, r, g, bl, rng in SCENE["lights"]:
+        d = np.array([x, y, z]) - pos
+        d2 = (d * d).sum(1)
+        fade = np.clip(1 - (d2 / rng ** 2) ** 2, 0, 1) ** 2
+        out += (intensity * np.clip(d[:, 1], 0, None) / np.sqrt(d2) / d2 * fade)[:, None] * to_linear([r, g, bl])
+    return out
+
+
+def match_live(bounce, lamp, day, pos, ao, glows):
+    """The live room is lit by a flat ambient fill. The bake puts daylight in its place, scaled so the garage and office
+    floors are as bright on average as live; a room the daylight hardly reaches gets an occluded fill instead."""
+    H, W = ao.shape
+    rooms = {"floor": "garage", "carpet": "office", "parquet": "trophy"}
+    floors = {k: floor_texels(k, W, H) for k in rooms}
+    target = {k: live_floor(pos[m]).mean() for k, m in floors.items()}
+    base = bounce + lamp
+    lit_by_day = ["floor", "carpet"]
+    n = {k: floors[k].sum() for k in rooms}
+    daylight = sum((target[k] - base[floors[k]].mean()) * n[k] for k in lit_by_day) / sum(day[floors[k]].mean() * n[k] for k in lit_by_day)
     daylight = max(daylight, 1.0)
     print(f"daylight x{daylight:.2f}")
     glow_strength(glows, daylight)
-    return bounce + lamp + day * daylight
+    out = base + day * daylight
+    fill = to_linear(FLAT_SKY)
+    for key in rooms:
+        if key in lit_by_day: continue
+        probe = next(p for p in SCENE["probes"] if p["name"] == rooms[key])
+        lo = np.array(probe["centre"]) - np.array(probe["size"]) / 2 - 0.03
+        hi = lo + np.array(probe["size"]) + 0.06
+        room = ((pos > lo) & (pos < hi)).all(-1)
+        m = floors[key]
+        w = max(target[key] - out[m].mean(), 0) / max(ao[m].mean() * fill.mean(), 1e-6)
+        print(f"{rooms[key]} fill x{w:.2f}")
+        out[room] += ao[room][:, None] * fill * w
+    for key, m in floors.items():
+        print(f"{rooms[key]} floor: live {target[key]:.3f}, baked {out[m].mean():.3f}")
+    return out
 
 
 def render_probe(sc, probe, lamps):
