@@ -15,6 +15,8 @@ namespace TarmacGauntlet.Raceday
     /// ahead of the car that zooms as it comes, a pan from close beside the track, the helicopter, an
     /// onboard, and the pit lane. <see cref="RaceCameras"/> hands it the camera in its TV view. Every shot but the onboard
     /// focuses on its car, so the background blurs (<see cref="PostEffects.Focus"/>).
+    /// With <see cref="Lock"/> set it stays on that one car and cuts between trackside shots and onboards from the
+    /// roll hoop, the nose, the wing mirror, the back of the car and the driver's seat.
     /// </summary>
     public sealed class BroadcastDirector : MonoBehaviour
     {
@@ -24,9 +26,15 @@ namespace TarmacGauntlet.Raceday
         public CarClass[] Classes;
         /// <summary>Index of the player's car, or -1 for none.</summary>
         public int Player = -1;
+        /// <summary>The car to stay on, or -1 to direct the whole race.</summary>
+        public int Lock = -1;
 
         private enum Story { None, Leader, Rejoin, Stop, Mine, Battle, LeadBattle, Crash }
-        private enum Shot { Trackside, Pan, Helicopter, Onboard, PitLane }
+        private enum Shot { Trackside, Pan, Helicopter, Onboard, PitLane, RollHoop, Nose, Mirror, Rear }
+
+        /// <summary>The shots that follow one another on a locked car.</summary>
+        private static readonly Shot[] LockedShots =
+            { Shot.Trackside, Shot.RollHoop, Shot.Pan, Shot.Nose, Shot.Trackside, Shot.Mirror, Shot.Pan, Shot.Rear, Shot.Trackside, Shot.Onboard };
 
         /// <summary>A fight is two cars of a class this close, s.</summary>
         private const float BattleGap = 0.5f;
@@ -63,11 +71,23 @@ namespace TarmacGauntlet.Raceday
         public bool Helicopter => shot == Shot.Helicopter;
         /// <summary>Counts the cuts to a new story or car, so graphics can tell a new one has started.</summary>
         public int Stories { get; private set; }
+        /// <summary>Counts every cut.</summary>
+        public int Shots { get; private set; }
+        /// <summary>The car the camera is on, round which a viewer may turn it.</summary>
+        public Vector3 Centre => subject >= 0 && Live(subject) ? Cars[subject].transform.position + Vector3.up * 0.8f : Vector3.zero;
 
         /// <summary>Puts the camera where the current shot wants it, thinking first if it is time to.</summary>
         public void Frame(Camera cam)
         {
             if (Cars == null || Circuit == null) return;
+            if (Lock >= 0)
+            {
+                if (Lock >= Cars.Length || !Live(Lock)) return;
+                if (subject != Lock) Cut(Story.Mine, Lock, -1, true);
+                else if (Cars[Lock].InPitLane != (shot == Shot.PitLane) || ShotDone()) Cut(Story.Mine, Lock, -1, false);
+                Place(cam);
+                return;
+            }
             onAir = Time.frameCount;
             if (Now >= nextThink)
             {
@@ -177,7 +197,7 @@ namespace TarmacGauntlet.Raceday
         private static float MinLength(Shot s) => s switch
         {
             Shot.Helicopter => 8f,
-            Shot.Onboard => 6f,
+            Shot.Onboard or Shot.RollHoop or Shot.Nose or Shot.Mirror or Shot.Rear => 6f,
             Shot.Pan => 3f,
             Shot.PitLane => 4f,
             _ => 4f,
@@ -186,7 +206,7 @@ namespace TarmacGauntlet.Raceday
         private static float MaxLength(Shot s) => s switch
         {
             Shot.Helicopter => 15f,
-            Shot.Onboard => 12f,
+            Shot.Onboard or Shot.RollHoop or Shot.Nose or Shot.Mirror or Shot.Rear => 10f,
             Shot.Pan => 6f,
             Shot.PitLane => 40f,
             _ => 8f,
@@ -199,7 +219,8 @@ namespace TarmacGauntlet.Raceday
             other = with;
             shotCount = newStory ? 0 : shotCount + 1;
             if (newStory) Stories++;
-            shot = Pick(s, shotCount);
+            Shots++;
+            shot = Lock >= 0 ? Cars[car].InPitLane ? Shot.PitLane : LockedShots[shotCount % LockedShots.Length] : Pick(s, shotCount);
             // A stop is shown until it's over: once the car leaves its box the story moves on.
             if (s == Story.Stop && shotCount > 0) shot = Shot.Trackside;
             shotStart = Now;
@@ -273,6 +294,24 @@ namespace TarmacGauntlet.Raceday
                     cam.fieldOfView = 70f;
                     break;
                 }
+                case Shot.RollHoop:
+                case Shot.Nose:
+                case Shot.Mirror:
+                case Shot.Rear:
+                {
+                    Bounds b = Body(t);
+                    (Vector3 at, Quaternion look) = shot switch
+                    {
+                        Shot.RollHoop => (new Vector3(0f, b.max.y + 0.2f, b.center.z - 0.15f * b.size.z), Quaternion.Euler(6f, 0f, 0f)),
+                        Shot.Nose => (new Vector3(0f, b.min.y + 0.3f, b.max.z + 0.05f), Quaternion.Euler(2f, 0f, 0f)),
+                        // Looking back down the car's right side.
+                        Shot.Mirror => (new Vector3(b.max.x + 0.08f, b.min.y + 0.55f * b.size.y, b.center.z + 0.15f * b.size.z), Quaternion.Euler(4f, 188f, 0f)),
+                        _ => (new Vector3(0f, b.min.y + 0.6f * b.size.y, b.min.z - 0.05f), Quaternion.Euler(5f, 180f, 0f)),
+                    };
+                    cam.transform.SetPositionAndRotation(t.TransformPoint(at), t.rotation * look);
+                    cam.fieldOfView = shot == Shot.RollHoop ? 65f : 75f;
+                    break;
+                }
                 case Shot.PitLane:
                 {
                     if (!placed)
@@ -286,7 +325,36 @@ namespace TarmacGauntlet.Raceday
                     break;
                 }
             }
-            if (shot != Shot.Onboard) PostEffects.Focus(cam, Vector3.Distance(cam.transform.position, target));
+            if (!Onboard(shot)) PostEffects.Focus(cam, Vector3.Distance(cam.transform.position, target));
+        }
+
+        private static bool Onboard(Shot s) => s == Shot.Onboard || s == Shot.RollHoop || s == Shot.Nose || s == Shot.Mirror || s == Shot.Rear;
+
+        private readonly System.Collections.Generic.Dictionary<int, Bounds> bodies = new System.Collections.Generic.Dictionary<int, Bounds>();
+
+        /// <summary>The car's body in its own frame, from its meshes, measured once per car.</summary>
+        private Bounds Body(Transform car)
+        {
+            if (bodies.TryGetValue(car.GetInstanceID(), out Bounds b)) return b;
+            bool any = false;
+            Matrix4x4 toCar = car.worldToLocalMatrix;
+            foreach (MeshFilter mf in car.GetComponentsInChildren<MeshFilter>())
+            {
+                if (mf.sharedMesh == null) continue;
+                Bounds m = mf.sharedMesh.bounds;
+                Matrix4x4 into = toCar * mf.transform.localToWorldMatrix;
+                for (int c = 0; c < 8; c++)
+                {
+                    Vector3 corner = m.center + Vector3.Scale(m.extents, new Vector3((c & 1) == 0 ? -1 : 1, (c & 2) == 0 ? -1 : 1, (c & 4) == 0 ? -1 : 1));
+                    Vector3 p = into.MultiplyPoint3x4(corner);
+                    if (!any) { b = new Bounds(p, Vector3.zero); any = true; }
+                    else b.Encapsulate(p);
+                }
+            }
+            // A car with no meshes yet: a typical racing car.
+            if (!any) b = new Bounds(new Vector3(0f, 0.6f, 0f), new Vector3(1.9f, 1.2f, 4.6f));
+            else bodies[car.GetInstanceID()] = b;
+            return b;
         }
 
         /// <summary>Turns the camera to the target, smoothly after the first frame of a shot.</summary>

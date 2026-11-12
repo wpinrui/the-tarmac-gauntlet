@@ -312,6 +312,9 @@
 .track-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 9px; background-color: rgb(255, 255, 255); }
 .knob { position: absolute; top: 9px; width: 16px; height: 16px; margin-left: -8px; border-radius: 8px; background-color: rgb(255, 255, 255); }
 .slider-value { width: 32px; font-size: 15px; -unity-text-align: middle-right; }
+.slider-value.wide { width: 46px; }
+.settings-reset { width: 250px; height: 36px; }
+.settings-reset > .ghost-label { font-size: 14px; letter-spacing: 1.1px; }
 
 /* Skill points: pips for the points left, then each skill between a minus and a plus */
 .skills { flex-shrink: 0; }

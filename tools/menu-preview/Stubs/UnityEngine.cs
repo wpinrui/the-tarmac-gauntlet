@@ -239,6 +239,7 @@ namespace UnityEngine
 
     public static class PlayerPrefs
     {
+        public static void DeleteKey(string k) { }
         public static bool HasKey(string k) => false;
         public static int GetInt(string k, int d = 0) => d;
         public static float GetFloat(string k, float d = 0) => d;
@@ -351,6 +352,7 @@ namespace UnityEngine
         public static float Sin(float v) => (float)Math.Sin(v);
         public static float Cos(float v) => (float)Math.Cos(v);
         public static float Lerp(float a, float b, float t) => a + (b - a) * Clamp01(t);
+        public static float InverseLerp(float a, float b, float v) => a == b ? 0f : Clamp01((v - a) / (b - a));
         public static float Max(float a, float b) => Math.Max(a, b);
         public static float Floor(float v) => (float)Math.Floor(v);
         public static int Max(int a, int b) => Math.Max(a, b);
