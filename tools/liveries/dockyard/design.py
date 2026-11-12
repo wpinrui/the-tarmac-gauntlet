@@ -26,8 +26,6 @@ TOOL = "#ffe680"       # the yellow, 25% lighter
 NAVY = "#152a4a"
 CREAM = "#fff4d6"
 INK = "#111214"
-RED = "#c92a22"
-CHALK = "#22302b"
 WHITE = "#ffffff"
 
 # Fantasy landmarks in OBJ metres: z along the car (+ nose), y up. Read off the true-scale views.
@@ -145,7 +143,7 @@ def diner_logo(scheme):
         # bleached plank, navy script edged in cream, DINER cream on a navy tag
         "bleached": dict(wood="#dcc7a2", grain="#b89c74", edge=NAVY, script=NAVY, script_edge=CREAM, tag=NAVY, tag_ink=CREAM),
         # dark plank, cream script, red DINER
-        "dark": dict(wood="#6e4529", grain="#8f6142", edge="#3e2615", script=CREAM, script_edge="#3e2615", tag="#3e2615", tag_ink="#e8392c"),
+        "dark": dict(wood="#6e4529", grain="#8f6142", edge="#3e2615", script=CREAM, script_edge="#3e2615", tag="#3e2615", tag_ink="#ff4a3a"),
         # mid plank, white script edged navy, DINER white on a red tag
         "tagged": dict(wood="#b88555", grain="#94653b", edge=NAVY, script=WHITE, script_edge=NAVY, tag="#c92a22", tag_ink=WHITE),
     }[scheme]
@@ -184,48 +182,38 @@ def _burger(x, y, s, bun, filling):
             f'<path d="M-34,25 h68 a6,6 0 0,1 -6,10 h-56 a6,6 0 0,1 -6,-10z" fill="{bun}"/></g>')
 
 
-def diner_ad(style):
-    """The tailgate as an advert for the Driftwood Diner: a board cut to the tailgate's shape,
-    the plank in the middle under the badge, what they serve either side. Units are millimetres,
-    1100 by 300, centred on TAILGATE."""
+def _sticker(art, edge=CREAM, w=16):
+    """Die-cut: a cream edge cut close round every shape and letter, under the art."""
+    fat = (art.replace(f'fill="{NAVY}"', f'fill="{edge}" stroke="{edge}" stroke-width="{w}" stroke-linejoin="round"')
+              .replace('fill="#e2a24a"', f'fill="{edge}" stroke="{edge}" stroke-width="{w}" stroke-linejoin="round"')
+              .replace('fill="#3f8f3a"', f'fill="{edge}" stroke="{edge}" stroke-width="{w}"')
+              .replace('fill="#6b3a22"', f'fill="{edge}" stroke="{edge}" stroke-width="{w}"')
+              .replace(f'stroke="{NAVY}" stroke-width="7"', f'stroke="{edge}" stroke-width="{7 + w}"')
+              .replace(f'stroke="{NAVY}" stroke-width="5"', f'stroke="{edge}" stroke-width="{5 + w}"'))
+    return f'<g>{fat}</g><g>{art}</g>'
+
+
+def diner_ad():
+    """The back of the car as an advert for the Driftwood Diner: the plank on the tailgate under
+    the badge, a sticker either side for what they serve, the address under it in black.
+    Millimetres, 1100 by 300, centred on TAILGATE."""
     vb, plank = _inner(diner_logo("dark"))
-    board = "M20,12 L1080,12 L1010,292 L90,292Z"
-    if style == "billboard":
-        ground, edge, ink, accent = CREAM, NAVY, NAVY, RED
-        left = _cup(240, 178, 76, NAVY)
-        right = _burger(870, 135, 100, "#e2a24a", ("#3f8f3a", "#6b3a22"))
-        lines_l = ("BOTTOMLESS", "COFFEE")
-        lines_r = ("ALL-DAY", "BREAKFAST")
-        foot = "PIER 9  HARBOUR ROAD"
-    else:  # chalkboard: the specials board on the counter
-        ground, edge, ink, accent = CHALK, "#8a5a34", CREAM, YELLOW
-        left = right = ""
-        lines_l = ("FRY-UP  6.50", "FISH & CHIPS  8.00")
-        lines_r = ("PIT CREW PIE  5.00", "COFFEE  FREE REFILLS")
-        foot = "OPEN 6AM TILL LATE"
-    def block(x, lines, y0, size):
-        return "".join(f'<text x="{x}" y="{y0 + i * size * 1.1}" text-anchor="middle" font-family="Barlow" font-size="{size}" '
-                       f'letter-spacing="{size * 0.08:.1f}" fill="{ink}">{t.replace("&", "&amp;")}</text>' for i, t in enumerate(lines))
-    if style == "billboard":
-        sides = block(240, lines_l, 232, 26) + block(870, lines_r, 214, 30)
-    else:
-        sides = block(240, lines_l, 190, 26) + block(870, lines_r, 160, 28)
-        sides += f'<text x="270" y="86" text-anchor="middle" font-family="Pacifico" font-size="40" fill="{accent}">Today</text>'
-        sides += f'<text x="870" y="96" text-anchor="middle" font-family="Pacifico" font-size="40" fill="{accent}">Specials</text>'
-    art = (f'<path d="{board}" fill="{ground}" stroke="{edge}" stroke-width="12" stroke-linejoin="round"/>'
-           f'<path d="M44,28 L1056,28 L994,276 L106,276Z" fill="none" stroke="{accent}" stroke-width="3"/>'
-           + left + right + sides
-           + f'<svg x="375" y="98" width="350" height="146" viewBox="{vb}">{plank}</svg>'
-           + f'<text x="550" y="266" text-anchor="middle" dominant-baseline="auto" font-family="Barlow" font-size="22" letter-spacing="6" fill="{accent}">{foot}</text>')
+
+    def words(x, y, lines, size):
+        return "".join(f'<text x="{x}" y="{y + i * size * 1.05}" text-anchor="middle" font-family="Barlow" font-size="{size}" '
+                       f'letter-spacing="{size * 0.06:.1f}" fill="{NAVY}">{t}</text>' for i, t in enumerate(lines))
+    coffee = _sticker(_cup(272, 162, 72, NAVY) + words(272, 226, ("BOTTOMLESS", "COFFEE"), 28))
+    breakfast = _sticker(_burger(840, 150, 90, "#e2a24a", ("#3f8f3a", "#6b3a22")) + words(840, 226, ("ALL-DAY", "BREAKFAST"), 28))
+    art = (coffee + breakfast
+           + f'<svg x="394" y="94" width="312" height="135" viewBox="{vb}">{plank}</svg>'
+           + f'<text x="550" y="276" text-anchor="middle" font-family="Barlow" font-size="44" letter-spacing="5" fill="{INK}">PIER 9  HARBOUR ROAD</text>')
     return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 300">{art}</svg>'
 
 
-def bumper_strip(style):
+def bumper_strip():
     """A strip across the rear bumper finishing the advert, 1240 by 110 mm."""
-    ground, ink = (NAVY, CREAM) if style == "billboard" else (CHALK, CREAM)
-    line = "EAT LIKE A MECHANIC" if style == "billboard" else "PIER 9  HARBOUR ROAD"
-    art = (f'<rect x="0" y="0" width="1240" height="110" rx="14" fill="{ground}"/>'
-           f'<text x="620" y="56" text-anchor="middle" dominant-baseline="central" font-family="Alfa" font-size="58" letter-spacing="6" fill="{ink}">{line}</text>'
+    art = (f'<rect x="0" y="0" width="1240" height="110" rx="14" fill="{NAVY}"/>'
+           f'<text x="620" y="56" text-anchor="middle" dominant-baseline="central" font-family="Alfa" font-size="58" letter-spacing="6" fill="{CREAM}">EAT LIKE A MECHANIC</text>'
            + "".join(f'<path d="M{x},55 l10,-22 10,22 -10,22z" fill="{YELLOW}"/>' for x in (40, 1180)))
     return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 110">{art}</svg>'
 
@@ -285,7 +273,7 @@ def crane(kind):
 
 
 # ---------------------------------------------------------------- the livery
-def shop_floor(views, ad="billboard", logo="beside", roof=None):
+def shop_floor(views, logo="beside", roof="gantry"):
     """Yellow all over, tools all over; the diner's advert across the back."""
     lv = Livery(views, YELLOW)
     for view in lv.views:
@@ -295,21 +283,14 @@ def shop_floor(views, ad="billboard", logo="beside", roof=None):
     vb = [float(x) for x in svg.split('viewBox="')[1].split('"')[0].split()]
     # 1.0 m across the bonnet, whatever the layout's shape, reading from in front of the car
     lv.mark("top", logo_file(f"team-{logo}", svg), BONNET, 1.0 * vb[3] / vb[2], rotate=-90)
-    lv.mark("rear", logo_file(f"ad-{ad}", diner_ad(ad)), TAILGATE, 0.30)
-    lv.mark("rear", logo_file(f"bumper-{ad}", bumper_strip(ad)), BUMPER, 0.11)
+    lv.mark("rear", logo_file("ad", diner_ad()), TAILGATE, 0.30)
+    lv.mark("rear", logo_file("bumper", bumper_strip()), BUMPER, 0.11)
     if roof:
         lv.mark("top", logo_file(f"roof-{roof}", crane(roof)), ROOF, 1.0)
     return lv
 
 
-OPTIONS = {
-    "billboard": lambda v: shop_floor(v, "billboard"),
-    "gantry": lambda v: shop_floor(v, "billboard", roof="gantry"),
-    "jib": lambda v: shop_floor(v, "billboard", roof="jib"),
-    "skyline": lambda v: shop_floor(v, "billboard", roof="skyline"),
-    "hook": lambda v: shop_floor(v, "billboard", roof="hook"),
-    "chalkboard": lambda v: shop_floor(v, "chalkboard"),
-}
+OPTIONS = {"shop-floor": shop_floor}
 
 if __name__ == "__main__":
     views = HERE / "out" / "views" / "views.json"
