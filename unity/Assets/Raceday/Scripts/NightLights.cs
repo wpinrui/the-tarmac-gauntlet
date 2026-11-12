@@ -45,7 +45,14 @@ namespace TarmacGauntlet.Raceday
         private const float UplightReach = 350f;
         private const float UplightIntensity = 1.5f, UplightRange = 26f, UplightCone = 50f;
 
+        /// <summary>The floodlights' beams in the volumetric mist come from the lamps nearer the camera than this, m.</summary>
+        private const float BeamReach = 400f;
+        /// <summary>How bright a beam lights the mist, and how far past its target it carries.</summary>
+        private const float BeamStrength = 30000f, BeamCarry = 1.6f;
+
         private Slot[] floods, heads;
+        private readonly Vector4[] beamPos = new Vector4[Atmosphere.MostBeams], beamAim = new Vector4[Atmosphere.MostBeams];
+        private int beamCount;
         private Light[] uplights;
         private float nextCheck, night = -1f;
         private readonly List<int> picks = new List<int>();
@@ -109,6 +116,7 @@ namespace TarmacGauntlet.Raceday
         {
             if (floods == null) return;
             float on = NightLook.On(Mathf.Max(night, 0f));
+            Atmosphere.Beams(beamPos, beamAim, on > 0.001f ? beamCount : 0, NightLook.Flood * (on * BeamStrength));
             float step = Time.unscaledDeltaTime / Fade;
             foreach (Slot s in floods) Follow(s, step, on * FloodIntensity, PlaceFlood);
             foreach (Slot s in heads) Follow(s, step, on * HeadIntensity, PlaceHead);
@@ -150,6 +158,22 @@ namespace TarmacGauntlet.Raceday
                     if (d < HeadReach * HeadReach) Insert(i, d, heads.Length);
                 }
             Share(heads, picks);
+
+            picks.Clear();
+            scores.Clear();
+            if (dark)
+                for (int i = 0; i < Layout.Lights.Count; i++)
+                {
+                    float d = (Layout.Lights[i].Position - eye).sqrMagnitude;
+                    if (d < BeamReach * BeamReach) Insert(i, d, Atmosphere.MostBeams);
+                }
+            beamCount = picks.Count;
+            for (int k = 0; k < beamCount; k++)
+            {
+                Floodlight f = Layout.Lights[picks[k]];
+                beamPos[k] = new Vector4(f.Position.x, f.Position.y, f.Position.z, f.Reach * BeamCarry);
+                beamAim[k] = new Vector4(f.Aim.x, f.Aim.y, f.Aim.z, Mathf.Cos(f.Cone * 0.5f * Mathf.Deg2Rad));
+            }
         }
 
         /// <summary>Keeps the nearest few: inserts index i at score d, dropping the worst past the limit.</summary>

@@ -55,6 +55,18 @@ namespace TarmacGauntlet.Visuals
         /// <summary>The race sky drawn with more care: haze at the horizon, a halo round the sun, finer and better lit clouds. Changes live.</summary>
         public static readonly GraphicsOption SkyDetail = Toggle("settings.skydetail", true);
 
+        /// <summary>The sun's rays streaming on screen between the trees, the buildings and the clouds in front of it, and its glare. Changes live.</summary>
+        public static readonly GraphicsOption SunRays = Toggle("settings.sunrays", true);
+
+        /// <summary>Real clouds in the race sky, lit towards the sun, in place of the painted ones. Changes live.</summary>
+        public static readonly GraphicsOption VolumetricClouds = Toggle("settings.volumetricclouds", false);
+
+        /// <summary>A low mist the sun shines through in shafts and the floodlights light in beams. Changes live.</summary>
+        public static readonly GraphicsOption VolumetricFog = Toggle("settings.volumetricfog", false);
+
+        /// <summary>A faint lens flare across the screen from the sun. Changes live.</summary>
+        public static readonly GraphicsOption LensFlare = Toggle("settings.lensflare", false);
+
         /// <summary>The fans in the grandstands, each one flat card turned to the camera. Changes live.</summary>
         public static readonly GraphicsOption Crowd = Toggle("settings.crowd", true);
 
@@ -99,6 +111,8 @@ namespace TarmacGauntlet.Visuals
 
         private static readonly int[] OffAtLow = { 0, 1, 1 };
         private static readonly int[] AlwaysOn = { 1, 1, 1 };
+        /// <summary>Low, Medium, High and Ultra: the most expensive effects, for a card like an RTX 4070.</summary>
+        private static readonly int[] HighUp = { 0, 0, 1, 1 };
 
         /// <summary>The settings menu's rows, in menu order. Every option is in one.</summary>
         public static readonly IReadOnlyList<GraphicsRow> Rows = new[]
@@ -109,7 +123,8 @@ namespace TarmacGauntlet.Visuals
             new GraphicsRow("Car detail", OffAtLow, Clearcoat, PaintFlake, CarGlass, LampLenses, CarTrims, CarReflections),
             new GraphicsRow("Track detail", AlwaysOn, TarmacDetail, RubberedLine, KerbWear, SkidMarks, Mowing),
             new GraphicsRow("Rain effects", OffAtLow, WetTrack, Puddles, RainRipples, Spray, SprayMist),
-            new GraphicsRow("Sky detail", OffAtLow, SkyDetail),
+            new GraphicsRow("Sky detail", OffAtLow, SkyDetail, SunRays),
+            new GraphicsRow("Volumetric sky", HighUp, VolumetricClouds, VolumetricFog, LensFlare),
             new GraphicsRow("Crowd", AlwaysOn, Crowd),
             new GraphicsRow("HQ lighting", AlwaysOn, BakedLighting, BakedReflections, Wear),
         };

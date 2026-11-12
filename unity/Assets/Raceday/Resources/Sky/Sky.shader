@@ -8,6 +8,9 @@
 // the sun scatters its light in a bright halo and a broad glow, the sun is a sharp disc darker at its rim, the
 // moon has a faint halo, and the clouds get a third, finer layer that breaks up their edges, light and shade
 // from two steps towards the sun, darker bases where they are thick and bright rims where the sun is behind them.
+//
+// While the camera drawing has the volumetric clouds (_TgVolumetricClouds, set by VolumetricsFeature), the painted clouds
+// are left out and the volumetric ones are laid over the sky in their place.
 Shader "Hidden/TarmacGauntlet/Sky"
 {
     Properties
@@ -33,6 +36,7 @@ Shader "Hidden/TarmacGauntlet/Sky"
             float4 _SunDir, _MoonDir;
             float4 _CloudOffset;   // xy the big layer, zw the small one
             float _Cover, _Night, _CloudScale, _Overcast;
+            float _TgVolumetricClouds;
 
             struct Attributes
             {
@@ -167,6 +171,7 @@ Shader "Hidden/TarmacGauntlet/Sky"
                 cloud = lerp(cloud, _Haze.rgb, haze * 0.8);
             #endif
 
+                c *= 1.0 - _TgVolumetricClouds;
                 float3 col = sky + (discCol * disc + 0.9 * star + float3(0.85, 0.88, 0.95) * moon * _Night) * (1.0 - c);
                 col = lerp(col, cloud, c);
                 return half4(col, 1.0);
