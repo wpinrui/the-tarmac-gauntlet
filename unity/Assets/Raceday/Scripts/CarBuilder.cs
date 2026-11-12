@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
 {
-    /// <summary>Makes a drivable car: the model, wheel pivots, collider and physics.</summary>
+    /// <summary>Makes a drivable car: the model, wheel pivots, the dark on the ground under it, collider and physics.</summary>
     public static class CarBuilder
     {
         private const int IgnoreRaycastLayer = 2;   // so the car's own suspension rays skip it
@@ -30,6 +30,7 @@ namespace TarmacGauntlet.Raceday
             string modelPath = CarArt.ModelPath(modelId);
             GameObject model = string.IsNullOrEmpty(modelPath) ? null : LoadModel(modelPath);
             Transform[] wheels = model != null ? AttachModel(root, model, modelPath, paint, team, raceNumber) : BuildBox(root, spec, paint ?? new Color(0.8f, 0.81f, 0.83f));
+            CarGround.Fit(root, wheels);
 
             BoxCollider box = root.AddComponent<BoxCollider>();
             box.center = new Vector3(0f, 0.62f, 0.06f);

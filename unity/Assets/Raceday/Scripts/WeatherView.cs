@@ -38,7 +38,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Side of the square of rain round the camera, m.</summary>
         private const float RainBox = 36f;
         /// <summary>Cars that throw spray at once at each quality level, the nearest to the camera within this range, m.</summary>
-        private static readonly int[] SpraysAt = { 6, 12, 16 };
+        private static readonly int[] SpraysAt = { 6, 12, 16, 24 };
         private const float SprayRange = 250f;
         /// <summary>Most particles in one car's spray, and in its mist.</summary>
         private const int MostSpray = 80, MostMist = 20;

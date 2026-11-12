@@ -11,8 +11,9 @@ namespace TarmacGauntlet.Raceday
     /// brings them on earlier under cloud and rain. The ground is lit by the pools alone. Real
     /// lights are kept for the cars near the camera, and light nothing but cars: as many as the settings allow, a third
     /// of them the headlamps of the cars nearest the camera and the rest at the floodlights nearest the camera's view. A light
-    /// moving to another floodlight or car fades out first and back in there, so nothing pops. Two uplights light the
-    /// start gantry while the camera is near it.
+    /// moving to another floodlight or car fades out first and back in there, so nothing pops. With light shadows on, the
+    /// nearer half of the floodlights' and of the headlamps' real lights cast soft shadows on the cars. Two uplights light
+    /// the start gantry while the camera is near it.
     /// </summary>
     public sealed class NightLights : MonoBehaviour
     {
@@ -46,6 +47,8 @@ namespace TarmacGauntlet.Raceday
         private const float UplightIntensity = 1.5f, UplightRange = 26f, UplightCone = 50f;
 
         private Slot[] floods, heads;
+        /// <summary>Light shadows on, read at the start of the race.</summary>
+        private bool shadows;
         private Light[] uplights;
         private float nextCheck, night = -1f;
         private readonly List<int> picks = new List<int>();
@@ -54,6 +57,7 @@ namespace TarmacGauntlet.Raceday
         private void Start()
         {
             int real = RealLights;
+            shadows = GraphicsOptions.LightShadows.On;
             heads = new Slot[Mathf.RoundToInt(real / 3f)];
             floods = new Slot[real - heads.Length];
             for (int i = 0; i < floods.Length; i++) floods[i] = new Slot { Light = Spot("Floodlight " + (i + 1), Materials.Tint) };
@@ -139,6 +143,7 @@ namespace TarmacGauntlet.Raceday
                     if (d < FloodReach * FloodReach) Insert(i, d, floods.Length);
                 }
             Share(floods, picks);
+            Shade(floods, picks, floods.Length / 2);
 
             picks.Clear();
             scores.Clear();
@@ -150,6 +155,18 @@ namespace TarmacGauntlet.Raceday
                     if (d < HeadReach * HeadReach) Insert(i, d, heads.Length);
                 }
             Share(heads, picks);
+            Shade(heads, picks, (heads.Length + 1) / 2);
+        }
+
+        /// <summary>With light shadows on, the lights going to the nearest few picks cast shadows; the others do not.</summary>
+        private void Shade(Slot[] slots, List<int> nearestFirst, int count)
+        {
+            foreach (Slot s in slots)
+            {
+                int rank = s.Want >= 0 ? nearestFirst.IndexOf(s.Want) : -1;
+                LightShadows want = shadows && rank >= 0 && rank < count ? LightShadows.Soft : LightShadows.None;
+                if (s.Light.shadows != want) s.Light.shadows = want;
+            }
         }
 
         /// <summary>Keeps the nearest few: inserts index i at score d, dropping the worst past the limit.</summary>
