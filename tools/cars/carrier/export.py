@@ -92,7 +92,6 @@ def build(game=False):
     cut(shell, parts.grooves(ref))
     print("grooves cut")
 
-    out += parts.exhaust()
     out += parts.mirrors()
     out += parts.interior()
     doors = []

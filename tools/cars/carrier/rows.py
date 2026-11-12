@@ -141,7 +141,7 @@ DIVIDER = [(0.835, 0.745), (0.89, belt(0.89))]    # the rear door's slanted fram
 DOOR_BOTTOM = -0.40                                   # both doors' bottom edge, one straight line
 FRONT_DOOR = [(-0.83, 0.218), (-0.87, DOOR_BOTTOM)]  # front edge: from the window's corner, straight down
 B_SHUT = 0.335                                        # straight down the middle of the B-pillar's black
-REAR_DOOR = [(0.94, 0.742), (1.42, 0.37), (1.42, 0.10)]   # down the C-pillar, then straight down
+REAR_DOOR = [(1.31, 0.30), (1.31, 0.10)]   # from the window's rear corner, straight down
 REAR_ARCH_GAP = 0.06                                  # then round the rear arch this far out from it
 SHUT_ROUND = 0.05                                     # every corner rounded this much
 # Windscreen (top render: Y, half width): foot and head, both straight across.
@@ -161,9 +161,7 @@ BONNET = {"y_rear": -0.91, "y_front": -2.185, "w": 0.785, "r": 0.05}   # plan: a
 TAIL = [(0.32, 0.20), (0.81, 0.20), (0.855, 0.047), (0.32, 0.047)]
 TAIL_SIDE = 0.15        # the lamp runs this far forward round the corner onto the side
 LID = {"w": 0.675, "z0": 0.205, "y_glass": 1.70}     # boot lid: half width, foot on the rear face
-BUMPER_TOP = {"z": 0.0, "y_side": 1.64}     # straight across the back, and straight along the side
 VALANCE = {"w": 0.82, "z0": -0.39, "z1": -0.32}
-EXHAUST = {"w": -0.48, "z": -0.36, "r": 0.03}       # on the car's right
 
 # ---------------------------------------------------------------- mirror (front and top renders)
 MIRROR = {"y0": -0.72, "y1": -0.62, "w0": 0.80, "w1": 0.97, "z0": 0.23, "z1": 0.345}
@@ -197,9 +195,7 @@ data = {
     "tail": end(TAIL),
     "tail_side": H(TAIL_SIDE),
     "lid": {"w": H(LID["w"]), "z0": Z(LID["z0"]), "x_glass": X(LID["y_glass"])},
-    "bumper_top": {"z": Z(BUMPER_TOP["z"]), "x_side": X(BUMPER_TOP["y_side"])},
     "valance": {"w": H(VALANCE["w"]), "z0": Z(VALANCE["z0"]), "z1": Z(VALANCE["z1"])},
-    "exhaust": {"y": H(EXHAUST["w"]), "z": Z(EXHAUST["z"]), "r": H(EXHAUST["r"])},
     "mirror": {"x_back": X(MIRROR["y1"]), "x_front": X(MIRROR["y0"]), "y_in": H(MIRROR["w0"]),
                "y_out": H(MIRROR["w1"]), "z0": Z(MIRROR["z0"]), "z1": Z(MIRROR["z1"])},
     "picks": {"frontbadge": 2, "rearbadge": 4, "name": 1},

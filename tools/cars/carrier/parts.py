@@ -1,5 +1,5 @@
 """The Carrier's parts: lamps, grille, rubbing strip, intake, glass, shut lines, front doors,
-mirrors, exhaust, interior, wheels, badge and name. Every shape and size here is the Carrier's
+mirrors, interior, wheels, badge and name. Every shape and size here is the Carrier's
 own, from rows.json, kept plain and smooth. Runs inside Blender's Python module, called by export.py."""
 import json
 import re
@@ -402,23 +402,14 @@ def lid_loop():
     return fr, np.array(shape.exterior.coords)[:-1]
 
 
-def bumper_path(wr):
-    """The rear bumper's top edge in the rear wrap's (u, z): straight across the back, round the
-    corner and straight forward along the side, at one height."""
-    b = R["bumper_top"]
-    return [(-0.01, b["z"]), (wr.side_u(b["x_side"]), b["z"])]
-
-
 def grooves(ref):
-    """Shut lines as V grooves to cut: doors, bonnet, boot lid, rear bumper."""
+    """Shut lines as V grooves to cut: doors, bonnet, boot lid."""
     obs = []
     for sgn, side in ((1, "l"), (-1, "r")):
         fr = side_fr(sgn)
         obs.append(blend.groove(ref, f"g_fdoor_{side}", front_path(), fr))
         obs.append(blend.groove(ref, f"g_bdoor_{side}", b_path(), fr))
         obs.append(blend.groove(ref, f"g_rdoor_{side}", rear_path(), fr))
-        wr = rear_wrap(sgn)
-        obs.append(blend.groove(ref, f"g_bumper_{side}", bumper_path(wr), wr))
     obs.append(blend.groove(ref, "g_bonnet", bonnet_loop(), top_fr(), closed=True))
     fr, lid = lid_loop()
     obs.append(blend.groove(ref, "g_lid", lid, fr, closed=True))
@@ -461,7 +452,8 @@ def door(ref, shell, obs, sgn=1):
     glass, card and mirror go with it."""
     side = "l" if sgn > 0 else "r"
     o = door_outline()
-    regions = [(o.intersection(box(-5, -1, 5, FLOOR + 0.02)), DOOR_DEPTH),
+    # the two depths overlap, so shrinking the inner cutter by the gap leaves no slit between them
+    regions = [(o.intersection(box(-5, -1, 5, FLOOR + 0.03)), DOOR_DEPTH),
                (o.intersection(box(-5, FLOOR + 0.02, 5, 5)), DOOR_WALL)]
     trim = [ob for ob in obs if ob.name == f"window_trim_{side}"]
     roles = {f"side_glass_{side}": "glass", f"side_glass_{side}_1": "glass", f"side_glass_{side}_2": "glass",
@@ -469,7 +461,7 @@ def door(ref, shell, obs, sgn=1):
     return blend.free_door(ref, side_fr(sgn), regions, DOOR_GAP, shell, trim, roles, o, name=f"door_{side}")
 
 
-# ---------------------------------------------------------------- mirrors and exhaust
+# ---------------------------------------------------------------- mirrors
 MIRROR_R = 0.022      # housing corner rounding
 MIRROR_SWEEP = 0.15   # radians the housing turns back from square to the car
 
@@ -512,24 +504,6 @@ def mirrors():
                              x0 + 0.0045, MIRROR_R - 0.0095, sgn, "mirror_glass")
         obs += [_sweep(house, sgn), _sweep(glass, sgn)]
     return obs
-
-
-def exhaust():
-    """One round tip under the right of the rear bumper."""
-    e = R["exhaust"]
-    y, z, r = e["y"], e["z"], e["r"]
-    x0 = TAIL + 0.02
-    t = np.linspace(0, 2 * np.pi, 40, endpoint=False)
-    outer = np.column_stack([y + r * np.cos(t), z + r * np.sin(t)])
-    inner = np.column_stack([y + (r - 0.004) * np.cos(t), z + (r - 0.004) * np.sin(t)])
-    rings = [np.column_stack([np.full(40, x), rg]) for x, rg in
-             ((x0, inner), (x0, outer), (x0 + 0.35, outer), (x0 + 0.35, inner))]
-    v, f = geom.close_rings(rings, cap=False)
-    m = 40
-    for j in range(m):
-        k = (j + 1) % m
-        f.append((3 * m + j, 3 * m + k, k, j))
-    return [blend.make("exhaust", v, f, "dark_metal")]
 
 
 def arches():
