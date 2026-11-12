@@ -232,7 +232,8 @@ namespace TarmacGauntlet.Raceday
             bump *= 1f - 60f / fs;
             float thud = Band(bump * (1f + 0.5f * Noise()), 45f, 2f, ref bumpLow, ref bumpBand);
             float swish = Band(Noise(), 2600f + 1600f * pace, 0.6f, ref swishLow, ref swishBand) * rustleEnv * rustleEnv;
-            return (0.5f * rustle * (0.4f + 0.6f * pace) + 0.25f * swish * pace + 0.45f * thud) * level;
+            // Kept subtle: on grass the road roar falls away, and only a soft swish and the bumps are left.
+            return (0.15f * rustle * (0.4f + 0.6f * pace) + 0.07f * swish * pace + 0.3f * thud) * level;
         }
 
         private float Roar(float pace)
