@@ -128,36 +128,118 @@ def slash(a, b, w0, w1, bend=0.0, n=24):
     return L + R[::-1]
 
 
-# --- Spilt Milk ------------------------------------------------------------------------------
-def spilt_milk(views):
-    """Green, with milk poured over the roof running down every panel in drips. The drink's
-    roundel and the number share the door, the name rides the sill."""
-    lv = Livery(views, G)
+# --- Parts ----------------------------------------------------------------------------------
+def milk_sides(lv, door_cap=0.05):
+    """Milk poured over the roof, drips down both sides, none crossing a door shut line."""
     rng = random.Random(7)
     line = lambda z: shoulder(z) - 0.06
     walls = [(a + 0.035, a - 0.035) for a in DOOR]
-    for poly in drips(line, 2.45, -2.35, rng, 0.3, skip=walls, short=[(0.25, -0.4, 0.05), (1.75, 0.98, 0.06), (-0.95, -1.75, 0.05)]):
+    for poly in drips(line, 2.45, -2.35, rng, 0.3, skip=walls,
+                      short=[(0.25, -0.4, door_cap), (0.8, 0.25, door_cap if door_cap < 0.05 else 0.3),
+                             (1.75, 0.98, 0.06), (-0.95, -1.75, 0.05)]):
         lv.side_poly(poly, M)
-    # Top: all milk, with green splats.
+
+
+def milk_top(lv, splat_col=G):
+    """The top all milk, with splats, clear of the bonnet and roof logos."""
     lv.band_x(-1.2, 1.2, M, views=("top",))
     splat = random.Random(3)
     for _ in range(14):
         z, x, r = splat.uniform(-2.0, 2.2), splat.uniform(-0.75, 0.75), splat.uniform(0.02, 0.06)
         if abs(z - 1.55) < 0.45 or abs(z - 0.1) < 0.35:
             continue
-        lv.poly("top", [(x + b, 0, z + a) for a, b in disc(0, 0, r)], G)
-    lv.mark("top", MARKS / "roundel.svg", (0, 0, 1.55), 0.72, rotate=-90)
-    lv.mark("top", MARKS / "team.svg", (0, 0, 0.1), 0.42, rotate=-90)
-    lv.mark("top", MARKS / "goats-milk.svg", (0, 0, -1.95), 0.07, rotate=90)
-    # Front and rear: the milk runs over the nose and the tail.
+        lv.poly("top", [(x + b, 0, z + a) for a, b in disc(0, 0, r)], splat_col)
+
+
+def milk_ends(lv):
+    """The milk running over the nose and the tail."""
     fr = random.Random(11)
-    for view, y0, longest in (("front", 0.82, 0.16), ("rear", 0.86, 0.16)):
+    for view, y0 in (("front", 0.82), ("rear", 0.86)):
         sign = 1 if view == "front" else -1
-        for poly in drips(lambda x: y0, 1.1, -1.1, fr, longest):
+        for poly in drips(lambda x: y0, 1.1, -1.1, fr, 0.16):
             lv.poly(view, [(sign * x, y, 0) for x, y in poly], M)
+
+
+def halftone(lv, col, top=True, reach=0.5):
+    """Halftone dots rising from the sills (and in from the top's edges), densest at the bottom."""
+    s = 0.045
+    dots = []
+    for j in range(int(1.1 / s) + 1):
+        y = 0.04 + j * s
+        k = max(0.0, 1 - (y - 0.05) / reach) ** 1.3
+        if k < 0.06:
+            continue
+        for i in range(int(4.9 / s) + 1):
+            dots.append((2.45 - i * s - (j % 2) * s / 2, y, k * s * 0.62))
+    side_circles(lv, dots, col)
+    if top:
+        dots = []
+        for j in range(int(2.1 / s) + 1):
+            x = -1.05 + j * s
+            k = max(0.0, (abs(x) - 0.45) / 0.55) ** 1.2
+            if k < 0.06:
+                continue
+            for i in range(int(4.9 / s) + 1):
+                dots.append(((x, 0, 2.45 - i * s - (j % 2) * s / 2), min(1, k) * s * 0.62))
+        circles(lv, "top", dots, col)
+    for view in ("front", "rear"):
+        dots = []
+        for j in range(int(0.7 / s) + 1):
+            y = 0.04 + j * s
+            k = max(0.0, 1 - (y - 0.05) / reach) ** 1.3
+            for i in range(int(2.1 / s) + 1):
+                dots.append(((-1.05 + i * s + (j % 2) * s / 2, y, 0), k * s * 0.62))
+        circles(lv, view, [d for d in dots if d[1] > 0.004], col)
+
+
+def slashes(lv, top=True):
+    """Magenta slashes, jumping the door shut lines."""
+    for a, b, w in (((1.25, 0.28), (-0.15, 0.78), 0.09), ((0.15, 0.2), (-1.05, 0.62), 0.06), ((2.3, 0.3), (1.75, 0.62), 0.05),
+                    ((-1.6, 0.78), (-2.25, 0.35), 0.06)):
+        lv.side_poly(slash(a, b, w, 0.012, 0.05), PK)
+    if top:
+        for a, b, w in (((0.6, 0.9), (-0.4, 0.55), 0.08), ((2.2, -0.75), (1.0, -0.6), 0.06), ((-0.9, -0.85), (-2.1, -0.4), 0.07)):
+            lv.poly("top", [(x, 0, z) for z, x in slash(a, b, w, 0.012, 0.06)], PK)
+
+
+def cartoon_number(lv):
+    """The number on a die-cut white plate at the door's front, in the cartoon digits."""
+    lv.side_poly(rounded(0.46, 0.55, 0.52, 0.36, 0.05), M)
+    lv.side_poly(rounded(0.46, 0.55, 0.48, 0.32, 0.035), K)
+    lv.side_poly(rounded(0.46, 0.55, 0.44, 0.28, 0.025), M)
+    lv.side_number(0.46, 0.55, 0.4, 0.22, Y, edge=K)
+
+
+def stickers(lv):
+    """The cartoon decals on the sides."""
+    side_mark_at(lv, "goat-sticker", -0.1, 0.56, 0.42, 8)
+    side_mark_at(lv, "gg-sticker", 0.2, 0.3, 0.16, -3)
+    side_mark_at(lv, "burst-30g", 2.0, 0.48, 0.4, -10)
+    side_mark_at(lv, "bolt", 0.98, 0.5, 0.42, -15)
+    side_mark_at(lv, "bubble", -1.95, 0.5, 0.22, 6)
+    side_mark_at(lv, "drop", -1.5, 0.78, 0.13, -12)
+
+
+def logos_top(lv, team="team", tail="goats-milk", tail_h=0.07, bolts=False):
+    lv.mark("top", MARKS / "roundel.svg", (0, 0, 1.55), 0.72, rotate=-90)
+    lv.mark("top", MARKS / f"{team}.svg", (0, 0, 0.12), 0.42, rotate=-90)
+    lv.mark("top", MARKS / f"{tail}.svg", (0, 0, -1.97), tail_h, rotate=90)
+    if bolts:
+        lv.mark("top", MARKS / "bolt.svg", (0.62, 0, 2.05), 0.22, rotate=-70)
+        lv.mark("top", MARKS / "bolt.svg", (-0.62, 0, 2.05), 0.22, rotate=-110)
+
+
+# --- Options ----------------------------------------------------------------------------------
+def spilt_milk(views):
+    """Green, with milk poured over the roof running down every panel in drips. The drink's
+    roundel and the number share the door, the name rides the sill."""
+    lv = Livery(views, G)
+    milk_sides(lv)
+    milk_top(lv)
+    logos_top(lv)
+    milk_ends(lv)
     lv.mark("front", MARKS / "roundel.svg", (0, 0.47, 0), 0.2)
     lv.mark("rear", MARKS / "limit.svg", (0, 0.575, 0), 0.042)
-    # Sides: number on a milk plate at the door's front, the roundel behind it, the name on the sill.
     lv.side_poly(rounded(0.5, 0.53, 0.5, 0.33, 0.04), M)
     lv.side_number(0.5, 0.53, 0.42, 0.24, K)
     side_mark_at(lv, "roundel", -0.06, 0.53, 0.42)
@@ -166,73 +248,37 @@ def spilt_milk(views):
     return lv
 
 
-# --- Overload --------------------------------------------------------------------------------
 def overload(views):
     """Black, sticker-bombed: green halftone rising from the sills, magenta slashes across the
     shut lines, and cartoon decals piled over the doors and haunches."""
     lv = Livery(views, K)
-    # Halftone on the sides, densest at the sill.
-    s = 0.045
-    dots = []
-    for j in range(int(1.1 / s) + 1):
-        y = 0.04 + j * s
-        k = max(0.0, 1 - (y - 0.05) / 0.5) ** 1.3
-        if k < 0.06:
-            continue
-        for i in range(int(4.9 / s) + 1):
-            z = 2.45 - i * s - (j % 2) * s / 2
-            dots.append((z, y, k * s * 0.62))
-    side_circles(lv, dots, G)
-    # Halftone on the top, rising from the edges, and on the nose and tail from the bottom.
-    dots = []
-    for j in range(int(2.1 / s) + 1):
-        x = -1.05 + j * s
-        k = max(0.0, (abs(x) - 0.45) / 0.55) ** 1.2
-        if k < 0.06:
-            continue
-        for i in range(int(4.9 / s) + 1):
-            dots.append(((x, 0, 2.45 - i * s - (j % 2) * s / 2), min(1, k) * s * 0.62))
-    circles(lv, "top", dots, G)
-    for view in ("front", "rear"):
-        dots = []
-        for j in range(int(0.7 / s) + 1):
-            y = 0.04 + j * s
-            k = max(0.0, 1 - (y - 0.05) / 0.5) ** 1.3
-            for i in range(int(2.1 / s) + 1):
-                dots.append(((-1.05 + i * s + (j % 2) * s / 2, y, 0), k * s * 0.62))
-        circles(lv, view, [d for d in dots if d[1] > 0.004], G)
-    # Magenta slashes, jumping the door shut lines.
-    for a, b, w in (((1.25, 0.28), (-0.15, 0.78), 0.09), ((0.15, 0.2), (-1.05, 0.62), 0.06), ((2.3, 0.3), (1.75, 0.62), 0.05),
-                    ((-1.6, 0.78), (-2.25, 0.35), 0.06)):
-        lv.side_poly(slash(a, b, w, 0.012, 0.05), PK)
-    for a, b, w in (((0.6, 0.9), (-0.4, 0.55), 0.08), ((2.2, -0.75), (1.0, -0.6), 0.06), ((-0.9, -0.85), (-2.1, -0.4), 0.07)):
-        lv.poly("top", [(x, 0, z) for z, x in slash(a, b, w, 0.012, 0.06)], PK)
-    # Number on a white plate, door front.
-    lv.side_poly(rounded(0.46, 0.55, 0.52, 0.36, 0.05), M)
-    lv.side_poly(rounded(0.46, 0.55, 0.48, 0.32, 0.035), K)
-    lv.side_poly(rounded(0.46, 0.55, 0.44, 0.28, 0.025), M)
-    lv.side_number(0.46, 0.55, 0.4, 0.22, Y, edge=K)
-    # Decals, sides.
-    side_mark_at(lv, "goat-sticker", -0.1, 0.56, 0.42, 8)
-    side_mark_at(lv, "gg-sticker", 0.2, 0.3, 0.16, -3)
-    side_mark_at(lv, "burst-30g", 2.0, 0.48, 0.4, -10)
-    side_mark_at(lv, "bolt", 0.98, 0.5, 0.42, -15)
-    side_mark_at(lv, "bubble", -1.15, 0.84, 0.2, 4)
-    side_mark_at(lv, "more", -1.95, 0.5, 0.075, 8)
-    side_mark_at(lv, "drop", -1.95, 0.7, 0.16, -12)
-    # Top: the roundel on the bonnet, the team logo on the roof, a sticker on the rear deck.
-    lv.mark("top", MARKS / "roundel.svg", (0, 0, 1.55), 0.72, rotate=-90)
-    lv.mark("top", MARKS / "team-light.svg", (0, 0, 0.12), 0.42, rotate=-90)
-    lv.mark("top", MARKS / "overstim.svg", (0, 0, -1.98), 0.09, rotate=90)
-    lv.mark("top", MARKS / "bolt.svg", (0.62, 0, 2.05), 0.22, rotate=-70)
-    lv.mark("top", MARKS / "bolt.svg", (-0.62, 0, 2.05), 0.22, rotate=-110)
-    # Nose and tail.
+    halftone(lv, G)
+    slashes(lv)
+    cartoon_number(lv)
+    stickers(lv)
+    logos_top(lv, "team-light", "overstim", 0.09, bolts=True)
     lv.mark("front", MARKS / "goat-sticker.svg", (0, 0.47, 0), 0.22)
     lv.mark("rear", MARKS / "protein.svg", (0, 0.575, 0), 0.06)
     return lv
 
 
-OPTIONS = {"spilt-milk": spilt_milk, "overload": overload}
+def milk_riot(views):
+    """Overload's black, halftone, slashes and stickers, with Spilt Milk's pour over the roof."""
+    lv = Livery(views, K)
+    halftone(lv, G, top=False)
+    milk_sides(lv, door_cap=0.04)
+    slashes(lv, top=False)
+    milk_top(lv, PK)
+    milk_ends(lv)
+    cartoon_number(lv)
+    stickers(lv)
+    logos_top(lv, "team", "overstim", 0.09, bolts=True)
+    lv.mark("front", MARKS / "goat-sticker.svg", (0, 0.47, 0), 0.22)
+    lv.mark("rear", MARKS / "protein.svg", (0, 0.575, 0), 0.06)
+    return lv
+
+
+OPTIONS = {"spilt-milk": spilt_milk, "overload": overload, "milk-riot": milk_riot}
 
 if __name__ == "__main__":
     views = HERE / "out" / "views" / "views.json"
