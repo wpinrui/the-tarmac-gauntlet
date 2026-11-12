@@ -78,8 +78,8 @@ namespace TarmacGauntlet.Management
             float top = playerIndex * RowHeight - list.scrollOffset.y, view = list.contentViewport.layout.height;
             bool above = top < 0, below = top + RowHeight > view;
             pin.style.display = above || below ? DisplayStyle.Flex : DisplayStyle.None;
-            pin.EnableInClassList("top", above);
-            pin.EnableInClassList("bottom", below);
+            pin.EnableInClassList("pin-top", above);
+            pin.EnableInClassList("pin-bottom", below);
         }
 
         private VisualElement TeamRow(GameState game, BaseTeam team, int rank)
