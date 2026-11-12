@@ -78,13 +78,13 @@ No real brand or sponsor graphics.
 ## 7. Show Ivan the direction first
 export.py builds the pieces with Blender's Python module (`pip install bpy`) and exports OBJ and MTL. It prints the triangle count for information only.
 publish.py writes the orbitable viewer with a wireframe toggle and a toggle for each lamp group.
-Before publishing, render close-ups of the nose, the pillars, the mirrors, the shut lines and the open doors, and fix what looks wrong.
-Publish the viewer as an Artifact and show Ivan.
+Publish the viewer as an Artifact and show Ivan at once.
 Run no checks until Ivan confirms the direction.
 
 ## 8. Check, then fix
 After Ivan confirms the direction, run check.py. It finds open or inward shells, floating parts, intersecting pairs and z-fighting.
 check.py also runs with every door open.
+Close-ups come before posting: the nose, the shut lines, the lamps.
 A pillar shut line runs down the pillar's middle, so each door shows the same width of black.
 Black window trim is one even band, with no jump at a shut line.
 Fix only the hits Ivan could see. Ignore hits hidden inside other parts or on options he did not pick. Then show Ivan the fixed version. He must say ok before it goes in.
