@@ -16,7 +16,7 @@ namespace TarmacGauntlet.Simulation.Tests
         [Test]
         public void EveryRosterTeamHasACountryCode()
         {
-            Assert.That(AiTeamRoster.All.All(e => e.Nationality.Length == 2 && e.Nationality == e.Nationality.ToLowerInvariant()), Is.True);
+            Assert.That(AiTeamRoster.All.All(e => System.Text.RegularExpressions.Regex.IsMatch(e.Nationality, "^[a-z]{2}(-[a-z]{3})?$")), Is.True);
         }
 
         [Test]
