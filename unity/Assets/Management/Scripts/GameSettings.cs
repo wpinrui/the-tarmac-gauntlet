@@ -5,7 +5,10 @@ using UnityEngine;
 
 namespace TarmacGauntlet.Management
 {
-    /// <summary>Graphics, race and audio settings. Every change applies at once and is remembered between runs.</summary>
+    /// <summary>
+    /// Graphics, race and audio settings. Every change applies at once and is remembered between runs. Graphics options
+    /// that an effect turns on and off are in <see cref="TarmacGauntlet.Visuals.GraphicsOptions"/>.
+    /// </summary>
     public static class GameSettings
     {
         private const string VolumeKey = "settings.volume", QualityKey = "settings.quality", VSyncKey = "settings.vsync";
@@ -80,23 +83,6 @@ namespace TarmacGauntlet.Management
             {
                 QualitySettings.vSyncCount = value ? 1 : 0;
                 PlayerPrefs.SetInt(VSyncKey, value ? 1 : 0);
-                PlayerPrefs.Save();
-            }
-        }
-
-        /// <summary>
-        /// Most real lights at night in the race: the rest of the night lighting is drawn glowing. The race reads it from
-        /// the same key (NightLights in Raceday).
-        /// </summary>
-        public const string RealLightsKey = "settings.reallights";
-        public const int MostRealLights = 24;
-
-        public static int RealLights
-        {
-            get => Mathf.Clamp(PlayerPrefs.GetInt(RealLightsKey, 6), 0, MostRealLights);
-            set
-            {
-                PlayerPrefs.SetInt(RealLightsKey, Mathf.Clamp(value, 0, MostRealLights));
                 PlayerPrefs.Save();
             }
         }

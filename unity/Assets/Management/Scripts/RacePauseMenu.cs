@@ -189,7 +189,13 @@ namespace TarmacGauntlet.Management
         private void OnGUI()
         {
             Event ev = Event.current;
-            if (ev.type != EventType.KeyDown || ev.keyCode != KeyCode.Escape || root == null) return;
+            if (ev.type != EventType.KeyDown || root == null) return;
+            if (MenuDropdown.Key(ev.keyCode))
+            {
+                ev.Use();
+                return;
+            }
+            if (ev.keyCode != KeyCode.Escape) return;
             if (overlay == Overlay.Settings) SetOverlay(Overlay.Pause);
             else if (overlay == Overlay.Pause) SetOverlay(Overlay.None);
             else if (CanPause) SetOverlay(Overlay.Pause);

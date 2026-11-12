@@ -141,6 +141,7 @@ namespace UnityEngine.UIElements
         public Sv width { get => Get("width"); set => Set("width", value); }
         public Sv height { get => Get("height"); set => Set("height", value); }
         public Sv minWidth { get => Get("min-width"); set => Set("min-width", value); }
+        public Sv maxHeight { get => Get("max-height"); set => Set("max-height", value); }
         public Sv flexBasis { get => Get("flex-basis"); set => Set("flex-basis", value); }
         public Sv flexGrow { get => Get("flex-grow"); set => Set("flex-grow", value); }
         public Sv opacity { get => Get("opacity"); set => Set("opacity", value); }
@@ -186,7 +187,11 @@ namespace UnityEngine.UIElements
     public sealed class PointerEnterEvent : PointerEventBase { }
     public sealed class PointerLeaveEvent : PointerEventBase { }
     public sealed class PointerCaptureOutEvent : EventBase { }
-    public sealed class GeometryChangedEvent : EventBase { }
+    public sealed class GeometryChangedEvent : EventBase
+    {
+        public Rect oldRect { get; set; }
+        public Rect newRect { get; set; }
+    }
     public sealed class DetachFromPanelEvent : EventBase { }
     public sealed class FocusInEvent : EventBase { }
     public sealed class FocusOutEvent : EventBase { }
@@ -279,8 +284,13 @@ namespace UnityEngine.UIElements
         public virtual VisualElement contentContainer => this;
         public VisualElement hierarchy => this;
         public Scheduler schedule { get; } = new Scheduler();
-        public Rect layout => new Rect(0, 0, 0, 0);
-        public Rect worldBound => new Rect(0, 0, 0, 0);
+        /// <summary>
+        /// Where a check puts an element, in reference px, since there is no layout here: measured in the browser and
+        /// fed back. Unset, every element is at 0, 0 with no size.
+        /// </summary>
+        public static Func<VisualElement, Rect> Measure;
+        public Rect layout => Measure?.Invoke(this) ?? new Rect(0, 0, 0, 0);
+        public Rect worldBound => Measure?.Invoke(this) ?? new Rect(0, 0, 0, 0);
         public Rect contentRect => new Rect(0, 0, 0, 0);
         public List<StyleSheet> styleSheets { get; } = new List<StyleSheet>();
         public bool enabledSelf { get; private set; } = true;
