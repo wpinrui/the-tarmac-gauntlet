@@ -9,7 +9,8 @@ namespace TarmacGauntlet.Raceday
     /// <summary>
     /// The sky, the sun and the light they give, following the race clock from the start time through
     /// the 24 hours (<see cref="SkyClock"/>). One directional light is the sun by day and the moon at
-    /// night. The ambient light and the fog take the sky's colours. The clouds drift with the wind,
+    /// night. The ambient light and the haze take the sky's colours: the haze is exponential fog, so
+    /// the far trees fade layer by layer into the air, thicker in the morning mist and under weather. The clouds drift with the wind,
     /// faster when the race runs faster and the wind blows. The weather (<see cref="WeatherSky"/>)
     /// spreads cloud over the sky, greys it and takes the sun's light and shadows. A sky-only
     /// reflection probe is redrawn as the sky changes, so shiny paint and a wet track reflect the sky
@@ -82,7 +83,7 @@ namespace TarmacGauntlet.Raceday
             RenderSettings.skybox = sky;
             RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.fog = true;
-            RenderSettings.fogMode = FogMode.Linear;
+            RenderSettings.fogMode = FogMode.Exponential;
 
             var reflections = new GameObject("Sky reflections");
             reflections.transform.SetParent(transform, false);
@@ -122,7 +123,7 @@ namespace TarmacGauntlet.Raceday
         {
             float hour = Hour;
             SkyState s = SkyClock.At(hour, SkyClock.Look);
-            float cover = SkyClock.Look.Cover, overcast = 0f, haze = SkyClock.Look.Haze, shadows = 1f, cloud = 0f, rain = 0f;
+            float cover = SkyClock.Look.Cover, overcast = 0f, haze = s.Haze, shadows = 1f, cloud = 0f, rain = 0f;
             if (Weather != null)
             {
                 WeatherState w = Weather();
@@ -154,8 +155,7 @@ namespace TarmacGauntlet.Raceday
             RenderSettings.ambientEquatorColor = s.AmbientEquator;
             RenderSettings.ambientGroundColor = s.AmbientGround;
             RenderSettings.fogColor = s.Fog;
-            RenderSettings.fogStartDistance = haze * 0.2f;
-            RenderSettings.fogEndDistance = haze;
+            RenderSettings.fogDensity = SkyClock.Density(haze);
 
             sky.SetColor(ZenithId, s.Zenith);
             sky.SetColor(HorizonId, s.Horizon);

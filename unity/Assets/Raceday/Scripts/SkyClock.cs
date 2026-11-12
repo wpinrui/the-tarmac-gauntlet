@@ -12,8 +12,10 @@ namespace TarmacGauntlet.Raceday
         public Color DayZenith, DayHorizon, TwilightZenith, TwilightHorizon, NightZenith, NightHorizon, Sunset;
         /// <summary>Cloud density threshold: higher is less cloud.</summary>
         public float Cover;
-        /// <summary>Distance where the haze hides everything, m.</summary>
+        /// <summary>Distance where the haze hides everything (all but 2% of it) in the afternoon, m.</summary>
         public float Haze;
+        /// <summary>Share of the haze distance the morning mist takes away round sunrise.</summary>
+        public float Mist;
         /// <summary>Moonlight intensity with the moon high and the sun well down.</summary>
         public float Moon;
     }
@@ -32,6 +34,8 @@ namespace TarmacGauntlet.Raceday
         public Color Zenith, Horizon, Glow;
         public Color AmbientSky, AmbientEquator, AmbientGround, Fog;
         public Color CloudLit, CloudShade;
+        /// <summary>Distance where the haze hides everything (all but 2% of it), m: closer in the morning mist.</summary>
+        public float Haze;
         /// <summary>0 by day, 1 when the stars are fully out.</summary>
         public float Night;
         /// <summary>
@@ -55,19 +59,24 @@ namespace TarmacGauntlet.Raceday
         public const float MoonDeclination = 12f;
         /// <summary>Local time of the sun's highest point, hours: standard time at about 6 degrees east.</summary>
         public const float SolarNoon = 12.3f;
+        /// <summary>When the morning mist is thickest, local time, and how many hours it takes to come and go.</summary>
+        public const float MistHour = 7.6f, MistHours = 2.5f;
+        /// <summary>The haze's optical depth at <see cref="SkyState.Haze"/>, ln 50: it hides everything there but 2% of the light.</summary>
+        public const float HazeDepth = 3.912f;
 
         /// <summary>The look of the race's sky.</summary>
         public static readonly SkyLook Look = new SkyLook
         {
-            DayZenith = new Color(0.18f, 0.42f, 0.78f),
-            DayHorizon = new Color(0.70f, 0.80f, 0.90f),
+            DayZenith = new Color(0.26f, 0.47f, 0.76f),
+            DayHorizon = new Color(0.78f, 0.84f, 0.89f),
             TwilightZenith = new Color(0.10f, 0.16f, 0.36f),
             TwilightHorizon = new Color(0.55f, 0.45f, 0.48f),
             NightZenith = new Color(0.02f, 0.035f, 0.08f),
             NightHorizon = new Color(0.05f, 0.07f, 0.12f),
             Sunset = new Color(1f, 0.48f, 0.18f),
             Cover = 0.58f,
-            Haze = 7000f,
+            Haze = 6000f,
+            Mist = 0.45f,
             Moon = 0.18f,
         };
 
@@ -125,10 +134,25 @@ namespace TarmacGauntlet.Raceday
             s.Fog = s.Horizon * 0.95f + s.Glow * 0.15f;
             s.CloudLit = s.LightColour * (s.LightIntensity * 0.75f) + s.AmbientSky * 0.55f + s.Glow * 0.6f;
             s.CloudShade = s.AmbientEquator * 0.9f + s.Glow * 0.2f;
+            s.Haze = look.Haze * (1f - look.Mist * Misty(hour));
             s.Night = Dark(e);
             s.Lights = s.Night;
             Opaque(ref s);
             return s;
+        }
+
+        /// <summary>
+        /// Exponential fog density, per m, for a haze that hides everything but 2% at this distance: the share of the light
+        /// it lets through falls by the same fraction every metre, so the far trees fade layer by layer into the air.
+        /// </summary>
+        public static float Density(float haze) => HazeDepth / haze;
+
+        /// <summary>How thick the morning mist is at this local time, 0 to 1: it settles before dawn and burns off by late morning.</summary>
+        public static float Misty(float hour)
+        {
+            float d = Mathf.Repeat(hour - MistHour + 12f, 24f) - 12f;
+            d /= MistHours;
+            return Mathf.Exp(-d * d);
         }
 
         /// <summary>How dark the sky is with the sun this many degrees up: 0 by day, 1 when the stars are fully out.</summary>
