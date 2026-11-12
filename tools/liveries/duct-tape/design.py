@@ -25,10 +25,8 @@ from PIL import Image, ImageDraw, ImageFilter
 HERE = Path(__file__).resolve().parent
 VIEWS = HERE / "out" / "views"
 sys.path.insert(0, str(HERE.parent / "common"))
-import livery as lvmod  # noqa: E402
 from livery import Livery, finish  # noqa: E402
 
-lvmod.FONTS["CaveatBrush"] = HERE / "font" / "CaveatBrush-Regular.ttf"
 
 OLIVE = np.array([0x48, 0x4e, 0x29]) / 255
 OLIVE_SUN = np.array([0x62, 0x66, 0x42]) / 255
@@ -229,7 +227,7 @@ def uri(rgb):
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
 
 
-def build(name, team_name=False):
+def build(name):
     import json
     meta = json.loads((VIEWS / "views.json").read_text())
     lv = Livery(VIEWS / "views.json", BASE, finish(*F_RUST))
@@ -242,11 +240,8 @@ def build(name, team_name=False):
     # The number, brushed on the front doors by hand: not level, and not where it is on the other side.
     lv.number("left", (1, 0.50, 0.22), 0.62, 0.30, INK, rotate=-5)
     lv.number("right", (-1, 0.47, 0.12), 0.62, 0.29, INK, rotate=3)
-    if team_name:
-        lv.side_text("Duct Tape Dynamics", -0.72, 0.56, 0.085, INK, font="CaveatBrush")
     lv.write(HERE / "out" / name)
 
 
 if __name__ == "__main__":
     build("rust")
-    build("rust-name", team_name=True)  # the name brushed on the rear doors
