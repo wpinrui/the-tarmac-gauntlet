@@ -162,7 +162,9 @@ def spill_edge(x, seed):
     for c, r, d in ((math.sin(seed) * 0.7, 0.16, 0.22), (math.sin(seed * 3) * 0.8, 0.11, 0.15), (math.cos(seed * 2) * 0.5, 0.09, 0.12)):
         if abs(x - c) < r:
             w -= d * math.sqrt(1 - ((x - c) / r) ** 2)
-    return w + 0.05
+    # Toward the car's flanks the spill rounds back, so it meets the side's pour in a curve.
+    edge = max(0.0, (abs(x) - 0.5) / 0.55)
+    return w + 0.05 + 0.42 * edge * edge
 
 
 def milk_top(lv, splat_col=G, span=None, bonnet=1.55):
@@ -312,7 +314,7 @@ def milk_riot(views):
     two thirds of the car. The nose and tail are all Overload."""
     lv = Livery(views, K)
     halftone(lv, G)
-    milk_sides(lv, door_cap=0.04, span=(RIOT_SPAN[0] + 0.35, RIOT_SPAN[1] - 0.35), ramp=0.4)
+    milk_sides(lv, door_cap=0.04, span=(RIOT_SPAN[0] - 0.2, RIOT_SPAN[1] + 0.2), ramp=0.45)
     slashes(lv)
     milk_top(lv, PK, span=RIOT_SPAN, bonnet=RIOT_BONNET[0])
     cartoon_number(lv)
