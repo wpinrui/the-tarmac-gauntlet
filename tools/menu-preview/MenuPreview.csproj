@@ -15,7 +15,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="*.cs;Stubs/*.cs" />
-    <Compile Include="$(ScriptsDir)/*.cs" Exclude="$(ScriptsDir)/MenuGlass.cs;$(ScriptsDir)/GarageBays.cs;$(ScriptsDir)/NewspaperView.cs;$(ScriptsDir)/PositionChart.cs" />
+    <Compile Include="$(ScriptsDir)/*.cs" Exclude="$(ScriptsDir)/HqDebugMenu.cs;$(ScriptsDir)/MenuGlass.cs;$(ScriptsDir)/GarageBays.cs;$(ScriptsDir)/NewspaperView.cs;$(ScriptsDir)/PositionChart.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../unity/dotnet/TarmacGauntlet.Career/TarmacGauntlet.Career.csproj" />
