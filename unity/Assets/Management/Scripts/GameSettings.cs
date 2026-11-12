@@ -65,7 +65,11 @@ namespace TarmacGauntlet.Management
         public static int Quality
         {
             get => QualityLevels.Level;
-            set => QualityLevels.Level = value;
+            set
+            {
+                QualityLevels.Level = value;
+                TarmacGauntlet.Visuals.GraphicsOptions.ApplyQuality(QualityLevels.Level);
+            }
         }
 
         public static bool VSync

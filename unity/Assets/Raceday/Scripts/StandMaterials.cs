@@ -17,14 +17,14 @@ namespace TarmacGauntlet.Raceday
             Seats = Make("Stand seats", Noise(seats, 0.04f, 13), 0.3f);
             Roof = Make("Stand roof", Noise(new Color(0.36f, 0.37f, 0.38f), 0.03f, 14), 0.25f);
             Bank = Make("Stand bank", Noise(new Color(0.23f, 0.41f, 0.15f), 0.08f, 4), 0.05f);
-            Crowd = Make("Crowd", Palette(), 0.1f);
+            Crowd = CrowdMaterial();
             FencePosts = Make("Catch fence posts", null, 0.5f, new Color(0.6f, 0.62f, 0.63f), 0.6f);
             FenceMesh = Make("Catch fence", Mesh(), 0.4f, new Color(0.62f, 0.64f, 0.64f), 0.5f);
             FenceMesh.mainTextureScale = new Vector2(4f, 4f);
             Lit.Cutout(FenceMesh);
         }
 
-        private static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
+        private static readonly int EmissionId = Shader.PropertyToID("_EmissionColor"), GlowId = Shader.PropertyToID("_Glow");
 
         /// <summary>
         /// Lights the seats and the crowd under the roofs at night, as the roofs' floodlights would: each glows in its own
@@ -32,16 +32,14 @@ namespace TarmacGauntlet.Raceday
         /// </summary>
         public void Night(float night, Color tint)
         {
-            foreach (Material m in new[] { Seats, Crowd })
+            Crowd.SetColor(GlowId, tint * (NightLook.StandGlow * night));
+            if (!Seats.IsKeywordEnabled("_EMISSION"))
             {
-                if (!m.IsKeywordEnabled("_EMISSION"))
-                {
-                    m.EnableKeyword("_EMISSION");
-                    m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
-                    m.SetTexture("_EmissionMap", m.mainTexture);
-                }
-                m.SetColor(EmissionId, tint * (NightLook.StandGlow * night));
+                Seats.EnableKeyword("_EMISSION");
+                Seats.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+                Seats.SetTexture("_EmissionMap", Seats.mainTexture);
             }
+            Seats.SetColor(EmissionId, tint * (NightLook.StandGlow * night));
         }
 
         /// <summary>Steel, seat and cladding colours for each look.</summary>
@@ -78,13 +76,27 @@ namespace TarmacGauntlet.Raceday
             return tex;
         }
 
+        /// <summary>The crowd's cards (Resources/Crowd), coloured from the palette; plain Lit if the shader is missing.</summary>
+        private static Material CrowdMaterial()
+        {
+            Shader shader = Resources.Load<Shader>("Crowd/Crowd");
+            if (shader == null)
+            {
+                Debug.LogWarning("Grandstands: crowd shader missing.");
+                return Make("Crowd", Palette(), 0.1f);
+            }
+            var m = new Material(shader) { name = "Crowd" };
+            m.SetTexture("_Palette", Palette());
+            return m;
+        }
+
         /// <summary>The crowd's palette, one texel per colour, never blended with its neighbours.</summary>
         private static Texture2D Palette()
         {
             var tex = new Texture2D(CrowdPalette.Width, CrowdPalette.Height, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
             var px = new Color[CrowdPalette.Width * CrowdPalette.Height];
             for (int i = 0; i < px.Length; i++) px[i] = Color.grey;
-            for (int row = 0; row < 3; row++)
+            for (int row = 0; row < CrowdPalette.Height; row++)
             {
                 Color[] colours = CrowdPalette.Row(row);
                 for (int x = 0; x < colours.Length; x++) px[row * CrowdPalette.Width + x] = colours[x];

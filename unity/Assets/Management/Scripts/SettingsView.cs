@@ -14,7 +14,8 @@ namespace TarmacGauntlet.Management
     {
         /// <summary>
         /// Fills the settings panel, emptying it first. The groups scroll inside the panel, which is never taller than the
-        /// screen. The graphics group ends with a row for each of <see cref="GraphicsOptions.All"/>.
+        /// screen. The graphics group ends with a row for each of <see cref="GraphicsOptions.Rows"/>, drawn again when the
+        /// quality level sets them.
         /// </summary>
         internal static void Fill(VisualElement settingsPanel)
         {
@@ -29,9 +30,21 @@ namespace TarmacGauntlet.Management
             resolution.Add(MenuDropdown.Make(sizes.Select(r => r.x + " × " + r.y).ToArray(), sizes.ToList().IndexOf(GameSettings.Resolution), "settings-dropdown",
                 i => GameSettings.Resolution = sizes[i]));
             graphics.Add(resolution);
-            graphics.Add(Stepper("Quality", GameSettings.QualityNames, GameSettings.Quality, i => GameSettings.Quality = i));
+            var rows = new List<VisualElement>();
+            void ShowRows()
+            {
+                foreach (VisualElement shown in rows) shown.RemoveFromHierarchy();
+                rows.Clear();
+                foreach (GraphicsRow row in GraphicsOptions.Rows) rows.Add(Row(row));
+                foreach (VisualElement shown in rows) graphics.Add(shown);
+            }
+            graphics.Add(Stepper("Quality", GameSettings.QualityNames, GameSettings.Quality, i =>
+            {
+                GameSettings.Quality = i;
+                ShowRows();
+            }));
             graphics.Add(Stepper("V-sync", new[] { "Off", "On" }, GameSettings.VSync ? 1 : 0, i => GameSettings.VSync = i == 1));
-            foreach (GraphicsOption option in GraphicsOptions.All) graphics.Add(Option(option));
+            ShowRows();
             scroll.Add(graphics);
 
             VisualElement race = SettingsGroup(1);
@@ -46,12 +59,12 @@ namespace TarmacGauntlet.Management
             settingsPanel.Add(scroll);
         }
 
-        /// <summary>An on/off option's row is a stepper, a count's a slider.</summary>
-        private static VisualElement Option(GraphicsOption option)
+        /// <summary>An on/off row is a stepper, a count a slider.</summary>
+        private static VisualElement Row(GraphicsRow row)
         {
-            if (option.IsToggle) return Stepper(option.Label, new[] { "Off", "On" }, option.On ? 1 : 0, i => option.On = i == 1);
-            int most = option.Most;
-            return Slider(option.Label, option.Value / (float)most, v => option.Value = Mathf.RoundToInt(v * most),
+            if (row.IsToggle) return Stepper(row.Label, new[] { "Off", "On" }, row.Value, i => row.Value = i);
+            int most = row.Most;
+            return Slider(row.Label, row.Value / (float)most, v => row.Value = Mathf.RoundToInt(v * most),
                 v => Mathf.RoundToInt(v * most).ToString(CultureInfo.InvariantCulture));
         }
 
