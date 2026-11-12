@@ -67,7 +67,7 @@ namespace TarmacGauntlet.Simulation
             new AiTeamEntry { Name = "Brasa Racing", Descriptor = "always bouncing back from the brink", Nationality = "mx", ModelId = "d-14", CarClass = CarClass.D },
             new AiTeamEntry { Name = "Freightline Racing", Descriptor = "corporate-backed mid-tier squad", Nationality = "de", ModelId = "d-15", CarClass = CarClass.D },
             new AiTeamEntry { Name = "Gearbox Grease Racing", Descriptor = "lubricant-sponsored touring car operation", Nationality = "jp", ModelId = "d-12", CarClass = CarClass.D },
-            new AiTeamEntry { Name = "Compost Racing", Descriptor = "scrappy but legitimate single-seater graduates", Nationality = "cn", ModelId = "d-13", CarClass = CarClass.D },
+            new AiTeamEntry { Name = "Zhuhai Racing", Descriptor = "scrappy but legitimate single-seater graduates", Nationality = "cn", ModelId = "d-13", CarClass = CarClass.D },
             new AiTeamEntry { Name = "Van Dijk Racing", Descriptor = "Dutch-run team with an eye on the podium", Nationality = "nl", ModelId = "d-14", CarClass = CarClass.D },
             new AiTeamEntry { Name = "Thornton Motorsport", Descriptor = "British family-run sports car team", Nationality = "gb", ModelId = "d-15", CarClass = CarClass.D },
             new AiTeamEntry { Name = "Brackley Engineering", Descriptor = "ex-factory engineers gone independent", Nationality = "gb", ModelId = "d-12", CarClass = CarClass.D },
