@@ -153,7 +153,7 @@ def headlamps(ref, cutters, out):
         out += blend.lay(ref, f"head_reflector_{side}", g(bowl.difference(core.buffer(0.004))), fr, -0.0422, -0.034,
                          "reflector", 0.004, along_ray=True)
         out += blend.lay(ref, f"lamp_head_{side}0", g(core), fr, -0.0422, -0.036, "lamp_head", 0.004, along_ray=True)
-        out += blend.lay(ref, f"lamp_head_{side}1", g(bar), fr, -0.0422, -0.037, "lamp_head", 0.004, along_ray=True)
+        out += blend.lay(ref, f"lamp_head_{side}1", g(bar), fr, -0.041, -0.037, "lamp_head", 0.004, along_ray=True)
         out += blend.lay(ref, f"head_glass_{side}", g(shp.buffer(-0.002)), fr, -0.0055, -0.0025, "head_glass", 0.006,
                          along_ray=True)
     # round fog lamps low in the bumper's corners
@@ -198,9 +198,10 @@ def strip(ref, out, fr, x_turn, x_end, u0, z0, z1, name):
     shapes = [box(u0, z0, edge, z1), box(-edge, z0, -u0, z1)] if u0 else [box(-edge, z0, edge, z1)]
     for i, sh in enumerate(shapes):
         out += blend.lay(ref, f"{name}_{i}", soft(sh, 0.006), fr, -0.001, 0.005, "trim", 0.01)
-    lo, hi = sorted((x_turn, x_end))
+    gap = 0.003 if x_end < x_turn else -0.003       # the side pieces stop just short of the end piece
+    lo, hi = sorted((x_turn - gap, x_end))
     for sgn, side in ((1, "l"), (-1, "r")):
-        out += blend.lay(ref, f"{name}_side_{side}", soft(box(lo, z0, hi, z1), 0.006), side_fr(sgn), -0.001, 0.005,
+        out += blend.lay(ref, f"{name}_side_{side}", soft(box(lo, z0, hi, z1), 0.006), side_fr(sgn), -0.0012, 0.0048,
                          "trim", 0.01)
 
 
@@ -464,7 +465,7 @@ def mirrors():
     in the housing's back."""
     m = R["mirror"]
     xb, xf = m["x_back"], m["x_front"]
-    x0, x1 = xb, xb + 0.09
+    x0, x1 = xb, xb + 0.12
     y0, y1, z0, z1 = m["y_in"] + 0.03, m["y_out"], m["z0"], m["z1"]
     root = body.y_at(xf - 0.05, belt(xf) + 0.02) - 0.03
     obs = []
@@ -473,7 +474,7 @@ def mirrors():
         cut = _rounded_bar(f"cut_mirror_{side}", y0 + 0.008, y1 - 0.008, z0 + 0.008, z1 - 0.008, x0 - 0.03, x0 + 0.006,
                            MIRROR_R - 0.008, sgn)
         blend.boolean(house, cut, "DIFFERENCE")
-        arm = _rounded_bar(f"mirror_arm_{side}", root, y0 + 0.03, z0 + 0.005, z0 + 0.05, xb + 0.02, xb + 0.07, 0.012,
+        arm = _rounded_bar(f"mirror_arm_{side}", root, y0 + 0.03, z0 + 0.005, z0 + 0.05, R["vent_x"] + 0.008, xb + 0.112, 0.012,
                            sgn, "trim")
         glass = _rounded_bar(f"mirror_glass_{side}", y0 + 0.0095, y1 - 0.0095, z0 + 0.0095, z1 - 0.0095, x0 + 0.0015,
                              x0 + 0.0045, MIRROR_R - 0.0095, sgn, "mirror_glass")
@@ -583,10 +584,10 @@ def interior():
     bc = R["rear_door"][0][0]
     for sgn, side in ((1, "l"), (-1, "r")):
         clip = lambda x, s=sgn: (box(0.3, FLOOR + 0.06, 1.2, belt(x) - 0.07) if s > 0 else box(-1.2, FLOOR + 0.06, -0.3, belt(x) - 0.07)).intersection(
-            body.inside(x, 0.035 + 0.002)).difference(body.inside(x, 0.035 + 0.020))
+            body.inside(x, 0.035 + 0.008)).difference(body.inside(x, 0.035 + 0.026))
         obs.append(_loft(f"door_card_{side}", bc + 0.04, 0.58, clip, n=10))
         yc = 0.36 * sgn
-        obs.append(_rbox(f"seat_base_{side}", -0.36, 0.12, yc - 0.22, yc + 0.22, FLOOR + 0.002, FLOOR + 0.16))
+        obs.append(_rbox(f"seat_base_{side}", -0.36, 0.12, yc - 0.22, yc + 0.22, FLOOR + 0.006, FLOOR + 0.16))
         obs.append(_rbox(f"seat_back_{side}", -0.50, -0.38, yc - 0.21, yc + 0.21, FLOOR + 0.161, FLOOR + 0.70, lean=0.22))
         obs.append(_rbox(f"headrest_{side}", -0.63, -0.53, yc - 0.12, yc + 0.12, FLOOR + 0.701, FLOOR + 0.80, r=0.035, lean=0.1))
     obs.append(_rbox("rear_base", -1.02, -0.72, -0.52, 0.52, FLOOR + 0.04, FLOOR + 0.20))
@@ -637,7 +638,7 @@ def wheels():
                 v, f = geom.close_rings(rings)
                 cutters.append(blend.make("hole", place(v), f, "tyre"))
             blend.boolean(rimob, blend.union_all(cutters, "holes"), "DIFFERENCE")
-            v, f = geom.disc((0, hw - 0.025, 0), (0, 1, 0), 0.045, 0.01, n=40)
+            v, f = geom.disc((0, hw - 0.022, 0), (0, 1, 0), 0.045, 0.01, n=40)
             obs += [rimob, blend.make(f"wheel_cap_{fb}{lr}", place(v), f, "chrome")]
             v, f = geom.disc((0, hw - 0.10, 0), (0, 1, 0), rr - 0.04, 0.008, n=64)
             obs.append(blend.make(f"wheel_disc_{fb}{lr}", place(v), f, "dark_metal"))
@@ -696,7 +697,7 @@ def badge(ref, style, size, fr, a, b, up, name):
     layer a little apart so no faces touch."""
     _outline, layers = badge_layers(style)
     objs = []
-    for i, ((g, m), (d0, d1)) in enumerate(zip(layers, ((0.0010, 0.0024), (0.0010, 0.0020), (0.0026, 0.0036)))):
+    for i, ((g, m), (d0, d1)) in enumerate(zip(layers, ((0.0010, 0.0024), (0.0016, 0.0022), (0.0028, 0.0038)))):
         if i == 1:
             g = g.buffer(-0.0008 / size)      # the field sits inside the ring with a hair's gap
         objs += _flat(ref, g, size, fr, a, b, up, f"{name}_{i}", d0, d1, m, 0.002)

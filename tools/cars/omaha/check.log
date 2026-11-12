@@ -1,0 +1,72 @@
+OBJ import of 'LibertyOmaha.obj' took 755.69 ms
+OBJ import of 'LibertyOmaha.obj' took 758.45 ms
+intersecting: body x exhaust
+intersecting: body x firewall
+intersecting: body x rear_back
+intersecting: body x rear_base
+intersecting: body x spoiler
+intersecting: body x strip_f_0
+intersecting: body x strip_f_1
+intersecting: body x strip_f_side_l
+intersecting: body x strip_f_side_r
+intersecting: body x strip_r_0
+intersecting: body x strip_r_side_l
+intersecting: body x strip_r_side_r
+intersecting: dash x steering
+intersecting: door_l x door_l_mirror
+intersecting: door_l_mirror x door_l_trim
+intersecting: door_r x door_r_mirror
+intersecting: door_r_mirror x door_r_trim
+intersecting: exhaust x exhaust_in
+intersecting: firewall x steering
+intersecting: opt_rearbadge_3_2 x opt_rearbadge_3_3
+intersecting: opt_rearbadge_4_2 x opt_rearbadge_4_3
+intersecting: rear_glass x spoiler
+intersecting: rear_trim x spoiler
+z-fighting: opt_frontbadge_1_2 x opt_frontbadge_1_3 (6 faces)
+z-fighting: opt_frontbadge_2_2 x opt_frontbadge_2_3 (6 faces)
+z-fighting: opt_frontbadge_3_2 x opt_frontbadge_3_3 (6 faces)
+z-fighting: opt_frontbadge_3_3 x opt_frontbadge_3_4 (2 faces)
+z-fighting: opt_frontbadge_4_2 x opt_frontbadge_4_3 (6 faces)
+z-fighting: opt_frontbadge_4_3 x opt_frontbadge_4_4 (2 faces)
+z-fighting: opt_rearbadge_1_2 x opt_rearbadge_1_3 (6 faces)
+z-fighting: opt_rearbadge_2_2 x opt_rearbadge_2_3 (6 faces)
+z-fighting: opt_rearbadge_3_2 x opt_rearbadge_3_3 (9 faces)
+z-fighting: opt_rearbadge_4_2 x opt_rearbadge_4_3 (9 faces)
+door open, floating: opt_name_2_0
+door open, floating: opt_name_2_1
+door open, floating: opt_name_2_2
+door open, floating: opt_name_2_3
+door open, intersecting: body x exhaust
+door open, intersecting: body x firewall
+door open, intersecting: body x rear_back
+door open, intersecting: body x rear_base
+door open, intersecting: body x spoiler
+door open, intersecting: body x strip_f_0
+door open, intersecting: body x strip_f_1
+door open, intersecting: body x strip_f_side_l
+door open, intersecting: body x strip_f_side_r
+door open, intersecting: body x strip_r_0
+door open, intersecting: body x strip_r_side_l
+door open, intersecting: body x strip_r_side_r
+door open, intersecting: dash x steering
+door open, intersecting: door_l x door_l_mirror
+door open, intersecting: door_l_mirror x door_l_trim
+door open, intersecting: door_r x door_r_mirror
+door open, intersecting: door_r_mirror x door_r_trim
+door open, intersecting: exhaust x exhaust_in
+door open, intersecting: firewall x steering
+door open, intersecting: opt_rearbadge_3_2 x opt_rearbadge_3_3
+door open, intersecting: opt_rearbadge_4_2 x opt_rearbadge_4_3
+door open, intersecting: rear_glass x spoiler
+door open, intersecting: rear_trim x spoiler
+door open, z-fighting: opt_frontbadge_1_2 x opt_frontbadge_1_3 (6 faces)
+door open, z-fighting: opt_frontbadge_2_2 x opt_frontbadge_2_3 (6 faces)
+door open, z-fighting: opt_frontbadge_3_2 x opt_frontbadge_3_3 (6 faces)
+door open, z-fighting: opt_frontbadge_3_3 x opt_frontbadge_3_4 (2 faces)
+door open, z-fighting: opt_frontbadge_4_2 x opt_frontbadge_4_3 (6 faces)
+door open, z-fighting: opt_frontbadge_4_3 x opt_frontbadge_4_4 (2 faces)
+door open, z-fighting: opt_rearbadge_1_2 x opt_rearbadge_1_3 (6 faces)
+door open, z-fighting: opt_rearbadge_2_2 x opt_rearbadge_2_3 (6 faces)
+door open, z-fighting: opt_rearbadge_3_2 x opt_rearbadge_3_3 (9 faces)
+door open, z-fighting: opt_rearbadge_4_2 x opt_rearbadge_4_3 (9 faces)

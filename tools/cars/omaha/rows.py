@@ -279,7 +279,7 @@ data = {
                "y_out": H(MIRROR["w1"]), "z0": Z(MIRROR["z0"]), "z1": Z(MIRROR["z1"])},
     "spoiler": side(SPOILER),
     "spoiler_span": H(SPOILER_SPAN),
-    "picks": {"frontbadge": 1, "rearbadge": 1, "name": 1, "spoiler": 1},     # until Ivan picks
+    "picks": {"frontbadge": 1, "rearbadge": 1, "name": 1, "spoiler": 1},     # Ivan's picks, 2026-11-12
 }
 # belt line z(x) in build space, sampled for parts to interpolate
 _ys = np.linspace(-0.75, 1.20, 40)
