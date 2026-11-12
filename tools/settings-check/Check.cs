@@ -26,7 +26,7 @@ internal static class Check
     private static readonly Vector2Int Size = new Vector2Int(1280, 720);
     private const int Quality = 3; // Ultra
     private const bool VSync = false;
-    private const float Volume = 0.35f;
+    private const float Volume = 0.35f, Music = 0.45f;
     private const int RealLights = 17;
 
     private static int Main(string[] args)
@@ -36,6 +36,7 @@ internal static class Check
         if (args[0] == "first")
         {
             Expect("a fresh game starts on Medium", GameSettings.Quality, 1);
+            Expect("a fresh game starts with the music at 70%", GameSettings.Music, 0.7f);
             Expect("a fresh game starts with every option at its default", GraphicsOptions.All.Count(o => o.Value != o.Default), 0);
             GameSettings.DisplayMode = Mode;
             GameSettings.Resolution = Size;
@@ -43,6 +44,7 @@ internal static class Check
             foreach (GraphicsRow row in GraphicsOptions.Rows) row.Value = Changed(row);
             GameSettings.VSync = VSync;
             GameSettings.Volume = Volume;
+            GameSettings.Music = Music;
             Application.Quit();
         }
         else
@@ -53,6 +55,7 @@ internal static class Check
             Expect("quality's pipeline asset in use", QualitySettings.renderPipeline?.name, "Quality/" + QualityLevels.Names[Quality]);
             Expect("v-sync", GameSettings.VSync, VSync);
             Expect("volume", GameSettings.Volume, Volume);
+            Expect("music", GameSettings.Music, Music);
             foreach (GraphicsRow row in GraphicsOptions.Rows)
             {
                 Expect(row.Label, row.Value, Changed(row));

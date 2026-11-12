@@ -25,6 +25,8 @@ namespace TarmacGauntlet.Management.Editor
 
         private static string BuildFolder => Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Builds", "Windows"));
 
+        private static string CreditsFile => Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", "CREDITS.md"));
+
         private static string InstallFolder =>
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", GameName);
 
@@ -90,6 +92,8 @@ namespace TarmacGauntlet.Management.Editor
             }
             if (report.summary.result == BuildResult.Succeeded)
             {
+                // CC BY music and sounds need their credits shipped with the game.
+                File.Copy(CreditsFile, Path.Combine(BuildFolder, "Credits.txt"), true);
                 Debug.Log($"Built {GameName} to {BuildFolder} in {report.summary.totalTime.TotalSeconds:0}s");
                 return true;
             }

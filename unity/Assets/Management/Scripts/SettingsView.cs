@@ -55,6 +55,7 @@ namespace TarmacGauntlet.Management
 
             VisualElement audio = SettingsGroup(2);
             audio.Add(Slider("Volume", GameSettings.Volume, v => GameSettings.Volume = v));
+            audio.Add(Slider("Music", GameSettings.Music, v => GameSettings.Music = v));
             scroll.Add(audio);
             settingsPanel.Add(scroll);
         }
