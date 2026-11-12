@@ -18,6 +18,9 @@ namespace TarmacGauntlet.Raceday
         private const float HardHit = 18f;        // m/s into a barrier that ends your run until you reset
         private const float ShiftTime = 0.08f;
         private const float LightWheel = 0.4f;    // share of its resting load under which a wheel skips, not spins
+        private const float Turn = 2f * Mathf.PI;
+        private const float AirSpinDown = 0.3f;   // share of its spin a wheel in the air loses each second
+        private const float AirSpinUp = 60f;      // rad/s² a driven wheel in the air gains on full throttle
 
         public CarSpec Spec { get; private set; }
         public KeyboardState Keys;
@@ -75,7 +78,9 @@ namespace TarmacGauntlet.Raceday
             public bool Front, Left;
             public Transform Visual;
             public Vector3 VisualRest;
-            public float Compression, Spin;
+            public float Compression;
+            /// <summary>How far the wheel has turned, radians, kept within a turn, and how fast it turns now, radians a second.</summary>
+            public float Spin, Rate;
             public bool Grounded;
             /// <summary>Where the tyre last touched a paved surface, and how hard it slid there (0 when it gripped).</summary>
             public Vector3 Contact, ContactNormal;
@@ -84,6 +89,12 @@ namespace TarmacGauntlet.Raceday
 
         /// <summary>Wheel i's visual pivot, at its centre: 0 front left, 1 front right, 2 rear left, 3 rear right. Null with none.</summary>
         public Transform WheelVisual(int i) => wheels[i]?.Visual;
+
+        /// <summary>How fast wheel i turns, radians a second, forward positive: 0 with none.</summary>
+        public float WheelRate(int i) => wheels[i]?.Rate ?? 0f;
+
+        /// <summary>Blurs the wheels' spokes into a spinning disc at speed, when the model has them (CarBuilder fits it).</summary>
+        internal WheelBlur Blur;
 
         /// <summary>
         /// How hard wheel i is sliding or spinning on tarmac or a kerb, 0 to 1: 0 while it grips, in the air, off the
@@ -405,10 +416,16 @@ namespace TarmacGauntlet.Raceday
                     gripUsed += Mathf.Min((fx * fx + fy * fy) / (cap * cap), 1f);
                     gripCount++;
                 }
-                w.Spin += vLong / Spec.WheelRadius * dt;
+                w.Rate = vLong / Spec.WheelRadius;
+                w.Spin += w.Rate * dt;
             }
-            else if (!w.Front && drive != 0f)
-                w.Spin += Mathf.Sign(drive) * 30f * dt;
+            else
+            {
+                // In the air the wheel runs on, slowing a little, and a driven one spins up under the throttle.
+                w.Rate *= 1f - Mathf.Min(AirSpinDown * dt, 1f);
+                if (!w.Front && drive != 0f) w.Rate += Mathf.Sign(drive) * AirSpinUp * throttle * dt;
+                w.Spin += w.Rate * dt;
+            }
         }
 
         private SurfaceKind SurfaceOf(Collider c)
@@ -471,7 +488,11 @@ namespace TarmacGauntlet.Raceday
             body.linearVelocity = rotation * Vector3.forward * speed;
             body.angularVelocity = up * yawRate;
 
-            foreach (Wheel w in wheels) w.Compression = compression;
+            foreach (Wheel w in wheels)
+            {
+                w.Compression = compression;
+                w.Rate = speed / Spec.WheelRadius;
+            }
             Speed = speed;
             Gear = Spec.GearFor(speed);
             shiftTimer = 0f;
@@ -484,21 +505,32 @@ namespace TarmacGauntlet.Raceday
         private void LateUpdate()
         {
             if (Spec == null) return;
-            foreach (Wheel w in wheels)
+            for (int i = 0; i < 4; i++)
             {
+                Wheel w = wheels[i];
                 if (w.Visual == null) continue;
+                float shown;
                 if (Asleep)
                 {
                     // Gliding: wheels at rest height, spinning with the car's speed.
                     w.Compression = Spec.StaticCompression;
                     w.Grounded = true;
-                    w.Spin += Speed / Spec.WheelRadius * Time.deltaTime;
+                    w.Rate = Speed / Spec.WheelRadius;
+                    w.Spin = Mathf.Repeat(w.Spin + w.Rate * Time.deltaTime, Turn);
+                    shown = w.Spin;
+                }
+                else
+                {
+                    // The spin steps with physics; between steps it runs on at its rate, so it turns every frame, not in jumps.
+                    w.Spin = Mathf.Repeat(w.Spin, Turn);
+                    shown = w.Spin + w.Rate * Mathf.Clamp(Time.time - Time.fixedTime, 0f, Time.fixedDeltaTime);
                 }
                 float drop = Spec.StaticCompression - w.Compression;
                 if (!w.Grounded) drop = Spec.StaticCompression - 0f;
                 w.Visual.localPosition = w.VisualRest + Vector3.down * Mathf.Min(drop, Spec.Travel);
                 float yaw = w.Front ? steer * Mathf.Rad2Deg : 0f;
-                w.Visual.localRotation = Quaternion.Euler(0f, yaw, 0f) * Quaternion.Euler(w.Spin * Mathf.Rad2Deg, 0f, 0f);
+                w.Visual.localRotation = Quaternion.Euler(0f, yaw, 0f) * Quaternion.Euler(shown * Mathf.Rad2Deg, 0f, 0f);
+                if (Blur != null) Blur.Show(i, w.Rate, shown);
             }
         }
 
