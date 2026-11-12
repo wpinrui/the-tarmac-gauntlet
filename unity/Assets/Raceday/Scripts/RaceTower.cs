@@ -68,6 +68,9 @@ namespace TarmacGauntlet.Raceday
         private float clock;
         /// <summary>Race seconds since the start, on the race clock.</summary>
         public float RaceTime => clock * TimeCompression;
+
+        /// <summary>Moves the race clock to this many race seconds from the start. For the debug menu.</summary>
+        public void SetRaceTime(float raceSeconds) => clock = Mathf.Max(0f, raceSeconds) / TimeCompression;
         private Font bold, semiBold;
         private GUIStyle clockStyle, posStyle, teamStyle, badgeStyle, gapStyle, headerStyle;
         private int styledFor = -1;
@@ -121,7 +124,7 @@ namespace TarmacGauntlet.Raceday
 
         private void OnGUI()
         {
-            if (Hidden || Event.current.type != EventType.Repaint || rows.Count == 0) return;
+            if (Hidden || DebugMenu.Clean || Event.current.type != EventType.Repaint || rows.Count == 0) return;
             float u = Unit();
             Style(u);
 

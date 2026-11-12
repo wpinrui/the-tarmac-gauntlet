@@ -108,6 +108,20 @@ namespace TarmacGauntlet.Raceday
         /// of the race. Any other failure cuts its power, and it limps to its box at the next pit
         /// entry, keeping its traffic manners, and parks there.
         /// </summary>
+        /// <summary>Takes a car out of the race now. For the debug menu.</summary>
+        public void RetireNow(int i, FailureType reason)
+        {
+            if (Finished || Day.Cars[i].Retired) return;
+            Day.Cars[i].Retire(Tower.RaceTime, reason);
+            Retire(i);
+        }
+
+        /// <summary>Ends the race now and settles it, as if every car had taken the flag. For the debug menu.</summary>
+        public void FinishNow()
+        {
+            if (!Finished && Day != null) Finish();
+        }
+
         private void Retire(int i)
         {
             CarController car = controllers[i];

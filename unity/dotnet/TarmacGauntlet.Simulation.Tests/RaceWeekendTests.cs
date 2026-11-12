@@ -116,6 +116,30 @@ namespace TarmacGauntlet.Simulation.Tests
         }
 
         [Test]
+        public void AnIssueGivenAndFixedFromTheDebugMenu()
+        {
+            (RaceDay _, CarRaceLog me) = PlayerRace(Never);
+            me.AddIssue("engine-misfire");
+            me.AddIssue("engine-misfire");
+            Assert.That(me.ActiveIssues.Count, Is.EqualTo(1));
+            Assert.That(me.Effects.Power, Is.EqualTo(0.9).Within(1e-9));
+            me.ClearIssues();
+            Assert.That(me.ActiveIssues, Is.Empty);
+            Assert.That(me.Effects.Power, Is.EqualTo(1));
+            Assert.That(me.Issues.Single().FixedLap, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void FatigueSetFromTheDebugMenuStaysInRange()
+        {
+            (RaceDay _, CarRaceLog me) = PlayerRace(Never);
+            me.SetFatigue(150);
+            Assert.That(me.Fatigue, Is.EqualTo(100));
+            me.SetFatigue(-5);
+            Assert.That(me.Fatigue, Is.EqualTo(0));
+        }
+
+        [Test]
         public void ALapAgesTheCar()
         {
             (RaceDay race, CarRaceLog me) = PlayerRace(Never);

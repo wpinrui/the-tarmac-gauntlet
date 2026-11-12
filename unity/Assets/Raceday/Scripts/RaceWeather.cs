@@ -32,6 +32,9 @@ namespace TarmacGauntlet.Raceday
     {
         public static WeatherState Now = WeatherState.Dry;
 
+        /// <summary>Weather the debug menu holds over the circuit in place of the race's own, or null.</summary>
+        public static WeatherState? Forced;
+
         /// <summary>Grip on a fully wet track, before it floods.</summary>
         public const float WetGrip = 0.75f;
 

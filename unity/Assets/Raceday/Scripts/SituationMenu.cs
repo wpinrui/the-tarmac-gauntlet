@@ -5,19 +5,17 @@ using UnityEngine;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// The AI debug menu, on Tab. It lists the set-ups of the racecraft spec (<see cref="Situations"/>)
-    /// by rule. Picking one puts the race away and places that set-up's cars at their spot and speed,
-    /// each on its tuned line, and they race at once. The menu also picks a car to drive, or none to
-    /// watch, switches slow motion (T) and restarts the set-up (Backspace). While a set-up runs, each
-    /// AI car shows the path it is steering for and, above it, why. The AI version and set-up are shown
-    /// small in the bottom left corner at all times, e.g. "v2 T2", so feedback can name what it was about.
+    /// The AI set-ups of the racecraft spec (<see cref="Situations"/>), picked from the debug menu's AI page
+    /// (<see cref="DebugMenu"/>). Picking one puts the race away and places that set-up's cars at their spot and speed,
+    /// each on its tuned line, and they race at once. The page also picks a car to drive, or none to
+    /// watch. Backspace restarts the set-up. While a set-up runs, each AI car shows the path it is steering
+    /// for and, above it, why, and the AI version and set-up are shown small in the bottom left corner, e.g. "v2 T2".
     /// </summary>
     public sealed class SituationMenu : MonoBehaviour
     {
-        private const float SlowMotion = 0.25f;
         /// <summary>How far ahead the path is drawn, seconds at the car's speed.</summary>
         private const float PathTime = 3f;
-        private static readonly Color Chosen = new Color(0.3f, 1f, 0.4f);
+        internal static readonly Color Chosen = new Color(0.3f, 1f, 0.4f);
 
         public Circuit Circuit;
         public KeyboardState Keys;
@@ -29,14 +27,18 @@ namespace TarmacGauntlet.Raceday
         /// <summary>True once a set-up has been picked: the race is put away.</summary>
         public bool Running => situation != null;
 
+        /// <summary>The set-up running, or null.</summary>
+        public Situation Current => situation;
+
+        /// <summary>The set-up's car the player drives, or -1 to watch.</summary>
+        public int Driving => drive;
+
         private Situation situation;
-        private bool open, slow;
         /// <summary>The set-up's car the player drives, or -1 to watch.</summary>
         private int drive = -1;
         private string version = "v?";
         private Task<AiPilot>[] building;
         private readonly List<AiDriver> cars = new List<AiDriver>();
-        private Vector2 scroll;
         private Material lineMaterial;
         private GUIStyle carLabel, corner;
 
@@ -49,19 +51,18 @@ namespace TarmacGauntlet.Raceday
         private void Update()
         {
             if (Keys == null) return;
-            if (Keys.Pressed(KeyCode.Tab)) open = !open;
-            if (Running && Keys.Pressed(KeyCode.Backspace)) Pick(situation);
-            if (Running && Keys.Pressed(KeyCode.T)) slow = !slow;
+            if (Running && Keys.Pressed(KeyCode.Backspace)) Restart();
             if (building != null) Build();
-            if (Running)
-            {
-                float scale = slow ? SlowMotion : 1f;
-                if (Time.timeScale != scale) Time.timeScale = scale;
-            }
+        }
+
+        /// <summary>Starts the running set-up again.</summary>
+        public void Restart()
+        {
+            if (Running) Pick(situation);
         }
 
         /// <summary>Puts the race away, or the last set-up's cars, and starts building this one's pilots.</summary>
-        private void Pick(Situation s)
+        public void Pick(Situation s)
         {
             situation = s;
             if (Race != null)
@@ -167,49 +168,13 @@ namespace TarmacGauntlet.Raceday
             corner.fontSize = Mathf.RoundToInt(18 * scale);
             carLabel.fontSize = Mathf.RoundToInt(18 * scale);
 
-            string label = version + (situation != null ? $" {situation.Id}" : "");
-            Shadowed(new Rect(12f * scale, Screen.height - 40f * scale, 400f * scale, 30f * scale), label, corner, scale);
-            if (Running && Event.current.type == EventType.Repaint) CarLabels(scale);
-            if (open) Menu(scale);
+            if (!Running || DebugMenu.Clean) return;
+            Shadowed(new Rect(12f * scale, Screen.height - 40f * scale, 400f * scale, 30f * scale), $"{version} {situation.Id}", corner, scale);
+            if (Event.current.type == EventType.Repaint) CarLabels(scale);
         }
 
-        private void Menu(float scale)
-        {
-            float w = 460f * scale, h = Screen.height * 0.8f;
-            GUILayout.BeginArea(new Rect((Screen.width - w) * 0.5f, (Screen.height - h) * 0.5f, w, h), GUI.skin.box);
-            int size = Mathf.RoundToInt(18 * scale);
-            var button = new GUIStyle(GUI.skin.button) { fontSize = size, alignment = TextAnchor.MiddleLeft };
-            var on = new GUIStyle(button) { fontStyle = FontStyle.Bold };
-            on.normal.textColor = on.hover.textColor = Chosen;
-
-            if (situation != null)
-            {
-                GUILayout.BeginHorizontal();
-                if (GUILayout.Button("Watch", drive < 0 ? on : button)) Drive(-1);
-                for (int i = 0; i < situation.Cars.Length; i++)
-                    if (GUILayout.Button(CarSpec.For(situation.Cars[i].Model).Name, drive == i ? on : button)) Drive(i);
-                GUILayout.EndHorizontal();
-                GUILayout.BeginHorizontal();
-                if (GUILayout.Button("Restart", button)) { Pick(situation); open = false; }
-                if (GUILayout.Button("Slow motion", slow ? on : button)) slow = !slow;
-                GUILayout.EndHorizontal();
-            }
-            GUILayout.Space(8f * scale);
-            scroll = GUILayout.BeginScrollView(scroll);
-            foreach (Situation s in Situations.All)
-            {
-                if (!s.Ready) continue;
-                if (GUILayout.Button(s.Name, s == situation ? on : button))
-                {
-                    Pick(s);
-                    open = false;
-                }
-            }
-            GUILayout.EndScrollView();
-            GUILayout.EndArea();
-        }
-
-        private void Drive(int i)
+        /// <summary>Drives the set-up's car <paramref name="i"/>, or watches with -1, and starts the set-up again.</summary>
+        public void Drive(int i)
         {
             if (drive == i) return;
             drive = i;
@@ -267,7 +232,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>The path each AI car steers for: from where it runs now across to racecraft's offset, at the rate it moves across.</summary>
         private void OnRenderObject()
         {
-            if (!Running || cars.Count == 0) return;
+            if (!Running || DebugMenu.Clean || cars.Count == 0) return;
             if (lineMaterial == null)
             {
                 lineMaterial = new Material(Shader.Find("Hidden/Internal-Colored")) { hideFlags = HideFlags.HideAndDontSave };
