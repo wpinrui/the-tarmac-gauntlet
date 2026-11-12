@@ -4,7 +4,12 @@
 //
 // Checks:
 //   textures repeat       every texture's opposite edges match as well as its neighbouring pixels do, so no seam
-//                         shows where the tile repeats (a kerb's only along it, as its blocks change across)
+//                         shows where the tile repeats (a kerb's and the rubber marks' only along, as they don't
+//                         repeat across)
+//   repairs clear of ends no sealant or patch within 0.8 m of the repairs tile's ends, so a repeat shifted or mirrored
+//                         against the next shows no seam, and some of both in the tile
+//   marks fade at edges   the rubber marks are clear of the tile's sides, so the clamped edge never streaks, and
+//                         darker near the line than 3 m off it
 //   line map on the road  the road's uv along it, as the builder lays it, matches CircuitBuilder.RoadAlong within
 //                         2 cm, so the shader finds the racing line at the right place on the road
 //   line on the road      the racing line runs at least 0.9 m inside both road edges, so its tyre tracks stay on it
@@ -16,7 +21,9 @@
 //                         racing line holds less water than the rest of the road
 //
 // Previews, in the out folder given: tarmac.png (colour, lit by a low sun), patches.png, kerbs.png (clean and worn,
-// lit), rubber.png (the road through the tightest corner, straightened, as the shader draws its rubber), ripples.png
+// lit), repairs.png (sealant, patches and their shades), marks.png, rubber.png (the road through the tightest corner,
+// straightened, as the shader draws it dry: grain, patches, repairs, rubber and marks, lit, each pixel averaged over
+// its footprint as a mip would), road-close.png (6 m of that road at 100 pixels a metre), ripples.png
 // (the ripple tile's rings and drop directions) and wet.png (the road through the lap's deepest dip, straightened, as
 // the shader draws it at a film of 0.05, 0.25, 0.6 and 1.5 mm: damp, drying on the line, wet, flooded).
 using System;
@@ -46,8 +53,10 @@ static class Check
         int n = circuit.Count;
 
         TrackTextures.Tarmac tarmac = TrackTextures.MakeTarmac(1);
-        Color[] road = TrackTextures.TarmacColour(tarmac, new Color(0.17f, 0.17f, 0.18f), 0.9f);
-        Color[] roadNormals = TrackTextures.TarmacNormals(tarmac, 1.6f);
+        Color[] road = TrackTextures.TarmacColour(tarmac, new Color(0.17f, 0.17f, 0.18f), 0.5f);
+        Color[] roadNormals = TrackTextures.TarmacNormals(tarmac, 1.2f);
+        Color[] repairs = TrackTextures.Repairs(12), marks = TrackTextures.Marks(14);
+        int ra = TrackTextures.RepairsAcross, rl = TrackTextures.RepairsAlong, mka = TrackTextures.MarksAcross, mkl = TrackTextures.MarksAlong;
         Color[] macro = TrackTextures.Macro(8);
         Color[] kerbClean = TrackTextures.Kerb(false, 9), kerbWorn = TrackTextures.Kerb(true, 9);
         Color[] kerbCleanN = TrackTextures.KerbNormals(false, 9), kerbWornN = TrackTextures.KerbNormals(true, 9);
@@ -76,7 +85,42 @@ static class Check
         Seam("tarmac normals", roadNormals, ts, ts, true);
         Seam("patches", macro, ms, ms, true);
         Seam("worn kerb normals", kerbWornN, ka, kl, false);
-        Report(seams.Count == 0, "textures repeat", seams.Count == 0 ? "4 textures" : string.Join(", ", seams));
+        Seam("repairs", repairs, ra, rl, true);
+        Seam("rubber marks", marks, mka, mkl, false);
+        Report(seams.Count == 0, "textures repeat", seams.Count == 0 ? "6 textures" : string.Join(", ", seams));
+
+        // ---- repairs clear of ends
+        int clearRows = (int)Math.Ceiling(0.8f / (TrackTextures.RepairsMetresAlong / rl));
+        float atEnds = 0f, sealShare = 0f, patchShare = 0f;
+        for (int y = 0; y < rl; y++)
+            for (int x = 0; x < ra; x++)
+            {
+                Color c = repairs[y * ra + x];
+                if (y < clearRows || y >= rl - clearRows) atEnds = Math.Max(atEnds, Math.Max(c.r, c.g));
+                sealShare += c.r;
+                patchShare += c.g;
+            }
+        sealShare /= ra * rl;
+        patchShare /= ra * rl;
+        Report(atEnds == 0f && sealShare > 0.003f && patchShare > 0.02f && patchShare < 0.25f, "repairs clear of ends",
+            $"most at the ends {atEnds:0.00}; sealant over {sealShare * 100f:0.0}% of the tile, patches over {patchShare * 100f:0.0}%");
+
+        // ---- marks fade at edges
+        float atSides = 0f, nearLine = 0f, offLine = 0f;
+        int nearCount = 0, offCount = 0;
+        for (int y = 0; y < mkl; y++)
+            for (int x = 0; x < mka; x++)
+            {
+                float across = (x + 0.5f) * TrackTextures.MarksMetresAcross / mka - TrackTextures.MarksMetresAcross / 2f;
+                float v = marks[y * mka + x].r;
+                if (x == 0 || x == mka - 1) atSides = Math.Max(atSides, v);
+                if (Math.Abs(across) < 1.2f) { nearLine += v; nearCount++; }
+                else if (Math.Abs(across) > 3f) { offLine += v; offCount++; }
+            }
+        nearLine /= nearCount;
+        offLine /= offCount;
+        Report(atSides < 0.01f && nearLine > 2f * offLine && nearLine > 0.03f, "marks fade at edges",
+            $"most at the sides {atSides:0.000}; within 1.2 m of the line {nearLine:0.000}, beyond 3 m {offLine:0.000}");
 
         // ---- line map on the road
         float[] along = CircuitBuilder.RoadAlong(circuit);
@@ -244,28 +288,48 @@ static class Check
             };
         });
 
-        // The road through the sharpest corner, straightened: across left to right, along bottom to top.
-        const float pxPerM = 24f, alongScale = 6f;
-        float from = along[sharpest] - 140f, to = along[sharpest] + 60f;
-        int width = (int)(2f * MaxHalf(circuit) * pxPerM) + 40, height = (int)((to - from) * alongScale);
-        WritePng(Path.Combine(outDir, "rubber.png"), width, height, (x, y) =>
+        WritePng(Path.Combine(outDir, "repairs.png"), ra * 3, rl / 2, (x, y) =>
         {
-            float s = Repeat(from + y / alongScale, along[n]);
-            float a = (x - 20) / pxPerM;
+            Color c = repairs[(y * 2) * ra + x % ra];
+            float v = (x / ra) switch { 0 => c.r, 1 => c.g, _ => c.g > 0f ? c.b : 0.5f };
+            return new Color(v, v, v);
+        });
+        WritePng(Path.Combine(outDir, "marks.png"), mka, mkl / 2, (x, y) =>
+        {
+            float v = 1f - marks[(y * 2) * mka + x].r;
+            return new Color(v, v, v);
+        });
+
+        // The road through the sharpest corner, straightened: across left to right, along bottom to top. Each pixel
+        // averages the shader's colour over its footprint, as a mip would.
+        float from = along[sharpest] - 140f, to = along[sharpest] + 60f;
+        Color Dry(float a, float s)
+        {
             int k = SampleAt(along, s);
             float w = 2f * circuit.HalfWidth(k);
             if (a < 0f || a > w) return new Color(0.23f, 0.41f, 0.15f);
             if (a < 0.12f || a > w - 0.12f) return new Color(0.92f, 0.92f, 0.9f);
-            float u = a / 4f, v = s / 4f;
-            Color grain = Sample(road, ts, ts, u, v);
-            Color onLine = Sample1D(map, s / along[n]);
-            float d = a - onLine.r;
-            float band = Bell(d, 1.1f) * 0.5f + (Bell(d - 0.8f, 0.24f) + Bell(d + 0.8f, 0.24f)) * 0.5f;
-            float streak = Sample(macro, ms, ms, a * 0.45f, s * 0.012f).g;
-            float rubber = Mathf.Clamp01(band * onLine.g * (0.45f + streak * 1.1f));
-            float k2 = 1f - rubber * 0.55f;
-            return new Color(grain.r * k2, grain.g * k2, grain.b * k2);
-        });
+            return DryAt(map, road, roadNormals, macro, repairs, marks, along[n], a, s);
+        }
+        void Road(string file, float pxPerM, float a0, float a1, float s0, float s1, int samples)
+        {
+            int width = (int)((a1 - a0) * pxPerM), height = (int)((s1 - s0) * pxPerM);
+            WritePng(Path.Combine(outDir, file), width, height, (x, y) =>
+            {
+                float r = 0f, g = 0f, b = 0f;
+                for (int j = 0; j < samples; j++)
+                    for (int i = 0; i < samples; i++)
+                    {
+                        Color c = Dry(a0 + (x + (i + 0.5f) / samples) / pxPerM, Repeat(s0 + (y + (j + 0.5f) / samples) / pxPerM, along[n]));
+                        r += c.r; g += c.g; b += c.b;
+                    }
+                float q = samples * samples;
+                return new Color(r / q, g / q, b / q);
+            });
+        }
+        Road("rubber.png", 8f, -1f, 2f * MaxHalf(circuit) + 1f, from, to, 8);
+        float lineHere = Sample1D(map, along[sharpest] / along[n]).r;
+        Road("road-close.png", 100f, lineHere - 3f, lineHere + 3f, along[sharpest] - 30f, along[sharpest] - 24f, 2);
         WritePng(Path.Combine(outDir, "ripples.png"), rs * 2, rs, (x, y) =>
         {
             Color c = ripples[y * rs + x % rs];
@@ -341,6 +405,39 @@ static class Check
         float smooth = gloss + (0.88f - gloss) * film;
         smooth += (0.96f - smooth) * puddle;
         return new Wet { Water = water, Darken = darken, Smoothness = smooth, Puddle = puddle };
+    }
+
+    /// <summary>
+    /// The track shader's dry road, line for line (Track.shader with _TRACK_DETAIL and _TRACK_RUBBER), lit by a low sun:
+    /// at a across the road from its left edge and s along it. Across and along stand in for world x and z, and the
+    /// repairs tile is read without its per-repeat shift, as the preview never reaches past one repeat's worth of road.
+    /// </summary>
+    static Color DryAt(Color[] map, Color[] road, Color[] normals, Color[] macro, Color[] repairs, Color[] marks, float lap, float a, float s)
+    {
+        int ts = TrackTextures.TarmacSize, ms = TrackTextures.MacroSize;
+        Color grain = Sample(road, ts, ts, a / 4f, s / 4f);
+        Color nrm = Sample(normals, ts, ts, a / 4f, s / 4f);
+        float k = 1f;
+        float broad = Sample(macro, ms, ms, a / 60f, s / 60f).r;
+        float fine = Sample(macro, ms, ms, s / 60f * 3.7f + 0.31f, -a / 60f * 3.7f + 0.31f).r;
+        float patch = (broad * 0.65f + fine * 0.35f) * 2f - 1f;
+        k *= 1f + patch * 0.35f;
+        Color rep = Sample(repairs, TrackTextures.RepairsAcross, TrackTextures.RepairsAlong, a / TrackTextures.RepairsMetresAcross, s / TrackTextures.RepairsMetresAlong);
+        k *= 1f + (0.76f + (1.1f - 0.76f) * rep.b - 1f) * rep.g;
+        Color onLine = Sample1D(map, s / lap);
+        float d = a - onLine.r;
+        float band = Bell(d, 1.1f) * 0.5f + (Bell(d - 0.8f, 0.24f) + Bell(d + 0.8f, 0.24f)) * 0.5f;
+        float streak = Sample(macro, ms, ms, a * 0.45f, s * 0.012f).g;
+        float rubber = Mathf.Clamp01(band * onLine.g * (0.5f + streak * 1.1f));
+        float u = d / 8f + 0.5f;
+        float mk = u <= 0f || u >= 1f ? 0f : Sample(marks, TrackTextures.MarksAcross, TrackTextures.MarksAlong, u, s / 160f).r * Mathf.Clamp01(onLine.g * 1.6f - 0.45f);
+        k *= (1f - rubber * 0.7f) * (1f - mk * 0.7f);
+        var c = new Color(grain.r * k, grain.g * k, grain.b * k);
+        float seal = rep.r * 0.75f;
+        c = Color.Lerp(c, new Color(0.03f, 0.03f, 0.033f), seal);
+        // Sealant lies flat over the grain.
+        nrm = Color.Lerp(nrm, new Color(0.5f, 0.5f, 1f), rep.r * 0.8f);
+        return Lit(c, nrm);
     }
 
     static float Bell(float d, float w) => (float)Math.Exp(-d * d / (2 * w * w));
