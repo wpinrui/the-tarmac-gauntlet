@@ -121,12 +121,13 @@ def build(game=False):
     print("grooves cut")
 
     out += parts.interior()
-    out += parts.hard_top("body")
+    out += parts.hard_top(next(o for o in out if o.name == "screen_trim"))
     print("body faces", len(shell.data.polygons))
     doors = []
     for sgn in (1, -1):
         doors.append(parts.door(ref, shell, sgn)[0])
         print("door cut free:", doors[-1].name, len(doors[-1].data.polygons), "body faces", len(shell.data.polygons))
+    out += parts.door_trim(ref)
     for ob in [shell] + doors:
         blend.tidy(ob)
         blend.thin(ob, 0.55)
