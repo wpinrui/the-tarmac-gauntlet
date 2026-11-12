@@ -96,7 +96,7 @@ namespace TarmacGauntlet.Simulation
             new AiTeamEntry { Name = "Barnacle Racing", Descriptor = "fuel giant's long-running works partnership", ModelId = "c-20", CarClass = CarClass.C },
             // CLASS B: 12 teams
             new AiTeamEntry { Name = "Scuderia Feretti", Descriptor = "Feretti's official works racing team", ModelId = "b-21", CarClass = CarClass.B },
-            new AiTeamEntry { Name = "Team Archer", Descriptor = "Archer' performance division works entry", ModelId = "b-22", CarClass = CarClass.B },
+            new AiTeamEntry { Name = "Team Archer", Descriptor = "Archer's performance division works entry", ModelId = "b-22", CarClass = CarClass.B },
             new AiTeamEntry { Name = "Liberty Performance Racing", Descriptor = "Liberty's factory GT programme", ModelId = "b-25", CarClass = CarClass.B },
             new AiTeamEntry { Name = "Molteni Corse", Descriptor = "Feretti customer team, Italian privateer", ModelId = "b-21", CarClass = CarClass.B },
             new AiTeamEntry { Name = "Apex Archer", Descriptor = "Archer satellite with factory parts supply", ModelId = "b-23", CarClass = CarClass.B },

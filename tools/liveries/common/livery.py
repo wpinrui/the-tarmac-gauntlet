@@ -57,7 +57,7 @@ class Livery:
         """An existing brand mark (SVG file), height metres tall, centred on p. ink recolours
         every fill, for a mark that would vanish on the paint. underline: colours of equal
         bars laid side by side under the mark, turning with it; edge outlines them in a colour."""
-        src = Path(svg_path).read_text()
+        src = re.sub(r"<metadata>.*?</metadata>", "", Path(svg_path).read_text(), flags=re.S)  # e.g. a c2pa manifest
         vb = [float(x) for x in re.search(r'viewBox="([^"]+)"', src).group(1).split()]
         inner = re.search(r"<svg[^>]*>(.*)</svg>", src, re.S).group(1)
         if ink:

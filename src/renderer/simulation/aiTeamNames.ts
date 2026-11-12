@@ -109,7 +109,7 @@ export const AI_TEAM_ROSTER: AiTeamEntry[] = [
   // CLASS B — 12 teams
   // -----------------------------------------------------------------------
   { name: "Scuderia Feretti",             descriptor: "Feretti's official works racing team", carClass: "B" },
-  { name: "Team Archer",            descriptor: "Archer' performance division works entry", carClass: "B" },
+  { name: "Team Archer",            descriptor: "Archer's performance division works entry", carClass: "B" },
   { name: "Liberty Performance Racing",      descriptor: "Liberty's factory GT programme", carClass: "B" },
   { name: "Molteni Corse",                descriptor: "Feretti customer team, Italian privateer", carClass: "B" },
   { name: "Apex Archer",                 descriptor: "Archer satellite with factory parts supply", carClass: "B" },
