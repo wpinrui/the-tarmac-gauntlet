@@ -282,7 +282,12 @@ namespace TarmacGauntlet.Raceday
             if (!career) views.StartInChase();
             RaceTower tower = Tower(circuit, racing, field, teams, watched, starter);
             raceTower = tower;
-            if (day != null) tower.Flagged = i => day.Cars[i].Flagged;
+            if (day != null)
+            {
+                tower.Flagged = i => day.Cars[i].Flagged;
+                tv.Flagged = tower.Flagged;
+                locked.Flagged = tower.Flagged;
+            }
             if (resumed) tower.SetRaceTime(resume.RaceTime);
             views.Tower = tower;
             if (player >= 0 && TeamColour(setup.Game, grid[player].TeamId) is Color own) tower.Colours[player] = own;
