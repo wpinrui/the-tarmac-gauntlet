@@ -13,7 +13,7 @@
 //                           car stops for jobs that start sooner (the walk round the car), and working most of the
 //                           time from then (60 %). A job over too soon to walk to may be let go. Someone with several
 //                           wheels works every one of them inside the tyre time
-//   home after              25 s after the car is released everyone is back at their spot in the garage, idle,
+//   home after              25 s after the car is released everyone is back at their spot in the garage, in their home pose,
 //                           and the crew rests
 //   out of the fast lane    no one steps into the fast lane, where cars pass the boxes at the limiter
 //   clear of passing cars   a car driving to or from any other box, or along the fast lane, keeps at least 0.5 m
@@ -434,7 +434,7 @@ static class Check
         if (!swap.AtRest || waiting.Body.At != swap.Rest) driverNotHome.Add(((waiting.Body.At - swap.Rest).magnitude, $"{tag}: waiting driver at ({waiting.Body.At.x:0.0}, {waiting.Body.At.y:0.0}), {waiting.Body.Clip}"));
         if (worstCar > 0f) driverInCar.Add((worstCar, tag + ": " + carWho));
         if (worstCrew > 0f) driverOnCrew.Add((worstCrew, tag + ": " + crewWho));
-        int away = crew.People.Count(m => (m.At - m.Home).magnitude > 0.01f || m.Clip != "Idle");
+        int away = crew.People.Count(m => !m.Settled);
         if (away > 0 || !crew.AtRest) notHome.Add((away, $"{tag}: {away} not home and idle"));
 
         if (worstDepth > 0f) throughCar.Add((worstDepth, tag + ": " + worstWho));

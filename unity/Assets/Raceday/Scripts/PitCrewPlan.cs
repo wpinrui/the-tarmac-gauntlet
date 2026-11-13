@@ -51,8 +51,20 @@ namespace TarmacGauntlet.Raceday
     public sealed class CrewMember
     {
         public Vector2 At, Home;
-        /// <summary>Flat unit vector they face, in the box's frame.</summary>
-        public Vector2 Facing;
+        /// <summary>Flat unit vector they face, in the box's frame, and the way they face at home.</summary>
+        public Vector2 Facing, HomeFacing;
+        /// <summary>How they wait at home, and their talking group there (-1 for none).</summary>
+        public readonly HomePose Pose;
+        public readonly int Group;
+        /// <summary>A point walked through on the way out from home and back, in the box's frame, or null to walk straight.</summary>
+        public readonly Vector2? Via;
+        /// <summary>True from passing <see cref="Via"/> on the way out until passing it again on the way home.</summary>
+        internal bool Out;
+        /// <summary>True while on their stool at home, or getting down onto it.</summary>
+        public bool Seated { get; internal set; }
+        /// <summary>The clip their talking group has them play at home: a talk, a nod, or null to stand idle.</summary>
+        internal string ChatClip, LastTalk;
+        internal float ChatLeft;
         public readonly List<CrewTask> Tasks = new List<CrewTask>();
 
         /// <summary>The clip playing: seconds into it, its playback rate and whether it loops.</summary>
@@ -92,14 +104,38 @@ namespace TarmacGauntlet.Raceday
         internal float Pace = 1f;
         internal readonly float IdleFrom;
 
-        public CrewMember(Vector2 home, float idleFrom)
+        public CrewMember(Vector2 home, float idleFrom) : this(home, new Vector2(0f, -1f), HomePose.Stand, -1, null, idleFrom) { }
+
+        /// <summary>Someone waiting at home, already in their home pose: a sitter on their stool, an engineer writing.</summary>
+        public CrewMember(Vector2 home, Vector2 homeFacing, HomePose pose, int group, Vector2? via, float idleFrom)
         {
             Home = At = home;
-            Facing = new Vector2(0f, -1f);
+            HomeFacing = Facing = homeFacing;
+            Pose = pose;
+            Group = group;
+            Via = via;
             IdleFrom = idleFrom;
-            Play("Idle", idleFrom, 1f, true);
+            if (pose == HomePose.Desk) Play("Write", idleFrom, 1f, true);
+            else if (pose == HomePose.Sit) Play("Sit", DriverSwap.SitClip, 1f, false);
+            else Play("Idle", idleFrom, 1f, true);
+            Seated = Sits;
             UnderWeight = 0f;
         }
+
+        /// <summary>True for those who wait sitting: on a stool in the crew's corner or at the engineers' desk.</summary>
+        public bool Sits => Pose == HomePose.Sit || Pose == HomePose.Desk;
+
+        /// <summary>True while at home in their home pose, with nothing under way.</summary>
+        public bool Settled => At == Home && Busy <= 0f && !Crouched && !Out && Seated == Sits && (Pose != HomePose.Desk || Clip == "Write");
+
+        /// <summary>
+        /// How far behind their feet the root stands, along their facing, m. The writing clip sits the hips this much
+        /// further forward of the root than the end of the sitting clip does, so the root steps back to keep the hips on
+        /// the stool, fading with the clips.
+        /// </summary>
+        public float Lean => (Clip == "Write" ? WriteLean : 0f) * (1f - UnderWeight) + (Under == "Write" ? WriteLean : 0f) * UnderWeight;
+
+        public const float WriteLean = 0.64f;
 
         /// <summary>True while down at a wheel, or getting down or up: far away the crew show a crouching figure.</summary>
         public bool Low => Crouched || Clip == "CrouchDown" || Clip == "CrouchUpA" && ClipTime < GarageCrew.CrouchUp * 0.5f;
@@ -128,7 +164,7 @@ namespace TarmacGauntlet.Raceday
 
     /// <summary>
     /// A box's crew, with no Unity objects so it can be checked outside Unity (tools/pit-crew). They wait in the garage
-    /// (<see cref="PitComplex.Standby"/>). When the car is on its way in they walk out to wait beside the box, clear of
+    /// (<see cref="PitComplex.Home"/>), standing, talking or sitting. When the car is on its way in they walk out to wait beside the box, clear of
     /// the car's way in, the lollipop on the lane in front of it. Once it stops they take their places round it
     /// (<see cref="PitStopSpots.Stop"/>), following the car if it stops off its mark, as each job's time comes, crouched
     /// at the wheels and jacks, and step back to the garage side once their work is done. Work in the car's way out ends
@@ -161,6 +197,11 @@ namespace TarmacGauntlet.Raceday
         public const float Fade = 0.25f;
         /// <summary>Lengths of the clips the crew wait on, s, as packed.</summary>
         public const float CrouchDown = 0.625f, CrouchUp = 2.542f;
+        /// <summary>Lengths of the talking clips and the nod, s, as packed.</summary>
+        private static readonly (string clip, float length)[] Talks = { ("TalkA", 94f / 24f), ("TalkB", 90f / 24f), ("TalkC", 124f / 24f) };
+        private const float Nod = 44f / 24f;
+        /// <summary>Rates the sitting clip plays at, down onto a stool and back up, played backwards.</summary>
+        private const float SitRate = 1.1f, StandRate = 1.7f;
         private const float DownRate = 1.2f, UpRate = 1.7f, QuickDownRate = 1.8f, QuickUpRate = 3.4f;
         /// <summary>Least work a person with several wheels gives each, s, and the time they allow for moving between them.</summary>
         private const float MinWheel = 0.3f, MoveBetween = 2.2f;
@@ -188,6 +229,11 @@ namespace TarmacGauntlet.Raceday
         /// <summary>The car this step, in the box's frame, and where it stopped: the stop's places follow a car that stops off the mark.</summary>
         private Vector2 car, stopped;
         private bool near, doorway;
+        /// <summary>Each talking group's people, who is talking (-1 for no one), and whether two or more are home to talk.</summary>
+        private readonly int[][] groups;
+        private readonly int[] talker;
+        private readonly bool[] talking;
+        private readonly System.Random chat;
         private readonly Dictionary<PitStopSpots.StopJob, (Vector2 at, Vector2 face)> placed = new Dictionary<PitStopSpots.StopJob, (Vector2, Vector2)>();
 
         /// <summary>True once everyone stands at home, idle: nothing to do until the next stop.</summary>
@@ -206,9 +252,27 @@ namespace TarmacGauntlet.Raceday
             floor = f.Floor.y;
             Door = Vector3.Dot(f.At(0f, 0f, complex.Depth * 0.5f) - Box, ToGarage);
             var rng = new System.Random(seed);
+            chat = new System.Random(seed * 7 + 3);
             int n = Mathf.Clamp(people, 0, PitComplex.StandbySpots);
             People = new CrewMember[n];
-            for (int i = 0; i < n; i++) People[i] = new CrewMember(Local(complex.Standby(garage, i).Position), (float)rng.NextDouble() * 2.5f);
+            int groupCount = 0;
+            for (int i = 0; i < n; i++)
+            {
+                CrewHome h = complex.Home(garage, i);
+                Vector2? via = h.Via is Vector3 v ? Local(v) : (Vector2?)null;
+                People[i] = new CrewMember(Local(h.Position), LocalDirection(h.Facing), h.Pose, h.Group, via, (float)rng.NextDouble() * 2.5f);
+                groupCount = Mathf.Max(groupCount, h.Group + 1);
+            }
+            groups = new int[groupCount][];
+            for (int g = 0; g < groupCount; g++)
+            {
+                var members = new List<int>();
+                for (int i = 0; i < n; i++) if (People[i].Group == g) members.Add(i);
+                groups[g] = members.ToArray();
+            }
+            talker = new int[groupCount];
+            talking = new bool[groupCount];
+            for (int g = 0; g < groupCount; g++) talker[g] = -1;
             Plan();
             AtRest = true;
         }
@@ -227,6 +291,9 @@ namespace TarmacGauntlet.Raceday
             w.y = p.y >= Door ? floor : Mathf.Lerp(Box.y, floor, Mathf.Clamp01(p.y / Door));
             return w;
         }
+
+        /// <summary>A flat direction in the world to the box's frame.</summary>
+        public Vector2 LocalDirection(Vector3 d) => new Vector2(d.x * Forward.x + d.z * Forward.z, d.x * ToGarage.x + d.z * ToGarage.z);
 
         /// <summary>A direction in the box's frame in the world.</summary>
         public Vector3 WorldDirection(Vector2 d) => Forward * d.x + ToGarage * d.y;
@@ -518,10 +585,28 @@ namespace TarmacGauntlet.Raceday
             return t.Parts > 1 ? eta / m.Pace : eta;
         }
 
-        /// <summary>Where a person wants to be, which way to face, and whether crouched, at this point of the stop.</summary>
-        private (Vector2 at, Vector2 face, bool low, bool fetch) Want(CrewMember m, in StopClock c)
+        /// <summary>
+        /// Where a person wants to be, which way to face, whether crouched, and whether that is home, at this point of the
+        /// stop. One whose home has a way point goes through it on the way out and on the way back.
+        /// </summary>
+        private (Vector2 at, Vector2 face, bool low, bool fetch, bool home) Want(CrewMember m, in StopClock c)
         {
-            var home = (m.Home, new Vector2(0f, -1f), false, false);
+            (Vector2 at, Vector2 face, bool low, bool fetch) w = Aim(m, c);
+            bool home = !w.fetch && w.at == m.Home;
+            if (m.Via is Vector2 via && home == m.Out)
+            {
+                if ((m.At - via).sqrMagnitude < 0.0025f) m.Out = !home;
+                else return (via, Toward(m.At, via, m.Facing), false, false, false);
+            }
+            return (w.at, w.face, w.low, w.fetch, home);
+        }
+
+        /// <summary>The way a person faces at home: to their group, or out of the door while no one else of it is home to talk to.</summary>
+        private Vector2 HomeFacing(CrewMember m) => m.Group >= 0 && !talking[m.Group] ? new Vector2(0f, -1f) : m.HomeFacing;
+
+        private (Vector2 at, Vector2 face, bool low, bool fetch) Aim(CrewMember m, in StopClock c)
+        {
+            var home = (m.Home, HomeFacing(m), false, false);
             if (m.Tasks.Count == 0) return home;
             // Kit fetched for the stop goes back where it came from on the way home.
             if (c.Stage == CrewStage.Home) m.FetchLetGo = false;
@@ -603,10 +688,11 @@ namespace TarmacGauntlet.Raceday
             return p.x - car.x > DriverSwap.DoorwayBack && p.x - car.x < DriverSwap.DoorwayAhead && out_ > -0.1f && out_ < DriverSwap.DoorwayOut;
         }
 
-        /// <summary>True when the straight walk between two points keeps out of the car's way.</summary>
+        /// <summary>True when the straight walk between two points keeps out of the car's way: tried every 25 cm, at least 12 times.</summary>
         private bool Clear(Vector2 from, Vector2 to)
         {
-            for (int k = 1; k <= 12; k++) if (InCar(Vector2.Lerp(from, to, k / 12f))) return false;
+            int n = Mathf.Max(12, Mathf.CeilToInt((to - from).magnitude / 0.25f));
+            for (int k = 1; k <= n; k++) if (InCar(Vector2.Lerp(from, to, k / (float)n))) return false;
             return true;
         }
 
@@ -650,7 +736,11 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Moves the crew on by dt of race time, following the stop's clock.</summary>
         public void Step(in StopClock clock, float dt)
         {
-            if (AtRest && (clock.Stage == CrewStage.Home || People.Length == 0)) return;
+            if (AtRest && (clock.Stage == CrewStage.Home || People.Length == 0))
+            {
+                Idle(dt);
+                return;
+            }
             if (clock.CarLength > 0f) Measure(clock.CarLength, clock.CarWidth);
             else if (length < 0f) Measure(4.6f, 1.9f);
             near = clock.CarNear;
@@ -666,9 +756,83 @@ namespace TarmacGauntlet.Raceday
             {
                 m.Stage = clock.Stage;
                 for (int s = 0; s < steps; s++) Move(m, clock, h);
-                rest &= clock.Stage == CrewStage.Home && m.At == m.Home && m.Clip == "Idle" && !m.Crouched && m.Busy <= 0f;
+                rest &= clock.Stage == CrewStage.Home && m.Settled;
             }
+            Chats(dt);
             AtRest = rest;
+        }
+
+        /// <summary>Everyone at home: the clips run on, the groups talk, and anyone still turning settles to face their way.</summary>
+        private void Idle(float dt)
+        {
+            foreach (CrewMember m in People)
+            {
+                m.Advance(dt);
+                if (!m.Seated) m.Facing = Turn(m.Facing, HomeFacing(m), dt * 7f);
+            }
+            Chats(dt);
+            foreach (CrewMember m in People) if (m.Group >= 0 && m.Settled) Chat(m);
+        }
+
+        /// <summary>The clip a person standing at home plays: their group's talk or nod, or idle.</summary>
+        private static void Chat(CrewMember m)
+        {
+            if (m.ChatClip == null) m.Play("Idle", m.IdleFrom, 1f, true);
+            else m.Play(m.ChatClip, 0f, 1f, false);
+        }
+
+        /// <summary>
+        /// Each group with two or more home talks: one talks a clip's length while the rest listen, nodding now and then,
+        /// then another, never the same one twice running, takes a turn.
+        /// </summary>
+        private void Chats(float dt)
+        {
+            for (int g = 0; g < groups.Length; g++)
+            {
+                int home = 0;
+                foreach (int k in groups[g]) if (People[k].Settled) home++;
+                talking[g] = home >= 2;
+                if (!talking[g])
+                {
+                    talker[g] = -1;
+                    foreach (int k in groups[g]) People[k].ChatClip = null;
+                    continue;
+                }
+                int t = talker[g];
+                if (t >= 0) People[t].ChatLeft -= dt;
+                if (t < 0 || !People[t].Settled || People[t].ChatLeft <= 0f)
+                {
+                    // Someone else home takes the next turn.
+                    int pick = chat.Next(home - (t >= 0 && People[t].Settled ? 1 : 0));
+                    int next = -1;
+                    foreach (int k in groups[g])
+                    {
+                        if (!People[k].Settled || k == t) continue;
+                        if (pick-- == 0) { next = k; break; }
+                    }
+                    if (t >= 0) People[t].ChatClip = null;
+                    CrewMember s = People[next];
+                    (string clip, float length) talk;
+                    do talk = Talks[chat.Next(Talks.Length)];
+                    while (talk.clip == s.LastTalk);
+                    s.LastTalk = s.ChatClip = talk.clip;
+                    s.ChatLeft = talk.length - Fade;
+                    talker[g] = next;
+                    t = next;
+                }
+                // The listeners nod, rest, and nod again.
+                foreach (int k in groups[g])
+                {
+                    CrewMember l = People[k];
+                    if (k == t || !l.Settled) continue;
+                    l.ChatLeft -= dt;
+                    if (l.ChatClip != null && l.ChatClip != "Nod") l.ChatLeft = 0f;
+                    if (l.ChatLeft > 0f) continue;
+                    bool nod = l.ChatClip == null;
+                    l.ChatClip = nod ? "Nod" : null;
+                    l.ChatLeft = nod ? Nod - Fade : 1.2f + (float)chat.NextDouble() * 1.8f;
+                }
+            }
         }
 
         private void Move(CrewMember m, in StopClock c, float dt)
@@ -676,7 +840,7 @@ namespace TarmacGauntlet.Raceday
             m.Advance(dt);
             m.Waving = false;
             Progress(m, c);
-            (Vector2 at, Vector2 face, bool low, bool fetch) want = Want(m, c);
+            (Vector2 at, Vector2 face, bool low, bool fetch, bool home) want = Want(m, c);
             Vector2 to = want.at - m.At;
             bool far = to.sqrMagnitude > 0.06f * 0.06f;
             m.Working = false;
@@ -684,6 +848,19 @@ namespace TarmacGauntlet.Raceday
             if (m.Busy > 0f)
             {
                 m.Busy -= dt;
+                return;
+            }
+            // Up off the stool first, the sitting clip played backwards.
+            if (m.Seated && (far || !want.home))
+            {
+                if (m.Clip == "Sit")
+                {
+                    m.ClipTime = Mathf.Min(m.ClipTime, DriverSwap.SitClip);
+                    m.Rate = -StandRate;
+                }
+                else m.Play("Sit", DriverSwap.SitClip, -StandRate, false);
+                m.Seated = false;
+                m.Busy = m.ClipTime / StandRate;
                 return;
             }
             if (m.Crouched && (far || !want.low))
@@ -721,6 +898,25 @@ namespace TarmacGauntlet.Raceday
                 m.Busy = FetchTime;
                 return;
             }
+            if (want.home && m.Sits)
+            {
+                // Turned to face their way, then down onto the stool; at the desk, writing once down.
+                if (!m.Seated)
+                {
+                    if (Vector2.Dot(m.Facing, want.face) < 0.985f)
+                    {
+                        m.Play("Idle", m.IdleFrom, 1f, true);
+                        return;
+                    }
+                    if (m.Clip == "Sit") m.Rate = SitRate;
+                    else m.Play("Sit", 0f, SitRate, false);
+                    m.Seated = true;
+                    m.Busy = Mathf.Max(0f, DriverSwap.SitClip - m.ClipTime) / SitRate;
+                    return;
+                }
+                if (m.Pose == HomePose.Desk && m.Clip != "Write") m.Play("Write", m.IdleFrom, 1f, true);
+                return;
+            }
             if (want.low && !m.Crouched)
             {
                 float down = several ? QuickDownRate * m.Pace : DownRate;
@@ -730,6 +926,7 @@ namespace TarmacGauntlet.Raceday
                 return;
             }
             if (m.Crouched) m.Play("Crouch", 0f, 1f, true);
+            else if (want.home && m.Group >= 0 && m.Settled) Chat(m);
             else m.Play("Idle", m.IdleFrom, 1f, true);
             m.Waving = !m.Crouched && (c.Stage == CrewStage.Welcome || c.Stage == CrewStage.Ready && c.Finish);
             // At the place, down if the job is done crouched, inside its time: the work is going on.
