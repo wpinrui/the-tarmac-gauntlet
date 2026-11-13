@@ -210,7 +210,7 @@ public static class Check
         System.IO.File.WriteAllBytes(System.IO.Path.Combine(dir, "noise3d.u8"), CloudNoise.Field(CloudNoise.Size));
         var scenes = new (string name, float hour, float cloud, float rain)[]
         {
-            ("noon", 12.5f, 0.3f, 0f), ("partly-cloudy", 14f, 0.5f, 0f), ("golden-hour", 16.6f, 0.3f, 0f), ("overcast", 13f, 1f, 0.3f),
+            ("noon", 12.5f, 0.3f, 0f), ("partly-cloudy", 14f, 0.5f, 0f), ("golden-hour", 16.6f, 0.3f, 0f), ("overcast", 13f, 1f, 0.3f), ("dusk", 18.5f, 0.3f, 0f), ("night", 19.1f, 0.3f, 0f), ("late-night", 22f, 0.3f, 0f),
         };
         var json = new System.Text.StringBuilder("[\n");
         for (int i = 0; i < scenes.Length; i++)
@@ -223,6 +223,11 @@ public static class Check
             SkyPalette.Apply(ref s, o);
             Color sun = s.LightColour * s.LightIntensity;
             SkyPalette.CloudAmbient(s, sun, out Color above, out Color below);
+            // The sky as it is seen, dimmer at night, as TimeOfDay draws it.
+            float seen = SkyClock.SkySeen(s, SkyClock.Look);
+            sun *= seen;
+            above *= seen;
+            below *= seen;
             PostEffects.Grade g = SkyGrade.For(s, o, WeatherSky.Heavy(sc.rain), 0f, SkyGrade.Patchy(sc.cloud, o));
             float haze = WeatherSky.Haze(s.Haze, w);
             string C(Color c) => $"[{c.r:0.0000},{c.g:0.0000},{c.b:0.0000}]";
@@ -230,8 +235,8 @@ public static class Check
             json.Append($"{{\"name\":\"{sc.name}\",\"cloud\":{sc.cloud},\"overcast\":{o:0.0000},\"cover\":{CloudMap.CoverFor(sc.cloud):0.0000},")
                 .Append($"\"skyCover\":{WeatherSky.Cover(sc.cloud):0.0000},\"tiles\":{CloudMap.TilesFor(0.45f, o):0.00000000},")
                 .Append($"\"sunDir\":{V(s.LightDir)},\"sun\":{C(sun)},\"sunColour\":{C(s.SunElevation > -2f ? s.LightColour : Color.black)},")
-                .Append($"\"zenith\":{C(s.Zenith)},\"horizon\":{C(s.Horizon)},\"haze\":{C(s.Fog)},\"glow\":{C(s.Glow)},\"goldenGlow\":{C(SkyPalette.Glow(s))},")
-                .Append($"\"deep\":{s.Deep:0.0000},\"cloudLit\":{C(s.CloudLit)},\"cloudShade\":{C(s.CloudShade)},\"ground\":{C(s.AmbientGround)},")
+                .Append($"\"zenith\":{C(s.Zenith * seen)},\"horizon\":{C(s.Horizon * seen)},\"haze\":{C(s.Fog * seen)},\"glow\":{C(s.Glow)},\"goldenGlow\":{C(SkyPalette.Glow(s))},")
+                .Append($"\"deep\":{s.Deep:0.0000},\"cloudLit\":{C(s.CloudLit * seen)},\"cloudShade\":{C(s.CloudShade * seen)},\"ground\":{C(s.AmbientGround * seen)},")
                 .Append($"\"skyLight\":{C(above)},\"groundLight\":{C(below)},")
                 .Append($"\"grade\":[{g.Exposure:0.000},{g.Contrast:0.00},{g.Saturation:0.00},{g.Temperature:0.00},{g.Tint:0.00}],\"elevation\":{s.SunElevation:0.00},")
                 .Append($"\"hazeDistance\":{haze:0.0},\"hazeDensity\":{SkyClock.Density(haze):0.00000000}}}{(i + 1 < scenes.Length ? "," : "")}\n");

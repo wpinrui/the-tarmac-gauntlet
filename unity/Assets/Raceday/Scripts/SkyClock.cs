@@ -18,6 +18,12 @@ namespace TarmacGauntlet.Raceday
         public float Mist;
         /// <summary>Moonlight intensity with the moon high and the sun well down.</summary>
         public float Moon;
+        /// <summary>
+        /// How bright the sky, the clouds and the haze look at full night, against how the colours above set them: the
+        /// night colours were picked in Gamma colour space, and taken as linear light they drew a sky as blue as a dull
+        /// day. The light on the ground is left as it is.
+        /// </summary>
+        public float NightSky;
     }
 
     /// <summary>The sky and its light at one moment.</summary>
@@ -82,10 +88,17 @@ namespace TarmacGauntlet.Raceday
             Haze = 6000f,
             Mist = 0.45f,
             Moon = 0.18f,
+            NightSky = 0.1f,
         };
 
         private static readonly Color MoonColour = new Color(0.62f, 0.72f, 1f);
         private static readonly Color GroundTint = new Color(0.36f, 0.36f, 0.24f);
+
+        /// <summary>
+        /// How bright the sky as it is seen (the sky, its clouds and the haze) is drawn now, against its colours: dimmer
+        /// towards <see cref="SkyLook.NightSky"/> as night falls.
+        /// </summary>
+        public static float SkySeen(in SkyState s, in SkyLook look) => 1f + (look.NightSky - 1f) * s.Night;
 
         /// <summary>Unit vector towards a body of this declination at this local time.</summary>
         public static Vector3 Direction(float hour, float declination)
