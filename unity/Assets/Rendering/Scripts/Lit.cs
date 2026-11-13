@@ -4,8 +4,9 @@ using UnityEngine.Rendering;
 namespace TarmacGauntlet.Rendering
 {
     /// <summary>
-    /// URP Lit for materials made in code. Lit's inspector sets its blend state and keywords for materials made in the
-    /// editor; these set them for the game's own, with the Standard shader's modes mapped across.
+    /// URP Lit for materials made in code: the game's copy of it (Resources/TarmacLit/Lit.shader), which is URP's own but
+    /// shades the night's lamps under their budget (Lamps.hlsl). Lit's inspector sets its blend state and keywords for
+    /// materials made in the editor; these set them for the game's own, with the Standard shader's modes mapped across.
     /// </summary>
     public static class Lit
     {
@@ -24,8 +25,17 @@ namespace TarmacGauntlet.Rendering
 
         private static Shader shader;
 
-        /// <summary>The URP Lit shader.</summary>
-        public static Shader Shader => shader != null ? shader : shader = UnityEngine.Shader.Find("Universal Render Pipeline/Lit");
+        /// <summary>The game's copy of URP Lit, or URP's own if it is missing.</summary>
+        public static Shader Shader
+        {
+            get
+            {
+                if (shader != null) return shader;
+                shader = Resources.Load<Shader>("TarmacLit/Lit");
+                if (shader == null) shader = UnityEngine.Shader.Find("Universal Render Pipeline/Lit");
+                return shader;
+            }
+        }
 
         /// <summary>A normal map, as Standard's _BumpMap.</summary>
         public static void NormalMap(Material m, Texture map)

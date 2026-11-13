@@ -16,8 +16,8 @@ namespace TarmacGauntlet.Visuals
         /// <summary>All of them.</summary>
         public static IReadOnlyList<GraphicsOption> All => all;
 
-        /// <summary>Most real lights at night in the race: the rest of the night lighting is drawn glowing. Read at the start of a race.</summary>
-        public static readonly GraphicsOption RealLights = Count("settings.reallights", 6, 24);
+        /// <summary>How many of the cars nearest the camera light the road with their headlamps at night; every floodlight lights it whatever this is. Read at the start of a race.</summary>
+        public static readonly GraphicsOption RealLights = Count("settings.reallights", 8, 24);
 
         /// <summary>A clear coat over the cars' paint. Changes live.</summary>
         public static readonly GraphicsOption Clearcoat = Toggle("settings.clearcoat", true);
@@ -52,7 +52,7 @@ namespace TarmacGauntlet.Visuals
         /// </summary>
         public static readonly GraphicsOption SoftShadows = Toggle("settings.softshadows", false);
 
-        /// <summary>Shadows from the real lights at night, the floodlights and headlamps near the camera. Read at the start of a race.</summary>
+        /// <summary>Soft shadows from the few floodlights nearest the camera's view at night. Read at the start of a race.</summary>
         public static readonly GraphicsOption LightShadows = Toggle("settings.lightshadows", false);
 
         /// <summary>
@@ -70,7 +70,7 @@ namespace TarmacGauntlet.Visuals
         /// <summary>Real clouds in the race sky, lit towards the sun, in place of the painted ones. Changes live.</summary>
         public static readonly GraphicsOption VolumetricClouds = Toggle("settings.volumetricsky.clouds", false);
 
-        /// <summary>A low mist the sun shines through in shafts and the floodlights light in beams. Changes live.</summary>
+        /// <summary>A low mist the sun shines through in shafts. Changes live.</summary>
         public static readonly GraphicsOption VolumetricFog = Toggle("settings.volumetricsky.fog", false);
 
         /// <summary>A faint lens flare across the screen from the sun. Changes live.</summary>
@@ -161,7 +161,7 @@ namespace TarmacGauntlet.Visuals
         /// <summary>The settings menu's rows, in menu order. Every option is in one.</summary>
         public static readonly IReadOnlyList<GraphicsRow> Rows = new[]
         {
-            new GraphicsRow("Real lights", new[] { 2, 6, 12, 20 }, RealLights),
+            new GraphicsRow("Real lights", new[] { 4, 8, 12, 20 }, RealLights),
             new GraphicsRow("Post effects", OffAtLow, ColourGrading, Bloom, AmbientOcclusion),
             new GraphicsRow("Shadow detail", OnFromHigh, SoftShadows, LightShadows),
             new GraphicsRow("Depth of field", OffAtLow, DepthOfField),

@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Builds the circuit and the floodlights with the game's own code outside Unity, checks the night's budget and writes
+       the scene for the night renders. Run through run.sh. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)../../out/night-budget/obj/</BaseIntermediateOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Check.cs;Sweep.cs;Scene.cs;Stubs.cs" />
+    <Compile Include="../circuit/geometry-check/UnityStubs.cs" />
+    <Compile Include="../furniture-check/Stubs.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Circuit.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/CircuitData.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/CircuitBuilder.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/CircuitPart.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/MeshKit.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Grandstands.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/PitComplex.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/PitComplexBuilder.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/PitBoxKit.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Furniture/TrackFurniture.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Furniture/FurnitureBuilder.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Night/FloodlightLayout.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Night/NightBudget.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Night/LampLight.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/SkyClock.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/WeatherSky.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/RaceWeather.cs" />
+    <Compile Include="../../unity/Assets/Rendering/Scripts/LinearLight.cs" />
+  </ItemGroup>
+</Project>

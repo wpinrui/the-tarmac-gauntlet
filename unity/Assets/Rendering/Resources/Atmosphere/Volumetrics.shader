@@ -1,8 +1,7 @@
 // The volumetric clouds and fog (VolumetricsFeature), at reduced resolution and smoothed over frames.
 //
 // March: each low resolution pixel follows its view ray through a low mist out to _TgSteps.z metres, lit by the sun
-// through the shadow map and the clouds' shadows, so the sun's light falls through the trees in shafts, and by the
-// floodlights' beams at night. Past the scene, a sky ray climbs through the cloud layer: fair weather cumulus drawn by the
+// through the shadow map and the clouds' shadows, so the sun's light falls through the trees in shafts. Past the scene, a sky ray climbs through the cloud layer: fair weather cumulus drawn by the
 // 3D noise where the cloud map lets them be, or under an overcast one low rolling deck, lit by the sun through them and
 // by the sky. Every constant of their look is in CloudLook.hlsl, which tools/cloud-preview reads to draw the same clouds
 // offline. The start of each ray steps on a little every frame. Out goes the light the air adds, and in alpha how much of
@@ -30,7 +29,6 @@ Shader "Hidden/TarmacGauntlet/Volumetrics"
         #include "Assets/Rendering/Shaders/CloudCover.hlsl"
         #include "Assets/Rendering/Shaders/CloudLook.hlsl"
 
-        #define TG_MOST_BEAMS 16
 
         TEXTURE2D(_TgDepth);
         TEXTURE2D(_TgHistory);
@@ -48,10 +46,6 @@ Shader "Hidden/TarmacGauntlet/Volumetrics"
         float4 _TgSkyLight, _TgGroundLight;   // the light in the clouds that is not the sun's: at their tops, at their bases
         float4 _TgHaze;        // the haze's colour, and in w its density per m
         float4 _TgMist;        // the mist's density at the ground per m, how fast it thins with height (m), the ground's height
-        float4 _TgBeams;       // how many beams, and their light
-        float _TgBeamMost;     // the most light the beams in the mist ever add, linear
-        float4 _TgBeamPos[TG_MOST_BEAMS];   // each lens, and in w how far its beam reaches
-        float4 _TgBeamAim[TG_MOST_BEAMS];   // each beam's aim, and in w the cosine of half its cone
 
         float RawDepth(float2 uv)
         {
@@ -101,68 +95,6 @@ Shader "Hidden/TarmacGauntlet/Volumetrics"
                 float2 uv = mul(_TgWorldToCloudShadow, float4(p, 1.0)).xy;
                 if (any(uv < 0.0) || any(uv > 1.0)) return 1.0;
                 return SAMPLE_TEXTURE2D_LOD(_TgCloudShadowTex, sampler_LinearClamp, uv, 0).r;
-            }
-
-            // How much of floodlight k's light falls on this point of the air, before its colour and strength.
-            float BeamAt(int k, float3 p)
-            {
-                float3 v = p - _TgBeamPos[k].xyz;
-                float dd = dot(v, v);
-                float reach = _TgBeamPos[k].w;
-                if (dd >= reach * reach) return 0.0;
-                float c = dot(v * rsqrt(dd + 1e-4), _TgBeamAim[k].xyz);
-                float edge = _TgBeamAim[k].w;
-                float cone = smoothstep(edge, lerp(edge, 1.0, 0.4), c);
-                return cone * saturate(1.0 - dd / (reach * reach)) / (dd + 9.0);
-            }
-
-            #define TG_BEAM_SAMPLES 8
-
-            // The floodlights' light the mist scatters towards the camera along the ray, out to far, rising one for one
-            // up to half of _TgBeamMost and then easing towards it, so however near a lens the camera is and however many
-            // beams it looks along, the mist never glows brighter than that. Each beam is
-            // sampled only over the stretch of the ray that passes through it: around where the ray comes nearest the
-            // beam's axis, as long as the beam is wide there. So a narrow beam far off gets as many samples as a near one,
-            // and never breaks up into dots the way it did sampled at the mist's own steps.
-            float3 BeamMist(float3 cam, float3 d, float far, float jitter)
-            {
-                float lit = 0.0;
-                int n = (int)_TgBeams.x;
-                UNITY_LOOP
-                for (int k = 0; k < n; k++)
-                {
-                    float3 lens = _TgBeamPos[k].xyz, aim = _TgBeamAim[k].xyz;
-                    float reach = _TgBeamPos[k].w;
-                    // The ray inside the beam's reach.
-                    float3 w0 = cam - lens;
-                    float b = dot(w0, d), c = dot(w0, w0) - reach * reach;
-                    float disc = b * b - c;
-                    if (disc <= 0.0) continue;
-                    float root = sqrt(disc);
-                    float t0 = max(-b - root, 0.0), t1 = min(-b + root, far);
-                    // Where the ray comes nearest the axis, and how long it stays as near as the beam is wide there.
-                    float da = dot(d, aim), e = dot(aim, w0);
-                    float side = max(1.0 - da * da, 1e-4);
-                    float tNear = (da * e - b) / side;
-                    float sNear = max((e - da * b) / side, 0.0);
-                    float cosEdge = _TgBeamAim[k].w;
-                    float wide = sNear * sqrt(max(1.0 - cosEdge * cosEdge, 0.0)) / max(cosEdge, 0.05) + 2.0;
-                    float stay = wide / max(sqrt(side), 0.05);
-                    float ta = max(t0, tNear - stay), tb = min(t1, tNear + stay);
-                    if (tb <= ta) continue;
-                    float dt = (tb - ta) / TG_BEAM_SAMPLES;
-                    UNITY_LOOP
-                    for (int i = 0; i < TG_BEAM_SAMPLES; i++)
-                    {
-                        float t = ta + dt * (i + jitter);
-                        float3 p = cam + d * t;
-                        float rho = _TgMist.x * exp(-max(p.y - _TgMist.z, 0.0) / _TgMist.y);
-                        lit += BeamAt(k, p) * rho * exp(-rho * t) * dt;
-                    }
-                }
-                float3 glow = _TgBeams.yzw * (lit / (4.0 * PI));
-                float most = max(_TgBeamMost, 1e-4), knee = most * 0.5;
-                return min(glow, knee) + (most - knee) * (1.0 - exp(-max(glow - knee, 0.0) / (most - knee)));
             }
 
             // The cloud layer's base and thickness, m: lower and thicker as the sky closes into a deck.
@@ -283,11 +215,10 @@ Shader "Hidden/TarmacGauntlet/Volumetrics"
                 int fogSteps = (int)_TgSteps.y;
                 float reach = min(dist, _TgSteps.z);
                 float sunPhase = 0.75 * Phase(cs, 0.6) + 0.25 * Phase(cs, -0.2);
-                bool beams = _TgBeams.x > 0.5;
                 UNITY_LOOP
                 for (int i = 0; i < fogSteps; i++)
                 {
-                    // Steps closer together near the camera, where the shafts and beams are seen up close.
+                    // Steps closer together near the camera, where the shafts are seen up close.
                     float a = (float)i / fogSteps, b = (float)(i + 1) / fogSteps;
                     float t0 = reach * a * a, t1 = reach * b * b;
                     float t = lerp(t0, t1, jitter);
@@ -299,7 +230,6 @@ Shader "Hidden/TarmacGauntlet/Volumetrics"
                     fogLight += fogT * light * (1.0 - through);
                     fogT *= through;
                 }
-                if (beams && fogSteps > 0) fogLight += BeamMist(cam, d, reach, jitter);
 
                 // The clouds, for a ray that climbs past the scene.
                 float3 cloudLight = 0.0;

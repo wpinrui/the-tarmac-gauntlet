@@ -8,7 +8,7 @@ namespace TarmacGauntlet.Raceday
 {
     /// <summary>
     /// Builds the circuit, the country round it (<see cref="Landscape"/>), the trackside furniture (<see cref="Trackside"/>), the pit crews (<see cref="PitCrews"/>), the podium (<see cref="Podium"/>), the sky and its sun (<see cref="TimeOfDay"/>), the race's weather (<see cref="WeatherPlan"/>), the floodlights
-    /// that come on at night (<see cref="NightLights"/>), the career's field and the cameras when the scene starts. The
+    /// and headlamps that light it at night (<see cref="NightLighting"/>), the career's field and the cameras when the scene starts. The
     /// field is every team with a car, from <see cref="RaceWeekend.Setup"/>, gridded by prestige: each
     /// car on a full tank and new tyres, its starting driver at the wheel. Run on its own, the scene
     /// makes a new career in which the player owns the Cheonma. The <see cref="RaceDirector"/> keeps
@@ -149,16 +149,16 @@ namespace TarmacGauntlet.Raceday
             trackside.SetPlainArmco(plainArmco.ToArray());
             Lap("trackside");
             yield return null;
-            var floodMaterials = new FloodMaterials();
-            var floods = new Floodlights(circuit, Complex, stands.RoofLamps, builder.PitWallRuns, GantrySpan.Of(circuit, trackside.Placed));
+            var floodLayout = new FloodlightLayout(circuit, Complex, stands.RoofLamps, builder.PitWallRuns, GantrySpan.Of(circuit, trackside.Placed));
             var lit = new GameObject("Floodlights");
-            foreach (CircuitPart part in floods.Build(floodMaterials.Steel, floodMaterials.Lens))
+            FloodlightRig floods = lit.AddComponent<FloodlightRig>();
+            floods.Layout = floodLayout;
+            foreach (CircuitPart part in floodLayout.Build(floods.Steel, floods.Lens))
                 AddPart(lit.transform, part);
-            NightLights night = lit.AddComponent<NightLights>();
+            NightLighting night = lit.AddComponent<NightLighting>();
             night.Sky = sky;
-            night.Layout = floods;
-            night.Field = new FloodField(floods);
-            night.Materials = floodMaterials;
+            night.Floods = floods;
+            night.Headlamps = lit.AddComponent<HeadlampRig>();
             night.Stands = standMaterials;
             Lap("floodlights");
             yield return null;

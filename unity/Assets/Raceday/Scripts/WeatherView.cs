@@ -136,7 +136,7 @@ namespace TarmacGauntlet.Raceday
             Camera cam = Camera.main;
             if (cam == null) return;
             Color light = RenderSettings.fogColor * 1.35f + RenderSettings.ambientSkyColor * 0.3f;
-            if (Night != null) light += NightLook.Flood * (0.35f * NightLook.On(Night()));
+            if (Night != null) light += NightBudget.Flood * (0.35f * NightBudget.On(Night()));
             Rain(cam, light);
             Spray(cam.transform.position, light);
         }

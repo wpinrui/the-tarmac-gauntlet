@@ -38,8 +38,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Redraw the reflections once the cloud has changed this much.</summary>
         private const float ReflectionCloud = 0.04f;
         /// <summary>
-        /// How bright the sky's reflection is at night. The floodlights' pools multiply everything under
-        /// them, the reflection too, so a wet track reflecting the glowing night sky would shine white.
+        /// How bright the sky's reflection is at night, so a wet track reflects a dark sky, not a grey glow.
         /// </summary>
         private const float NightShine = 0.2f;
         /// <summary>The sun's light is matched for Linear colour space on a surface turned at least this far towards it (cosine).</summary>
@@ -48,7 +47,7 @@ namespace TarmacGauntlet.Raceday
         private const float GoldenBounce = 0.6f;
         /// <summary>
         /// The low mist's density at the ground, per m: a trace on a clear afternoon, thick in the morning mist and the rain,
-        /// and a little damp at night for the floodlights' beams. And how fast it thins with height, m.
+        /// and a little damp at night. And how fast it thins with height, m.
         /// </summary>
         private const float MistClear = 0.0004f, MistMorning = 0.003f, MistRain = 0.0025f, MistNight = 0.0008f, MistHeight = 40f, MistRises = 60f;
         /// <summary>Real seconds the colour grade takes to follow the sun in and out of a cloud's shadow.</summary>

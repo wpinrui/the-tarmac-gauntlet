@@ -128,7 +128,7 @@ half4 ShadeCarPaint(float3 positionWS, half3 normalWS, float4 positionCS, half f
 #endif
     s.smoothness = FilteredSmoothness(s.smoothness, d.normalWS);
 
-    half4 c = UniversalFragmentPBR(d, s);
+    half4 c = TarmacFragmentPBR(d, s);
 
 #if defined(_CLEARCOAT)
     {
@@ -150,8 +150,6 @@ half4 ShadeCarPaint(float3 positionWS, half3 normalWS, float4 positionCS, half f
     }
 #endif
 
-    // The headlamps; the floodlights light the cars with real lights.
-    c.rgb += NightLit(positionWS, d.normalWS, albedo * (1 - metallic), 0);
     c.rgb = MixFog(c.rgb, d.fogCoord);
     return c;
 }

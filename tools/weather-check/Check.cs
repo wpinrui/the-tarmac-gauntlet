@@ -146,7 +146,7 @@ public static class Check
         Expect("heavy rain brings them on by 16:30", wetAfternoon > 0.12f, $"{wetAfternoon:0.00}");
         Expect("they stay off by day, even in a downpour at noon", wetNoon == 0f && greyDay == 0f, $"noon {wetNoon:0.00}, overcast 15:00 {greyDay:0.00}");
 
-        // How far the lights are on (NightLook.On) may rise and fall with the weather, but never off and back on within ten minutes.
+        // How far the lights are on (NightBudget.On) may rise and fall with the weather, but never off and back on within ten minutes.
         const int Window = 10;
         float maxStep = 0f, worstFlicker = 0f;
         int worstSeed = 0, worstMinute = 0;
