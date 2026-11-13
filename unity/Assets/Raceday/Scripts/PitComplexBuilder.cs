@@ -12,15 +12,21 @@ namespace TarmacGauntlet.Raceday
         public readonly float X, Y, Z;
         /// <summary>Degrees the prop turns from facing out of the door, clockwise seen from above.</summary>
         public readonly float Yaw;
+        /// <summary>True when X is measured from the +x wall's inner face, which round the bend comes in towards the door.</summary>
+        public readonly bool ByRightWall;
 
-        public GarageProp(string id, float x, float y, float z, float yaw)
+        public GarageProp(string id, float x, float y, float z, float yaw, bool byRightWall = false)
         {
             Id = id;
             X = x;
             Y = y;
             Z = z;
             Yaw = yaw;
+            ByRightWall = byRightWall;
         }
+
+        /// <summary>The prop's place across one garage.</summary>
+        public float XIn(PitComplex complex, int garage) => ByRightWall ? complex.RightWall(garage, Z) + X : X;
     }
 
     /// <summary>
@@ -49,6 +55,12 @@ namespace TarmacGauntlet.Raceday
         /// </summary>
         public static readonly GarageProp[] Props = GarageProps();
 
+        /// <summary>Two sets of spare race tyres standing in a row in front of the cabinets: the first tyre's middle across, the gap between, and out.</summary>
+        public const float TyreRowX = -1.9f, TyrePitchRow = 0.31f, TyreRowZ = -6.5f, RaceTyreRadius = 0.285f;
+
+        /// <summary>The stool under each seated waiting place: its seat stands where the sitting clip lands the hips.</summary>
+        public const string Seat = "metal_stool_02";
+
         private static GarageProp[] GarageProps()
         {
             var props = new List<GarageProp>
@@ -57,21 +69,39 @@ namespace TarmacGauntlet.Raceday
                 new GarageProp("metal_tool_chest", 5.8f, 0f, -0.6f, 90f),
                 new GarageProp("korean_fire_extinguisher_01", -7.9f, 0f, -3.0f, 90f),
                 new GarageProp("metal_toolbox", 1.6f, 1.0f, -7.25f, 0f),
-                new GarageProp("desk", PitComplex.DeskX, 0f, PitComplex.DeskZ, 0f),
+                new GarageProp("metal_office_desk", PitComplex.DeskX, 0f, PitComplex.DeskZ, 0f),
                 new GarageProp("clipboard", PitComplex.DeskX + 0.1f, 0.79f, PitComplex.DeskZ + 0.15f, 15f),
                 new GarageProp("steel_frame_shelves_03", -6.85f, 0f, -7.3f, 0f),
-                new GarageProp("cardboard_box_01", -7.7f, 0f, -6.3f, 10f),
-                new GarageProp("cardboard_box_01", -7.7f, 0.34f, -6.3f, -5f),
-                new GarageProp("plastic_crate_01", 6.4f, 0f, -2.9f, 0f),
-                new GarageProp("plastic_crate_01", 6.4f, 0.26f, -2.9f, 8f),
+                new GarageProp("cardboard_box_01", -5.1f, 0f, -6.6f, 10f),
+                new GarageProp("cardboard_box_01", -5.1f, 0.34f, -6.6f, -5f),
+                // Racks and a cabinet along the -x wall behind the crew's corner, a lamp over them and a camera in the corner.
+                new GarageProp("worn_metal_rack", -7.9f, 0f, -5.85f, 90f),
+                new GarageProp("worn_metal_rack", -7.9f, 0f, -4.85f, 90f),
+                new GarageProp("utility_box_02", -8.0f, 0f, -3.85f, 90f),
+                new GarageProp("industrial_wall_lamp", -8.1f, 2.9f, -4.5f, 90f),
+                new GarageProp("industrial_wall_lamp", -8.1f, 2.9f, 4.0f, 90f),
+                new GarageProp("security_camera_01", -7.85f, 4.6f, -7.25f, 135f),
+                // The parts cart in front of the cabinets, and the pit board stood by the door.
+                new GarageProp("industrial_storage_cart", 1.65f, 0f, -6.2f, 0f),
+                new GarageProp("pit_board", -8.1f, 0f, 7.45f, 90f),
+                // Along the +x wall: shelving, a hand truck, more crates, and fuel cans by the fuel rig.
+                new GarageProp("steel_frame_shelves_02", -0.3f, 0f, -2.55f, -90f, true),
+                new GarageProp("steel_frame_shelves_02", -0.3f, 0f, -1.95f, -90f, true),
+                new GarageProp("plastic_crate_02", -0.3f, 0f, -3.15f, 5f, true),
+                new GarageProp("plastic_crate_02", -0.3f, 0.25f, -3.15f, -8f, true),
+                new GarageProp("metal_jerrycan", -0.15f, 0f, -1.35f, -90f, true),
+                new GarageProp("metal_jerrycan", -0.15f, 0f, -0.95f, -85f, true),
+                new GarageProp("plastic_crate_01", -0.95f, 0f, -2.9f, 0f, true),
+                new GarageProp("plastic_crate_01", -0.95f, 0.26f, -2.9f, 8f, true),
                 new GarageProp("wall_clock", -1.0f, 2.85f, -7.64f, 0f),
                 new GarageProp("multi_cleaner_5_litre", -4.2f, 1.0f, -7.4f, 0f),
                 new GarageProp("spray_paint_bottles", -2.4f, 1.0f, -7.35f, 10f),
                 new GarageProp("small_oil_can_01", 2.6f, 1.0f, -7.3f, -20f),
             };
+            for (int k = 0; k < 8; k++) props.Add(new GarageProp("race_tyre", TyreRowX + k * TyrePitchRow, RaceTyreRadius, TyreRowZ, 0f));
             foreach (PitComplex.HomeSpot h in PitComplex.HomeSpots)
                 if (h.Pose == HomePose.Sit || h.Pose == HomePose.Desk)
-                    props.Add(new GarageProp("stool", h.Seat.x, 0f, h.Seat.y, 0f));
+                    props.Add(new GarageProp(Seat, h.Seat.x, 0f, h.Seat.y, 0f));
             return props.ToArray();
         }
 
@@ -81,7 +111,7 @@ namespace TarmacGauntlet.Raceday
         private readonly List<CircuitPart> parts = new List<CircuitPart>();
 
         private readonly MeshKit concrete = new MeshKit(), glass = new MeshKit(), steel = new MeshKit();
-        private readonly MeshKit team = new MeshKit(), fit = new MeshKit(), metal = new MeshKit(), rubber = new MeshKit(), lamps = new MeshKit(), paintFloor = new MeshKit();
+        private readonly MeshKit team = new MeshKit(), fit = new MeshKit(), metal = new MeshKit(), rubber = new MeshKit(), lamps = new MeshKit(), paintFloor = new MeshKit(), mats = new MeshKit();
 
         /// <param name="materials">May be null outside Unity (tests and previews).</param>
         public PitComplexBuilder(PitComplex complex, PitMaterials materials)
@@ -107,6 +137,7 @@ namespace TarmacGauntlet.Raceday
             Emit("Pit building steel", steel, m?.Steel, true);
             Emit("Garage team colours", team, m?.Palette, false);
             Emit("Garage floor paint", paintFloor, m?.Palette, false);
+            Emit("Garage mats", mats, m?.Rubber, false);
             Emit("Garage fit-out", fit, m?.Fit, false);
             Emit("Garage metal", metal, m?.Metal, false);
             Emit("Garage tyres", rubber, m?.Rubber, false);
@@ -209,6 +240,30 @@ namespace TarmacGauntlet.Raceday
             Span(paintFloor, f, bx0, bx0 + 0.1f, (bz + door - 0.3f) * 0.5f, door - 0.3f - bz, 0f, 0.006f, paint);
             Span(paintFloor, f, bx1 - 0.1f, bx1, (bz + door - 0.3f) * 0.5f, door - 0.3f - bz, 0f, 0.006f, paint);
             Span(paintFloor, f, bx0, bx1, bz + 0.05f, 0.1f, 0f, 0.006f, paint);
+
+            // Panelling along both side walls, dark below a band of the team's colour. The +x wall is laid in
+            // short runs, as round the bend it comes in towards the door.
+            float back0 = -pc.Depth * 0.5f + 0.3f;
+            Span(fit, f, left, left + 0.03f, (back0 + door) * 0.5f, door - back0, 0f, 2.45f);
+            Span(team, f, left, left + 0.03f, (back0 + door) * 0.5f, door - back0, 2.45f, 2.75f, paint);
+            for (float z0 = back0; z0 < door - 0.01f; z0 += 4f)
+            {
+                float z1 = Mathf.Min(z0 + 4f, door), wall = Mathf.Min(pc.RightWall(g, z0), pc.RightWall(g, z1));
+                Span(fit, f, wall - 0.03f, wall, (z0 + z1) * 0.5f, z1 - z0, 0f, 2.45f);
+                Span(team, f, wall - 0.03f, wall, (z0 + z1) * 0.5f, z1 - z0, 2.45f, 2.75f, paint);
+            }
+
+            // Two screens on the back wall by the engineers' desk, in a frame of the team's colour.
+            Span(team, f, 4.25f, 6.25f, back + 0.03f, 0.06f, 1.55f, 2.45f, paint);
+            foreach (float tx in new[] { 4.75f, 5.75f })
+                Block(rubber, f, tx, back + 0.08f, 0.9f, 0.04f, 1.65f, 2.35f);
+
+            // Warmers in the team's colour round the tread of the first two spare race tyres (TyreRow).
+            for (int k = 0; k < 2; k++)
+                Tyre(team, f.At(TyreRowX + k * TyrePitchRow, RaceTyreRadius, TyreRowZ), f.Side, RaceTyreRadius / 0.92f + 0.01f, 0.2f, flat); // flats of the eight-sided drum clear the round tread
+
+            // Rubber mats under the crew's corner.
+            Span(mats, f, -7.7f, -3.2f, -2.2f, 3.8f, 0f, 0.012f);
 
             // Strip lights across the ceiling.
             foreach (float lz in new[] { -5.0f, -1.5f, 2.0f, 5.5f })
@@ -370,7 +425,8 @@ namespace TarmacGauntlet.Raceday
         {
             const int sides = 8;
             Vector3 ax = axis.normalized;
-            Vector3 u = Vector3.up, v = Vector3.Cross(ax, u).normalized;
+            // Round the axis from straight up, or for a tyre lying flat, from across.
+            Vector3 u = Mathf.Abs(ax.y) > 0.9f ? Vector3.Cross(ax, Vector3.right).normalized : Vector3.up, v = Vector3.Cross(ax, u).normalized;
             Vector3 half = ax * (width * 0.5f);
             Vector2 U(float a, float b) => uv ?? new Vector2(a, b);
             for (int i = 0; i < sides; i++)

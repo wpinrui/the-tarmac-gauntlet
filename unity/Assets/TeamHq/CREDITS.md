@@ -11,6 +11,8 @@ Downloaded from Sketchfab, converted and packed into Resources/Props by tools/te
 - **crew_vest**: "Mechanic Low Poly Character" by 00amza, https://sketchfab.com/3d-models/mechanic-low-poly-character-81b1d3d665f04345a4c47e5418b8e6ad
 - **trophy_1, trophy_2, trophy_3**: "Trophy Cups" by unrealqw, https://sketchfab.com/3d-models/trophy-cups-bf548826eb4a46438d04950699b34f7b (split, simplified)
 - **office_chair**: "Modern Office Chair / Game Ready" by Renend Studio (@RenendStudio), https://sketchfab.com/3d-models/modern-office-chair-game-ready-f137cbbefa5e4dba90d1f0bd42e1fdc0
+- **race_tyre**: "Semi Slick Racing Tire" by FreddieSign, https://sketchfab.com/3d-models/semi-slick-racing-tire-1f2ba59e13cf427d80c7314da81e2b06 (used in the raceday pit garages)
+- **pit_board**: "Pit Board" by Alex Werner (@alexwerndesign), https://sketchfab.com/3d-models/pit-board-42e680a0171246f8854918ac03e4c33c (rescaled; used in the raceday pit garages)
 
 ## CC0
 
