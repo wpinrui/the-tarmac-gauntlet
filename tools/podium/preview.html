@@ -290,6 +290,7 @@ function Step(t) {
     p.root.visible = shown;
     if (!shown) continue;
     p.root.position.copy(V(f, o));
+    p.root.scale.setScalar(p.a.size || 1);
     p.root.quaternion.copy(RootRotation(new THREE.Vector3(f[o + 3], 0, f[o + 5])));
     p.root.updateMatrixWorld(true);
     const clip = n => clips[C.clips[n]];

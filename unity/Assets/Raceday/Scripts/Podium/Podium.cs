@@ -287,6 +287,7 @@ namespace TarmacGauntlet.Raceday
                 Rig r = pool.Count > 0 ? pool.Pop() : NewRig();
                 r.Actor = a;
                 r.Body.Root.SetActive(true);
+                r.Body.Root.transform.localScale = Vector3.one * a.Size;
                 Dress(r, a, colours[a.Place]);
                 cast.Add(r);
             }

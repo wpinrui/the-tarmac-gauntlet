@@ -32,6 +32,13 @@ namespace TarmacGauntlet.Raceday
         public Vector3 Spot;
         /// <summary>A crew member's own phase, so the crowd doesn't cheer in step.</summary>
         public float Phase;
+        /// <summary>
+        /// Their own manner, so no two people move in step: how fast their clips play (1 is the clip's own pace), how
+        /// far into a looping clip they start, s, how late they react, s, how far they turn from straight ahead,
+        /// degrees, how far off their mark they stand, m, how fast they walk, as a share of the pace, and their size.
+        /// </summary>
+        public float Rate = 1f, Offset, Lag, Turn, Pace = 1f, Size = 1f;
+        public Vector3 Nudge;
     }
 
     /// <summary>A camera shot: where the camera is, what it looks at, and its vertical field of view.</summary>
@@ -78,13 +85,56 @@ namespace TarmacGauntlet.Raceday
             for (int p = 0; p < 3; p++)
             {
                 if (drivers[p] <= 0) continue;
-                for (int k = 0; k < drivers[p]; k++) Actors.Add(new PodiumActor { Role = PodiumRole.Driver, Place = p, Slot = k });
-                Actors.Add(new PodiumActor { Role = PodiumRole.Presenter, Place = p });
+                for (int k = 0; k < drivers[p]; k++) Actors.Add(Manner(new PodiumActor { Role = PodiumRole.Driver, Place = p, Slot = k }));
+                Actors.Add(Manner(new PodiumActor { Role = PodiumRole.Presenter, Place = p }));
             }
             if (crowd == null) return;
             for (int c = 0; c < crowd.Count; c++)
                 if (drivers[crowd[c].place] > 0)
-                    Actors.Add(new PodiumActor { Role = PodiumRole.Crew, Place = crowd[c].place, Slot = c, Spot = crowd[c].at, Phase = (c * 0.618f) % 1f * 2.1f });
+                    Actors.Add(Manner(new PodiumActor { Role = PodiumRole.Crew, Place = crowd[c].place, Slot = c, Spot = crowd[c].at, Phase = (c * 0.618f) % 1f * 2.1f }));
+        }
+
+        /// <summary>A number from 0 to 1 that is the same every time for one person and one use.</summary>
+        private static float Hash(PodiumActor a, int use)
+        {
+            uint h = (uint)((int)a.Role * 7919 + a.Place * 104729 + a.Slot * 15485863 + use * 32452843);
+            h ^= h >> 16; h *= 0x7feb352d; h ^= h >> 15; h *= 0x846ca68b; h ^= h >> 16;
+            return (h & 0xffffff) / 16777216f;
+        }
+
+        private static float Between(PodiumActor a, int use, float lo, float hi) => lo + (hi - lo) * Hash(a, use);
+
+        /// <summary>
+        /// Gives a person their own manner. The lead drivers and the presenters keep their marks and facing, as the
+        /// trophy and the champagne pass between their hands; everyone else stands a little off their mark and turned.
+        /// </summary>
+        private static PodiumActor Manner(PodiumActor a)
+        {
+            a.Rate = Between(a, 1, 0.86f, 1.16f);
+            a.Offset = Between(a, 2, 0f, 4f);
+            a.Pace = Between(a, 3, 0.94f, 1.06f);
+            bool lead = a.Role == PodiumRole.Driver && a.Slot == 0;
+            switch (a.Role)
+            {
+                case PodiumRole.Driver:
+                    a.Lag = Between(a, 4, 0f, 0.45f);
+                    if (!lead)
+                    {
+                        a.Turn = Between(a, 5, -14f, 14f);
+                        a.Nudge = new Vector3(Between(a, 6, -0.06f, 0.06f), 0f, Between(a, 7, -0.12f, 0.08f));
+                    }
+                    break;
+                case PodiumRole.Presenter:
+                    a.Lag = Between(a, 4, 0f, 0.6f);
+                    a.Turn = Between(a, 5, -10f, 10f);
+                    break;
+                default:
+                    a.Lag = Between(a, 4, 0f, 1.1f);
+                    a.Turn = Between(a, 5, -24f, 24f);
+                    a.Size = Between(a, 8, 0.93f, 1.06f);
+                    break;
+            }
+            return a;
         }
 
         // ------------------------------------------------------------------ helpers
@@ -108,21 +158,21 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>Sets the clip from a list of (start, clip, loop) segments, the one before fading out under it.</summary>
-        private static void Clips(ref PodiumPose pose, float t, IList<(float start, string clip, bool loop, float rate)> segs)
+        private static void Clips(ref PodiumPose pose, float t, IList<(float start, string clip, bool loop, float rate)> segs, float offset = 0f)
         {
             int i = 0;
             while (i + 1 < segs.Count && t >= segs[i + 1].start) i++;
             var s = segs[i];
             pose.Clip = s.clip;
             pose.Loop = s.loop;
-            pose.ClipTime = Mathf.Max(0f, t - s.start) * s.rate;
+            pose.ClipTime = Mathf.Max(0f, t - s.start) * s.rate + (s.loop ? offset : 0f);
             pose.UnderWeight = 0f;
             if (i > 0 && t - s.start < Fade)
             {
                 var b = segs[i - 1];
                 pose.Under = b.clip;
                 pose.UnderLoop = b.loop;
-                pose.UnderTime = (t - b.start) * b.rate;
+                pose.UnderTime = (t - b.start) * b.rate + (b.loop ? offset : 0f);
                 pose.UnderWeight = 1f - (t - s.start) / Fade;
             }
         }
@@ -130,9 +180,9 @@ namespace TarmacGauntlet.Raceday
         // ------------------------------------------------------------------ the drivers
 
         /// <summary>The way a driver walks out: from the doorway to the walkway behind their spot, then forward up onto the step.</summary>
-        public static Vector3[] DriverPath(int place, int drivers, int k)
+        public static Vector3[] DriverPath(int place, int drivers, int k, Vector3 nudge = default)
         {
-            Vector3 stand = PodiumPlan.Stand(place, drivers, k);
+            Vector3 stand = PodiumPlan.Stand(place, drivers, k) + nudge;
             Vector3 door = PodiumPlan.Door;
             return new[] { door, new Vector3(stand.x, PodiumPlan.Floor, PodiumPlan.WalkwayZ), new Vector3(stand.x, PodiumPlan.Floor, stand.z) };
         }
@@ -165,8 +215,8 @@ namespace TarmacGauntlet.Raceday
             return PodiumPlan.Floor + h * Smooth((at.z - (PodiumPlan.StairBack - 0.15f)) / (PodiumPlan.StepBack + 0.2f - (PodiumPlan.StairBack - 0.15f)));
         }
 
-        public float StartOf(PodiumActor a) => WalkOut[a.Place] + a.Slot * DriverGap;
-        public float ArrivalOf(PodiumActor a) => StartOf(a) + PathLength(DriverPath(a.Place, Drivers[a.Place], a.Slot)) / WalkSpeed;
+        public float StartOf(PodiumActor a) => WalkOut[a.Place] + a.Slot * DriverGap + a.Lag * 0.4f;
+        public float ArrivalOf(PodiumActor a) => StartOf(a) + PathLength(DriverPath(a.Place, Drivers[a.Place], a.Slot, a.Nudge)) / (WalkSpeed * a.Pace);
 
         /// <summary>When the last of a place's drivers is on the step.</summary>
         public float Arrived(int place)
@@ -190,43 +240,47 @@ namespace TarmacGauntlet.Raceday
         private PodiumPose DriverPose(PodiumActor a, float t)
         {
             int p = a.Place, n = Drivers[p];
-            Vector3[] path = DriverPath(p, n, a.Slot);
-            float start = StartOf(a), length = PathLength(path), arrive = start + length / WalkSpeed;
+            Vector3[] path = DriverPath(p, n, a.Slot, a.Nudge);
+            float speed = WalkSpeed * a.Pace;
+            float start = StartOf(a), length = PathLength(path), arrive = start + length / speed;
             var pose = new PodiumPose();
-            float d = Mathf.Clamp((t - start) * WalkSpeed, 0f, length);
+            float d = Mathf.Clamp((t - start) * speed, 0f, length);
             Vector3 at = Along(path, d);
             at.y = Ground(p, at);
             pose.At = at;
             // Facing the way they walk, looking a little ahead so they turn into the corner; the crowd once there.
             Vector3 ahead = Flat(Along(path, Mathf.Min(d + 0.45f, length)) - Along(path, d));
-            pose.Face = t < arrive - 0.05f && ahead.sqrMagnitude > 1e-4f ? ahead.normalized : Toward;
+            // Once there, turned a little their own way, settling into it over a moment.
+            Vector3 settled = Turn(Toward, a.Turn * Span(t, arrive, arrive + 0.8f));
+            pose.Face = t < arrive - 0.05f && ahead.sqrMagnitude > 1e-4f ? ahead.normalized : settled;
             if (t < start) pose.Face = Toward;
 
             float presented = Present[p];
             bool lead = a.Slot == 0;
             float group = Arrived(p);
+            float r = a.Rate, cheer = CheerLength / r, lag = a.Lag;
             var segs = new List<(float, string, bool, float)>
             {
-                (-1f, "Idle", true, 1f),
-                (start, "Walk", true, WalkSpeed / ClipWalkSpeed),
-                (arrive, "Idle", true, 1f),
-                (group + 0.2f, "Cheer", false, 1f),
-                (group + 0.2f + CheerLength, "Idle", true, 1f),
+                (-1f, "Idle", true, r),
+                (start, "Walk", true, speed / ClipWalkSpeed),
+                (arrive, "Idle", true, r),
+                (group + 0.2f + lag, "Cheer", false, r),
+                (group + 0.2f + lag + cheer, "Idle", true, r),
             };
             if (!lead)
             {
-                // Teammates cheer the trophy, the champagne and the end.
-                segs.Add((presented + Handed, "Cheer", false, 1f));
-                segs.Add((presented + Handed + CheerLength, "Idle", true, 1f));
-                for (float c = PopAt + 0.4f + a.Slot * 0.5f; c < SprayEnd; c += CheerLength + 1.1f)
+                // Teammates cheer the trophy, the champagne and the end, each in their own time.
+                segs.Add((presented + Handed + lag, "Cheer", false, r));
+                segs.Add((presented + Handed + lag + cheer, "Idle", true, r));
+                for (float c = PopAt + 0.4f + a.Slot * 0.5f + lag * 2f; c < SprayEnd; c += cheer + 0.8f + a.Offset * 0.3f)
                 {
-                    segs.Add((c, "Cheer", false, 1f));
-                    segs.Add((c + CheerLength, "Idle", true, 1f));
+                    segs.Add((c, "Cheer", false, r));
+                    segs.Add((c + cheer, "Idle", true, r));
                 }
-                segs.Add((ConfettiAt + a.Slot * 0.3f, "Cheer", true, 1f));
+                segs.Add((ConfettiAt + a.Slot * 0.3f + lag, "Cheer", true, r));
             }
             segs.Sort((x, y) => x.Item1.CompareTo(y.Item1));
-            Clips(ref pose, t, segs);
+            Clips(ref pose, t, segs, a.Offset);
             if (!lead) return pose;
 
             // The lead driver's hands: the trophy, then the champagne.
@@ -380,24 +434,26 @@ namespace TarmacGauntlet.Raceday
             float t0 = Present[p];
             Vector3 from = PodiumPlan.PresenterStart(p, Drivers[p]), to = PodiumPlan.PresenterRest(p);
             float leave = t0 + Handed + 0.3f;
+            float speed = WalkSpeed * a.Pace;
             float length = Flat(to - from).magnitude;
-            float walk = length / WalkSpeed;
+            float walk = length / speed;
             var pose = new PodiumPose();
-            float d = Mathf.Clamp((t - leave) * WalkSpeed, 0f, length);
+            float d = Mathf.Clamp((t - leave) * speed, 0f, length);
             pose.At = Vector3.Lerp(from, to, length > 0f ? d / length : 1f);
             Vector3 way = Flat(to - from).normalized;
-            Vector3 inward = new Vector3(-Mathf.Sign(to.x), 0f, -0.6f).normalized;
+            Vector3 inward = Turn(new Vector3(-Mathf.Sign(to.x), 0f, -0.6f).normalized, a.Turn);
             if (t < leave) pose.Face = Away;
             else if (t < leave + walk - 0.3f) pose.Face = Vector3.Lerp(Away, way, Span(t, leave, leave + 0.4f)).normalized;
             else pose.Face = Vector3.Lerp(way, inward, Span(t, leave + walk - 0.3f, leave + walk + 0.4f)).normalized;
+            float r = a.Rate;
             Clips(ref pose, t, new List<(float, string, bool, float)>
             {
-                (-1f, "Idle", true, 1f),
-                (leave, "Walk", true, WalkSpeed / ClipWalkSpeed),
-                (leave + walk, "Idle", true, 1f),
-                (ConfettiAt + 1f, "Cheer", false, 1f),
-                (ConfettiAt + 1f + CheerLength, "Idle", true, 1f),
-            });
+                (-1f, "Idle", true, r),
+                (leave, "Walk", true, speed / ClipWalkSpeed),
+                (leave + walk, "Idle", true, r),
+                (ConfettiAt + 1f + a.Lag, "Cheer", false, r),
+                (ConfettiAt + 1f + a.Lag + CheerLength / r, "Idle", true, r),
+            }, a.Offset);
             if (t < t0 + Handed + 0.2f)
             {
                 (Vector3 trophy, Vector3 side) = Trophy(p, t);
@@ -413,22 +469,34 @@ namespace TarmacGauntlet.Raceday
         private PodiumPose CrewPose(PodiumActor a, float t)
         {
             var pose = new PodiumPose { At = a.Spot };
-            Vector3 look = Flat(new Vector3(PodiumPlan.StepX[a.Place] * 0.6f, 0f, PodiumPlan.StandZ) - a.Spot);
-            pose.Face = look.sqrMagnitude > 1e-4f ? look.normalized : Away;
-            // Cheering as their drivers come out and get the trophy, through the champagne and at the end; between, waiting.
-            float cheerFrom = Arrived(a.Place) - 0.6f + a.Phase * 0.3f;
-            var segs = new List<(float, string, bool, float)> { (-1f, "Idle", true, 1f) };
+            // Looking up at their drivers, each a little their own way, and turning to follow the trophy as it goes up.
+            float follow = Span(t, Present[a.Place], Present[a.Place] + 2f) * (1f - Span(t, Present[a.Place] + 6f, Present[a.Place] + 9f));
+            Vector3 look = Flat(new Vector3(PodiumPlan.StepX[a.Place] * (0.6f + 0.4f * follow), 0f, PodiumPlan.StandZ) - a.Spot);
+            pose.Face = Turn(look.sqrMagnitude > 1e-4f ? look.normalized : Away, a.Turn * (1f - 0.5f * follow));
+            // Cheering as their drivers come out and get the trophy, through the champagne and at the end; between,
+            // waiting. Each reacts in their own time, cheers for their own length, and some sit out the trophy.
+            float r = a.Rate, lag = a.Lag;
+            float cheerFrom = Arrived(a.Place) - 0.6f + lag;
+            var segs = new List<(float, string, bool, float)> { (-1f, "Idle", true, r) };
             void Burst(float from, float until)
             {
-                segs.Add((from, "Cheer", true, 1f));
-                segs.Add((until, "Idle", true, 1f));
+                segs.Add((from, "Cheer", true, r));
+                segs.Add((until, "Idle", true, r));
             }
-            Burst(cheerFrom, cheerFrom + 2.6f + a.Phase);
-            Burst(Present[a.Place] + Handed + a.Phase * 0.25f, Present[a.Place] + Handed + 3.2f + a.Phase * 0.4f);
-            Burst(PopAt - 0.2f + a.Phase * 0.2f, Length + 1f);
+            Burst(cheerFrom, cheerFrom + 1.8f + 2.2f * Hash(a, 10));
+            if (Hash(a, 11) > 0.25f)
+                Burst(Present[a.Place] + Handed + lag * 0.6f, Present[a.Place] + Handed + 2.2f + 2.4f * Hash(a, 12));
+            // Through the champagne, a few stop for breath and go again.
+            float pop = PopAt - 0.2f + lag * 0.5f;
+            if (Hash(a, 13) > 0.6f)
+            {
+                float rest = PopAt + 3f + 4f * Hash(a, 14);
+                Burst(pop, rest);
+                Burst(rest + 1.2f + 1.5f * Hash(a, 15), Length + 1f);
+            }
+            else Burst(pop, Length + 1f);
             segs.Sort((x, y) => x.Item1.CompareTo(y.Item1));
-            Clips(ref pose, t, segs);
-            if (pose.Clip == "Cheer") pose.ClipTime += a.Phase;
+            Clips(ref pose, t, segs, a.Offset + a.Phase);
             return pose;
         }
 
