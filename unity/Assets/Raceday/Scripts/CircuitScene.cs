@@ -431,6 +431,9 @@ namespace TarmacGauntlet.Raceday
             intro.Keys = keys;
             outro = new GameObject("Outro").AddComponent<StageSequence>();
             outro.Keys = keys;
+            CooldownStage cooldown = outro.gameObject.AddComponent<CooldownStage>();
+            cooldown.Director = director;
+            outro.Add(cooldown);
             Lap("race");
             built = true;
             SceneLoader.Release();
