@@ -43,7 +43,7 @@ namespace TarmacGauntlet.Raceday
         public RaceTower Tower;
 
         public bool Finished { get; private set; }
-        /// <summary>True once the race is under way: from the green, or the first car out of the pit lane.</summary>
+        /// <summary>True once the race is under way: from the green.</summary>
         public bool Started => started;
         /// <summary>Seconds since the green.</summary>
         public float Elapsed => started ? Time.time - startTime : 0f;

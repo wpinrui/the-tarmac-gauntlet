@@ -183,6 +183,25 @@ namespace TarmacGauntlet.Raceday
             State = Stage.ToBox;
         }
 
+        /// <summary>
+        /// Takes over a car someone else drove into the pit lane, at track sample <paramref name="k"/>: on to the box
+        /// if it is still ahead, on with the <paramref name="service"/> already under way in it, or out of the lane
+        /// once the box is behind or the stop is done.
+        /// </summary>
+        public void TakeOver(AiPilot racing, int seed, int k, PitService service)
+        {
+            Box(racing, seed);
+            if (service != null)
+            {
+                Service = service;
+                State = service.Done ? Stage.Leaving : Stage.Stopped;
+                return;
+            }
+            Circuit c = Lane.Circuit;
+            int ahead = c.Wrap(boxSample - k);
+            if (ahead == 0 || ahead > c.Count / 2) State = Stage.Leaving;
+        }
+
         /// <summary>Gives up on the stop, after the car is moved back to the track.</summary>
         public void Abort()
         {
