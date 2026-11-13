@@ -273,6 +273,7 @@ def taillamps(ref, skins, cutters, out):
         ring = seen.difference(brake.buffer(0.008))
         out += _floor(ref, f"lamp_tail_{side}", ring, fr, "lamp_tail", -0.03, -0.026)
         out += _floor(ref, f"lamp_brake_{side}", brake, fr, "lamp_brake", -0.03, -0.026)
+        out += _floor(ref, f"tail_back_{side}", seen.buffer(0.002), fr, "grille", -0.036, -0.028)
 
 
 # ---------------------------------------------------------------- front and rear
@@ -283,7 +284,7 @@ def _pocket(name, shape, mat, ref, cutters, out, fr, depth, sides=True, back=Tru
         k = f"_{side}" if side else ""
         cutters += blend.lay(ref, f"cut_{name}{k}", g, fr, -depth, 0.006, mat, 0.006, along_ray=True)
         if back:
-            out += blend.lay(ref, f"{name}_back{k}", g.buffer(-0.002), fr, -depth + 0.001, -depth + 0.005, mat, 0.006,
+            out += blend.lay(ref, f"{name}_back{k}", g.buffer(0.002), fr, -depth - 0.002, -depth + 0.005, mat, 0.006,
                              along_ray=True)
 
 
@@ -300,16 +301,16 @@ def front_parts(ref, cutters, out):
     _pocket("intake", gr, "grille", ref, cutters, out, fr, 0.05, sides=False)
     u, z, r = R["fog"]
     fog = Point(u, z).buffer(r * 1.25, 48)
-    bars = unary_union([box(-1, zb - 0.006, 1, zb + 0.006) for zb in R["grille_bars"]]).intersection(gr.buffer(-0.012))
-    bars = bars.difference(both(fog.buffer(0.006)))
+    bars = unary_union([box(-1, zb - 0.006, 1, zb + 0.006) for zb in R["grille_bars"]]).intersection(gr.buffer(0.003))
+    bars = bars.difference(both(Point(u, z).buffer(r, 48)))     # ends run into the walls and the fog rings
     out += blend.lay(ref, "intake_bars", bars, fr, -0.03, -0.012, "chrome", 0.006, along_ray=True)
     for sgn, side in ((1, "l"), (-1, "r")):
         g = (lambda q: q) if sgn > 0 else flip
-        out += blend.lay(ref, f"fog_ring_{side}", g(fog.difference(Point(u, z).buffer(r * 0.95, 48))), fr, -0.035, -0.02,
+        out += blend.lay(ref, f"fog_ring_{side}", g(fog.difference(Point(u, z).buffer(r * 0.95, 48))), fr, -0.043, -0.02,
                          "chrome", 0.004, along_ray=True)
-        out += blend.lay(ref, f"fog_back_{side}", g(Point(u, z).buffer(r * 0.97, 48)), fr, -0.045, -0.04, "reflector",
+        out += blend.lay(ref, f"fog_back_{side}", g(Point(u, z).buffer(r * 0.97, 48)), fr, -0.047, -0.039, "reflector",
                          0.004, along_ray=True)
-        out += blend.lay(ref, f"lamp_head_fog_{side}", g(Point(u, z).buffer(r * 0.45, 32)), fr, -0.04, -0.034,
+        out += blend.lay(ref, f"lamp_head_fog_{side}", g(Point(u, z).buffer(r * 0.45, 32)), fr, -0.0415, -0.034,
                          "lamp_head", 0.004, along_ray=True)
 
 
@@ -324,7 +325,7 @@ def rear_parts(ref, cutters, out):
     _pocket("rain_pocket", pk, "grille", ref, cutters, out, fr, 0.035)
     for sgn, side in ((1, "l"), (-1, "r")):
         g = Point(u * sgn, z).buffer(r, 40)
-        out += blend.lay(ref, f"lamp_rain_{side}", g, fr, -0.03, -0.024, "lamp_rain", 0.004, along_ray=True)
+        out += blend.lay(ref, f"lamp_rain_{side}", g, fr, -0.0315, -0.024, "lamp_rain", 0.004, along_ray=True)
 
 
 # ---------------------------------------------------------------- glass and trim
@@ -649,10 +650,10 @@ def interior():
             body.inside(x, 0.035 + 0.006)).difference(body.inside(x, 0.035 + 0.024))
         obs.append(_loft(f"door_card_{side}", xr, xf, clip, n=10))
         yc = 0.36 * sgn
-        obs.append(_rbox(f"seat_base_{side}", -0.30, 0.18, yc - 0.23, yc + 0.23, FLOOR + 0.006, FLOOR + 0.17))
+        obs.append(_rbox(f"seat_base_{side}", -0.30, 0.18, yc - 0.23, yc + 0.23, FLOOR - 0.01, FLOOR + 0.17))
         obs.append(_rbox(f"seat_back_{side}", -0.44, -0.32, yc - 0.22, yc + 0.22, FLOOR + 0.171, FLOOR + 0.70, lean=0.22))
         obs.append(_rbox(f"headrest_{side}", -0.57, -0.47, yc - 0.12, yc + 0.12, FLOOR + 0.701, FLOOR + 0.81, r=0.035, lean=0.1))
-    obs.append(_rbox("rear_base", -1.00, -0.66, -0.50, 0.50, FLOOR + 0.04, FLOOR + 0.20))
+    obs.append(_rbox("rear_base", -1.00, -0.66, -0.50, 0.50, FLOOR - 0.01, FLOOR + 0.20))
     obs.append(_rbox("rear_back", -1.12, -1.01, -0.48, 0.48, FLOOR + 0.201, FLOOR + 0.56, lean=0.35))
     obs.append(steering())
     xm = R["screen"]["x_top_mid"] - 0.04
@@ -795,7 +796,7 @@ def options(ref):
         add("rearbadge", 3 + k, badge(ref, style, 0.07, rear_fr(), 0, lid_z + 0.1, up, "rb"))
     cap = 0.028
     # name: on the hatch right of the badge (where the reference's trim badges sit), left of it,
-    # or low on both doors behind the front wheel
+    # low on both doors behind the front wheel
     add("name", 1, _flat(ref, nm, cap, rear_fr(), 0.2, lid_z - 0.03, up, "nm", 0.0012, 0.0025, "chrome"))
     add("name", 2, _flat(ref, nm, cap, rear_fr(), -0.2, lid_z - 0.03, up, "nm", 0.0012, 0.0025, "chrome"))
     q = []
@@ -803,4 +804,6 @@ def options(ref):
     for sgn in (1, -1):
         q += _flat(ref, nm, cap * 1.3, side_fr(sgn), xd, R["door_bottom"] + 0.1, up, "nm", 0.0012, 0.0025, "chrome")
     add("name", 3, q)
+    # or centred under the rear badge
+    add("name", 4, _flat(ref, nm, cap, rear_fr(), 0, lid_z - 0.085, up, "nm", 0.0012, 0.0025, "chrome"))
     return out
