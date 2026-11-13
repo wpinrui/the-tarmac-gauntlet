@@ -9,6 +9,10 @@
    text is 39%, which shows as 62% blended in sRGB did). Pick a colour's alpha as if blending in sRGB, then convert it
    with tools/linear-preview/ui_alpha.py. */
 
+/* Text never wraps or shrinks unless its class asks to (white-space: normal, flex-shrink: 1). The menus' theme is
+   empty, so without this a label squeezed by its row breaks one letter per line. */
+Label, TextElement { white-space: nowrap; flex-shrink: 0; }
+
 .root { position: absolute; left: 0; top: 0; right: 0; bottom: 0; color: rgb(255, 255, 255); }
 .layer { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
 .centre { align-items: center; justify-content: center; }
