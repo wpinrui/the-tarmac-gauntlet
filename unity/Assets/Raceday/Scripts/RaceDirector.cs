@@ -10,7 +10,8 @@ namespace TarmacGauntlet.Raceday
     /// power, grip, fuel efficiency and tyre life until a stop fixes them, and a retired car limps to
     /// its box, or stops beside the track after a fatal crash (<see cref="Retire"/>). After a stop's driver change, the new driver drives at their own pace.
     /// The driver at the wheel tires lap by lap (<see cref="CarRaceLog.Fatigue"/>), which slows the car until a stop puts in someone fresh. When the
-    /// race clock runs out each car takes the chequered flag the next time it crosses the line, then drives a
+    /// race clock runs out the leader takes the chequered flag the next time it crosses the line, and every car
+    /// after it as each crosses the line (<see cref="RaceDay.CompleteLap"/>). Past the flag a car drives a
     /// cooldown lap at <see cref="CooldownSpeed"/>, off the racing line, and parks in its box. Once every car
     /// is parked or out of the race, or <see cref="FlagWait"/> and <see cref="CooldownWait"/> after the time ran out,
     /// the race is settled into the career (<see cref="RaceWeekend.Finish"/>) and the player's car is parked in its

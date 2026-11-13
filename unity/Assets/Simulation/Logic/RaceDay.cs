@@ -49,7 +49,7 @@ namespace TarmacGauntlet.Simulation
         public int SpareParts { get; private set; }
         public bool Retired { get; private set; }
         public FailureType? RetirementReason { get; private set; }
-        /// <summary>Race seconds when the car last crossed the line, or retired.</summary>
+        /// <summary>Race seconds when the car last crossed the line. Retiring doesn't move it: the car is classified on the laps it completed, when it completed them.</summary>
         public double LastLineTime { get; private set; }
         /// <summary>True once the car has crossed the line after the race time ran out.</summary>
         public bool Flagged { get; private set; }
@@ -163,7 +163,6 @@ namespace TarmacGauntlet.Simulation
             if (Retired) return;
             Retired = true;
             RetirementReason = reason;
-            LastLineTime = Math.Max(LastLineTime, raceTime);
             CloseStint();
         }
 
@@ -372,23 +371,34 @@ namespace TarmacGauntlet.Simulation
             Cars = setup.Grid.Select((car, i) => new CarRaceLog(car, i)).ToArray();
         }
 
-        /// <summary>A car crossed the line. Returns the issues it picked up on the lap.</summary>
+        /// <summary>
+        /// A car crossed the line. Returns the issues it picked up on the lap. Once the time is up
+        /// (<paramref name="timeUp"/>) the chequered flag comes out for the leader: the first car still
+        /// running to cross the line with no running car on more laps. Every car to cross after it takes the flag too.
+        /// </summary>
         public IReadOnlyList<ActiveIssue> CompleteLap(int index, double raceTime, double lapSeconds, InstructionMode mode, bool timeUp)
         {
             CarRaceLog car = Cars[index];
             if (car.Retired || car.Flagged) return Array.Empty<ActiveIssue>();
             bool leader = Cars.All(c => c.Laps <= car.Laps);
-            IReadOnlyList<ActiveIssue> found = car.CompleteLap(raceTime, lapSeconds, mode, timeUp, random);
+            bool flag = timeUp && (FlagOut || Cars.All(c => c == car || c.Retired || c.Laps <= car.Laps));
+            IReadOnlyList<ActiveIssue> found = car.CompleteLap(raceTime, lapSeconds, mode, flag, random);
             if (lapSeconds > 0 && (FastestLap == null || lapSeconds < FastestLap.Time))
                 FastestLap = new FastestLap { TeamId = car.Car.TeamId, Time = lapSeconds };
             if (leader && car.Laps > positions.Count) RecordPositions();
             return found;
         }
 
+        /// <summary>True once the leader has taken the chequered flag: every car crossing the line from now on takes it too.</summary>
+        public bool FlagOut => Cars.Any(c => c.Flagged);
+
         /// <summary>True once every car still running has taken the flag.</summary>
         public bool AllFlagged => Cars.All(c => c.Retired || c.Flagged);
 
-        /// <summary>The field in finishing order: most laps, then soonest across the line.</summary>
+        /// <summary>
+        /// The field in finishing order: most laps, then soonest to complete the last of them. A car that retired
+        /// counts the laps it completed, so it finishes ahead of a car that completed as many laps later.
+        /// </summary>
         public IReadOnlyList<CarRaceLog> Classify() =>
             Cars.OrderByDescending(c => c.Laps).ThenBy(c => c.LastLineTime).ThenBy(c => c.Index).ToArray();
 
