@@ -25,6 +25,8 @@ namespace TarmacGauntlet.Rendering
         /// the race at High and above, where the depth costs little.
         /// </summary>
         public static bool SoftParticles;
+        /// <summary>True while the cars throw spray in the wet, which fades into the scene at every quality level.</summary>
+        public static bool SoftSpray;
         /// <summary>
         /// True while the floodlights' pools are lit: they read the scene's colour to light a moon shadow in them as
         /// brightly as the ground beside it (LampFill.hlsl). Set by the race at night.
@@ -45,7 +47,7 @@ namespace TarmacGauntlet.Rendering
         {
             if (renderingData.cameraData.cameraType != CameraType.Game) return;
             bool haze = ExhaustHaze && GraphicsOptions.ExhaustHaze.On;
-            bool soft = SoftParticles, pools = LitPools;
+            bool soft = SoftParticles || SoftSpray, pools = LitPools;
             if (haze || soft || pools)
             {
                 ScriptableRenderPassInput wanted = ScriptableRenderPassInput.None;

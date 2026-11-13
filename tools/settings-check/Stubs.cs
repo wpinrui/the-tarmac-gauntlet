@@ -52,6 +52,7 @@ namespace UnityEngine
         private static readonly Dictionary<string, int> ids = new Dictionary<string, int>();
         public static int PropertyToID(string name) => ids.TryGetValue(name, out int id) ? id : ids[name] = ids.Count + 1;
         public static void SetGlobalVector(int id, Vector4 v) => Globals[id] = v;
+        public static void SetGlobalFloat(int id, float v) => Globals[id] = new Vector4(v, 0, 0, 0);
     }
 
     public enum FullScreenMode { ExclusiveFullScreen, FullScreenWindow, MaximizedWindow, Windowed }
