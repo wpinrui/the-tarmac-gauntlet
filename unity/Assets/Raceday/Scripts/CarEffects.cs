@@ -59,7 +59,8 @@ namespace TarmacGauntlet.Raceday
         private MaterialPropertyBlock block;
 
         private static readonly int GlowId = Shader.PropertyToID("_Glow"), SoftId = Shader.PropertyToID("_EffectsSoft"),
-            NightId = Shader.PropertyToID("_EffectsNight");
+            NightId = Shader.PropertyToID("_EffectsNight"), DarkId = Shader.PropertyToID("_EffectsDark"),
+            FloodId = Shader.PropertyToID("_EffectsFlood");
 
         private sealed class Discs
         {
@@ -93,6 +94,7 @@ namespace TarmacGauntlet.Raceday
             HeatHazeFeature.ExhaustHaze = false;
             HeatHazeFeature.SoftParticles = false;
             Shader.SetGlobalFloat(SoftId, 0f);
+            Shader.SetGlobalFloat(DarkId, 0f);
             Destroy(smokeMaterial);
             Destroy(sparkMaterial);
             Destroy(hazeMaterial);
@@ -159,10 +161,15 @@ namespace TarmacGauntlet.Raceday
                 Pick(cam.transform.position);
             }
 
-            float night = Night != null ? NightLook.On(Night()) : 0f;
+            float lights = Night != null ? Night() : 0f;
+            float night = NightLook.On(lights);
             Color flood = NightLook.Flood * (0.3f * night);
             // Set as a colour so Unity converts it to linear light.
             Shader.SetGlobalColor(NightId, flood);
+            Shader.SetGlobalFloat(DarkId, night);
+            // The smoke is lit by the floodlights' beams as brightly as the pools light the road under them, and by the
+            // headlamps as the ground is (HeadlampGround).
+            Shader.SetGlobalVector(FloodId, FloodMaterials.Brightening(NightLook.Flood, NightLook.PoolBrightening * lights));
 
             Glow(dt);
             if (dt <= 1e-5f) return;
@@ -172,7 +179,8 @@ namespace TarmacGauntlet.Raceday
             bool sparking = GraphicsOptions.Sparks.On && sparks.main.maxParticles > 0;
             if (smoking || sparking)
                 foreach (int c in nearSmoke) Friction(c, dt, smoking, sparking, dryness);
-            if (HeatHazeFeature.ExhaustHaze)
+            // The haze fades out as the lamps come on (Haze.shader): none is thrown at full night.
+            if (HeatHazeFeature.ExhaustHaze && night < 0.999f)
                 foreach (int c in nearHaze) Exhaust(c, dt);
         }
 

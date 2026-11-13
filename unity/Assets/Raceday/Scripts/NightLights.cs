@@ -114,7 +114,11 @@ namespace TarmacGauntlet.Raceday
             }
         }
 
-        private void OnDestroy() => HeadlampGround.Clear();
+        private void OnDestroy()
+        {
+            HeadlampGround.Clear();
+            HeatHazeFeature.LitPools = false;
+        }
 
         private Light Spot(string name, Color colour)
         {
@@ -141,6 +145,7 @@ namespace TarmacGauntlet.Raceday
                 {
                     night = now;
                     Materials.Night(night);
+                    HeatHazeFeature.LitPools = night > 0.001f;
                     LampMaterials.Shared.Night(night);
                     Stands?.Night(night, Materials.Tint);
                 }

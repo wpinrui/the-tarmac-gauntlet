@@ -25,6 +25,11 @@ namespace TarmacGauntlet.Rendering
         /// the race at High and above, where the depth costs little.
         /// </summary>
         public static bool SoftParticles;
+        /// <summary>
+        /// True while the floodlights' pools are lit: they read the scene's colour to light a moon shadow in them as
+        /// brightly as the ground beside it (LampFill.hlsl). Set by the race at night.
+        /// </summary>
+        public static bool LitPools;
 
         private ShimmerPass shimmer;
         private InputPass inputs;
@@ -40,11 +45,11 @@ namespace TarmacGauntlet.Rendering
         {
             if (renderingData.cameraData.cameraType != CameraType.Game) return;
             bool haze = ExhaustHaze && GraphicsOptions.ExhaustHaze.On;
-            bool soft = SoftParticles;
-            if (haze || soft)
+            bool soft = SoftParticles, pools = LitPools;
+            if (haze || soft || pools)
             {
                 ScriptableRenderPassInput wanted = ScriptableRenderPassInput.None;
-                if (haze) wanted |= ScriptableRenderPassInput.Color;
+                if (haze || pools) wanted |= ScriptableRenderPassInput.Color;
                 if (soft) wanted |= ScriptableRenderPassInput.Depth;
                 inputs.ConfigureInput(wanted);
                 renderer.EnqueuePass(inputs);
