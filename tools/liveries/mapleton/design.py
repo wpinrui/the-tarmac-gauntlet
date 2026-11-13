@@ -2,11 +2,9 @@
 sentimental, with fine detail kept small enough to find only up close. Independent: no maker's
 logo. The team's roundel (a maple leaf in a red ring) and its roadside town sign.
 
-Two options:
-  cottage  Sage green over a still lake along the sills: a pine shoreline, ripples, a canoe, a loon
-           and the town sign on the shore. The roof is a contour map of a lake.
-  flannel  Warm ivory over a washed-out red buffalo check, edged with a cream stitch line, like a
-           favourite shirt. A check maple leaf stitched on the roof, the roundel as a sewn patch.
+Sage green over a still lake along the sills: a pine shoreline, ripples, a canoe, a loon and the
+town sign on the shore. An ivory roof with a big maple leaf cut from a washed red buffalo check and
+stitched on. The roundel big on the bonnet and small on each rear quarter. The name in a hand.
 
 Run: node ../common/views.js ../../../unity/Assets/Art/Vehicles/NusaFox/NusaFox.obj out/views
      node ../common/digits.js --font font/Fraunces-SemiBold.ttf --out out/digits
@@ -52,7 +50,7 @@ TAIL, NOSE = -1.84, 2.12
 SHORE_Y = 0.33                       # sides: lake below, pines rise from here
 NUMBER = (0.15, 0.56, 0.40, 0.24)    # door: z, y, box w, h
 NAME = (0.15, 0.80, 0.062)           # door: z, y, cap height
-ROUNDEL = (-1.02, 0.83, 0.27)        # rear quarter: z, y, height
+ROUNDEL = (-0.68, 0.72, 0.27)        # rear quarter, just behind the door gap and clear of the shoulder: z, y, height
 
 LEAF = [(50, 5), (56, 20), (64, 16), (61, 40), (75, 26), (78, 34), (92, 31), (87, 46), (95, 50), (73, 66), (76, 76),
         (54, 72), (54, 95), (46, 95), (46, 72), (24, 76), (27, 66), (5, 50), (13, 46), (8, 31), (22, 34), (25, 26),
@@ -169,25 +167,7 @@ def loon(u, v, ln, d):
             f'<path d="M-0.3,-0.06 L0.2,-0.06" stroke="{IVORY}" stroke-width="0.03" stroke-dasharray="0.04 0.04"/></g>')
 
 
-def lake_contours(cz, cx, rz, rx, n, col, seed):
-    """Top view: a contour map round a lake, the inner rings filled as water. u = z, v = -x."""
-    r = random.Random(seed)
-    ph = [r.random() * 7 for _ in range(3)]
-    rings = []
-    for k in range(1, n + 1):
-        s = k / n
-        pts = []
-        for i in range(126):
-            a = i / 126 * math.tau
-            w = 1 + 0.18 * math.sin(a * 3 + ph[0] + k * 0.15) + 0.1 * math.sin(a * 5 + ph[1]) + 0.06 * math.sin(a * 2 + ph[2])
-            pts.append((cz + math.cos(a) * rz * s * w, -cx + math.sin(a) * rx * s * w))
-        d = "M" + " L".join(f"{f(a)},{f(b)}" for a, b in pts) + " Z"
-        fill = LAKE if k <= 2 else "none"
-        rings.append(f'<path d="{d}" fill="{fill}" fill-opacity="{0.55 if k == 1 else 0.3}" stroke="{col}" stroke-width="0.004"/>')
-    return "".join(reversed(rings))
-
-
-def cottage_livery():
+def mapleton_livery():
     meta = json.loads((VIEWS / "views.json").read_text())
     lv = Livery(VIEWS / "views.json", SAGE, F_PAINT)
     r = random.Random(7)
@@ -208,11 +188,11 @@ def cottage_livery():
         a, b = side_uv(lv, view, 0.74, 0.885), side_uv(lv, view, -1.75, 0.975)
         lv.raw(view, f'<line x1="{f(a[0])}" y1="{f(a[1])}" x2="{f(b[0])}" y2="{f(b[1])}" stroke="{IVORY}" stroke-width="0.007"/>')
         roundel(lv, view, *side_uv(lv, view, ROUNDEL[0], ROUNDEL[1]), ROUNDEL[2])
-    lv.side_text("Mapleton Autosport", NAME[0], NAME[1], NAME[2], IVORY, font="Fraunces")
+    lv.side_text("Mapleton Autosport", NAME[0], NAME[1], NAME[2] * 1.35, IVORY, font="Caveat")
     lv.side_number(NUMBER[0], NUMBER[1], NUMBER[2], NUMBER[3], IVORY)
-    # Roof: the lake map. Bonnet: the number, read from the nose.
-    lv.raw("top", lake_contours(-0.57, 0, 0.6, 0.46, 9, IVORY, 5))
-    lv.number("top", (0, 0, 1.5), 0.52, 0.30, IVORY, rotate=-90)
+    # Roof: ivory with the check leaf. Bonnet: the roundel, big, read from the nose.
+    roof(lv)
+    roundel(lv, "top", *lv.uv("top", (0, 0, 1.5)), 0.9, rotate=-90)
     # Front and rear: the shoreline carried round the bumpers.
     for view, base, h in (("front", 0.36, 0.13), ("rear", 0.36, 0.16)):
         vw = meta["views"][view]
@@ -221,12 +201,11 @@ def cottage_livery():
         lv.raw(view, ripples(random.Random(13), vw["u0"], vw["u1"], vb, vw["v1"], IVORY))
         rr = random.Random(17)
         lv.raw(view, "".join(pine_svg(u, vb + 0.004, hh, SHORE) for u, hh in pines(rr, vw["u0"], vw["u1"], h)))
-    lv.text("rear", "Mapleton Autosport", (0, 0.70, 0), 0.045, IVORY, font="Fraunces")
+    lv.text("rear", "Mapleton Autosport", (0, 0.68, 0), 0.06, IVORY, font="Caveat")
     return lv
 
 
-# --- flannel -------------------------------------------------------------------------------------------
-CHECK_Y = 0.42                       # sides: check below this
+# --- the roof -------------------------------------------------------------------------------------------
 CELL = 0.11                          # buffalo check cell, metres
 
 
@@ -241,60 +220,22 @@ def check_pattern(pid, rotate=0):
             f'<rect width="{f(2 * c)}" height="{f(c)}" fill="{CHAR}" opacity="0.45"/>{lint}</pattern>')
 
 
-def stitch(u0, u1, v, col=IVORY, sw=0.006):
-    return (f'<line x1="{f(u0)}" y1="{f(v)}" x2="{f(u1)}" y2="{f(v)}" stroke="{col}" stroke-width="{sw}" '
-            f'stroke-dasharray="0.022 0.014" stroke-linecap="round"/>')
+ROOF = (-1.27, 0.13, 0.53)           # roof seen from above: z from, z to, half width
+ROOF_BLEED = (-1.25, 0.32, 0.56)     # the ivory runs on under the windscreen and side glass, short of the wing
 
 
-def hem(lv, view, top, pid):
-    """The check from top down to the ground on a side, front or rear view, with its stitch and a brown pinstripe."""
-    vw = meta_views[view]
-    v = lv.uv(view, (0, top, 0))[1] if view in ("front", "rear") else side_uv(lv, view, 0, top)[1]
-    w = vw["u1"] - vw["u0"]
-    lv.raw(view, f'<defs>{check_pattern(pid)}</defs><rect x="{f(vw["u0"])}" y="{f(v)}" width="{f(w)}" height="{f(vw["v1"] - v)}" fill="url(#{pid})"/>'
-                 + stitch(vw["u0"], vw["u1"], v + 0.03)
-                 + f'<line x1="{f(vw["u0"])}" y1="{f(v - 0.012)}" x2="{f(vw["u1"])}" y2="{f(v - 0.012)}" stroke="{BARK}" stroke-width="0.008"/>')
-
-
-def patch(inner, u, v, h, w=None):
-    """A sewn patch: an ivory ground with a stitched edge round whatever inner draws, in metres."""
-    w = w or h
-    return (f'<g transform="translate({f(u)} {f(v)})"><rect x="{f(-w / 2)}" y="{f(-h / 2)}" width="{f(w)}" height="{f(h)}" rx="{f(h * 0.18)}" fill="{IVORY}"/>'
-            f'<rect x="{f(-w / 2 + 0.012)}" y="{f(-h / 2 + 0.012)}" width="{f(w - 0.024)}" height="{f(h - 0.024)}" rx="{f(h * 0.14)}" fill="none" '
-            f'stroke="{FLANNEL}" stroke-width="0.005" stroke-dasharray="0.014 0.009"/>{inner}</g>')
-
-
-meta_views = {}
-
-
-def flannel_livery():
-    meta = json.loads((VIEWS / "views.json").read_text())
-    meta_views.update(meta["views"])
-    lv = Livery(VIEWS / "views.json", IVORY, F_PAINT)
-    for view in ("left", "right"):
-        hem(lv, view, CHECK_Y, f"chk-{view}")
-        u, v = side_uv(lv, view, ROUNDEL[0], ROUNDEL[1])
-        lv.raw(view, patch("", u, v, ROUNDEL[2] + 0.05, ROUNDEL[2] + 0.05))
-        roundel(lv, view, u, v, ROUNDEL[2])
-    lv.side_text("Mapleton Autosport", NAME[0], NAME[1], NAME[2] * 1.35, BARK, font="Caveat")
-    lv.side_number(NUMBER[0], NUMBER[1], NUMBER[2], NUMBER[3], BARK)
-    hem(lv, "front", 0.40, "chk-front")
-    hem(lv, "rear", 0.42, "chk-rear")
-    # Roof: a big maple leaf cut from the check and stitched on. Bonnet: the number.
+def roof(lv):
+    """Top view: the roof in ivory, a big maple leaf cut from the check and stitched on."""
+    z0, z1, hw = ROOF_BLEED
+    cz = (ROOF[0] + ROOF[1]) / 2
     s = 1.0 / 90
-    lv.raw("top", f'<defs>{check_pattern("chk-top", 45)}<clipPath id="leaf-top"><path transform="translate(-0.57 0) rotate(90) scale({s:.6f})" d="{LEAF_D}"/></clipPath></defs>'
-                  f'<rect x="-1.2" y="-0.6" width="1.3" height="1.2" fill="url(#chk-top)" clip-path="url(#leaf-top)"/>'
-                  + leaf(-0.57, 0, 0.94, stroke=IVORY, sw=0.006, rotate=90, dash=(0.022, 0.014)))
-    lv.number("top", (0, 0, 1.5), 0.52, 0.30, BARK, rotate=-90)
-    # Rear: the town sign as a patch on the hatch beside the maker's badge, the name under it.
-    u, v = lv.uv("rear", (0.3, 0.82, 0))
-    lv.raw("rear", patch("", u, v, 0.16, 0.28))
-    town_sign(lv, "rear", u, v, 0.12)
-    lv.text("rear", "Mapleton Autosport", (0, 0.68, 0), 0.06, BARK, font="Caveat")
-    return lv
+    lv.raw("top", f'<rect x="{f(z0)}" y="{f(-hw)}" width="{f(z1 - z0)}" height="{f(2 * hw)}" rx="0.12" fill="{IVORY}"/>'
+                  f'<defs>{check_pattern("chk-top", 45)}<clipPath id="leaf-top"><path transform="translate({f(cz)} 0) rotate(90) scale({s:.6f})" d="{LEAF_D}"/></clipPath></defs>'
+                  f'<rect x="{f(cz - 0.6)}" y="-0.6" width="1.2" height="1.2" fill="url(#chk-top)" clip-path="url(#leaf-top)"/>'
+                  + leaf(cz, 0, 0.94, stroke=IVORY, sw=0.006, rotate=90, dash=(0.022, 0.014)))
 
 
-OPTIONS = {"cottage": cottage_livery, "flannel": flannel_livery}
+OPTIONS = {"mapleton": mapleton_livery}
 
 if __name__ == "__main__":
     for name, build in OPTIONS.items():
