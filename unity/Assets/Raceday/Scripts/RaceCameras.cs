@@ -8,9 +8,11 @@ namespace TarmacGauntlet.Raceday
     /// C cycles the car cameras: TV coverage locked to the car (a second <see cref="BroadcastDirector"/> with its
     /// Lock set, cutting between trackside shots and onboards), then the chase, bonnet and bumper views, whose
     /// places come from <see cref="CameraPresets"/> in the settings.
-    /// V puts the broadcast on (<see cref="BroadcastDirector"/>) and V or C takes it off again. Holding B
+    /// The broadcast (<see cref="BroadcastDirector"/>) has no way in for now: its V toggle is off while Ivan rethinks
+    /// the mode. Do not remove the broadcast mode or its director. It stays in the game, to come back. Holding B
     /// looks back on every camera, the broadcast showing the chase view turned round. = rides
     /// with the car behind in race order and - with the car ahead, leaving the broadcast for the chase view.
+    /// Backspace comes back to your own car, in the chase view.
     /// While you are not driving your own car, the camera is yours to move: hold the right mouse button and
     /// drag to look, W A S D move, Q and E go down and up, Shift is 5x faster and the wheel changes speed.
     /// All of it stays relative to the car, so you still ride along. The locked TV camera takes the mouse
@@ -42,7 +44,11 @@ namespace TarmacGauntlet.Raceday
         [System.NonSerialized] public bool Held;
 
         private View view = View.Chase;
-        private bool broadcast = true;
+        /// <summary>
+        /// True while the broadcast has the camera. Off from the start and with no key to turn it on while the mode is
+        /// rethought. Keep the mode: it comes back.
+        /// </summary>
+        private bool broadcast;
 
         /// <summary>Starts in the chase view instead of the broadcast, as the scene does run on its own for AI testing.</summary>
         public void StartInChase() => broadcast = false;
@@ -86,11 +92,6 @@ namespace TarmacGauntlet.Raceday
         private void Update()
         {
             if (Keys == null) return;
-            if (Keys.Pressed(KeyCode.V))
-            {
-                broadcast = !broadcast;
-                Apply();
-            }
             if (Keys.Pressed(KeyCode.C))
             {
                 if (broadcast) broadcast = false;
@@ -99,6 +100,7 @@ namespace TarmacGauntlet.Raceday
             }
             if (Keys.Pressed(KeyCode.Equals)) Step(+1);
             if (Keys.Pressed(KeyCode.Minus)) Step(-1);
+            if (Keys.Pressed(KeyCode.Backspace) && Own != null && (Car != Own || broadcast)) Watch(Own);
             if (Driving && (offset != Vector3.zero || yaw != 0f || pitch != 0f || orbit != 0f || rise != 0f || zoom != 1f)) Apply();   // taking the wheel puts the view back
         }
 
@@ -259,8 +261,10 @@ namespace TarmacGauntlet.Raceday
                 return;
             }
             chaseSettled = true;
-            // Looking back from the bumper camera puts it on the back bumper.
-            if (back && shown == View.Bumper) place.z = -place.z;
+            // Looking back moves the onboard cameras to the tail, so they see the road behind and not the car:
+            // the bonnet camera to the top of the tail, the bumper camera to the back bumper.
+            if (back && shown == View.Bonnet) place = CarCameraSpots.Rear(t);
+            if (back && shown == View.Bumper) place.z = CarCameraSpots.TailZ(t) + 0.05f;
             Ride(t.TransformPoint(place), t.rotation * round, tilt);
         }
 

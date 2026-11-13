@@ -27,6 +27,12 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Raised once, when the last stage is done.</summary>
         public event Action Completed;
 
+        /// <summary>Raised when holding Enter skips a stage.</summary>
+        public event Action Skipped;
+
+        /// <summary>True while the hold-Enter hint is on screen.</summary>
+        public bool HintShown => Running && stages[current].Skippable && !DebugMenu.Bare;
+
         private readonly List<SkippableStage> stages = new List<SkippableStage>();
         private int current = -1;
         private readonly SkipHold hold = new SkipHold();
@@ -86,6 +92,7 @@ namespace TarmacGauntlet.Raceday
             bool held = Keys != null && (Keys.Held(KeyCode.Return) || Keys.Held(KeyCode.KeypadEnter));
             if (!hold.Step(held, Time.unscaledDeltaTime)) return;
             stage.Skip();
+            Skipped?.Invoke();
             if (stage.Done) Next();
         }
 

@@ -42,6 +42,15 @@ namespace TarmacGauntlet.Simulation
         /// <summary>Fires when the player asks to skip the cooldown laps (<see cref="SkipToEnd"/>).</summary>
         public static event Action? SkippingToEnd;
 
+        /// <summary>
+        /// Fires once the race summary should open: straight after <see cref="Finished"/>, or after the podium when the
+        /// race ran to its end. The race scene calls <see cref="ShowSummary"/>.
+        /// </summary>
+        public static event Action? SummaryDue;
+
+        /// <summary>Opens the race summary of the race just settled.</summary>
+        public static void ShowSummary() => SummaryDue?.Invoke();
+
         /// <summary>Settles the race now, without waiting for the cooldown laps. The race scene does it on <see cref="SkippingToEnd"/>.</summary>
         public static void SkipToEnd() => SkippingToEnd?.Invoke();
 

@@ -167,7 +167,7 @@ namespace TarmacGauntlet.Raceday
 #pragma warning restore 0649
 
         /// <summary>The suit's and helmet's colours for a team, per the chosen look.</summary>
-        private static (MaterialPropertyBlock suit, MaterialPropertyBlock helmet) DriverKit(Color team)
+        internal static (MaterialPropertyBlock suit, MaterialPropertyBlock helmet) DriverKit(Color team)
         {
             team.a = 1f;
             (Color cloth, Color panel, Color shell) = Suit switch

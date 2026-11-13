@@ -69,14 +69,15 @@ compiles in Unity.
 ## Raceday scene
 
 `Assets/Raceday/Raceday.unity` opens when the editor starts. Press Play and the AI drives the Seorak
-Cheonma CX-24Si. `I` hands the car to you, and pressing it again hands it back.
+Cheonma CX-24Si. Delete hands the car to you, and pressing it again hands it back.
 
-Start on the scene's `CircuitScene` picks how the race starts. Rolling (the default) starts behind the pace car. Pit Lane: the 100 cars
-queue in the pit lane's fast lane, quickest first with the Cheonma last, and leave three seconds apart
-from the pit exit line (the end of the limiter zone), the queue moving up behind each car that goes
-(`PitLaneStart.cs`). The scene fast forwards at 32x until just before the car ahead of the Cheonma
-leaves; `F` or `I` ends the fast forward early. Pit stops open once every car is out of the pit lane, and
-every car starts on a full tank. Grid races from the grid at once.
+Start on the scene's `CircuitScene` picks how the race starts. Rolling (the default) starts behind the pace car,
+from the garages: after the grid show, the pit exit stage sends the whole field out at once on a timetable
+(`GarageStart.cs`). Each car has a slot in a line that moves down the pit lane at a steady headway, the pace car
+two slots ahead, and leaves its garage just in time to meet its slot, so the garage order does not matter.
+A car that would cut into a car already on its way waits for it. A player who drives out slowly holds up
+everyone behind, who queue. Hold Enter to skip the stage; the formation lap then puts the field in place.
+Every car starts on a full tank. Grid races from the grid at once.
 
 The field is the season's 99 AI teams, by the class of their roster entry, and the player's. The timing
 tower in the top left (`RaceTower.cs`, order in `Standings.cs`) counts down the 24 hour race clock, which runs
@@ -117,14 +118,31 @@ you cross the line: past the speed that holds your place the power is cut, and a
 you can't pass the car before you in grid order. `bash tools/ai-check/run.sh final` runs it with 100 cars, with and
 without a player driving flat out against the limiter.
 
-The camera starts on the broadcast when the race comes from the career, and on the chase camera when the scene runs on
-its own. `C` cycles the car cameras: TV, chase, bonnet and bumper. The TV camera is coverage locked to the car: a second
+After the flag come the cool-down lap (`Stages/CooldownStage.cs`), then two podium ceremonies (`Podium/PodiumStage.cs`):
+the overall top three, then your class's, skipped when it is the same three cars or you have no car in the race. The
+podium stands all race on the race offices' front, a balcony over the pit lane with three steps under a canopy
+(`Podium/PodiumPlan.cs`, `Podium/PodiumBuilder.cs`). A ceremony (`Podium/PodiumShow.cs`) is a timeline: the drivers
+walk out of the doorway and up onto their steps, each lead driver is handed the trophy and lifts it, then takes the
+champagne from the ice bucket, shakes it and sprays it over the others and the podium teams' crews in the fast lane
+below, and confetti falls. Every car still on its cool-down lap is put in its box first. The people are Team HQ's crew
+body as live rigs, posed from its clips with their arms reaching for the trophy and the bottle (`Podium/Podium.cs`).
+Each person has their own pace, timing, lean and mark, so nobody moves in step. The crowd below swells with how many
+are cheering and roars at each moment; the corks pop, the champagne fizzes and the confetti cannon booms
+(`Podium/PodiumSound.cs`). The corks, fizz and confetti are synthesised by `python3 tools/podium/sounds.py`.
+The race summary opens once the last ceremony ends or is skipped (`RaceDirector.ShowSummary`). After changing the
+podium, run `bash tools/podium/run.sh [folder]`: it builds the podium on the real pit building and plays a ceremony
+for every line-up of one to three drivers in each place, checking it sits on the offices, nobody walks into anybody,
+every hand reaches what it holds, the crowd stands clear of the parked cars and every shot's camera is clear. With a
+folder it writes a preview there that plays the ceremony through its own camera.
+
+The camera starts on the chase camera. The broadcast has no way in for now, while the mode is rethought: its `V` toggle
+is off. Do not remove the broadcast mode or its director, which stay in the game to come back. `C` cycles the car cameras: TV, chase, bonnet and bumper. The TV camera is coverage locked to the car: a second
 director with `Lock` set shows mostly trackside shots and pans, a helicopter shot now and then, and an onboard about one
-shot in ten (roll hoop, driver's seat or wing mirror, in turn, never down at the bumpers). `V` puts the broadcast on, and `V` or `C` takes it off. Holding `B` looks back on every
+shot in ten (roll hoop, driver's seat or wing mirror, in turn, never down at the bumpers). Holding `B` looks back on every
 camera. While you are not driving your own car, the car camera is yours to move and still rides along with the car. Hold
 the right mouse button and drag to look, `W` `A` `S` `D` move, `Q` and `E` go down and up, `Shift` is 5x faster and the
 wheel changes speed. On the TV camera the drag orbits the car and the wheel zooms, within each shot. Switching camera or
-car, or taking the wheel, puts the view back. Camera in the race's pause menu sets the chase, bonnet and bumper cameras'
+car, or taking the wheel, puts the view back. `Backspace` comes back to your own car. Camera in the race's pause menu sets the chase, bonnet and bumper cameras'
 field of view, position and tilt (`Visuals/CameraPresets.cs`). The bonnet camera's position is moved from each car's own
 bonnet spot, just ahead of the windscreen's base and over the bonnet, measured from its model (`CarCameraSpots.cs`), with the race seen through the camera being tuned beside the
 panel, changing as each slider moves. On the broadcast the director (`BroadcastDirector.cs`) picks
@@ -135,6 +153,11 @@ helicopter, onboard and pit lane shots.
 The director's shots carry the broadcast graphics (`BroadcastGraphics.cs`): a battle strip with the gap in a
 fight, a driver strip the first time a car is on air in a stint, a pit timer with fuel, tyres and driver
 change lit as each is done, and the track map during helicopter shots, or always with Track map on in the settings.
+
+Off the broadcast, the driver card (`DriverCard.cs`) sits bottom left under the timing tower, which stops short for it: the driver now in the car
+the cameras ride with, their flag, name and overall (the average of their five stats, as in the menus), over their
+five stats. While that car rolls through the pit lane to a stop that changes the driver, a strip above it, tabbed NEXT, shows who
+gets in (`NextDriverWatch` in `DriverFacts.cs`). `bash tools/driver-card-check/run.sh` checks both outside Unity.
 
 `T` opens live timing while the AI drives your car (`LiveTiming.cs`), with the race at 16x behind it: every
 car in race order by class, your car's onboard and the track map, its driver, fuel, tyres and condition with
@@ -162,8 +185,9 @@ leaving the track and within 5% of its predicted time, that Pace, Consistency an
 say, and that overcooked corners cost time. `run.sh glide` checks gliding: every model's gliding lap
 is within 1.5% of its driven one, a gliding mistake costs about what a driven one does, cars switch
 between gliding and physics without leaving the track or touching, 100 gliding cars at 16x keep their
-pace, gliding cars still pit and start rolling with the pack, and the pit lane start sends all 100
-cars out cleanly (`run.sh pitstart` for the same with a line per car). `StandInCar.cs` copies `CarController`'s formulas, so keep
+pace, and gliding cars still pit and start rolling with the pack. `run.sh garagestart` sends 100 cars out
+of their garages into formation behind the pace car (`GARAGE_GLIDE=1` with the far cars gliding), and
+`run.sh garageslow` does it with a slow player in slot 40, checking the cars behind queue without touching. `StandInCar.cs` copies `CarController`'s formulas, so keep
 it in step when those change.
 
 Driving: left and right arrows steer, up accelerates, down brakes (hold it at a standstill to

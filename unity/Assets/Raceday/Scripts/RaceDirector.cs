@@ -6,7 +6,8 @@ namespace TarmacGauntlet.Raceday
 {
     /// <summary>
     /// Keeps the race for the career (<see cref="RaceDay"/>). Each time a car crosses the line it
-    /// logs the lap, which ages the car and may give it an issue or retire it: issues cut the car's
+    /// teaches the stint's fuel and tyre estimate the lap just driven, unless the car was in the pit lane
+    /// (<see cref="Consumables.Stint"/>), and logs the lap, which ages the car and may give it an issue or retire it: issues cut the car's
     /// power, grip, fuel efficiency and tyre life until a stop fixes them, and a retired car limps to
     /// its box, or stops beside the track after a fatal crash (<see cref="Retire"/>). After a stop's driver change, the new driver drives at their own pace.
     /// The driver at the wheel tires lap by lap (<see cref="CarRaceLog.Fatigue"/>), which slows the car until a stop puts in someone fresh. When the
@@ -42,7 +43,7 @@ namespace TarmacGauntlet.Raceday
         public RaceTower Tower;
 
         public bool Finished { get; private set; }
-        /// <summary>True once the race is under way: from the green, or the first car out of the pit lane.</summary>
+        /// <summary>True once the race is under way: from the green.</summary>
         public bool Started => started;
         /// <summary>Seconds since the green.</summary>
         public float Elapsed => started ? Time.time - startTime : 0f;
@@ -54,6 +55,8 @@ namespace TarmacGauntlet.Raceday
         private CarController[] controllers;
         private int[] counted;
         private int[] driverShown;
+        /// <summary>True for a car that has been in the pit lane since it last crossed the line: that lap teaches its stint nothing.</summary>
+        private bool[] pitLap;
         private float[] crossed;
         private bool started;
         private float startTime;
@@ -123,6 +126,7 @@ namespace TarmacGauntlet.Raceday
             counted = new int[Cars.Length];
             driverShown = new int[Cars.Length];
             crossed = new float[Cars.Length];
+            pitLap = new bool[Cars.Length];
             for (int i = 0; i < Cars.Length; i++) controllers[i] = Cars[i].GetComponent<CarController>();
         }
 
@@ -153,6 +157,7 @@ namespace TarmacGauntlet.Raceday
                 if (log.Retired || log.Flagged) continue;
                 Consumables supplies = controllers[i].Supplies;
                 log.FuelLeft = supplies.Fuel;
+                pitLap[i] |= Cars[i].InPitLane;
                 // Until the first lap is in, follow the count down too: the formation lap comes off it at the green.
                 if (log.Laps == 0 && Cars[i].Laps < counted[i]) counted[i] = Cars[i].Laps;
                 if (Cars[i].Laps > counted[i])
@@ -160,6 +165,8 @@ namespace TarmacGauntlet.Raceday
                     counted[i] = Cars[i].Laps;
                     float lap = Time.time - crossed[i];
                     crossed[i] = Time.time;
+                    supplies.Stint.Line(supplies.Fuel, supplies.Wear, !pitLap[i]);
+                    pitLap[i] = Cars[i].InPitLane;
                     Day.CompleteLap(i, Time.time - startTime, lap, supplies.Mode, timeUp);
                     supplies.Effects = log.Effects;
                     if (log.Retired)
@@ -276,13 +283,65 @@ namespace TarmacGauntlet.Raceday
                 Debug.LogException(e);
                 return;
             }
-            ParkForSummary();
+            // After the flag the podium plays first, and opens the summary when it is done (ShowSummary).
+            if (HoldSummary && timeUpAt >= 0f) return;
+            ShowSummary();
         }
+
+        /// <summary>
+        /// True when the stages after the flag play the podium before the race summary: a race settled once its time is
+        /// up waits for <see cref="ShowSummary"/>. A race settled before then, the player retiring, opens it at once.
+        /// </summary>
+        [NonSerialized] public bool HoldSummary;
+
+        /// <summary>Parks the player's car for the race summary and opens it. Once only.</summary>
+        public void ShowSummary()
+        {
+            if (!Finished || summaryShown || RaceWeekend.Summary == null) return;
+            summaryShown = true;
+            ParkForSummary();
+            RaceWeekend.ShowSummary();
+        }
+
+        private bool summaryShown;
 
         /// <summary>
         /// Sets the scene for the race summary: the player's car parked in its box, seen from across the pit lane, at
         /// normal speed, with the race views, timing tower and driving HUD gone.
         /// </summary>
+        /// <summary>
+        /// Every car still driving put in its box and held there, out of the pit lane's traffic: the podium's crowd
+        /// stands in the fast lane. A car with no box is taken off the track. Cars already parked, or stopped out on the
+        /// track, stay where they are.
+        /// </summary>
+        public void ParkAll()
+        {
+            if (Cars == null || controllers == null) return;
+            for (int i = 0; i < Cars.Length; i++)
+            {
+                if (Cars[i] == null || !Cars[i].enabled || controllers[i] == null || controllers[i].Hold) continue;
+                if (Cars[i].Pits != null && Cars[i].Garage >= 0) PlaceInBox(i);
+                else Cars[i].gameObject.SetActive(false);
+            }
+        }
+
+        /// <summary>Puts car i in its box, held, its driver off: the box, the way into the garage, and the way down the lane.</summary>
+        private (Vector3 box, Vector3 toGarage, Vector3 along) PlaceInBox(int i)
+        {
+            PitLane pits = Cars[i].Pits;
+            int garage = Cars[i].Garage;
+            Vector3 box = pits.BoxPoint(garage);
+            Vector3 toGarage = pits.LaneLeft(pits.BoxLane[garage]);
+            var along = new Vector3(toGarage.z, 0f, -toGarage.x);   // down the lane, the way cars drive it
+            if (Drivers[i] != null) Drivers[i].enabled = false;
+            Cars[i].enabled = false;   // out of every other car's traffic
+            CarController car = controllers[i];
+            car.PlaceAt(box, along);
+            car.Hold = true;
+            car.InputEnabled = false;
+            return (box, toGarage, along);
+        }
+
         private void ParkForSummary()
         {
             Time.timeScale = 1f;
@@ -300,18 +359,7 @@ namespace TarmacGauntlet.Raceday
             for (int i = 0; i < Day.Cars.Count; i++) if (Day.Cars[i].Car.Player) me = i;
             if (me < 0 || Cars[me] == null || Cars[me].Pits == null || Cars[me].Garage < 0) return;
 
-            PitLane pits = Cars[me].Pits;
-            int garage = Cars[me].Garage;
-            Vector3 box = pits.BoxPoint(garage);
-            Vector3 toGarage = pits.LaneLeft(pits.BoxLane[garage]);
-            var along = new Vector3(toGarage.z, 0f, -toGarage.x);   // down the lane, the way cars drive it
-
-            Drivers[me].enabled = false;
-            Cars[me].enabled = false;   // out of every other car's traffic
-            CarController car = controllers[me];
-            car.PlaceAt(box, along);
-            car.Hold = true;
-            car.InputEnabled = false;
+            (Vector3 box, Vector3 toGarage, Vector3 along) = PlaceInBox(me);
 
             if (cam == null) return;
             cam.fieldOfView = 34f;

@@ -92,6 +92,9 @@ namespace TarmacGauntlet.Raceday
             if (Racer == null) Begin();
         }
 
+        /// <summary>The AI has just taken the wheel in the pit lane: it carries on the stop from where the car is (<see cref="AiRacer.TakeOverInPits"/>).</summary>
+        public void TakeOverInPits(int k, PitService service) => Racer?.TakeOverInPits(k, service);
+
         private void OnEnable()
         {
             if (car != null) car.AiDriving = true;

@@ -3,8 +3,8 @@ using UnityEngine;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// Runs a start for the AI cars: the rolling start (<see cref="RaceStart"/>) or the pit lane start
-    /// (<see cref="PitStart"/>). Each AI car asks it every step how to drive until the start is over.
+    /// Runs a start for the AI cars: the rolling start (<see cref="RaceStart"/>). Each AI car asks it every step
+    /// how to drive until the start is over.
     /// </summary>
     public abstract class Starter : MonoBehaviour
     {
