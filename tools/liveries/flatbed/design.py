@@ -44,8 +44,11 @@ SILL_Y = 0.27              # and below this, all round
 GLASS = (-1.40, 1.24, 0.80, 0.22)   # top: black greenhouse, z from, z to, half width, corner radius
 DOOR = (0.80, -0.33)
 WING_Z = -0.42             # sides: chevrons behind this (the door's rear shut line is at -0.33)
-TAIL_TOP = 1.10            # rear: chevrons up to the rear glass's foot
-DECK_Z = -1.46             # top: chevrons on the tail deck behind this
+CORNER_Z = -1.55           # sides: solid black behind this, round the tail's corners
+TAIL = (0.98, 0.52)        # rear: chevrons below this height and inside this half width, black round them
+DECK_Z = -1.46             # top: the tail deck behind this is black
+# Where two views meet round the tail, both are solid black, so the sides' stripes and the tail's
+# chevrons never blend into a cross-hatch.
 BAND = 0.12                # chevron stripe width
 
 
@@ -89,16 +92,17 @@ def ground(view, meta, wing_chevrons):
         black = np.maximum(soft(y - BELT_Y), soft(SILL_Y - y))
         if wing_chevrons:
             band = soft(WING_Z - z) * soft(y - SILL_Y) * soft(BELT_Y - y)
-            black = np.maximum(black, band * stripes(y + z))
+            black = np.maximum(black, band * np.maximum(stripes(y + z), soft(CORNER_Z - z)))
     elif view == "top":
         z0, z1, hw, r = GLASS
         black = soft(rounded_box(z, x, z0, z1, hw, r))
-        black = np.maximum(black, soft(DECK_Z - z) * stripes(np.abs(x) - z))
+        black = np.maximum(black, soft(DECK_Z - z))
     elif view == "front":
         black = soft(SILL_Y - y)
     else:
-        black = np.maximum(soft(SILL_Y - y), soft(y - TAIL_TOP) * 0)
-        black = np.maximum(black, soft(TAIL_TOP - y) * soft(y - SILL_Y) * stripes(y + np.abs(x)))
+        top, hw = TAIL
+        inside = soft(top - y) * soft(hw - np.abs(x))
+        black = np.maximum(soft(SILL_Y - y), 1 - inside + inside * stripes(y + np.abs(x)))
     col = YELLOW_RGB * (1 - black[..., None]) + INK_RGB * black[..., None]
     return np.concatenate([col, np.ones(shape + (1,))], -1)
 
@@ -147,8 +151,7 @@ def common(lv, wing_chevrons):
     meta = json.loads((VIEWS / "views.json").read_text())
     for view in meta["views"]:
         lv.image(view, uri(ground(view, meta, wing_chevrons)))
-    # Bonnet: the number, read from the nose. Tail: the name on a yellow plate in the chevrons, under the boot lid.
-    lv.number("top", (0, 0, 1.58), 0.50, 0.28, INK, rotate=-90)
+    # Tail: the name on a yellow plate in the chevrons, under the boot lid.
     u, v = lv.uv("rear", (0, 0.48, 0))
     lv.raw("rear", f'<rect x="{u - 0.30:.4f}" y="{v - 0.13:.4f}" width="0.60" height="0.26" rx="0.03" '
                    f'fill="{YELLOW}" stroke="{INK}" stroke-width="0.02"/>')
@@ -164,8 +167,9 @@ def letters_livery():
     for view in ("left", "right"):
         shaded(lv, view, "FLATBED", Livery._side(view, mid, 0.79), 0.12)
         shaded(lv, view, "LEGENDS", Livery._side(view, mid, 0.61), 0.12)
-        lv.mark(view, marks / "badge.svg", Livery._side(view, 1.28, 0.81), 0.17)
     lv.side_number(mid, 0.40, 0.44, 0.24, INK)
+    # Bonnet: the badge, read from the nose. The number is on the doors only.
+    lv.mark("top", marks / "badge.svg", (0, 0, 1.58), 0.40, rotate=-90)
     return lv
 
 
@@ -173,6 +177,7 @@ def badge_livery():
     lv = Livery(VIEWS / "views.json", YELLOW)
     marks = write_marks()
     common(lv, wing_chevrons=False)
+    lv.number("top", (0, 0, 1.58), 0.50, 0.28, INK, rotate=-90)
     mid = (DOOR[0] + DOOR[1]) / 2
     for view in ("left", "right"):
         lv.mark(view, marks / "badge-blank.svg", Livery._side(view, mid, 0.58), 0.56)
