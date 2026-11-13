@@ -199,6 +199,8 @@ namespace TarmacGauntlet.Raceday
             var cars = new CarController[field.Length];
             var racing = new RaceCar[field.Length];
             var drivers = new AiDriver[field.Length];
+            // Each car's lap at its starting driver's limit, for the race preview's lap times and favourites.
+            var predicted = new float[field.Length];
             if (start == StartMode.PitLane) pitLaneStart = new PitLaneStart(pits, line, field.Length);
             Starter starter = start == StartMode.Rolling ? new GameObject("Race start").AddComponent<RaceStart>()
                 : start == StartMode.PitLane ? new GameObject("Pit lane start").AddComponent<PitStart>()
@@ -223,7 +225,9 @@ namespace TarmacGauntlet.Raceday
                 car.Spec.Stats = stats;
                 DriverStats starter0 = grid[i].Lineup[0].Stats;
                 float pace = (float)starter0.Pace;
-                car.Supplies = Consumables.For(car.Spec, new SpeedProfile(line, car.Spec, AiPilot.LimitFor(pace)), (float)starter0.Smoothness);
+                var profile = new SpeedProfile(line, car.Spec, AiPilot.LimitFor(pace));
+                predicted[i] = profile.LapTime;
+                car.Supplies = Consumables.For(car.Spec, profile, (float)starter0.Smoothness);
                 car.Supplies.Log = day.Cars[i];
                 car.Supplies.PowerTrim = model.Power > 0 ? (float)(stats.Power / model.Power) : 1f;
                 car.Supplies.GripTrim = (float)((1.0 + 0.006 * stats.Handling) / (1.0 + 0.006 * model.Handling));
@@ -424,6 +428,12 @@ namespace TarmacGauntlet.Raceday
             // The stages before the green and after the flag, each skipped by holding Enter. Stages are added here in order.
             intro = new GameObject("Intro").AddComponent<StageSequence>();
             intro.Keys = keys;
+            BroadcastIntro preview = new GameObject("Race preview").AddComponent<BroadcastIntro>();
+            preview.Circuit = circuit;
+            preview.Cameras = views;
+            preview.Tower = tower;
+            preview.Facts = IntroFacts.From(setup, predicted);
+            intro.Add(preview);
             outro = new GameObject("Outro").AddComponent<StageSequence>();
             outro.Keys = keys;
             Lap("race");
