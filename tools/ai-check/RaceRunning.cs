@@ -136,13 +136,13 @@ static partial class Check
         if (verbose) foreach (Contact c in s.Contacts) Console.WriteLine("  contact " + Describe(c));
     }
 
-    static void RollingStartCheck(int cars, bool verbose, bool glide = false)
+    static void RollingStartCheck(int cars, bool verbose, bool glide = false, bool garages = false, int slowPlayer = -1)
     {
         List<string> order = SceneField();
         // As the game's scene: quickest first, the player's car (the quickest) at the back.
         if (QuickestFirst) { order.Reverse(); order.Add(order[0]); order.RemoveAt(0); }
         var entries = order.Take(cars).Select(m => (m, 1f)).ToList();
-        var s = new Session(circuit, line, entries, rolling: true, LineFor, int.TryParse(Environment.GetEnvironmentVariable("START_SEED"), out int startSeed) ? startSeed : 11);
+        var s = new Session(circuit, line, entries, rolling: true, LineFor, int.TryParse(Environment.GetEnvironmentVariable("START_SEED"), out int startSeed) ? startSeed : 11, garages: garages) { SlowPlayer = slowPlayer };
         if (glide) Watch(s, s.Cars[s.Cars.Count - 1]);
         var watch = System.Diagnostics.Stopwatch.StartNew();
         float worstSlip = 0f;
@@ -172,7 +172,8 @@ static partial class Check
             if (verbose && (int)(s.Time / Session.Dt) % 1000 == 0)
             {
                 SessionCar a = s.Cars[0], z = s.Cars[s.Cars.Count - 1];
-                Console.WriteLine($"  {Session.Clock(s.Time)} {s.Start.State} leader {a.Distance:0} m {a.Car.Speed * 3.6f:0} km/h, last {a.Distance - z.Distance:0} m back {z.Car.Speed * 3.6f:0} km/h, contacts {s.Contacts.Count}");
+                string g = garages && !s.GaragesDone ? $", {s.Leaving.Count(l => l == 0)} parked, {s.Leaving.Count(l => l == 1)} rolling out, {s.OutAtTime.Count(t => t >= 0f)} out" : "";
+                Console.WriteLine($"  {Session.Clock(s.Time)} {s.Start.State} leader {a.Distance:0} m {a.Car.Speed * 3.6f:0} km/h, last {a.Distance - z.Distance:0} m back {z.Car.Speed * 3.6f:0} km/h, contacts {s.Contacts.Count}{g}");
             }
         }
         var problems = new List<string>();
@@ -192,7 +193,28 @@ static partial class Check
             if (c.OffTime >= 0f) problems.Add($"{s.Name(c)} left the track at {Session.Clock(c.OffTime)} at {c.OffWhere:0} m");
         }
         float lastBack = s.Cars[0].Distance - s.Cars.Min(c => c.Distance);
-        Report($"{(glide ? "gliding rolling start" : "rolling start")} ({cars} cars{(glide ? $", {s.MostOnPhysics} on physics at most, {s.Cars.Sum(c => c.Handovers)} switches, {s.GhostOverlaps} overlaps while gliding" : "")}: green at {Session.Clock(Math.Max(s.GreenTime, 0f))}, worst place {worstSlip:0} m out, {s.Contacts.Count - Math.Max(contactsAtGreen, 0)} contacts from the green to {Session.Clock(Math.Max(s.Time, 0f))}, {s.Contacts.Count(c => c.Speed > 1f)} over 1 m/s, {(clearAt >= 0f ? $"{back.Model} at the back clear of E and F {clearAt - s.GreenTime:0} s after the green" : $"{back.Model} at the back not clear of E and F")}, {s.CrawlSteps * Session.Dt:0} s crawling on track, {s.CrawlBrakeSteps * Session.Dt:0} s of it braking for a car ahead, field {lastBack:0} m long, {watch.Elapsed.TotalSeconds:0} s to run)", problems);
+        string garageNote = "";
+        if (garages)
+        {
+            if (!s.GaragesDone) problems.Add($"the field never all got out of the garages: {s.Leaving.Count(l => l < 2)} still in them");
+            float lastLaunch = s.Launched.Max(), lastJoin = s.Joined.Max();
+            garageNote = $"out of the garages: last car left at {lastLaunch:0.0} s, all on their routes by {lastJoin:0.0} s, all out of the pit lane by {Session.Clock(Math.Max(s.GaragesDoneAt, 0f))}; ";
+            if (verbose)
+                foreach (SessionCar c in s.Cars)
+                    Console.WriteLine($"  {s.Name(c)} garage {c.Garage}: left {s.Launched[c.Slot]:0.0} s, on its route {s.Joined[c.Slot]:0.0} s, out {Session.Clock(Math.Max(s.OutAtTime[c.Slot], 0f))}");
+        }
+        if (slowPlayer >= 0)
+        {
+            garageNote += $"slot {slowPlayer} out of its garage at {s.Launched[slowPlayer]:0} s and down the lane at {Session.SlowSpeed * 3.6f:0} km/h, out {Session.Clock(Math.Max(s.OutAtTime[slowPlayer], 0f))}, slot {slowPlayer + 1} out {Session.Clock(Math.Max(s.OutAtTime[slowPlayer + 1], 0f))}; ";
+            // The formation lap cuts the field into place once the drive out is over (FinalFormation), so only the
+            // drive out counts: no contacts while any car is still on its way out.
+            problems.Clear();
+            if (!s.GaragesDone) problems.Add("the field never all got out of the garages");
+            var during = s.Contacts.Where(c => c.Time < s.GaragesDoneAt).ToList();
+            if (during.Count > 0) problems.Add($"{during.Count} contacts on the way out, first {Describe(during[0])}");
+            garageNote += $"{during.Count} contacts on the way out; ";
+        }
+        Report($"{(garages ? "garage start" : glide ? "gliding rolling start" : "rolling start")} ({garageNote}{cars} cars{(glide ? $", {s.MostOnPhysics} on physics at most, {s.Cars.Sum(c => c.Handovers)} switches, {s.GhostOverlaps} overlaps while gliding" : "")}: green at {Session.Clock(Math.Max(s.GreenTime, 0f))}, worst place {worstSlip:0} m out, {s.Contacts.Count - Math.Max(contactsAtGreen, 0)} contacts from the green to {Session.Clock(Math.Max(s.Time, 0f))}, {s.Contacts.Count(c => c.Speed > 1f)} over 1 m/s, {(clearAt >= 0f ? $"{back.Model} at the back clear of E and F {clearAt - s.GreenTime:0} s after the green" : $"{back.Model} at the back not clear of E and F")}, {s.CrawlSteps * Session.Dt:0} s crawling on track, {s.CrawlBrakeSteps * Session.Dt:0} s of it braking for a car ahead, field {lastBack:0} m long, {watch.Elapsed.TotalSeconds:0} s to run)", problems);
         if (verbose) foreach (Contact c in s.Contacts) Console.WriteLine("  contact " + Describe(c));
     }
 

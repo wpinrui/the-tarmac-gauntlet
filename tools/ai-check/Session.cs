@@ -108,7 +108,7 @@ sealed class Session
     /// <c>rolling</c> it starts behind the pace car; with <c>pitLane</c> it queues in the pit lane
     /// and leaves a car at a time; otherwise it races from the grid at once.
     /// </summary>
-    public Session(Circuit circuit, RacingLine minimum, IList<(string Model, float Fuel)> entries, bool rolling, Func<string, RacingLine> lineFor, int seed = 11, bool pitLane = false)
+    public Session(Circuit circuit, RacingLine minimum, IList<(string Model, float Fuel)> entries, bool rolling, Func<string, RacingLine> lineFor, int seed = 11, bool pitLane = false, bool garages = false)
     {
         this.circuit = circuit;
         pits = new PitLane(circuit);
@@ -124,7 +124,7 @@ sealed class Session
             float smoothness = 30f + 60f * (float)rng.NextDouble();
             var supplies = Consumables.For(spec, new SpeedProfile(minimum, spec, AiPilot.LimitFor(pace)), smoothness);
             supplies.Fuel = supplies.Capacity * entries[i].Fuel;
-            int garage = i % pits.Garages;
+            int garage = garages ? GarageStart.GarageFor(i, pits.Garages) : i % pits.Garages;
             var pilot = new AiPilot(line, spec, pace, consistency, safety, i + 1);
             var car = new SessionCar
             {
@@ -164,6 +164,138 @@ sealed class Session
         PaceCar = new StandInCar(paceSpec, columns[0]) { Pits = pits };
         PaceCar.PlaceAt(circuit.IndexOf(circuit.Data.grid.slots[0].d + 40f), RollingStart.ColumnOf(0));
         paceDriver = new AiPilot(columns[0], paceSpec, 100f, 100f, 100f, 1, lanes: false, maxSpeed: Start.Speeds);
+        if (garages) BeginGarages();
+        int kp = Math.Max(PaceCar.TrackIndex, 0);
+        paceLaps = kp * circuit.Step > circuit.Lap * 0.5f ? -1 : 0;
+        paceLast = kp;
+        paceDistance = paceLaps * circuit.Lap + circuit.DistanceAt(kp, PaceCar.Position);
+    }
+
+    // ---------------------------------------------------------------- the garage start, as RaceStart runs it
+
+    /// <summary>The drive out of the garages, or null.</summary>
+    public GarageStart Garages;
+    /// <summary>True once every car is out of the pit lane on its column.</summary>
+    public bool GaragesDone;
+    public PitComplex Complex;
+    /// <summary>Per car: 0 parked, 1 rolling out of the garage, 2 on its route; and when it launched, joined its route and got out.</summary>
+    public int[] Leaving;
+    public float[] Launched, Joined, OutAtTime;
+    public float GaragesDoneAt = -1f;
+    /// <summary>A slot driven as a player might: out of its garage late and down the pit lane at a crawl, or -1.</summary>
+    public int SlowPlayer = -1;
+    public const float SlowSpeed = 8f, SlowLeaves = 20f;
+    public float[] Along;
+    float paceAlong;
+    int[] progress;
+    AiPilot[] lanes;
+
+    void BeginGarages()
+    {
+        GarageData[] gd = circuit.Data.pit.garages;
+        var floors = new float[gd.Length];
+        for (int g = 0; g < gd.Length; g++) floors[g] = gd[g].y;
+        Complex = new PitComplex(circuit, floors);
+        var specs = new List<CarSpec>();
+        var garageOf = new int[Cars.Count];
+        foreach (SessionCar c in Cars)
+        {
+            Vector3 p = GarageStart.Parked(Complex, c.Garage, out Vector3 forward);
+            c.Car.Wake(p, forward, 0f, 0f, 0f);
+            int k = Math.Max(c.Car.TrackIndex, 0);
+            c.Last = k;
+            c.Laps = k * circuit.Step > circuit.Lap * 0.5f ? -1 : 0;
+            specs.Add(c.Car.Spec);
+            garageOf[c.Slot] = c.Garage;
+        }
+        Garages = new GarageStart(pits, Complex, columns, garageOf, specs, Start.Speeds);
+        Along = new float[Cars.Count];
+        if (Environment.GetEnvironmentVariable("GARAGE_PATHS") != null)
+            for (int i = 1; i < Cars.Count; i++)
+            {
+                Vector3[] a = Garages.Path(i), b = Garages.Path(i - 1);
+                float sync = float.MaxValue, any = float.MaxValue;
+                for (int p = 0; p < a.Length; p++)
+                {
+                    if (p < b.Length) { float dx = a[p].x - b[p].x, dz = a[p].z - b[p].z; sync = Math.Min(sync, (float)Math.Sqrt(dx * dx + dz * dz)); }
+                    for (int q = 0; q < b.Length; q += 2) { float dx = a[p].x - b[q].x, dz = a[p].z - b[q].z; any = Math.Min(any, (float)Math.Sqrt(dx * dx + dz * dz)); }
+                }
+                Console.WriteLine($"  path {i} garage {Cars[i].Garage}: {a.Length} pts, nearest car ahead's path in step {sync:0.0} m, ever {any:0.0} m, joins {Garages.Join(i)}");
+            }
+        Leaving = new int[Cars.Count];
+        Launched = Enumerable.Repeat(-1f, Cars.Count).ToArray();
+        Joined = Enumerable.Repeat(-1f, Cars.Count).ToArray();
+        OutAtTime = Enumerable.Repeat(-1f, Cars.Count).ToArray();
+        progress = new int[Cars.Count];
+        lanes = new AiPilot[Cars.Count];
+        int kp = Garages.PlaceSample(-1);
+        RacingLine way = Garages.PaceRoute;
+        PaceCar.Wake(way.Point[kp], way.Tangent[kp], 0f, 0f, 0f);
+        float[] limits = pits.Limits();
+        for (int j = 0; j < limits.Length; j++) limits[j] = Math.Min(limits[j], Start.Speeds[j] > 0f ? Math.Max(Start.Speeds[j], GarageStart.RoadSpeed) : limits[j]);
+        paceDriver = new AiPilot(way, PaceCar.Spec, 100f, 100f, 100f, 1, lanes: false, maxSpeed: limits);
+        paceDriver.Relocate(kp);
+        laneLimits = pits.Limits();
+    }
+
+    /// <summary>RaceStart.Steers and Brief's garage part for one car. True when the start drives the car itself this step.</summary>
+    bool GarageCar(SessionCar s, out float throttle, out float brake, out float steer)
+    {
+        throttle = brake = steer = 0f;
+        int i = s.Slot;
+        AiRacer r = s.Racer;
+        if (Leaving[i] == 0)
+        {
+            bool late = i == SlowPlayer && Time < SlowLeaves;
+            if (late || !Garages.Launch(i) || !Garages.JoinClear(i, Along, Leaving.Select(l => l == 2).ToArray())) { brake = 1f; s.Car.Hold = true; return true; }
+            Leaving[i] = 1;
+            Launched[i] = Time;
+            s.Car.Hold = false;
+        }
+        if (Leaving[i] == 1)
+        {
+            if (!GarageStart.Roll(Garages.Path(i), ref progress[i], s.Car.Position, s.Car.Forward, s.Car.Speed, s.Car.Spec, out AiPilot.Controls c))
+            {
+                throttle = c.Throttle; brake = c.Brake; steer = c.Steer;
+                return true;
+            }
+            var lane = new AiPilot(Garages.Route[i], s.Car.Spec, r.Pilot.Pace, 100f, 100f, s.Id + 1, lanes: false, maxSpeed: laneLimits);
+            lane.Relocate(Garages.Join(i));
+            lanes[i] = lane;
+            Leaving[i] = 2;
+            Joined[i] = Time;
+            Along[i] = Garages.Along(i, Garages.Join(i), s.Car.Position, Garages.Route[i]);
+        }
+        Along[i] = Garages.Along(i, lanes[i].Index, s.Car.Position, lanes[i].Line);
+        RacingLine way = Garages.Way(i, Along[i]);
+        if (lanes[i].Line != way && lanes[i].Index >= 0)
+        {
+            int k = lanes[i].Index;
+            lanes[i] = new AiPilot(way, s.Car.Spec, r.Pilot.Pace, 100f, 100f, s.Id + 1, lanes: false);
+            lanes[i].Relocate(k);
+        }
+        r.Formation = lanes[i];
+        r.InFormation = true;
+        // RaceStart.FollowOut: anything on its way ahead, the pace car included.
+        int myK = lanes[i].Index >= 0 ? lanes[i].Index : Garages.Join(i);
+        bool Close(float at, Vector3 p) { float g = Garages.Between(Along[i], at); return g > 0f && g < 80f && Garages.InWay(i, myK, p, Along[i]); }
+        float follow = Close(paceAlong, PaceCar.Position) ? Garages.Behind(Along[i], s.Car.Speed, s.Car.Spec, paceAlong, PaceCar.Speed, PaceCar.Spec) : float.PositiveInfinity;
+        for (int j = 0; j < Cars.Count; j++)
+            if (j != i && Leaving[j] == 2 && Close(Along[j], Cars[j].Car.Position)) follow = Math.Min(follow, Garages.Behind(Along[i], s.Car.Speed, s.Car.Spec, Along[j], Cars[j].Car.Speed, Cars[j].Car.Spec));
+        r.FormationCap = i == SlowPlayer ? Math.Min(SlowSpeed, follow) : Garages.Cap(i, Along[i], follow);
+        if (OutAtTime[i] < 0f && Garages.Out(Along[i])) OutAtTime[i] = Time;
+        if (trace == s.Id && (int)(Time / Dt) % TraceEvery == 0)
+            Console.WriteLine($"    G {Clock(Time)} #{s.Id} along {Along[i]:0.0} place {Garages.Place(i):0.0} cap {Math.Min(r.FormationCap, 99f) * 3.6f:0} speed {s.Car.Speed * 3.6f:0} follow {Math.Min(follow, 99f) * 3.6f:0} rate {Garages.RateNow:0.00} lim {s.Car.SpeedLimit * 3.6f:0}");
+        return false;
+    }
+
+    void EndGarages()
+    {
+        GaragesDone = true;
+        GaragesDoneAt = Time;
+        int k = Math.Max(paceDriver.Index, 0);
+        paceDriver = new AiPilot(columns[0], PaceCar.Spec, 100f, 100f, 100f, 1, lanes: false, maxSpeed: Start.Speeds);
+        paceDriver.Relocate(k);
     }
 
     void GridPlace(int i, out float d, out float lateral)
@@ -210,7 +342,17 @@ sealed class Session
     public void Step()
     {
         Measure();
-        float[] caps = Start != null && Cars.Any(c => Start.Holds(c.Laps)) ? StartStep() : null;
+        bool garagePhase = Garages != null && !GaragesDone;
+        if (garagePhase)
+        {
+            Start.Tick(Dt);
+            Garages.Tick(Dt);
+            paceAlong = Garages.Along(-1, paceDriver.Index, PaceCar.Position, paceDriver.Line);
+            paceDriver.SpeedCap = Garages.Cap(-1, paceAlong, float.PositiveInfinity);
+            CountPace();
+            if (Cars.All(c => Leaving[c.Slot] == 2 && Garages.Out(Along[c.Slot]))) { EndGarages(); garagePhase = false; }
+        }
+        float[] caps = !garagePhase && Start != null && Cars.Any(c => Start.Holds(c.Laps)) ? StartStep() : null;
         lodClock += Dt;
         if (Physics != null && lodClock >= 0.25f)
         {
@@ -234,8 +376,18 @@ sealed class Session
             SessionCar s = Cars[i];
             AiRacer r = s.Racer;
             StandInCar car = s.Car;
-            bool held = caps != null && Start.Holds(s.Laps);
-            if (PitStart != null) BriefPitStart(s);
+            bool held = (caps != null || garagePhase) && Start.Holds(s.Laps);
+            if (garagePhase)
+            {
+                if (GarageCar(s, out float gt, out float gb, out float gs))
+                {
+                    car.Step(Dt, gt, gb, gs);
+                    if (s.InPitLane) inLane++;
+                    Watch(s, default);
+                    continue;
+                }
+            }
+            else if (PitStart != null) BriefPitStart(s);
             else if (held)
             {
                 if (!formation.TryGetValue(s.Id, out AiPilot f))
@@ -423,10 +575,8 @@ sealed class Session
                 }
             }
             paceDriver.SpeedCap = Start.PaceCarCap;
+            CountPace();
             int i = Math.Max(paceDriver.Index, 0);
-            if (paceLast > circuit.Count - 50 && i < 50) paceLaps++;
-            paceLast = i;
-            paceDistance = paceLaps * circuit.Lap + i * circuit.Step;
             if (paceOnRoute && pits.LaneAt(i) > pits.LimitStartLane + 120) PaceCarGone = true;
             paceSpeed = PaceCar.Speed;
         }
@@ -459,6 +609,16 @@ sealed class Session
             }
         }
         return caps;
+    }
+
+    void CountPace()
+    {
+        int i = paceDriver.Index;
+        if (i < 0) return;
+        if (paceLast > circuit.Count - 50 && i < 50) paceLaps++;
+        else if (paceLast >= 0 && paceLast < 50 && i > circuit.Count - 50) paceLaps--;
+        paceLast = i;
+        paceDistance = paceLaps * circuit.Lap + circuit.DistanceAt(i, PaceCar.Position);
     }
 
     /// <summary>Records what the checks look at: the limiter, the stops, laps, the track and the tank.</summary>
@@ -502,7 +662,8 @@ sealed class Session
         }
 
         float off = Math.Abs(car.Lateral) - circuit.HalfWidth(k);
-        if (off > KerbWidth && !car.OnPitLane(car.Position))
+        // A car in its garage or driving out of it is off the track on purpose.
+        if (off > KerbWidth && !car.OnPitLane(car.Position) && (Leaving == null || Leaving[s.Slot] == 2))
         {
             if (s.OffTime < 0f) { s.OffTime = Time; s.OffWhere = k * circuit.Step; }
             s.OffSeconds += Dt;

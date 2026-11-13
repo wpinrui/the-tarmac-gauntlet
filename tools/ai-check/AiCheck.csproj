@@ -26,6 +26,8 @@
     <Compile Include="../../unity/Assets/Raceday/Scripts/StopPlanner.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/PitLaneStart.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/RollingStart.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/GarageStart.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/PitComplex.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/AiRacer.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/Rejoin.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/LineTuner.cs" />

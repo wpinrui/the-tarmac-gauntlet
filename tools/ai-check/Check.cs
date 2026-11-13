@@ -155,6 +155,16 @@ static partial class Check
             SceneTrace(args.Length > 2 ? float.Parse(args[2]) : 120f);
             return 0;
         }
+        if (args.Length > 1 && args[1] == "garageslow")
+        {
+            RollingStartCheck(100, verbose: false, glide: Environment.GetEnvironmentVariable("GARAGE_PHYSICS") == null, garages: true, slowPlayer: 40);
+            return failed ? 1 : 0;
+        }
+        if (args.Length > 1 && args[1] == "garagestart")
+        {
+            RollingStartCheck(args.Length > 2 ? int.Parse(args[2]) : 100, verbose: true, glide: Environment.GetEnvironmentVariable("GARAGE_GLIDE") != null, garages: true);
+            return failed ? 1 : 0;
+        }
         if (args.Length > 1 && args[1] == "pitstart")
         {
             PitLaneStartCheck(verbose: true);

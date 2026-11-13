@@ -25,18 +25,28 @@ namespace TarmacGauntlet.Raceday
         private float lastNight = -1f;
 
         /// <summary>
-        /// Paints garage g in the colour of car g, the car that uses it, and fits out each garage with a car.
-        /// Garages beyond the field stay plain and empty.
+        /// Paints each car's garage in its colour and fits out each garage with a car. Garages no car uses stay plain
+        /// and empty. <c>carGarages</c> is each car's garage.
         /// </summary>
-        public void Fit(PitComplex complex, Color[] cars, int garages)
+        public void Fit(PitComplex complex, Color[] cars, int[] carGarages, int garages)
         {
             var paint = new Color[garages];
-            for (int g = 0; g < garages; g++) paint[g] = g < cars.Length ? cars[g] : PitMaterials.Empty;
-            Materials.Paint(paint);
-            for (int g = 0; g < garages && g < cars.Length; g++) Props(complex.Frame(g), g);
-            // Car i uses garage i, as the race seats them.
+            for (int g = 0; g < garages; g++) paint[g] = PitMaterials.Empty;
             var used = new int[cars.Length];
-            for (int i = 0; i < used.Length; i++) used[i] = i < garages ? i : -1;
+            for (int i = 0; i < used.Length; i++)
+            {
+                int g = i < carGarages.Length ? carGarages[i] : -1;
+                used[i] = g >= 0 && g < garages ? g : -1;
+                if (used[i] >= 0) paint[used[i]] = cars[i];
+            }
+            Materials.Paint(paint);
+            var fitted = new bool[garages];
+            foreach (int g in used)
+            {
+                if (g < 0 || fitted[g]) continue;
+                fitted[g] = true;
+                Props(complex.Frame(g), g);
+            }
             Kit = new GameObject("Pit box kit").AddComponent<PitBoxKitView>();
             Kit.transform.SetParent(transform, false);
             Kit.Build(complex, used, cars);

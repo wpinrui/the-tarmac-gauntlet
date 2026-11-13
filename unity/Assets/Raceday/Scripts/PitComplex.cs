@@ -64,6 +64,8 @@ namespace TarmacGauntlet.Raceday
         public const int StandbySpots = 16;
         /// <summary>Half a garage side wall's thickness, as the circuit builder lays them.</summary>
         public const float WallHalf = 0.15f;
+        /// <summary>Middle of the crew's waiting rows across the garage, m: clear of the car parked on the +x side.</summary>
+        public const float CrewMiddle = -1.6f;
 
         public readonly PitData Data;
         public readonly float Width, Depth;
@@ -176,14 +178,15 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>
-        /// Where the crew wait inside the garage, in rows of six across the clear front, facing the door. Spot 0 is
-        /// nearest the door in the middle; later spots work outwards and back.
+        /// Where the crew wait inside the garage, in rows of six across the clear front, facing the door, off to the
+        /// garage's -x side: the +x side is where the car waits before the race (<see cref="GarageStart.Parked"/>).
+        /// Spot 0 is nearest the door in the middle of the rows; later spots work outwards and back.
         /// </summary>
         public CrewSpot Standby(int garage, int spot)
         {
             GarageFrame f = frames[garage];
             int row = spot / 6, col = spot % 6;
-            float x = (col % 2 == 0 ? 1f : -1f) * (0.7f + 1.4f * (col / 2));
+            float x = CrewMiddle + (col % 2 == 0 ? 1f : -1f) * (0.6f + 1.2f * (col / 2));
             float z = Depth * 0.5f - 1.4f - row * 1.6f;
             return new CrewSpot(f.At(x, 0f, z), f.Out);
         }
