@@ -25,11 +25,6 @@ namespace TarmacGauntlet.Rendering
         /// the race at High and above, where the depth costs little.
         /// </summary>
         public static bool SoftParticles;
-        /// <summary>
-        /// True while the cars' headlamp beams are drawn: they read the scene's depth, to light only the ground. Set by the
-        /// race at night, at every quality level.
-        /// </summary>
-        public static bool HeadlampBeams;
 
         private ShimmerPass shimmer;
         private InputPass inputs;
@@ -45,13 +40,12 @@ namespace TarmacGauntlet.Rendering
         {
             if (renderingData.cameraData.cameraType != CameraType.Game) return;
             bool haze = ExhaustHaze && GraphicsOptions.ExhaustHaze.On;
-            bool soft = SoftParticles, beams = HeadlampBeams;
-            if (haze || soft || beams)
+            bool soft = SoftParticles;
+            if (haze || soft)
             {
                 ScriptableRenderPassInput wanted = ScriptableRenderPassInput.None;
                 if (haze) wanted |= ScriptableRenderPassInput.Color;
                 if (soft) wanted |= ScriptableRenderPassInput.Depth;
-                if (beams) wanted |= ScriptableRenderPassInput.Depth;
                 inputs.ConfigureInput(wanted);
                 renderer.EnqueuePass(inputs);
             }

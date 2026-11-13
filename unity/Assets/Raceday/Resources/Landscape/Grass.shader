@@ -208,6 +208,8 @@ Shader "Hidden/TarmacGauntlet/Grass"
             #pragma vertex vert
             #pragma fragment frag
             #include_with_pragmas "Assets/Rendering/Shaders/LitKeywords.hlsl"
+            // The cars' headlamps light it at night (Headlamps.hlsl).
+            #define TARMAC_HEADLAMPS
             #include "Assets/Rendering/Shaders/TarmacLit.hlsl"
 
             struct Varyings

@@ -114,7 +114,7 @@ namespace TarmacGauntlet.Raceday
             }
         }
 
-        private void OnDestroy() => HeatHazeFeature.HeadlampBeams = false;
+        private void OnDestroy() => HeadlampGround.Clear();
 
         private Light Spot(string name, Color colour)
         {
@@ -143,8 +143,6 @@ namespace TarmacGauntlet.Raceday
                     Materials.Night(night);
                     LampMaterials.Shared.Night(night);
                     Stands?.Night(night, Materials.Tint);
-                    bool beams = LampMaterials.Shared.BeamsOn;
-                    foreach (CarLamps c in CarLamps.All) c.ShowBeam(beams);
                 }
                 Assign();
             }
@@ -159,6 +157,7 @@ namespace TarmacGauntlet.Raceday
             foreach (Slot s in floods) Follow(s, step, on * FloodIntensity, PlaceFlood, false);
             foreach (Slot s in heads) Follow(s, step, on * HeadIntensity, PlaceHead, true);
             Camera cam = Camera.main;
+            HeadlampGround.Publish(cam, on);
             foreach (Light l in uplights)
             {
                 bool near = cam != null && (cam.transform.position - l.transform.position).sqrMagnitude < UplightReach * UplightReach;

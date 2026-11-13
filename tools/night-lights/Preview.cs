@@ -103,7 +103,7 @@ static class Preview
             red = Rgb(NightLook.Red),
             look = new
             {
-                NightLook.PoolBrightening, NightLook.PoolLift, NightLook.BeamBrightening, NightLook.BeamLift, NightLook.LensGlow,
+                NightLook.PoolBrightening, NightLook.PoolLift, NightLook.HeadlampGround, NightLook.LensGlow,
                 NightLook.HeadlampGlow, NightLook.TailGlow, NightLook.BrakeGlow, NightLook.StandGlow,
             },
             crowd = new[] { CrowdPalette.Shirts, CrowdPalette.Skins, CrowdPalette.Trousers }.Select(row => row.Select(Rgb).ToArray()).ToArray(),
