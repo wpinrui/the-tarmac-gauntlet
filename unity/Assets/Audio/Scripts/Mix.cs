@@ -101,8 +101,13 @@ namespace TarmacGauntlet.Audio
 
         /// <summary>How long the muffle takes to close as the race pauses and to open as it resumes, real seconds.</summary>
         public const float PauseIn = 0.25f, PauseOut = 0.35f;
-        /// <summary>The race's groups under the pause, as a gain (-8 dB), and the muffle's low-pass then, Hz.</summary>
-        public const float PausedGain = 0.4f, PausedCutoff = 700f;
+        /// <summary>The track's sound under the pause, as a gain (-8 dB), and the muffle's low-pass then, Hz.</summary>
+        public const float TrackPausedGain = 0.4f, PausedCutoff = 700f;
+
+        /// <summary>A race group's gain under the pause: the cars (engines and tyres) cut to silence, as the race has
+        /// stopped dead; the effects and the track's ambience play on muffled and low behind the menu.</summary>
+        public static float PausedGain(SoundGroup group) =>
+            group == SoundGroup.Engines || group == SoundGroup.Tyres ? 0f : TrackPausedGain;
         /// <summary>The low-pass with the muffle open: above hearing, so it does nothing.</summary>
         public const float OpenCutoff = 22000f;
 
@@ -201,12 +206,12 @@ namespace TarmacGauntlet.Audio
 
         /// <summary>
         /// A group's volume now, 0 to 1, under the master volume: its slider, its loudness-pass level, and for the race's
-        /// groups the pause and the crossfade with the HQ's music (<see cref="RaceLevel"/>). The crowd and PA take <see cref="CrowdDuck"/> on top.
+        /// groups the pause (<see cref="PausedGain(SoundGroup)"/>) and the crossfade with the HQ's music (<see cref="RaceLevel"/>). The crowd and PA take <see cref="CrowdDuck"/> on top.
         /// </summary>
         public static float Gain(SoundGroup group)
         {
             float g = Taper(Position(SliderOf(group))) * Trim(group);
-            if (InRace(group)) g *= (1f - (1f - PausedGain) * Smooth(Muffle)) * CrossGain(race);
+            if (InRace(group)) g *= (1f - (1f - PausedGain(group)) * Smooth(Muffle)) * CrossGain(race);
             return g;
         }
 

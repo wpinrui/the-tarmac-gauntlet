@@ -65,8 +65,9 @@ public static class Check
         Mix.Paused = true;
         Frames(15, 0f, 1f / 60f);
         Expect("paused, the race muffles within a quarter of a second", Mix.Muffle == 1f && Math.Abs(Mix.Cutoff - Mix.PausedCutoff) < 1f);
-        Expect("paused, the race's groups drop to 40%", new[] { SoundGroup.Engines, SoundGroup.Tyres, SoundGroup.Effects, SoundGroup.Ambience }
-            .All(g => Math.Abs(Mix.Gain(g) - Mix.Trim(g) * Mix.PausedGain) < 1e-5));
+        Expect("paused, the engines and tyres cut out", Mix.Gain(SoundGroup.Engines) == 0f && Mix.Gain(SoundGroup.Tyres) == 0f);
+        Expect("paused, the effects and ambience drop to 40%", new[] { SoundGroup.Effects, SoundGroup.Ambience }
+            .All(g => Math.Abs(Mix.Gain(g) - Mix.Trim(g) * Mix.TrackPausedGain) < 1e-5));
         Expect("paused, the music and UI stay as they were", Mix.Gain(SoundGroup.Music) == music && Mix.Gain(SoundGroup.Ui) == ui);
         Mix.Paused = false;
         Frames(10, 1f / 60f, 1f / 60f);
