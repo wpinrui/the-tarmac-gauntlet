@@ -3,8 +3,8 @@ sentimental, with fine detail kept small enough to find only up close. Independe
 logo. The team's roundel (a maple leaf in a red ring) and its roadside town sign.
 
 Sage green over a still lake along the sills: a pine shoreline, ripples, a canoe, a loon and the
-town sign on the shore. The roof a contour map of a lake. The roundel big on the bonnet and small
-on each rear quarter. The name in a hand.
+town sign on the shore. The roof a contour map of a lake. The roundel big on the bonnet over the
+tagline, and small on each rear quarter. The name in a hand.
 
 Run: node ../common/views.js ../../../unity/Assets/Art/Vehicles/NusaFox/NusaFox.obj out/views
      node ../common/digits.js --font font/Fraunces-SemiBold.ttf --out out/digits
@@ -47,6 +47,8 @@ TAIL, NOSE = -1.84, 2.12
 SHORE_Y = 0.33                       # sides: lake below, pines rise from here
 NUMBER = (0.15, 0.56, 0.40, 0.24)    # door: z, y, box w, h
 NAME = (0.15, 0.80, 0.062)           # door: z, y, cap height
+BONNET_ROUNDEL = (0, 0, 1.30)        # bonnet: up towards the windscreen, the tagline under it
+TAGLINE = (0, 0, 1.75, 0.075)        # bonnet: x, y, z, cap height
 ROUNDEL = (-0.68, 0.72, 0.27)        # rear quarter, just behind the door gap and clear of the shoulder: z, y, height
 
 LEAF = [(50, 5), (56, 20), (64, 16), (61, 40), (75, 26), (78, 34), (92, 31), (87, 46), (95, 50), (73, 66), (76, 76),
@@ -205,9 +207,10 @@ def mapleton_livery():
         roundel(lv, view, *side_uv(lv, view, ROUNDEL[0], ROUNDEL[1]), ROUNDEL[2])
     lv.side_text("Mapleton Autosport", NAME[0], NAME[1], NAME[2] * 1.35, IVORY, font="Caveat")
     lv.side_number(NUMBER[0], NUMBER[1], NUMBER[2], NUMBER[3], IVORY)
-    # Roof: the lake map. Bonnet: the roundel, big, read from the nose.
+    # Roof: the lake map. Bonnet: the roundel, the tagline under it, read from the nose.
     lv.raw("top", lake_contours(-0.57, 0, 0.6, 0.46, 9, IVORY, 5))
-    roundel(lv, "top", *lv.uv("top", (0, 0, 1.5)), 0.63, rotate=-90)
+    roundel(lv, "top", *lv.uv("top", BONNET_ROUNDEL), 0.63, rotate=-90)
+    lv.text("top", "From Mapleton, with love", TAGLINE[:3], TAGLINE[3], IVORY, rotate=-90, font="Caveat")
     # Front and rear: the shoreline carried round the bumpers.
     for view, base, h in (("front", 0.36, 0.13), ("rear", 0.36, 0.16)):
         vw = meta["views"][view]
