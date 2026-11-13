@@ -55,6 +55,8 @@ namespace TarmacGauntlet.Raceday
         private RaceDirector director;
         /// <summary>The stages before the green (<see cref="StageSequence"/>), played once the scene is built.</summary>
         private StageSequence intro;
+        /// <summary>The end of the formation lap, the last stage before the green, or null without a rolling start.</summary>
+        private FinalFormation finalFormation;
         /// <summary>The stages after the chequered flag, played once the race's time is up.</summary>
         private StageSequence outro;
         private LiveTiming timing;
@@ -424,6 +426,13 @@ namespace TarmacGauntlet.Raceday
             // The stages before the green and after the flag, each skipped by holding Enter. Stages are added here in order.
             intro = new GameObject("Intro").AddComponent<StageSequence>();
             intro.Keys = keys;
+            if (starter is RaceStart rollingStart)
+            {
+                finalFormation = intro.gameObject.AddComponent<FinalFormation>();
+                finalFormation.Start = rollingStart;
+                finalFormation.Cameras = views;
+                intro.Add(finalFormation);
+            }
             outro = new GameObject("Outro").AddComponent<StageSequence>();
             outro.Keys = keys;
             Lap("race");
@@ -672,8 +681,9 @@ namespace TarmacGauntlet.Raceday
         /// while you drive gives the car to the AI once you have driven out of the pit lane.
         /// </summary>
         /// <summary>
-        /// When you start the race in your own car, you drive it from the green, or from the pit exit after a pit lane
-        /// start. The AI only has it for the formation lap and the queue. Delete still hands it back and forth.
+        /// When you start the race in your own car, you drive it from the end of the formation lap, on its limiter to
+        /// the line, or from the green without one, or from the pit exit after a pit lane start. The AI only has it for
+        /// the rest of the formation lap and the queue. Delete still hands it back and forth.
         /// </summary>
         private void TakeTheStart()
         {
@@ -684,7 +694,8 @@ namespace TarmacGauntlet.Raceday
                 return;
             }
             bool green = raceTower.Racing == null || raceTower.Racing();
-            if (!green || racingCars[playerIndex].InPitLane) return;
+            bool final = finalFormation != null && finalFormation.Begun;
+            if (!(green || final) || racingCars[playerIndex].InPitLane) return;
             handedOver = true;
             ai.enabled = false;
         }

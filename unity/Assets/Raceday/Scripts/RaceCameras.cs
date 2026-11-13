@@ -144,6 +144,9 @@ namespace TarmacGauntlet.Raceday
             return -1;
         }
 
+        /// <summary>The cars were moved, as at a cut in the start: the chase view starts afresh where its car is now, with no swing.</summary>
+        public void Cut() => chaseSettled = false;
+
         public void Watch(CarController next)
         {
             if (next == null) return;

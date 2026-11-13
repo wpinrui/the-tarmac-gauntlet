@@ -99,6 +99,13 @@ scene is built and `outro` once the race's time is up. A stage derives from `Ski
 hold [Enter] to skip [stage]". Holding Enter for a second fills the circle beside it, and the full circle skips that
 one stage. The next stage fills only after Enter is let go (`SkipHold.cs`).
 
+The last stage before the green is the end of the formation lap (`Stages/FinalFormation.cs`). It cuts to the leader
+200 m short of the last corner, the pace car gone into the pit lane and the field behind two by two in grid order, and
+ends at the green. Skipped, it cuts to the leader at the line. From the cut you drive your own car, on a limiter until
+you cross the line: past the speed that holds your place the power is cut, and a little over it the brakes come on, so
+you can't pass the car before you in grid order. `bash tools/ai-check/run.sh final` runs it with 100 cars, with and
+without a player driving flat out against the limiter.
+
 The camera starts on the broadcast when the race comes from the career, and on the chase camera when the scene runs on
 its own. `C` cycles the car cameras: TV, chase, bonnet and bumper. The TV camera is coverage locked to the car: a second
 director with `Lock` set shows mostly trackside shots and pans, a helicopter shot now and then, and an onboard about one

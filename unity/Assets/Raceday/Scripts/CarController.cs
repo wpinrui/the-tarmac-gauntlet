@@ -42,6 +42,11 @@ namespace TarmacGauntlet.Raceday
         /// <summary>True while the car is held on its brakes, stopped in its box.</summary>
         public bool Hold;
         public bool Limiting => !float.IsPositiveInfinity(SpeedLimit);
+        /// <summary>
+        /// Above this speed along the car the brakes come on by themselves (<see cref="RollingStart.LimiterBrake"/>),
+        /// as the formation's limiter holds a car someone drives in its place. Set each physics step.
+        /// </summary>
+        public float BrakeAbove = float.PositiveInfinity;
 
         public bool Automatic { get; private set; } = true;
         public bool SteeringHelp => DriveSettings.SteeringHelp;
@@ -266,7 +271,8 @@ namespace TarmacGauntlet.Raceday
             body.AddForceAtPosition(down * 0.4f, transform.TransformPoint(new Vector3(0, 0, Spec.HalfWheelbase)));
             body.AddForceAtPosition(down * 0.6f, transform.TransformPoint(new Vector3(0, 0, -Spec.HalfWheelbase)));
 
-            float brakeTotal = brake * Spec.BrakeDecel * Spec.Mass * Gravity;
+            float braking = Mathf.Max(brake, RollingStart.LimiterBrake(along, BrakeAbove));
+            float brakeTotal = braking * Spec.BrakeDecel * Spec.Mass * Gravity;
             gripUsed = 0f;
             gripCount = 0;
             for (int i = 0; i < 4; i++)
