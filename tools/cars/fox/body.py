@@ -2,7 +2,7 @@
 
 Each station holds the values of a hatchback section with flared arches: the bottom, the widest
 point, the shoulder, and the deck across the top. Over the arches the flare stands out from the
-side and rolls in hard to the shoulder. Over the bonnet the shoulder is the wing's top
+side and rolls in to the shoulder; over each wheel a round flare stands out from it. Over the bonnet the shoulder is the wing's top
 and the deck the bonnet's crowned middle; behind the cabin the deck is the tailgate's top. Over
 the cabin a tall greenhouse stands on the shoulder: its
 glass foot, the roof edge (A-pillar, roof side or C-pillar) and the crown at the centre. Every
@@ -97,11 +97,36 @@ def _round(g):
     return Polygon(g.exterior)
 
 
+FLARE_R = 0.035    # the flare's edges round off this much
+FLARE_EDGE = 0.10  # over this far at its front and back the flare eases out to the side
+
+
+def flare(x, v):
+    """The arch flare's section at x, if any: full width from the bottom up to the blister's
+    edge, a circle round the wheel centre in side view."""
+    out = []
+    for xc, zc, r, wf in ROWS["flares"]:
+        dx = abs(x - xc)
+        if dx >= r - 0.005:
+            continue
+        top = zc + np.sqrt(r * r - dx * dx)
+        k = min(1.0, (r - dx) / FLARE_EDGE)
+        w = v["w"] + (wf - v["w"]) * (3 * k * k - 2 * k ** 3)
+        if w <= v["w"] + 0.002 or top <= v["zb"] + 0.05:
+            continue
+        g = box(-w, v["zb"], w, top)
+        out.append(g.buffer(-FLARE_R, join_style=1).buffer(FLARE_R, join_style=1))
+    return out
+
+
 @lru_cache(maxsize=4096)
 def section_poly(x):
     """The section at x as a shapely polygon in (y, z)."""
     v = values(x)
     g = _poly(lower_half(v))
+    fl = flare(x, v)
+    if fl:
+        g = unary_union([g] + fl)
     if GH0 + 0.004 < x < GH1 - 0.004:
         gh = _poly(gh_half(v))
         g = unary_union([g, gh])

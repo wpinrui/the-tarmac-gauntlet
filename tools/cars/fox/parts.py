@@ -90,6 +90,23 @@ def soft(g, r):
     return g.buffer(-r, join_style=1).buffer(r, join_style=1)
 
 
+def smooth_line(pts, n=60):
+    """An even, smooth curve through traced points (open)."""
+    from scipy.interpolate import splev, splprep
+    p = np.array(pts, float)
+    tck, _u = splprep([p[:, 0], p[:, 1]], s=len(p) * 2e-6, k=3)
+    return np.column_stack(splev(np.linspace(0, 1, n), tck))
+
+
+def smooth_outline(pts, n=240):
+    """A closed outline traced as points, rebuilt as one smooth periodic curve with n points."""
+    from scipy.interpolate import splev, splprep
+    p = np.array(pts, float)
+    p = np.vstack([p, p[:1]])
+    tck, _u = splprep([p[:, 0], p[:, 1]], s=len(p) * 2e-6, k=3, per=True)
+    return Polygon(np.column_stack(splev(np.linspace(0, 1, n, endpoint=False), tck))).buffer(0)
+
+
 def half_shape(pts, r=0.004):
     """A shape traced as its left half from the centre line, joined to its mirror."""
     return soft(both(poly([(0.0, pts[0][1])] + [tuple(p) for p in pts] + [(0.0, pts[-1][1])])), r)
@@ -140,12 +157,15 @@ def mirror_lr(sgn):
     return (lambda q: q) if sgn > 0 else flip
 
 
+HEAD_STEP = 0.007      # the headlamp is laid on this mesh; its outline keeps every point of its smooth curve
+
+
 def headlamps(ref, cutters, out):
     """Each headlamp is the traced teardrop on the nose's corner. Our own interior: a round
     projector bowl at the inner end with a bright core, and a thin light blade along the upper
     edge running out to the corner."""
     fr = front_fr()
-    shp = soft(poly(R["head"]), 0.008)
+    shp = smooth_outline(R["head"])
     b = shp.bounds
     inner = shp.buffer(-0.008)
     bowl = Point(b[0] + 0.09, (b[1] + b[3]) / 2 - 0.004).buffer(0.042, 64).intersection(inner)
@@ -154,12 +174,12 @@ def headlamps(ref, cutters, out):
     blade = soft(max(getattr(blade, "geoms", [blade]), key=lambda g: g.area), 0.003)
     for sgn, side in ((1, "l"), (-1, "r")):
         g = mirror_lr(sgn)
-        cutters += blend.lay(ref, f"cut_head_{side}", g(shp), fr, -0.05, 0.006, "housing", 0.006, along_ray=True)
-        out += blend.lay(ref, f"head_back_{side}", g(shp.buffer(-0.002)), fr, -0.047, -0.043, "housing", 0.006, along_ray=True)
+        cutters += blend.lay(ref, f"cut_head_{side}", g(shp), fr, -0.05, 0.006, "housing", HEAD_STEP, along_ray=True)
+        out += blend.lay(ref, f"head_back_{side}", g(shp.buffer(-0.002)), fr, -0.047, -0.043, "housing", HEAD_STEP, along_ray=True)
         out += blend.lay(ref, f"head_reflector_{side}", g(bowl.difference(core.buffer(0.004))), fr, -0.0422, -0.034,
-                         "reflector", 0.004, along_ray=True)
-        out += blend.lay(ref, f"lamp_head_{side}0", g(core), fr, -0.0422, -0.036, "lamp_head", 0.004, along_ray=True)
-        out += blend.lay(ref, f"lamp_head_{side}1", g(blade), fr, -0.041, -0.037, "lamp_head", 0.004, along_ray=True)
+                         "reflector", HEAD_STEP, along_ray=True)
+        out += blend.lay(ref, f"lamp_head_{side}0", g(core), fr, -0.0422, -0.036, "lamp_head", HEAD_STEP, along_ray=True)
+        out += blend.lay(ref, f"lamp_head_{side}1", g(blade), fr, -0.041, -0.037, "lamp_head", HEAD_STEP, along_ray=True)
         out += blend.lay(ref, f"head_glass_{side}", g(shp.buffer(-0.002)), fr, -0.0055, -0.0025, "head_glass", 0.006,
                          along_ray=True)
     # fog lamps in the bumper's corners: a black recess with a slim lamp across its middle
@@ -175,23 +195,54 @@ def headlamps(ref, cutters, out):
                          along_ray=True)
 
 
+TAIL_R = 0.25        # the wrap's unrolled coordinate: metres round the corner at this radius
+TAIL_STEP = 0.008    # the tail lamp is laid on this mesh; its outline keeps every point of its smooth curve
+
+
+def tail_fr(sgn):
+    """Rays fanning out from a vertical axis inside the tail's corner, so the lamp can wrap from
+    the tail round onto the side. (a, b): a is the angle from straight back times TAIL_R, b is z."""
+    xa, ya = R["tail_axis"]
+
+    def fr(a, b):
+        t = a / TAIL_R
+        out = np.array([-np.cos(t), np.sin(t) * sgn, 0.0])
+        return np.array([xa, ya * sgn, b]) + out * 1.2, -out
+    return fr
+
+
+def tail_outline(ref):
+    """The traced lamp outline found on the body, read in the wrap's coordinates and smoothed."""
+    xa, ya = R["tail_axis"]
+    pts = []
+    for (u, z) in R["tail"]:
+        pts.append(blend.cast(ref, rear_fr(), u, z)[0])
+    for (x, z) in R["tail_side"]:
+        pts.append(blend.cast(ref, side_fr(1), x, z)[0])
+    for (u, z) in R["tail_top"]:
+        pts.append(blend.cast(ref, rear_fr(), u, z)[0])
+    ab = [(np.arctan2(p[1] - ya, -(p[0] - xa)) * TAIL_R, p[2]) for p in pts]
+    return smooth_outline(ab, 300)
+
+
 def taillamps(ref, cutters, out):
-    """Each tail lamp is the traced outline on the tail's corner. Our own interior: the tail lamp
-    an L of light along the top and the outer edge, the brake lamp filling the rest."""
-    fr = rear_fr()
-    shp = soft(poly(R["tail"]), 0.008)
+    """Each tail lamp is the traced outline wrapping the tail's corner. Our own interior: the tail
+    lamp a slim band along the top edge running round onto the side, the brake lamp filling the
+    lamp's broad part on the tail."""
+    shp = tail_outline(ref)
     b = shp.bounds
     inner = shp.buffer(-0.007)
-    ring = inner.difference(box(b[0] - 1, b[1] - 1, b[2] - 0.03, b[3] - 0.03))
-    tail = soft(ring, 0.003)
-    brake = soft(inner.difference(ring.buffer(0.006)), 0.004)
+    band = inner.difference(inner.buffer(-0.016).union(box(b[0] - 1, b[1] - 1, b[2] + 1, (b[1] + b[3]) / 2)))
+    band = soft(max(getattr(band, "geoms", [band]), key=lambda g: g.area), 0.003)
+    brake = inner.buffer(-0.02).intersection(box(b[0] - 1, b[1] - 1, b[0] + 0.55 * (b[2] - b[0]), b[3] + 1))
+    brake = soft(max(getattr(brake, "geoms", [brake]), key=lambda g: g.area), 0.006)
     for sgn, side in ((1, "l"), (-1, "r")):
-        g = mirror_lr(sgn)
-        cutters += blend.lay(ref, f"cut_tail_{side}", g(shp), fr, -0.035, 0.006, "housing", 0.006, along_ray=True)
-        out += blend.lay(ref, f"tail_back_{side}", g(shp.buffer(-0.002)), fr, -0.034, -0.03, "housing", 0.006, along_ray=True)
-        out += blend.lay(ref, f"lamp_tail_{side}", g(tail), fr, -0.029, -0.025, "lamp_tail", 0.003, along_ray=True)
-        out += blend.lay(ref, f"lamp_brake_{side}", g(brake), fr, -0.029, -0.025, "lamp_brake", 0.004, along_ray=True)
-        out += blend.lay(ref, f"tail_glass_{side}", g(shp.buffer(-0.002)), fr, -0.0055, -0.0025, "tail_glass", 0.006,
+        fr = tail_fr(sgn)
+        cutters += blend.lay(ref, f"cut_tail_{side}", shp, fr, -0.035, 0.006, "housing", TAIL_STEP, along_ray=True)
+        out += blend.lay(ref, f"tail_back_{side}", shp.buffer(-0.002), fr, -0.034, -0.03, "housing", TAIL_STEP, along_ray=True)
+        out += blend.lay(ref, f"lamp_tail_{side}", band, fr, -0.029, -0.025, "lamp_tail", TAIL_STEP, along_ray=True)
+        out += blend.lay(ref, f"lamp_brake_{side}", brake, fr, -0.029, -0.025, "lamp_brake", TAIL_STEP, along_ray=True)
+        out += blend.lay(ref, f"tail_glass_{side}", shp.buffer(-0.002), fr, -0.0055, -0.0025, "tail_glass", TAIL_STEP,
                          along_ray=True)
 
 
@@ -361,17 +412,31 @@ def door_path():
     return fillet(pts, [er, sr, sr, er])
 
 
-def bonnet_path():
-    """The bonnet's shut line in plan: from the windscreen's foot on the right, out and forward
-    along the wing and the lamp, across the nose, and back along the left side to the windscreen."""
-    b = np.array(R["bonnet"], float)            # nose middle first, out to the left windscreen corner
-    return np.vstack([(b * [1, -1])[::-1], b[1:]])
+def bonnet_path(ref):
+    """The bonnet's shut line in plan: from the windscreen's foot on the right, back along the
+    wing, across the nose above the grille and the lamps' tops, and back along the left side to
+    the windscreen. The nose part is traced from ahead, found on the body, and read in plan."""
+    nose = []
+    for u, z in smooth_line(R["bonnet_nose"], 40):
+        loc, _n = blend.cast(ref, front_fr(), u, z)
+        nose.append((loc[0], loc[1]))
+    side = np.array(R["bonnet"], float)
+    left = np.vstack([nose, side])               # nose middle first, out and back to the left windscreen corner
+    return np.vstack([(left * [1, -1])[::-1], left[1:]])
 
 
-def hatch_loop():
-    """The tailgate's shut line seen from behind, one closed loop with its corners rounded."""
-    h = soft(half_shape(R["hatch"], 0.0), 0.03)
-    return np.array(h.exterior.coords)[:-1]
+def hatch_paths(ref):
+    """The tailgate's shut line in two runs that meet at its top corners: the sides and bottom
+    traced from behind, and the top across the roof's end traced from above, where a line
+    traced from behind would graze the nearly flat roof and smear."""
+    h = np.array(R["hatch"], float)
+    lower = np.vstack([(h * [-1, 1])[::-1], h[1:]])
+    lower = np.array(fillet(lower.tolist(), 0.03))
+    corner, _n = blend.cast(ref, rear_fr(), *h[-1])
+    t = np.array(R["hatch_top"], float)
+    left = np.vstack([[corner[0], corner[1]], t])
+    top = np.vstack([left, (left * [1, -1])[::-1][1:]])
+    return lower, np.array(fillet(top.tolist(), 0.03))
 
 
 def grooves(ref):
@@ -379,8 +444,10 @@ def grooves(ref):
     obs = []
     for sgn, side in ((1, "l"), (-1, "r")):
         obs.append(blend.groove(ref, f"g_door_{side}", door_path(), side_fr(sgn)))
-    obs.append(blend.groove(ref, "g_bonnet", bonnet_path(), top_fr()))
-    obs.append(blend.groove(ref, "g_hatch", hatch_loop(), rear_fr(), closed=True))
+    obs.append(blend.groove(ref, "g_bonnet", bonnet_path(ref), top_fr()))
+    lower, top = hatch_paths(ref)
+    obs.append(blend.groove(ref, "g_hatch", lower, rear_fr()))
+    obs.append(blend.groove(ref, "g_hatch_top", top, top_fr()))
     return obs
 
 
@@ -430,7 +497,7 @@ def door(ref, shell, obs, sgn=1):
 
 
 # ---------------------------------------------------------------- mirrors
-MIRROR_R = 0.035      # housing corner rounding
+MIRROR_R = 0.045      # housing corner rounding
 MIRROR_SWEEP = 0.08   # radians the housing turns back from square to the car
 
 
@@ -452,23 +519,40 @@ def _sweep(ob, sgn):
     return ob
 
 
+def _pod(name, y0, y1, z0, z1, x0, x1, sgn, mat="trim"):
+    """A rounded mirror housing: a soft oval face at the back, its rings shrinking towards the
+    front on a quarter circle, so the front is one smooth dome."""
+    face = soft(box(y0, z0, y1, z1), min(MIRROR_R, 0.45 * (z1 - z0)))
+    ring = body.even(np.array(face.exterior.coords)[:-1], 96)
+    cy, cz = y0 + 0.4 * (y1 - y0), (z0 + z1) / 2
+    rings = []
+    for t in np.concatenate([[0.0, 0.004], np.linspace(0.1, 1.0, 14)]):
+        k = max(np.sqrt(max(1 - t * t, 0.0)), 0.18)
+        rr = np.column_stack([cy + (ring[:, 0] - cy) * k, cz + (ring[:, 1] - cz) * k])
+        rings.append(np.column_stack([np.full(96, x0 + (x1 - x0) * t), rr[:, 0] * sgn, rr[:, 1]]))
+    v, f = geom.close_rings(rings)
+    if sgn < 0:
+        f = [tuple(q[::-1]) for q in f]
+    return blend.make(name, v, f, mat)
+
+
 def mirrors():
-    """A black housing standing off the door on a short black arm from the belt, part way along
-    the door glass as on the reference, its glass in a recess in the housing's back."""
+    """A rounded black housing at the door's front corner on a short black arm from the black
+    corner by the windscreen pillar, its glass in a recess in the housing's back."""
     m = R["mirror"]
     xb, xf = m["x_back"], m["x_front"]
-    x0, x1 = xb, xb + 0.11
+    x0, x1 = xb, xf
     y0, y1, z0, z1 = m["y_in"] + 0.03, m["y_out"], m["z0"], m["z1"]
-    xa = (xb + xf) / 2
+    xa = xb + 0.6 * (xf - xb)
     zb = belt(xa)
-    root = body.y_at(xa, zb - 0.015) - 0.03
+    root = body.y_at(xa, zb + 0.03) - 0.03
     obs = []
     for sgn, side in ((1, "l"), (-1, "r")):
-        house = _rounded_bar(f"mirror_{side}", y0, y1, z0, z1, x0, x1, MIRROR_R, sgn, "trim")
+        house = _pod(f"mirror_{side}", y0, y1, z0, z1, x0, x1, sgn, "trim")
         cut = _rounded_bar(f"cut_mirror_{side}", y0 + 0.008, y1 - 0.008, z0 + 0.008, z1 - 0.008, x0 - 0.03, x0 + 0.006,
                            MIRROR_R - 0.008, sgn)
         blend.boolean(house, cut, "DIFFERENCE")
-        arm = _rounded_bar(f"mirror_arm_{side}", root, y0 + 0.03, zb - 0.035, zb - 0.005, xa - 0.025, xa + 0.025, 0.010,
+        arm = _rounded_bar(f"mirror_arm_{side}", root, y0 + 0.03, zb + 0.012, zb + 0.045, xa - 0.035, xa + 0.02, 0.010,
                            sgn, "trim")
         glass = _rounded_bar(f"mirror_glass_{side}", y0 + 0.0095, y1 - 0.0095, z0 + 0.0095, z1 - 0.0095, x0 + 0.0015,
                              x0 + 0.0045, MIRROR_R - 0.0095, sgn, "mirror_glass")
@@ -794,7 +878,7 @@ def options(ref):
             ob.name = f"opt_{group}_{n}_{i}"
             out.append(ob)
     gz = [p[1] for p in R["grille"]]
-    bonnet_x = max(p[0] for p in R["bonnet"]) - 0.10
+    bonnet_x = NOSE - 0.30
     gate_z, gate_low = R["gate_z"], R["gate_low"]
     for k, style in ((0, "chrome"), (1, "colour")):
         # front: on the nose under the upper grille's middle (the reference's spot), or on the bonnet's nose

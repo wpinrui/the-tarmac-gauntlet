@@ -96,13 +96,16 @@ BOTTOM = [(-2.125, -0.22), (-2.12, -0.33), (-2.11, -0.39), (-2.09, -0.410), (-2.
           (-1.70, -0.410), (-1.62, -0.400), (-1.40, -0.394), (-1.00, -0.390), (-0.60, -0.378),
           (0.90, -0.376), (1.00, -0.366), (1.40, -0.358), (1.70, -0.346), (1.90, -0.342), (1.96, -0.322),
           (2.00, -0.300), (2.020, -0.260), (2.035, -0.150), (2.042, -0.050), (2.045, -0.010)]
-# Half width in plan (top render), mirrors left out: the flared arches and the narrower doors.
+# Half width in plan (top render), mirrors and arch flares left out: the bumpers' wide corners and
+# the narrower sides between them.
 HALF = [(-2.125, 0.30), (-2.115, 0.40), (-2.10, 0.456), (-2.075, 0.55), (-2.05, 0.62), (-2.00, 0.707),
-        (-1.95, 0.76), (-1.90, 0.808), (-1.85, 0.854), (-1.80, 0.90), (-1.75, 0.938), (-1.70, 0.952),
-        (-1.60, 0.955), (-1.40, 0.954), (-1.00, 0.953), (-0.86, 0.950), (-0.80, 0.918), (-0.75, 0.877),
-        (-0.70, 0.856), (-0.40, 0.855), (0.00, 0.862), (0.30, 0.879), (0.60, 0.890), (0.85, 0.899),
-        (0.90, 0.917), (0.95, 0.938), (1.00, 0.952), (1.70, 0.952), (1.75, 0.948), (1.80, 0.933),
-        (1.85, 0.890), (1.90, 0.838), (1.95, 0.763), (2.00, 0.640), (2.030, 0.52), (2.045, 0.40)]
+        (-1.95, 0.76), (-1.90, 0.808), (-1.85, 0.854), (-1.80, 0.895), (-1.76, 0.915), (-1.70, 0.900),
+        (-1.60, 0.878), (-1.00, 0.872), (-0.80, 0.862), (-0.60, 0.857), (0.00, 0.862), (0.60, 0.880),
+        (1.00, 0.893), (1.50, 0.903), (1.70, 0.910), (1.80, 0.912), (1.85, 0.888), (1.90, 0.838),
+        (1.95, 0.763), (2.00, 0.640), (2.030, 0.52), (2.045, 0.40)]
+# Arch flares (side and top renders): a round blister over each wheel, centred on it, its radius in
+# the side view and its half width.
+FLARES = [(Y_FRONT, Z_WHEEL, 0.50, 0.955), (Y_REAR, Z_WHEEL, 0.52, 0.955)]
 # The flares and the sides stand full width over a band: its bottom (WIDEST) and top (WIDE_TOP),
 # read off the front and rear renders.
 WIDEST = [(-2.125, -0.25), (-1.60, -0.25), (-0.90, -0.20), (-0.60, -0.15), (0.80, -0.15), (1.00, -0.25),
@@ -200,11 +203,13 @@ SCREEN = {"y_base_mid": -0.84, "y_base_edge": -0.72, "w_base": 0.675, "y_top_mid
 # Hatch glass (top render): head and foot.
 REAR_GLASS = {"y_top_mid": 1.50, "y_top_edge": 1.47, "w_top": 0.565, "y_base_mid": 1.86, "y_base_edge": 1.84,
               "w_base": 0.62}
-# Bonnet shut line (top render: Y, half width): across the nose over the grille, back along the
-# headlamps' inner edge and the wings' inner edge, then in to the windscreen's foot inside its corners.
-BONNET = [(-2.035, 0.0), (-2.035, 0.20), (-2.03, 0.34), (-2.00, 0.44), (-1.93, 0.55), (-1.84, 0.66),
-          (-1.74, 0.74), (-1.60, 0.775), (-1.30, 0.775), (-1.00, 0.772), (-0.86, 0.765), (-0.80, 0.735),
-          (-0.775, 0.67)]
+# Bonnet shut line. Its front (front render: U, Z) runs across the nose above the grille, meets
+# the headlamp's inner top corner and follows the lamp's top edge out. From there (top render: Y,
+# half width) it runs back along the wing's inner edge, then bends in to the windscreen's foot,
+# inside its corner.
+BONNET_NOSE = [(0.0, 0.196), (0.20, 0.196), (0.36, 0.198), (0.43, 0.204), (0.55, 0.229), (0.65, 0.249),
+               (0.73, 0.263), (0.795, 0.270)]
+BONNET = [(-1.74, 0.80), (-1.60, 0.785), (-1.30, 0.778), (-1.00, 0.772), (-0.86, 0.765), (-0.748, 0.60)]
 
 # ---------------------------------------------------------------- front (front render, left half)
 HEAD = [(0.400, 0.155), (0.450, 0.190), (0.550, 0.216), (0.650, 0.236), (0.730, 0.250), (0.790, 0.255),
@@ -218,22 +223,32 @@ FOG = [(0.440, -0.150), (0.600, -0.150), (0.620, -0.170), (0.620, -0.245), (0.45
 SPLITTER = (0.93, -0.414, -0.386)                 # black splitter under the bumper: half width, bottom, top
 
 # ---------------------------------------------------------------- rear (rear render, left half)
-TAIL = [(0.835, 0.480), (0.660, 0.490), (0.605, 0.470), (0.580, 0.420), (0.568, 0.335), (0.620, 0.310),
-        (0.780, 0.300), (0.840, 0.330), (0.852, 0.400)]
-TAIL_SIDE = 0.16          # the lamp runs this far forward round the corner onto the side
+# Each tail lamp wraps round the tail's corner onto the side. Its outline on the tail (rear render:
+# U, Z), from the inner top corner down and out along the bottom to the corner...
+TAIL = [(0.660, 0.490), (0.605, 0.470), (0.580, 0.420), (0.568, 0.335), (0.620, 0.310), (0.780, 0.300)]
+# ...then on the side (side render: Y, Z) along the bottom forward to the pointed tip and back
+# along the top to the corner...
+TAIL_SIDE = [(1.880, 0.330), (1.800, 0.372), (1.720, 0.428), (1.672, 0.462), (1.700, 0.482), (1.760, 0.498),
+             (1.860, 0.505)]
+# ...and on the tail again along the top back to the start.
+TAIL_TOP = [(0.800, 0.488), (0.730, 0.492)]
+TAIL_AXIS = (1.80, 0.62)  # the corner's axis in plan (top render: Y, half width), the lamp's rays fan from it
 # The dark band low across the bumper's back and the rain light in its middle.
 BAND_R = [(0.0, -0.150), (0.640, -0.150), (0.670, -0.165), (0.640, -0.200), (0.0, -0.200)]
 RAIN = (0.075, -0.192, -0.158)                    # rain light: half width, bottom, top
-# The tailgate's outline on the tail: across above the bumper, up the lamps' inner edges, out
-# round the glass and over the top under the roof.
+# The tailgate's outline on the tail (rear render): across above the bumper, up the lamps' inner
+# edges and out round the glass's sides.
 HATCH = [(0.0, 0.165), (0.420, 0.165), (0.500, 0.190), (0.555, 0.250), (0.565, 0.330), (0.578, 0.440),
-         (0.615, 0.545), (0.640, 0.630), (0.630, 0.760), (0.600, 0.880), (0.565, 0.935), (0.0, 0.945)]
+         (0.615, 0.545), (0.640, 0.630), (0.630, 0.740), (0.600, 0.830)]
+# Its top edge runs across the roof's end, traced from above (top render: Y, half width) from the
+# side's top corner in to the middle.
+HATCH_TOP = [(1.50, 0.545), (1.468, 0.40), (1.462, 0.0)]
 GATE_Z, GATE_LOW = 0.510, 0.300                   # the tailgate under the glass (the badge), and low on it
 EXHAUST = (0.0, -0.290, 0.036)                    # one round tip under the bumper's middle: U, Z, radius
 EXHAUST_END = 2.000
 
 # ---------------------------------------------------------------- other parts
-MIRROR = {"y0": -0.15, "y1": 0.05, "w0": 0.76, "w1": 0.95, "z0": 0.44, "z1": 0.56}
+MIRROR = {"y0": -0.56, "y1": -0.37, "w0": 0.74, "w1": 0.94, "z0": 0.525, "z1": 0.635}   # at the door's front corner
 # Rally wing over the hatch (side and top renders): its section, front to back over the top and
 # back under, and its half span.
 WING = [(1.470, 0.928), (1.600, 0.962), (1.730, 0.998), (1.738, 0.982), (1.620, 0.946), (1.500, 0.912)]
@@ -248,6 +263,7 @@ data = {
     "wheel": {"r": TYRE_R, "rim_r": RIM_R, "width_f": 0.195, "width_r": 0.195, "outer_y": H(0.935),
               "outer_y_r": H(0.935), "front_x": X(Y_FRONT), "rear_x": X(Y_REAR), "arch_r": round(TYRE_R + 0.04, 4)},
     "stations": stations(),
+    "flares": [[X(y), Z(z), L(r), H(w)] for y, z, r, w in FLARES],
     "gh": [X(GH[1]), X(GH[0])],
     "dlo": {"a_foot": side([DLO["a_foot"]])[0], "a_head": side([DLO["a_head"]])[0], "roof": side(DLO["roof"]),
             "c_head": side([DLO["c_head"]])[0], "c_foot": side([DLO["c_foot"]])[0]},
@@ -264,6 +280,7 @@ data = {
     "rear_glass": {"x_top_mid": X(REAR_GLASS["y_top_mid"]), "x_top_edge": X(REAR_GLASS["y_top_edge"]),
                    "w_top": H(REAR_GLASS["w_top"]), "x_base_mid": X(REAR_GLASS["y_base_mid"]),
                    "x_base_edge": X(REAR_GLASS["y_base_edge"]), "w_base": H(REAR_GLASS["w_base"])},
+    "bonnet_nose": end(BONNET_NOSE),
     "bonnet": plan(BONNET),
     "head": end(HEAD),
     "grille": end(GRILLE),
@@ -271,10 +288,13 @@ data = {
     "fog": end(FOG),
     "splitter": [H(SPLITTER[0]), Z(SPLITTER[1]), Z(SPLITTER[2])],
     "tail": end(TAIL),
-    "tail_side": L(TAIL_SIDE),
+    "tail_side": side(TAIL_SIDE),
+    "tail_top": end(TAIL_TOP),
+    "tail_axis": plan([TAIL_AXIS])[0],
     "band_r": end(BAND_R),
     "rain": [H(RAIN[0]), Z(RAIN[1]), Z(RAIN[2])],
     "hatch": end(HATCH),
+    "hatch_top": plan(HATCH_TOP),
     "gate_z": Z(GATE_Z),
     "gate_low": Z(GATE_LOW),
     "exhaust": [H(EXHAUST[0]), Z(EXHAUST[1]), L(EXHAUST[2])],
