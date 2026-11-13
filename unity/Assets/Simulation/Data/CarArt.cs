@@ -49,6 +49,7 @@ namespace TarmacGauntlet.Simulation
             { "Duct Tape Dynamics", "Assets/Art/Liveries/DuctTapeDynamics" },
             { "Greystone Archer", "Assets/Art/Liveries/GreystoneArcher" },
             { "Lo-fi Racing", "Assets/Art/Liveries/LofiRacing" },
+            { "Shed Monozukuri Co.", "Assets/Art/Liveries/ShedMonozukuriCo" },
         };
 
         /// <summary>The team's livery folder, or null for a team with no livery yet.</summary>
