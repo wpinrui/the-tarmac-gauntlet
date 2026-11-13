@@ -127,7 +127,9 @@ below, and confetti falls. Every car still on its cool-down lap is put in its bo
 body as live rigs, posed from its clips with their arms reaching for the trophy and the bottle (`Podium/Podium.cs`).
 Each person has their own pace, timing, lean and mark, so nobody moves in step. The crowd below swells with how many
 are cheering and roars at each moment; the corks pop, the champagne fizzes and the confetti cannon booms
-(`Podium/PodiumSound.cs`). The corks, fizz and confetti are synthesised by `python3 tools/podium/sounds.py`.
+(`Podium/PodiumSound.cs`), and one of the HQ's tracks plays over the circuit's loudspeakers. The hands close round
+the trophy's handles and the bottle (`Podium.Hold`). Every engine is switched off once the cars are parked. The corks,
+fizz and confetti are synthesised by `python3 tools/podium/sounds.py`.
 The race summary opens once the last ceremony ends or is skipped (`RaceDirector.ShowSummary`). After changing the
 podium, run `bash tools/podium/run.sh [folder]`: it builds the podium on the real pit building and plays a ceremony
 for every line-up of one to three drivers in each place, checking it sits on the offices, nobody walks into anybody,

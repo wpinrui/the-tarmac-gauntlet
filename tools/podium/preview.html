@@ -169,7 +169,9 @@ function Person(role, place) {
   }
   const find = n => nodes[info.nodes.findIndex(x => x.name === n)];
   scene.add(root);
-  return { root, nodes, L: [find('LeftArm'), find('LeftForeArm'), find('LeftHand')], R: [find('RightArm'), find('RightForeArm'), find('RightHand')] };
+  const fingers = side => [...['Index', 'Middle', 'Ring', 'Pinky'].flatMap(f => [1, 2, 3].map(j => find(side + 'Hand' + f + j))), find(side + 'HandThumb2'), find(side + 'HandThumb3')];
+  return { root, nodes, L: [find('LeftArm'), find('LeftForeArm'), find('LeftHand')], R: [find('RightArm'), find('RightForeArm'), find('RightHand')],
+    LF: fingers('Left'), RF: fingers('Right') };
 }
 
 function Pose(rig, layers) {
@@ -226,6 +228,30 @@ function Reach([upper, lower, end], target, pole, weight) {
   const ql = new THREE.Quaternion().setFromUnitVectors(c2.clone().sub(b2).normalize(), a.clone().add(dir.clone().multiplyScalar(d)).sub(b2).normalize());
   SetWorldRotation(lower, ql.multiply(lower.getWorldQuaternion(new THREE.Quaternion())));
   if (weight < 1) { upper.quaternion.copy(u0.slerp(upper.quaternion, weight)); lower.quaternion.copy(l0.slerp(lower.quaternion, weight)); upper.updateMatrixWorld(true); }
+}
+
+// The game's grip (Podium.Hold), in three's frame: the game's local z is three's -z, and its turns about x run the other way.
+const PalmSign = -1, PalmLength = 0.075, CurlThin = [70, 85, 60], CurlThick = [45, 60, 45];
+function Hold(arm, fingers, rightHand, at, bar, radius, pole, weight) {
+  if (weight <= 0) return;
+  const hand = arm[2];
+  if (bar.lengthSq() < 1e-6) { Reach(arm, at, pole(at), weight); return; }
+  bar.normalize();
+  const hq = hand.getWorldQuaternion(new THREE.Quaternion());
+  const thumbSide = new THREE.Vector3(rightHand ? 1 : -1, 0, 0).applyQuaternion(hq);
+  const held = new THREE.Quaternion().setFromUnitVectors(thumbSide, bar).multiply(hq);
+  const palm = new THREE.Vector3(0, PalmLength, -PalmSign * (radius + 0.012)).applyQuaternion(held);
+  const wrist = at.clone().sub(palm);
+  Reach(arm, wrist, pole(wrist), weight);
+  const now = hand.getWorldQuaternion(new THREE.Quaternion());
+  SetWorldRotation(hand, now.slerp(held, weight));
+  const curl = radius > 0.025 ? CurlThick : CurlThin;
+  fingers.forEach((j, i) => {
+    if (!j) return;
+    const angle = (i >= 12 ? 30 : curl[i % 3]) * PalmSign * weight * Math.PI / 180;
+    j.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -angle));
+  });
+  hand.updateMatrixWorld(true);
 }
 
 // The root faces like Unity's LookRotation(-face): built in Unity's frame, then mirrored.
@@ -285,7 +311,7 @@ function Step(t) {
   const C = P.ceremonies[cer];
   const k = Math.min(Math.floor(t / F), C.cams.length - 1);
   for (const p of people) {
-    const f = p.a.f, o = k * 21;
+    const f = p.a.f, o = k * 29;
     const shown = p.a.role !== 0 || t >= p.a.start;
     p.root.visible = shown;
     if (!shown) continue;
@@ -307,8 +333,8 @@ function Step(t) {
       return new THREE.Vector3(0, -(1 - high), 0).add(side.clone().multiplyScalar(0.6 + 0.6 * high)).add(faceM.clone().multiplyScalar(-0.25)).normalize();
     };
     const lt = V(f, o + 13), rt = V(f, o + 17);
-    if (f[o + 16] > 0) Reach(p.L, lt, pole(right.clone().negate(), lt, wp(p.L[0])), f[o + 16]);
-    if (f[o + 20] > 0) Reach(p.R, rt, pole(right, rt, wp(p.R[0])), f[o + 20]);
+    Hold(p.L, p.LF, false, lt, V(f, o + 21), f[o + 24], w => pole(right.clone().negate(), w, wp(p.L[0])), f[o + 16]);
+    Hold(p.R, p.RF, true, rt, V(f, o + 25), f[o + 28], w => pole(right, w, wp(p.R[0])), f[o + 20]);
   }
   const props = C.props[k];
   for (let pl = 0; pl < 3; pl++) {
@@ -375,6 +401,14 @@ function Step(t) {
 }
 
 window.seek = (c, t) => { if (c !== cer) { cer = c; Load(c); } clock = t; paused = true; Step(clock); renderer.render(scene, camera); return true; };
+// A close look at a person's hand, for screenshots: from where the shot's camera is, d metres from the hand.
+window.closeUp = (role, place, side, d) => {
+  const p = people.find(x => x.a.role === role && x.a.place === place);
+  const h = wp((side ? p.R : p.L)[2]);
+  const dir = camera.position.clone().sub(h).normalize();
+  free = true; camera.position.copy(h.clone().add(dir.multiplyScalar(d))); camera.lookAt(h); camera.fov = 40; camera.updateProjectionMatrix();
+  renderer.render(scene, camera);
+};
 window.freeView = (eye, look) => { free = true; camera.position.set(eye[0], eye[1], -eye[2]); camera.lookAt(look[0], look[1], -look[2]); camera.fov = 40; camera.updateProjectionMatrix(); };
 if (free) { const c = P.ceremonies[cer].cams[0]; camera.position.copy(V(c, 0)); controls.target.copy(V(c, 3)); controls.update(); }
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });

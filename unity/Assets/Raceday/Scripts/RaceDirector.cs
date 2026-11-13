@@ -323,6 +323,8 @@ namespace TarmacGauntlet.Raceday
                 if (Cars[i].Pits != null && Cars[i].Garage >= 0) PlaceInBox(i);
                 else Cars[i].gameObject.SetActive(false);
             }
+            // The race is over: every engine is switched off, the cars already in their boxes too.
+            EngineAudio.SwitchOffAll();
         }
 
         /// <summary>Puts car i in its box, held, its driver off: the box, the way into the garage, and the way down the lane.</summary>

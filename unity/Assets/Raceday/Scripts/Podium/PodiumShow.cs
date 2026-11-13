@@ -15,6 +15,13 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Where each wrist reaches, and how much the reach overrides the clip, 0 to 1.</summary>
         public Vector3 LeftHand, RightHand;
         public float LeftWeight, RightWeight;
+        /// <summary>
+        /// The bar each hand closes round, where it reaches for something: the way it runs, out past the thumb (a
+        /// bottle's axis, base to neck; a trophy's handle, upward). Zero where the hand holds nothing.
+        /// </summary>
+        public Vector3 LeftGrip, RightGrip;
+        /// <summary>The radius of the bar each hand closes round, m.</summary>
+        public float LeftBar, RightBar;
     }
 
     /// <summary>Who someone on the podium is.</summary>
@@ -294,19 +301,25 @@ namespace TarmacGauntlet.Raceday
                 pose.RightHand = trophy + Up * TrophyHandle(p) + right * TrophySide(p);
                 pose.LeftWeight = w;
                 pose.RightWeight = w * (1f - Span(t, presented + Lowering, presented + Lowering + 0.4f));
+                pose.LeftGrip = pose.RightGrip = Up;
+                pose.LeftBar = pose.RightBar = HandleBar * TrophyScale(p);
             }
             if (t >= BottleAt)
             {
-                (Vector3 hand, _) = BottleHand(p, n, pose.At, face, t);
+                (Vector3 hand, Vector3 axis) = BottleHand(p, n, pose.At, face, t);
                 pose.RightHand = hand;
+                pose.RightGrip = axis;
+                pose.RightBar = BottleBar;
                 pose.RightWeight = Mathf.Max(pose.RightWeight, Span(t, BottleAt, BottleAt + 0.5f));
             }
             return pose;
         }
 
         /// <summary>The trophies' handles: how high over the base, and how far out either side, m.</summary>
-        public static float TrophyHandle(int place) => 0.26f * TrophyScale(place);
-        public static float TrophySide(int place) => 0.15f * TrophyScale(place);
+        public static float TrophyHandle(int place) => 0.38f * TrophyScale(place);
+        public static float TrophySide(int place) => 0.165f * TrophyScale(place);
+        /// <summary>The radius of a full-size trophy's handle, and of the bottle where it is held, m.</summary>
+        public const float HandleBar = 0.009f, BottleBar = 0.045f;
         public static float TrophyScale(int place) => place == 0 ? 1f : place == 1 ? 0.88f : 0.8f;
 
         /// <summary>Where the lead driver holds the trophy at their side by its left handle, lifting it again at the end.</summary>
@@ -395,7 +408,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Where the trophy is handed over, between the presenter's hands and the driver's, over the step's front edge.</summary>
         public static Vector3 Handover(int place)
         {
-            return new Vector3(0f, PodiumPlan.Floor + 1.24f + PodiumPlan.StepHeights[place] * 0.75f - 0.26f, 10.47f);
+            return new Vector3(0f, PodiumPlan.Floor + 1.24f + PodiumPlan.StepHeights[place] * 0.75f - TrophyHandle(place), 10.47f);
         }
 
         /// <summary>The trophy's base and the way its handles point: with the presenter, handed over, lifted, then at the lead driver's side.</summary>
@@ -460,6 +473,8 @@ namespace TarmacGauntlet.Raceday
                 pose.LeftHand = trophy + Up * TrophyHandle(p) + side * TrophySide(p) * 1.05f;
                 pose.RightHand = trophy + Up * TrophyHandle(p) - side * TrophySide(p) * 1.05f;
                 pose.LeftWeight = pose.RightWeight = 1f - Span(t, t0 + Handed - 0.1f, t0 + Handed + 0.2f);
+                pose.LeftGrip = pose.RightGrip = Up;
+                pose.LeftBar = pose.RightBar = HandleBar * TrophyScale(p);
             }
             return pose;
         }

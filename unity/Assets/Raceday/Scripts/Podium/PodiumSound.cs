@@ -7,9 +7,12 @@ namespace TarmacGauntlet.Raceday
     /// The podium ceremony's sound, kept in time with its <see cref="PodiumShow"/>. The crews below murmur, and swell
     /// with how many of them are cheering. They roar as each place's drivers reach their step, as each trophy goes up,
     /// at the corks and at the confetti. Each champagne bottle pops its cork and fizzes while it sprays. The confetti
-    /// cannon booms and the paper flutters down. The crowd plays in the ambience's group of the <see cref="Mix"/>, the
-    /// rest in the effects'. The crowd is the race ambience's own recordings (Resources/Ambience); the corks, fizz and
-    /// confetti are made by tools/podium/sounds.py (Resources/Podium).
+    /// cannon booms and the paper flutters down. Over it all, one of the HQ's tracks plays over the circuit's
+    /// loudspeakers, thin, a little rough and echoing off the pit building. It plays on from one ceremony into the next
+    /// and fades once the last ends. The crowd plays in the ambience's group of the <see cref="Mix"/>, the music in the
+    /// music's, the rest in the effects'. The crowd is the race ambience's own recordings (Resources/Ambience); the
+    /// music is the HQ's (Resources/Music); the corks, fizz and confetti are made by tools/podium/sounds.py
+    /// (Resources/Podium).
     /// </summary>
     public sealed class PodiumSound : MonoBehaviour
     {
@@ -19,9 +22,13 @@ namespace TarmacGauntlet.Raceday
         private const float BedFollow = 1.5f;
         /// <summary>When each place's cork goes, after the show's pop, s: never quite together.</summary>
         private static readonly float[] CorkLag = { 0f, 0.11f, 0.19f };
+        /// <summary>The music's level over the loudspeakers, before the mix, and how long it fades once the last ceremony ends, s.</summary>
+        private const float MusicLevel = 0.6f, MusicFade = 2.5f;
 
         private PodiumFrame frame;
-        private AudioSource bed, confettiVoice;
+        private AudioSource bed, confettiVoice, music;
+        private AudioClip[] tracks;
+        private float musicLevel;
         private readonly AudioSource[] roars = new AudioSource[2], corks = new AudioSource[3], fizz = new AudioSource[3];
         private AudioClip[] roarClips, corkClips;
         private readonly float[] roarLevels = new float[2];
@@ -44,6 +51,12 @@ namespace TarmacGauntlet.Raceday
                 corks[p] = Voice("Podium cork", null, false, crowdAt, 6f);
                 fizz[p] = Voice("Podium fizz", Load("Podium/fizz"), true, crowdAt, 5f);
             }
+            tracks = Resources.LoadAll<AudioClip>("Music");
+            // The loudspeakers hang under the canopy, over the crowd.
+            music = Voice("Podium music", null, true, f.At(new Vector3(0f, PodiumPlan.Floor + PodiumPlan.CanopyHeight - 0.4f, PodiumPlan.CanopyFront)), 20f);
+            music.priority = 20;
+            music.spatialBlend = 0.4f;
+            Loudspeaker(music.gameObject);
             confettiVoice = Voice("Podium confetti", Load("Podium/confetti"), false, f.At(new Vector3(0f, PodiumPlan.CanopyHeight + PodiumPlan.Floor, PodiumPlan.StandZ)), 10f);
         }
 
@@ -68,11 +81,36 @@ namespace TarmacGauntlet.Raceday
             return s;
         }
 
-        /// <summary>Starts a ceremony's sound.</summary>
+        /// <summary>
+        /// A circuit's loudspeaker: no bass and little top, a horn's rasp, and a slap back off the pit building across
+        /// the lane.
+        /// </summary>
+        private static void Loudspeaker(GameObject go)
+        {
+            go.AddComponent<AudioHighPassFilter>().cutoffFrequency = 380f;
+            AudioLowPassFilter low = go.AddComponent<AudioLowPassFilter>();
+            low.cutoffFrequency = 4200f;
+            low.lowpassResonanceQ = 1.6f;
+            go.AddComponent<AudioDistortionFilter>().distortionLevel = 0.35f;
+            AudioEchoFilter echo = go.AddComponent<AudioEchoFilter>();
+            echo.delay = 140f;
+            echo.decayRatio = 0.3f;
+            echo.wetMix = 0.45f;
+            echo.dryMix = 1f;
+        }
+
+        /// <summary>Starts a ceremony's sound. The music carries on if a ceremony has just ended.</summary>
         public void Begin()
         {
             Stop();
             playing = true;
+            if (!music.isPlaying && tracks != null && tracks.Length > 0)
+            {
+                music.clip = tracks[Random.Range(0, tracks.Length)];
+                music.time = 0f;
+                music.Play();
+            }
+            musicLevel = 1f;
             last = -1f;
             bedLevel = BedQuiet;
             if (bed.clip != null)
@@ -134,6 +172,18 @@ namespace TarmacGauntlet.Raceday
             last = t;
         }
 
+        private void Update()
+        {
+            if (music == null || !music.isPlaying) return;
+            // Once the last ceremony ends, the music fades away.
+            if (!playing)
+            {
+                musicLevel = Mathf.MoveTowards(musicLevel, 0f, Time.unscaledDeltaTime / MusicFade);
+                if (musicLevel <= 0f) music.Stop();
+            }
+            music.volume = musicLevel * MusicLevel * Mix.Gain(SoundGroup.Music);
+        }
+
         /// <summary>True the first step at or past moment.</summary>
         private bool Crossed(float moment, float t) => last < moment && t >= moment;
 
@@ -151,7 +201,7 @@ namespace TarmacGauntlet.Raceday
             roars[i].Play();
         }
 
-        /// <summary>Silences everything at once.</summary>
+        /// <summary>Silences everything at once but the music, which fades.</summary>
         public void Stop()
         {
             playing = false;

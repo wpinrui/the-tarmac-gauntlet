@@ -496,11 +496,12 @@ static class Check
                 PodiumPose p = show.Pose(a, t);
                 if (!first) actors.Append(',');
                 first = false;
-                // Root, face; clip, time, under, time, weight; left hand, weight; right hand, weight.
+                // Root, face; clip, time, under, time, weight; left hand, weight; right hand, weight; left grip, bar; right grip, bar.
                 actors.Append(F3(W(p.At))).Append(',').Append(F3(D(p.Face))).Append(',')
                     .Append(Clip(p.Clip)).Append(',').Append(F(p.ClipTime)).Append(',').Append(p.Loop ? 1 : 0).Append(',')
                     .Append(p.UnderWeight > 0f ? Clip(p.Under) : -1).Append(',').Append(F(p.UnderTime)).Append(',').Append(p.UnderLoop ? 1 : 0).Append(',').Append(F(p.UnderWeight)).Append(',')
-                    .Append(F3(W(p.LeftHand))).Append(',').Append(F(p.LeftWeight)).Append(',').Append(F3(W(p.RightHand))).Append(',').Append(F(p.RightWeight));
+                    .Append(F3(W(p.LeftHand))).Append(',').Append(F(p.LeftWeight)).Append(',').Append(F3(W(p.RightHand))).Append(',').Append(F(p.RightWeight)).Append(',')
+                    .Append(F3(D(p.LeftGrip))).Append(',').Append(F(p.LeftBar)).Append(',').Append(F3(D(p.RightGrip))).Append(',').Append(F(p.RightBar));
             }
             actors.Append("]}");
         }
