@@ -30,6 +30,26 @@ namespace TarmacGauntlet.Simulation
         /// <summary>Share of a lap's time spent where grip sets the speed, for weighing a repair against the laps to come.</summary>
         private const double GripShare = 0.6;
 
+        /// <summary>
+        /// Damaging hits a car takes per hour of driving, for a car far from the camera, which runs without physics and
+        /// can't hit anything: in a pack the AI makes about this many contacts over 3 m/s an hour.
+        /// </summary>
+        public const double HitsPerHour = 3;
+        /// <summary>Mean m/s above <see cref="MinImpact"/> of a rolled hit: most are knocks, a very few total the car.</summary>
+        public const double MeanRolledImpact = 6;
+
+        /// <summary>
+        /// For a car with no physics: the speed of a hit it takes over <paramref name="seconds"/> of driving, or null
+        /// for none. Hits come at <see cref="HitsPerHour"/>, their speed above <see cref="MinImpact"/> spread exponentially.
+        /// </summary>
+        public static double? RollHit(double seconds, Func<double> random)
+        {
+            if (seconds <= 0) return null;
+            double chance = 1 - Math.Exp(-HitsPerHour * seconds / 3600);
+            if (random() >= chance) return null;
+            return MinImpact - MeanRolledImpact * Math.Log(1 - random());
+        }
+
         /// <summary>Damage a hit at <paramref name="impact"/> m/s does.</summary>
         public static double FromImpact(double impact) => Math.Max(0, impact - MinImpact) * DamagePerImpact;
 

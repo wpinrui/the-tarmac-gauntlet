@@ -701,12 +701,7 @@ namespace TarmacGauntlet.Raceday
         {
             if (playerIndex < 0) return;
             CarRaceLog mine = day.Cars[playerIndex];
-            if (mine.Retired)
-            {
-                // Out of the race, nobody drives: a car that can still move limps back to its box on the AI.
-                if (!ai.enabled && mine.RetirementReason != FailureType.Crash && !ai.Car.Hold) GiveToAi();
-                return;
-            }
+            if (mine.Retired) return;   // out of the race, nobody drives the car
             string now = mine.Driver.Id;
             bool changed = now != lastDriver;
             lastDriver = now;
