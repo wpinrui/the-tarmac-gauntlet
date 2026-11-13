@@ -240,10 +240,10 @@ def sides(lv):
         cu = lu + lw / 2
         out = []
         # shell: grip ridges fore and aft of the arches, moulded lettering along the sill
-        for zz0, zz1, ya, yb in ((2.22, 1.86, 0.64, 0.36), (-1.86, -2.25, 0.78, 0.42)):
+        for zz0, zz1, ya, yb in ((2.12, 1.86, 0.56, 0.36), (-1.86, -2.18, 0.68, 0.42)):
             (ua, va), (ub, vb) = P(zz0, ya), P(zz1, yb)
             out.append(ridges(min(ua, ub), max(ua, ub), va, vb))
-        for z, y in ((2.05, 0.30), (-2.05, 0.30), (1.98, 0.86), (-1.40, 0.96), (0.95, 0.27), (-0.95, 0.27)):
+        for z, y in ((2.05, 0.30), (-1.90, 0.32), (-1.40, 0.96), (0.95, 0.27), (-0.95, 0.27)):
             out.append(screw(*P(z, y)))
         u, v = P(0.0, 0.29)
         out.append(words(MONO_F, "MADE IN TAIWAN", u, v, 0.024, MOULD, spacing=0.25))
@@ -260,7 +260,7 @@ def sides(lv):
         out.append(words(MONO_F, "NORMAL BIAS  120µs EQ", u, v, 0.018, MOULD, spacing=0.1))
         u, v = P(1.25, 0.86)
         out.append(words(COND_F, "HIGH OUTPUT  LOW NOISE", u, v, 0.03, MOULD, spacing=0.12))
-        out.append(masking(*P(2.02, 0.74), 0.22, 0.07, 6 * fwd, "重播", 0.04, KAI_F))
+        out.append(masking(*P(1.62, 0.82), 0.18, 0.065, 6 * fwd, "重播", 0.038, KAI_F))
         out.append(words(CJK_F, "台灣製造  卡式錄音帶", *P(1.20, 0.80), 0.026, MOULD, spacing=0.2))
         out.append(masking(*P(-1.22, 0.82), 0.36, 0.06, -4 * fwd, "DO NOT ERASE!!"))
         out.append(masking(*P(-1.10, 0.885), 0.22, 0.055, 3 * fwd, "請勿消除", 0.032, KAI_F))
@@ -292,7 +292,7 @@ def sides(lv):
         for i, t in enumerate(TRACKS):
             u, v = P(-0.81, 0.76 - i * 0.05)
             out.append(words(MARKER_F, t, u, v, 0.016, MARKER, width=0.24))
-        out.append(barcode(*P(-0.80, 0.44), 0.18, 0.06, 3))
+        out.append(barcode(*P(-0.78, 0.50), 0.18, 0.05, 3))
         # the window, the logo on the front of the label
         out.append(tape_window(*P(WIN[0], WIN[1]), WIN[2], WIN[3]))
         # tape chewed out of the shell, trailing back along the sill
@@ -302,7 +302,7 @@ def sides(lv):
         out.append(logo(*P(0.80, 0.42), 0.09))
         # stickers over the edges, and the label's own screws
         out.append(rec(*P(0.96, 0.86), 0.04))
-        out.append(price(*P(-0.95, 0.38), -8 if view == "left" else 8))
+        out.append(price(*P(-0.86, 0.40), -8 if view == "left" else 8))
         for z, y in ((0.92, 0.39), (-0.92, 0.84)):
             out.append(screw(*P(z, y), 0.018))
         lv.raw(view, "".join(out))
@@ -347,9 +347,9 @@ def top(lv):
         out.append(words(MARKER_F, t, tu, tv, 0.024, LABEL, rotate=-90, width=0.4, anchor="middle"))
     # grip ridges on the wings, beside the bonnet
     for x in (0.86, -0.86):
-        (ua, va), (ub, vb) = T(1.15, x - 0.05), T(1.85, x + 0.05)
+        (ua, va), (ub, vb) = T(1.15, x - 0.05), T(1.68, x + 0.05)
         out.append(f'<g transform="rotate(90 {(ua + ub) / 2:.4f} {(va + vb) / 2:.4f})">'
-                   + ridges((ua + ub) / 2 - 0.05, (ua + ub) / 2 + 0.05, (va + vb) / 2 - 0.35, (va + vb) / 2 + 0.35) + "</g>")
+                   + ridges((ua + ub) / 2 - 0.05, (ua + ub) / 2 + 0.05, (va + vb) / 2 - 0.26, (va + vb) / 2 + 0.26) + "</g>")
     # the roof: a paper patch with the number, upright from the nose
     ru, rv = T(-0.38, 0)
     out.append(rrect(ru, rv, 0.62, 0.74, 0.03, LABEL))
@@ -361,8 +361,8 @@ def top(lv):
             out.append(screw(ru + dz, rv + dx, 0.016))
     out.append(price(ru - 0.25, rv + 0.28, -80))
     out.append(masking(*T(1.06, 0.46), 0.26, 0.06, -86, "SIDE A, PLAY LOUD"))
-    out.append(masking(*T(-1.55, 0), 0.40, 0.065, -92, "be kind, rewind"))
-    out.append(masking(*T(-0.38, -0.44), 0.30, 0.055, -88, "demo"))
+    out.append(masking(*T(-2.07, 0), 0.40, 0.065, -92, "be kind, rewind"))
+    out.append(masking(*T(-0.38, -0.30), 0.24, 0.055, -88, "demo"))
     # the boot lid: moulded lettering
     bu, bv = T(-1.80, 0)
     out.append(words(CJK_F, "低傳真錄音帶", bu, bv, 0.05, MOULD, rotate=-90))
@@ -376,18 +376,16 @@ def front(lv):
         return lv.uv("front", (x, y, 2.4))
 
     out = []
-    u, v = F(0, 0.69)
-    out.append(words(BLACK_F, "LO-FI RACING", u, v, 0.045, LABEL, spacing=0.08))
+    u, v = F(0, 0.71)
+    out.append(words(BLACK_F, "LO-FI RACING", u, v, 0.04, LABEL, spacing=0.08))
     for s in (1, -1):
         out.append(screw(*F(s * 0.80, 0.52), 0.02))
         out.append(screw(*F(s * 0.80, 0.24), 0.02))
-        (ua, va), (ub, vb) = F(s * 0.86, 0.48), F(s * 0.64, 0.30)
+        (ua, va), (ub, vb) = F(s * 0.86, 0.33), F(s * 0.66, 0.24)
         out.append(ridges(min(ua, ub), max(ua, ub), va, vb, 0.02))
-    out.append(words(MONO_F, "DO NOT TOUCH TAPE SURFACE", *F(0, 0.175), 0.017, MOULD, spacing=0.2))
-    out.append(words(CJK_F, "請勿觸摸磁帶", *F(0, 0.205), 0.026, MOULD, spacing=0.3))
+    out.append(words(CJK_F, "請勿觸摸磁帶", *F(0, 0.66), 0.022, MOULD, spacing=0.3))
     out.append(seal(*F(-0.62, 0.40), 0.05))
-    out.append(rec(*F(-0.62, 0.62), 0.04))
-    out.append(masking(*F(0.62, 0.34), 0.24, 0.06, -5, "play loud"))
+    out.append(masking(*F(0.74, 0.29), 0.20, 0.06, -5, "play loud"))
     lv.raw("front", "".join(out))
 
 
