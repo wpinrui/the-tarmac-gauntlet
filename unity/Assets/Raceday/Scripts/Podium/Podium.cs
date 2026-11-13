@@ -38,6 +38,9 @@ namespace TarmacGauntlet.Raceday
         private readonly Transform[] trophies = new Transform[3], bottles = new Transform[3], buckets = new Transform[3];
         private readonly ParticleSystem[] sprays = new ParticleSystem[3];
         private ParticleSystem confetti;
+        private PodiumSound sound;
+        private readonly float[] sprayLevels = new float[3];
+        private readonly Vector3[] mouths = new Vector3[3];
         private PodiumShow show;
         private float clock;
         private bool confettiFired;
@@ -116,6 +119,10 @@ namespace TarmacGauntlet.Raceday
                 sprays[p] = Spray(p);
             }
             confetti = Confetti();
+            Vector3 centre = Vector3.zero;
+            foreach ((Vector3 at, _) in crowd) centre += at;
+            sound = gameObject.AddComponent<PodiumSound>();
+            sound.Make(Plan.Frame, crowd.Count > 0 ? centre / crowd.Count : new Vector3(0f, 0f, 18f));
             Hide();
         }
 
@@ -299,6 +306,7 @@ namespace TarmacGauntlet.Raceday
                 buckets[p].gameObject.SetActive(used);
                 if (used) buckets[p].SetPositionAndRotation(Plan.Frame.At(PodiumPlan.Bucket(p, show.Drivers[p])), Quaternion.identity);
             }
+            if (sound != null) sound.Begin();
             Step(0f);
         }
 
@@ -331,6 +339,7 @@ namespace TarmacGauntlet.Raceday
             }
             cast.Clear();
             show = null;
+            if (sound != null) sound.Stop();
             Hide();
         }
 
@@ -388,10 +397,16 @@ namespace TarmacGauntlet.Raceday
         private void Step(float t)
         {
             PodiumFrame f = Plan.Frame;
+            int crew = 0, cheering = 0;
             foreach (Rig r in cast)
             {
                 PodiumActor a = r.Actor;
                 PodiumPose pose = show.Pose(a, t);
+                if (a.Role == PodiumRole.Crew)
+                {
+                    crew++;
+                    if (pose.Clip == "Cheer") cheering++;
+                }
                 // Drivers wait out of sight inside the doorway until they walk out.
                 bool shown = a.Role != PodiumRole.Driver || t >= show.StartOf(a);
                 if (r.Body.Root.activeSelf != shown) r.Body.Root.SetActive(shown);
@@ -416,8 +431,11 @@ namespace TarmacGauntlet.Raceday
                 (Vector3 bb, Vector3 axis) = show.Bottle(p, t);
                 bottles[p].SetPositionAndRotation(f.At(bb), Quaternion.FromToRotation(Vector3.up, f.Dir(axis).normalized));
                 ParticleSystem.EmissionModule e = sprays[p].emission;
+                sprayLevels[p] = -1f;
                 if (show.Spray(p, t, out Vector3 mouth, out Vector3 aim))
                 {
+                    mouths[p] = mouth;
+                    sprayLevels[p] = 1f - Mathf.Clamp01((t - PodiumShow.PopAt) / (PodiumShow.SprayEnd - PodiumShow.PopAt));
                     sprays[p].transform.SetPositionAndRotation(f.At(mouth), Quaternion.LookRotation(f.Dir(aim).normalized, Vector3.up));
                     // A burst as the cork goes, then a steady stream that thins as the bottle empties.
                     float since = t - PodiumShow.PopAt;
@@ -429,6 +447,17 @@ namespace TarmacGauntlet.Raceday
             {
                 confettiFired = true;
                 confetti.Emit(3200);
+            }
+            if (sound != null)
+            {
+                // Before the spray, the corks pop from where the bottles are.
+                for (int p = 0; p < 3; p++)
+                    if (sprayLevels[p] < 0f && show.Drivers[p] > 0)
+                    {
+                        (Vector3 bb, Vector3 axis) = show.Bottle(p, t);
+                        mouths[p] = bb + axis * PodiumShow.BottleLength;
+                    }
+                sound.Step(show, t, crew > 0 ? (float)cheering / crew : 0f, sprayLevels, mouths);
             }
         }
 
