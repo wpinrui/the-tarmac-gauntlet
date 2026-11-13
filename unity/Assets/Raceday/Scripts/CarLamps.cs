@@ -26,6 +26,8 @@ namespace TarmacGauntlet.Raceday
         public bool HasHeadlamps { get; private set; } = true;
         /// <summary>Middle of the headlamps, in the car's space.</summary>
         public Vector3 Nose { get; private set; } = new Vector3(0f, 0.7f, 2.3f);
+        /// <summary>How far forward the car reaches, in its space, m: the front of its bumper.</summary>
+        public float Front { get; private set; } = 2.3f;
 
         private readonly struct BrakeSlot
         {
@@ -92,6 +94,16 @@ namespace TarmacGauntlet.Raceday
             }
             if (anyHead) Nose = transform.InverseTransformPoint(heads.center);
             HasHeadlamps = anyHead;
+            Front = Nose.z;
+            foreach (Renderer r in model.GetComponentsInChildren<Renderer>())
+            {
+                Bounds b = r.bounds;
+                for (int k = 0; k < 8; k++)
+                {
+                    var corner = new Vector3((k & 1) == 0 ? b.min.x : b.max.x, (k & 2) == 0 ? b.min.y : b.max.y, (k & 4) == 0 ? b.min.z : b.max.z);
+                    Front = Mathf.Max(Front, transform.InverseTransformPoint(corner).z);
+                }
+            }
         }
 
         private void FitBox()
@@ -102,6 +114,7 @@ namespace TarmacGauntlet.Raceday
             brakes.Add(new BrakeSlot(rear, 0, shared.BoxTail, shared.BoxBrake));
             Vector3 c = CarBuilder.BoxCentre, s = CarBuilder.BoxSize;
             Nose = new Vector3(0f, c.y + s.y * 0.2f, c.z + s.z * 0.5f);
+            Front = Nose.z;
         }
 
         private Renderer Lamp(string name, Mesh mesh, Material material)
@@ -215,8 +228,7 @@ namespace TarmacGauntlet.Raceday
         private float night;
 
         private static readonly int EmissionId = Shader.PropertyToID("_EmissionColor"), ColorId = Shader.PropertyToID("_Color"),
-            LiftId = Shader.PropertyToID("_Lift"), CapId = Shader.PropertyToID("_Cap"), ShapeId = Shader.PropertyToID("_Shape"),
-            BandId = Shader.PropertyToID("_Band");
+            LiftId = Shader.PropertyToID("_Lift"), ShapeId = Shader.PropertyToID("_Shape"), BandId = Shader.PropertyToID("_Band");
 
         /// <summary>The beam reaches from the nose to this far ahead, widening from the first width to the second, m.</summary>
         private const float BeamLength = 24f, BeamNear = 1.8f, BeamFar = 9f;
@@ -287,7 +299,6 @@ namespace TarmacGauntlet.Raceday
             foreach (Material m in tailLenses.Values) m.SetColor(EmissionId, tail * LensGlow);
             Beam.SetVector(ColorId, FloodMaterials.Brightening(headTint, NightLook.BeamBrightening * amount));
             Beam.SetVector(LiftId, FloodMaterials.Lift(headTint, NightLook.BeamLift * amount));
-            Beam.SetFloat(CapId, NightLook.BeamCap * amount);
             BeamsOn = amount > 0.02f;
             HeatHazeFeature.HeadlampBeams = BeamsOn;
         }

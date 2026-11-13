@@ -32,9 +32,27 @@ namespace TarmacGauntlet.Raceday
         private const float FocusAhead = 30f;
         /// <summary>Real lights only go to floodlights and cars nearer the view than this, m.</summary>
         private const float FloodReach = 160f, HeadReach = 120f;
-        private const float FloodIntensity = 2.5f, HeadIntensity = 3f, HeadRange = 70f, HeadCone = 55f;
+        private const float FloodIntensity = 2.5f, HeadRange = 70f, HeadCone = 55f;
+        /// <summary>
+        /// A headlamp light's intensity in Linear, candela-like: it lights a white car 15 m ahead to about a tenth of white,
+        /// clearly lit against the night but with its shading and paint kept. Set directly: matched from the Gamma lamp at
+        /// 15 m (LightFalloff.UrpLinear) it came out near 1000 and blew every car ahead out to white.
+        /// </summary>
+        private const float HeadIntensity = 24f;
         /// <summary>How far ahead the headlamps mostly light the cars in front, m.</summary>
         private const float HeadLights = 15f;
+        /// <summary>
+        /// A car's headlamp light sits this far ahead of its bumper, m, so it never lights its own car: from the nose it
+        /// lit the bonnet's leading edge a hand's width away, hundreds of times brighter than the cars it was set for.
+        /// </summary>
+        private const float HeadAhead = 0.15f;
+        /// <summary>
+        /// A car close in front is lit at most this many times as brightly as one <see cref="HeadLights"/> ahead: the light
+        /// dims as a car closes on it, where the square of the distance would light a car 3 m off 25 times as brightly.
+        /// </summary>
+        private const float HeadNearest = 2f;
+        /// <summary>A car's body reaches this far from its middle, along it and across it, m.</summary>
+        private const float CarHalfLength = 2.2f, CarHalfWidth = 0.9f;
 
         private sealed class Slot
         {
@@ -44,6 +62,8 @@ namespace TarmacGauntlet.Raceday
             public float Level;
             /// <summary>How far from the light the things it lights mostly are, m: its brightness is matched there.</summary>
             public float Lights;
+            /// <summary>The share of its brightness the light gives now: less with a car close in front of it.</summary>
+            public float Scale = 1f;
         }
 
         /// <summary>The gantry's uplights are on only while the camera is this near the start line, m.</summary>
@@ -136,8 +156,8 @@ namespace TarmacGauntlet.Raceday
             float on = NightLook.On(Mathf.Max(night, 0f));
             Atmosphere.Beams(beamPos, beamAim, on > 0.001f ? beamCount : 0, NightLook.Flood.linear * (on * BeamStrength * BeamLinear));
             float step = Time.unscaledDeltaTime / Fade;
-            foreach (Slot s in floods) Follow(s, step, on * FloodIntensity, PlaceFlood);
-            foreach (Slot s in heads) Follow(s, step, on * HeadIntensity, PlaceHead);
+            foreach (Slot s in floods) Follow(s, step, on * FloodIntensity, PlaceFlood, false);
+            foreach (Slot s in heads) Follow(s, step, on * HeadIntensity, PlaceHead, true);
             Camera cam = Camera.main;
             foreach (Light l in uplights)
             {
@@ -239,8 +259,11 @@ namespace TarmacGauntlet.Raceday
 
         private delegate bool Place(Slot s);
 
-        /// <summary>Fades a light out from where it is, moves it, and fades it in at its new place.</summary>
-        private static void Follow(Slot s, float step, float full, Place place)
+        /// <summary>
+        /// Fades a light out from where it is, moves it, and fades it in at its new place. <paramref name="full"/> is its
+        /// Linear intensity when <paramref name="linear"/>, otherwise its Gamma one, matched where it mostly lights things.
+        /// </summary>
+        private static void Follow(Slot s, float step, float full, Place place, bool linear)
         {
             if (s.Want != s.At)
             {
@@ -254,7 +277,8 @@ namespace TarmacGauntlet.Raceday
                 if (s.Light.enabled) s.Light.enabled = false;
                 return;
             }
-            s.Light.intensity = s.Level * LightFalloff.UrpLinear(s.Light.color, full, s.Light.range, s.Lights);
+            float intensity = linear ? full : LightFalloff.UrpLinear(s.Light.color, full, s.Light.range, s.Lights);
+            s.Light.intensity = s.Level * s.Scale * intensity;
             if (!s.Light.enabled) s.Light.enabled = true;
         }
 
@@ -276,12 +300,38 @@ namespace TarmacGauntlet.Raceday
             if (s.At >= CarLamps.All.Count) return false;
             CarLamps car = CarLamps.All[s.At];
             Transform c = car.transform;
-            s.Light.transform.SetPositionAndRotation(c.TransformPoint(car.Nose), c.rotation * Quaternion.Euler(4f, 0f, 0f));
+            Vector3 at = c.TransformPoint(new Vector3(car.Nose.x, car.Nose.y, car.Front + HeadAhead));
+            Quaternion aim = c.rotation * Quaternion.Euler(4f, 0f, 0f);
+            s.Light.transform.SetPositionAndRotation(at, aim);
             s.Light.range = HeadRange;
             s.Lights = HeadLights;
             s.Light.spotAngle = HeadCone;
             s.Light.innerSpotAngle = HeadCone * 0.5f;
+            float near = Nearest(car, at, aim * Vector3.forward);
+            s.Scale = Mathf.Min(1f, HeadNearest * LightFalloff.At(HeadLights, HeadRange) / LightFalloff.At(near, HeadRange));
             return true;
+        }
+
+        /// <summary>
+        /// How near the closest other car in front of a headlamp light is, m, to the nearest point of its body: those within
+        /// the cone and a margin around it, for a car alongside catches the cone's soft edge.
+        /// </summary>
+        private static float Nearest(CarLamps own, Vector3 at, Vector3 forward)
+        {
+            float nearest = HeadRange, edge = Mathf.Cos((HeadCone * 0.5f + 25f) * Mathf.Deg2Rad);
+            foreach (CarLamps other in CarLamps.All)
+            {
+                if (other == own) continue;
+                Transform t = other.transform;
+                Vector3 axis = t.forward * CarHalfLength, from = t.position - axis;
+                // The nearest point on the car's middle line, then out to its side.
+                float k = Mathf.Clamp01(Vector3.Dot(at - from, axis) / (2f * CarHalfLength * CarHalfLength));
+                Vector3 v = from + axis * (2f * k) + Vector3.up * 0.6f - at;
+                float d = v.magnitude;
+                if (d >= nearest + CarHalfWidth || Vector3.Dot(v, forward) < edge * d) continue;
+                nearest = Mathf.Min(nearest, Mathf.Max(d - CarHalfWidth, 0.5f));
+            }
+            return nearest;
         }
     }
 }
