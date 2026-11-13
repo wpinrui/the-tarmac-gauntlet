@@ -117,6 +117,20 @@ you cross the line: past the speed that holds your place the power is cut, and a
 you can't pass the car before you in grid order. `bash tools/ai-check/run.sh final` runs it with 100 cars, with and
 without a player driving flat out against the limiter.
 
+After the flag come the cool-down lap (`Stages/CooldownStage.cs`), then two podium ceremonies (`Podium/PodiumStage.cs`):
+the overall top three, then your class's, skipped when it is the same three cars or you have no car in the race. The
+podium stands all race on the race offices' front, a balcony over the pit lane with three steps under a canopy
+(`Podium/PodiumPlan.cs`, `Podium/PodiumBuilder.cs`). A ceremony (`Podium/PodiumShow.cs`) is a timeline: the drivers
+walk out of the doorway and up onto their steps, each lead driver is handed the trophy and lifts it, then takes the
+champagne from the ice bucket, shakes it and sprays it over the others and the podium teams' crews in the fast lane
+below, and confetti falls. Every car still on its cool-down lap is put in its box first. The people are Team HQ's crew
+body as live rigs, posed from its clips with their arms reaching for the trophy and the bottle (`Podium/Podium.cs`).
+The race summary opens once the last ceremony ends or is skipped (`RaceDirector.ShowSummary`). After changing the
+podium, run `bash tools/podium/run.sh [folder]`: it builds the podium on the real pit building and plays a ceremony
+for every line-up of one to three drivers in each place, checking it sits on the offices, nobody walks into anybody,
+every hand reaches what it holds, the crowd stands clear of the parked cars and every shot's camera is clear. With a
+folder it writes a preview there that plays the ceremony through its own camera.
+
 The camera starts on the broadcast when the race comes from the career, and on the chase camera when the scene runs on
 its own. `C` cycles the car cameras: TV, chase, bonnet and bumper. The TV camera is coverage locked to the car: a second
 director with `Lock` set shows mostly trackside shots and pans, a helicopter shot now and then, and an onboard about one

@@ -28,7 +28,7 @@ namespace TarmacGauntlet.Raceday
 
         /// <summary>The kit look the crews wear.</summary>
         public const KitLook Kit = KitLook.TeamSuit;
-        private const string BodyId = "crew_suit";
+        internal const string BodyId = "crew_suit";
         /// <summary>Most people played as live rigs at once.</summary>
         private const int MaxLive = 48;
         /// <summary>A crew is played live while a person in it stands at least this share of the screen's height.</summary>
@@ -183,12 +183,18 @@ namespace TarmacGauntlet.Raceday
         // ---------------------------------------------------------------- materials and still figures
 
         /// <summary>The body's own materials, but the suit's cloth parts drawn with the kit shader, all instanced.</summary>
-        private void Materials()
+        private void Materials() => materials = KitMaterials(body, out kitParts);
+
+        /// <summary>
+        /// A crew body's materials with the suit's cloth parts drawn with the kit shader, all instanced, and the submeshes
+        /// those parts are: paint them with <see cref="KitBlock"/> or <see cref="DriverKit"/>. The podium dresses its people the same way.
+        /// </summary>
+        internal static Material[] KitMaterials(HqCrewBody body, out int[] kitParts)
         {
             Material[] own = body.PartMaterials(body.Palette(0));
             Shader kit = Resources.Load<Shader>("PitCrew/CrewKit");
             var parts = new List<int>();
-            materials = new Material[own.Length];
+            var materials = new Material[own.Length];
             for (int s = 0; s < own.Length; s++)
             {
                 string name = body.MaterialName(s);
@@ -208,10 +214,11 @@ namespace TarmacGauntlet.Raceday
                 parts.Add(s);
             }
             kitParts = parts.ToArray();
+            return materials;
         }
 
         /// <summary>The team's colours for the kit parts, per the chosen look.</summary>
-        private static MaterialPropertyBlock KitBlock(Color team)
+        internal static MaterialPropertyBlock KitBlock(Color team)
         {
             var b = new MaterialPropertyBlock();
             team.a = 1f;

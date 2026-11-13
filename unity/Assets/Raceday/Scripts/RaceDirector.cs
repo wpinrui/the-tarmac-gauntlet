@@ -276,13 +276,65 @@ namespace TarmacGauntlet.Raceday
                 Debug.LogException(e);
                 return;
             }
-            ParkForSummary();
+            // After the flag the podium plays first, and opens the summary when it is done (ShowSummary).
+            if (HoldSummary && timeUpAt >= 0f) return;
+            ShowSummary();
         }
+
+        /// <summary>
+        /// True when the stages after the flag play the podium before the race summary: a race settled once its time is
+        /// up waits for <see cref="ShowSummary"/>. A race settled before then, the player retiring, opens it at once.
+        /// </summary>
+        [NonSerialized] public bool HoldSummary;
+
+        /// <summary>Parks the player's car for the race summary and opens it. Once only.</summary>
+        public void ShowSummary()
+        {
+            if (!Finished || summaryShown || RaceWeekend.Summary == null) return;
+            summaryShown = true;
+            ParkForSummary();
+            RaceWeekend.ShowSummary();
+        }
+
+        private bool summaryShown;
 
         /// <summary>
         /// Sets the scene for the race summary: the player's car parked in its box, seen from across the pit lane, at
         /// normal speed, with the race views, timing tower and driving HUD gone.
         /// </summary>
+        /// <summary>
+        /// Every car still driving put in its box and held there, out of the pit lane's traffic: the podium's crowd
+        /// stands in the fast lane. A car with no box is taken off the track. Cars already parked, or stopped out on the
+        /// track, stay where they are.
+        /// </summary>
+        public void ParkAll()
+        {
+            if (Cars == null || controllers == null) return;
+            for (int i = 0; i < Cars.Length; i++)
+            {
+                if (Cars[i] == null || !Cars[i].enabled || controllers[i] == null || controllers[i].Hold) continue;
+                if (Cars[i].Pits != null && Cars[i].Garage >= 0) PlaceInBox(i);
+                else Cars[i].gameObject.SetActive(false);
+            }
+        }
+
+        /// <summary>Puts car i in its box, held, its driver off: the box, the way into the garage, and the way down the lane.</summary>
+        private (Vector3 box, Vector3 toGarage, Vector3 along) PlaceInBox(int i)
+        {
+            PitLane pits = Cars[i].Pits;
+            int garage = Cars[i].Garage;
+            Vector3 box = pits.BoxPoint(garage);
+            Vector3 toGarage = pits.LaneLeft(pits.BoxLane[garage]);
+            var along = new Vector3(toGarage.z, 0f, -toGarage.x);   // down the lane, the way cars drive it
+            if (Drivers[i] != null) Drivers[i].enabled = false;
+            Cars[i].enabled = false;   // out of every other car's traffic
+            CarController car = controllers[i];
+            car.PlaceAt(box, along);
+            car.Hold = true;
+            car.InputEnabled = false;
+            return (box, toGarage, along);
+        }
+
         private void ParkForSummary()
         {
             Time.timeScale = 1f;
@@ -300,18 +352,7 @@ namespace TarmacGauntlet.Raceday
             for (int i = 0; i < Day.Cars.Count; i++) if (Day.Cars[i].Car.Player) me = i;
             if (me < 0 || Cars[me] == null || Cars[me].Pits == null || Cars[me].Garage < 0) return;
 
-            PitLane pits = Cars[me].Pits;
-            int garage = Cars[me].Garage;
-            Vector3 box = pits.BoxPoint(garage);
-            Vector3 toGarage = pits.LaneLeft(pits.BoxLane[garage]);
-            var along = new Vector3(toGarage.z, 0f, -toGarage.x);   // down the lane, the way cars drive it
-
-            Drivers[me].enabled = false;
-            Cars[me].enabled = false;   // out of every other car's traffic
-            CarController car = controllers[me];
-            car.PlaceAt(box, along);
-            car.Hold = true;
-            car.InputEnabled = false;
+            (Vector3 box, Vector3 toGarage, Vector3 along) = PlaceInBox(me);
 
             if (cam == null) return;
             cam.fieldOfView = 34f;

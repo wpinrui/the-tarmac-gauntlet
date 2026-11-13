@@ -450,6 +450,27 @@ namespace TarmacGauntlet.Simulation.Tests
         }
 
         [Test]
+        public void TheSummaryOpensOnlyWhenAsked()
+        {
+            GameState game = Career();
+            int due = 0;
+            Action count = () => due++;
+            RaceWeekend.SummaryDue += count;
+            try
+            {
+                RaceSetup setup = RaceWeekend.Begin(game);
+                RaceWeekend.Finish(new RaceDay(setup, Never));
+                Assert.That(due, Is.EqualTo(0), "settling the race leaves the summary to the race scene, after the podium");
+                RaceWeekend.ShowSummary();
+                Assert.That(due, Is.EqualTo(1));
+            }
+            finally
+            {
+                RaceWeekend.SummaryDue -= count;
+            }
+        }
+
+        [Test]
         public void BeginAndFinishHandTheRaceOver()
         {
             GameState game = Career();

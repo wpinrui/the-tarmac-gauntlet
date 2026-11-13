@@ -7,7 +7,7 @@ using UnityEngine;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// Builds the circuit, the country round it (<see cref="Landscape"/>), the trackside furniture (<see cref="Trackside"/>), the pit crews (<see cref="PitCrews"/>), the sky and its sun (<see cref="TimeOfDay"/>), the race's weather (<see cref="WeatherPlan"/>), the floodlights
+    /// Builds the circuit, the country round it (<see cref="Landscape"/>), the trackside furniture (<see cref="Trackside"/>), the pit crews (<see cref="PitCrews"/>), the podium (<see cref="Podium"/>), the sky and its sun (<see cref="TimeOfDay"/>), the race's weather (<see cref="WeatherPlan"/>), the floodlights
     /// that come on at night (<see cref="NightLights"/>), the career's field and the cameras when the scene starts. The
     /// field is every team with a car, from <see cref="RaceWeekend.Setup"/>, gridded by prestige: each
     /// car on a full tank and new tyres, its starting driver at the wheel. Run on its own, the scene
@@ -190,6 +190,8 @@ namespace TarmacGauntlet.Raceday
             Lap("racing line");
             yield return null;
             var pits = new PitLane(circuit);
+            // The podium on the race offices' front, standing there all race for the ceremonies after the flag.
+            Podium podium = Podium.Build(Complex, pits, pitMaterials, buildings.transform);
             bool career = RaceWeekend.Setup != null;
             RaceSetup setup = RaceWeekend.Setup ?? RaceWeekend.Begin(TestCareer());
             if (resume == null) setup = DebugActions.Field(setup, DebugSettings.Field, DebugSettings.Car);
@@ -475,6 +477,20 @@ namespace TarmacGauntlet.Raceday
             cooldown.Crews = pitCrews;
             cooldown.Player = playerIndex;
             outro.Add(cooldown);
+            // The overall podium, then the player's class podium, on the race offices; the last opens the race summary.
+            director.HoldSummary = podium != null;
+            for (int k = 0; k < 2 && podium != null; k++)
+            {
+                PodiumStage ceremony = new GameObject(k == 0 ? "Overall podium" : "Class podium").AddComponent<PodiumStage>();
+                ceremony.Podium = podium;
+                ceremony.Director = director;
+                ceremony.Cameras = views;
+                ceremony.Tower = tower;
+                ceremony.Colours = tower.Colours;
+                ceremony.ClassPodium = k == 1;
+                ceremony.Last = k == 1;
+                outro.Add(ceremony);
+            }
             Lap("race");
             built = true;
             SceneLoader.Release();
