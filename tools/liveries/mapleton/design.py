@@ -3,8 +3,8 @@ sentimental, with fine detail kept small enough to find only up close. Independe
 logo. The team's roundel (a maple leaf in a red ring) and its roadside town sign.
 
 Sage green over a still lake along the sills: a pine shoreline, ripples, a canoe, a loon and the
-town sign on the shore. An ivory roof with a big maple leaf cut from a washed red buffalo check and
-stitched on. The roundel big on the bonnet and small on each rear quarter. The name in a hand.
+town sign on the shore. The roof a contour map of a lake. The roundel big on the bonnet and small
+on each rear quarter. The name in a hand.
 
 Run: node ../common/views.js ../../../unity/Assets/Art/Vehicles/NusaFox/NusaFox.obj out/views
      node ../common/digits.js --font font/Fraunces-SemiBold.ttf --out out/digits
@@ -40,9 +40,6 @@ PINE = "#4d6350"           # pine green
 SAGE = "#7f977b"
 LAKE = "#2e4a55"
 SHORE = "#3c5243"          # the pines, a shade off pine so they sit back
-# Flannel.
-FLANNEL = "#9a3c33"
-CHAR = "#2c2422"
 
 F_PAINT = finish(0.86, 0.8, 0.0)     # a factory gloss, no metal
 
@@ -167,6 +164,24 @@ def loon(u, v, ln, d):
             f'<path d="M-0.3,-0.06 L0.2,-0.06" stroke="{IVORY}" stroke-width="0.03" stroke-dasharray="0.04 0.04"/></g>')
 
 
+def lake_contours(cz, cx, rz, rx, n, col, seed):
+    """Top view: a contour map round a lake, the inner rings filled as water. u = z, v = -x."""
+    r = random.Random(seed)
+    ph = [r.random() * 7 for _ in range(3)]
+    rings = []
+    for k in range(1, n + 1):
+        s = k / n
+        pts = []
+        for i in range(126):
+            a = i / 126 * math.tau
+            w = 1 + 0.18 * math.sin(a * 3 + ph[0] + k * 0.15) + 0.1 * math.sin(a * 5 + ph[1]) + 0.06 * math.sin(a * 2 + ph[2])
+            pts.append((cz + math.cos(a) * rz * s * w, -cx + math.sin(a) * rx * s * w))
+        d = "M" + " L".join(f"{f(a)},{f(b)}" for a, b in pts) + " Z"
+        fill = LAKE if k <= 2 else "none"
+        rings.append(f'<path d="{d}" fill="{fill}" fill-opacity="{0.55 if k == 1 else 0.3}" stroke="{col}" stroke-width="0.004"/>')
+    return "".join(reversed(rings))
+
+
 def mapleton_livery():
     meta = json.loads((VIEWS / "views.json").read_text())
     lv = Livery(VIEWS / "views.json", SAGE, F_PAINT)
@@ -190,8 +205,8 @@ def mapleton_livery():
         roundel(lv, view, *side_uv(lv, view, ROUNDEL[0], ROUNDEL[1]), ROUNDEL[2])
     lv.side_text("Mapleton Autosport", NAME[0], NAME[1], NAME[2] * 1.35, IVORY, font="Caveat")
     lv.side_number(NUMBER[0], NUMBER[1], NUMBER[2], NUMBER[3], IVORY)
-    # Roof: ivory with the check leaf. Bonnet: the roundel, big, read from the nose.
-    roof(lv)
+    # Roof: the lake map. Bonnet: the roundel, big, read from the nose.
+    lv.raw("top", lake_contours(-0.57, 0, 0.6, 0.46, 9, IVORY, 5))
     roundel(lv, "top", *lv.uv("top", (0, 0, 1.5)), 0.63, rotate=-90)
     # Front and rear: the shoreline carried round the bumpers.
     for view, base, h in (("front", 0.36, 0.13), ("rear", 0.36, 0.16)):
@@ -203,36 +218,6 @@ def mapleton_livery():
         lv.raw(view, "".join(pine_svg(u, vb + 0.004, hh, SHORE) for u, hh in pines(rr, vw["u0"], vw["u1"], h)))
     lv.text("rear", "Mapleton Autosport", (0, 0.68, 0), 0.06, IVORY, font="Caveat")
     return lv
-
-
-# --- the roof -------------------------------------------------------------------------------------------
-CELL = 0.11                          # buffalo check cell, metres
-
-
-def check_pattern(pid, rotate=0):
-    """A washed buffalo check: dark bands both ways, darker where they cross, cream lint across it."""
-    c = CELL
-    lint = "".join(f'<rect x="{f(random.Random(i).random() * 2 * c)}" y="{f(random.Random(i + 99).random() * 2 * c)}" '
-                   f'width="0.012" height="0.0025" fill="{IVORY}" opacity="0.12"/>' for i in range(30))
-    return (f'<pattern id="{pid}" width="{f(2 * c)}" height="{f(2 * c)}" patternUnits="userSpaceOnUse" patternTransform="rotate({rotate})">'
-            f'<rect width="{f(2 * c)}" height="{f(2 * c)}" fill="{FLANNEL}"/>'
-            f'<rect width="{f(c)}" height="{f(2 * c)}" fill="{CHAR}" opacity="0.45"/>'
-            f'<rect width="{f(2 * c)}" height="{f(c)}" fill="{CHAR}" opacity="0.45"/>{lint}</pattern>')
-
-
-ROOF = (-1.27, 0.13, 0.53)           # roof seen from above: z from, z to, half width
-ROOF_BLEED = (-1.25, 0.32, 0.56)     # the ivory runs on under the windscreen and side glass, short of the wing
-
-
-def roof(lv):
-    """Top view: the roof in ivory, a big maple leaf cut from the check and stitched on."""
-    z0, z1, hw = ROOF_BLEED
-    cz = (ROOF[0] + ROOF[1]) / 2
-    s = 1.0 / 90
-    lv.raw("top", f'<rect x="{f(z0)}" y="{f(-hw)}" width="{f(z1 - z0)}" height="{f(2 * hw)}" rx="0.12" fill="{IVORY}"/>'
-                  f'<defs>{check_pattern("chk-top", 45)}<clipPath id="leaf-top"><path transform="translate({f(cz)} 0) rotate(90) scale({s:.6f})" d="{LEAF_D}"/></clipPath></defs>'
-                  f'<rect x="{f(cz - 0.6)}" y="-0.6" width="1.2" height="1.2" fill="url(#chk-top)" clip-path="url(#leaf-top)"/>'
-                  + leaf(cz, 0, 0.94, stroke=IVORY, sw=0.006, rotate=90, dash=(0.022, 0.014)))
 
 
 OPTIONS = {"mapleton": mapleton_livery}
