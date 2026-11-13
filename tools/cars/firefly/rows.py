@@ -79,7 +79,7 @@ def plan(pts):
 # the boot and the rear bumper's face.
 TOP = [(24, 436), (28, 419), (32, 415), (40, 412), (48, 405), (56, 389), (60, 384), (70, 365), (80, 350),
        (90, 341), (100, 334), (120, 321), (140, 311), (160, 303), (180, 296), (200, 291), (220, 287), (240, 283),
-       (260, 281), (280, 276), (300, 269), (320, 254), (340, 239), (360, 224), (380, 210), (400, 196), (420, 183),
+       (260, 282), (280, 282), (300, 269), (320, 254), (340, 239), (360, 224), (380, 210), (400, 196), (420, 183),
        (440, 172), (460, 161), (480, 152), (500, 143), (520, 137), (540, 131), (560, 127), (580, 123), (600, 120),
        (620, 118), (640, 116), (660, 115), (680, 114), (720, 114), (740, 115), (760, 116), (780, 119), (800, 121),
        (820, 124), (840, 128), (860, 133), (880, 139), (900, 145), (920, 152), (940, 161), (960, 171), (980, 182),
@@ -99,17 +99,18 @@ HALF = [(24, 12), (30, 90), (40, 140), (56, 179), (72, 201), (88, 216), (104, 22
 # Height of the hull's widest point, and how far its bottom tucks in from it (front and rear renders).
 WIDEST = [(24, 446), (60, 440), (150, 430), (300, 400), (450, 385), (850, 385), (1100, 420), (1248, 440)]
 TUCK = [(24, 6), (100, 18), (200, 22), (450, 20), (850, 20), (1150, 18), (1248, 8)]
-# Shoulder: where the side turns in to the top. Over the bonnet it is the bonnet's edge, along the
-# cabin the belt, over the boot the boot lid's edge. Height (side render) and half width (top render).
-SHOULDER = [(24, 438), (40, 420), (60, 392), (72, 373), (85, 357), (100, 348), (130, 331), (160, 318),
-            (200, 309), (250, 304), (290, 303), (335, 301), (380, 294), (440, 288), (970, 281), (1000, 281),
+# Shoulder: where the side turns in to the top. Over the bonnet it is the wings' crown, so the
+# bonnet runs flat out to the wings with no step; along the cabin the belt; over the boot the boot
+# lid's edge. Height (side render) and half width (top render).
+SHOULDER = [(24, 438), (45, 428), (60, 399), (80, 364), (100, 344), (130, 327), (160, 315), (200, 305),
+            (250, 299), (290, 300), (335, 300), (380, 294), (440, 288), (970, 281), (1000, 281),
             (1040, 279), (1080, 276), (1110, 274), (1140, 292), (1170, 320), (1196, 352), (1220, 385),
             (1248, 430)]
-SHOULDER_W = [(24, 8), (40, 60), (60, 80), (75, 90), (85, 118), (100, 138), (130, 158), (170, 172), (220, 184),
-              (280, 200), (335, 208), (380, 222), (440, 232), (700, 233), (950, 230), (1000, 225), (1040, 205),
-              (1080, 180), (1110, 156), (1140, 150), (1170, 140), (1196, 118), (1220, 90), (1248, 20)]
+SHOULDER_W = [(24, 8), (45, 104), (60, 134), (80, 158), (100, 174), (130, 186), (160, 192), (200, 198),
+              (250, 204), (290, 208), (335, 210), (380, 222), (440, 232), (700, 233), (950, 230), (1000, 225),
+              (1040, 205), (1080, 180), (1110, 156), (1140, 150), (1170, 140), (1196, 118), (1220, 90), (1248, 20)]
 # Deck height at the middle under the greenhouse (hidden), joined to the cowl and the boot.
-DECK = [(286, 282), (400, 284), (1000, 282), (1110, 262)]
+DECK = [(286, 283), (400, 284), (1000, 282), (1110, 262)]
 
 # Greenhouse, from the windscreen's foot to past the rear glass's foot, where the C-pillars fade
 # into the boot lid. Glass foot (u) along the cabin, and the roof edge in side (px, py) and plan
@@ -117,10 +118,10 @@ DECK = [(286, 282), (400, 284), (1000, 282), (1110, 262)]
 GH = (286, 1110)
 GLASS_FOOT = [(286, 199), (335, 206), (380, 218), (440, 227), (700, 228), (950, 225), (1000, 219), (1040, 200),
               (1080, 175), (1110, 151)]
-ROOF_Z = [(286, 282), (335, 279), (380, 240), (437, 191), (470, 163), (500, 165), (540, 165), (600, 155),
+ROOF_Z = [(286, 300), (335, 297), (380, 250), (437, 191), (470, 163), (500, 165), (540, 165), (600, 155),
           (650, 149), (700, 146), (740, 146), (780, 152), (830, 165), (880, 185), (930, 211), (985, 247),
           (1040, 265), (1110, 272)]
-ROOF_W = [(286, 198), (335, 198), (380, 186), (437, 178), (470, 179), (500, 181), (540, 185), (600, 188),
+ROOF_W = [(286, 198), (335, 198), (380, 190), (437, 184), (470, 181), (500, 182), (540, 185), (600, 188),
           (740, 188), (850, 186), (950, 180), (1040, 165), (1110, 152)]
 
 # ---------------------------------------------------------------- wings
@@ -195,7 +196,8 @@ REAR_DOOR = [(752, 282), (752, DOOR_BOTTOM)]                 # rear edge, down t
 SHUT_ROUND = 10                             # the door's bottom corners rounded this much (px)
 
 # Windscreen and rear glass in plan (top render: px, u): foot and head are even curves, sides straight.
-SCREEN = {"x_base_mid": 285, "x_base_edge": 335, "w_base": 199, "x_top_mid": 458, "x_top_edge": 482, "w_top": 160}
+SCREEN = {"x_base_mid": 285, "x_base_edge": 335, "x_top_mid": 458, "x_top_edge": 482}
+A_PILLAR = 5        # px the windscreen's sides keep in from the roof edge, so each A-pillar is one even width
 REAR_GLASS = {"x_top_mid": 866, "x_top_edge": 885, "w_top": 132, "x_base_mid": 1042, "x_base_edge": 1018,
               "w_base": 138}
 # Bonnet shut line: in plan from the windscreen's foot inboard of its corner, out to the bonnet's
@@ -292,8 +294,8 @@ data = {
     "rear_door": side(REAR_DOOR),
     "shut_round": L(SHUT_ROUND),
     "screen": {"x_base_mid": X(SCREEN["x_base_mid"]), "x_base_edge": X(SCREEN["x_base_edge"]),
-               "w_base": H(SCREEN["w_base"]), "x_top_mid": X(SCREEN["x_top_mid"]),
-               "x_top_edge": X(SCREEN["x_top_edge"]), "w_top": H(SCREEN["w_top"])},
+               "w_base": H(table(ROOF_W)(SCREEN["x_base_edge"]) - A_PILLAR), "x_top_mid": X(SCREEN["x_top_mid"]),
+               "x_top_edge": X(SCREEN["x_top_edge"]), "w_top": H(table(ROOF_W)(SCREEN["x_top_edge"]) - A_PILLAR)},
     "rear_glass": {"x_top_mid": X(REAR_GLASS["x_top_mid"]), "x_top_edge": X(REAR_GLASS["x_top_edge"]),
                    "w_top": H(REAR_GLASS["w_top"]), "x_base_mid": X(REAR_GLASS["x_base_mid"]),
                    "x_base_edge": X(REAR_GLASS["x_base_edge"]), "w_base": H(REAR_GLASS["w_base"])},
