@@ -51,8 +51,7 @@ export function lapsCompletedAtSim(
  * mid-race. Retired cars are still counted: their last logged snapshot
  * legitimately reflects laps they ran in race-time, so a high-class retiree
  * can briefly hold this number until a still-running car overtakes their
- * total. By the end of the race the value converges to `leaderTotalLaps` for
- * the no-tie case.
+ * total.
  */
 export function leaderLapAt(
   result: RaceResultFull,
@@ -66,12 +65,4 @@ export function leaderLapAt(
     if (laps > max) max = laps;
   }
   return max;
-}
-
-/**
- * Final lap count of the standings winner — the displayed "total laps" for
- * the race. Falls back to 0 if results are empty.
- */
-export function leaderTotalLaps(result: RaceResultFull): number {
-  return result.results[0]?.lapsCompleted ?? 0;
 }

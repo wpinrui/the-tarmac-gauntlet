@@ -3,7 +3,6 @@ import {
   TOTAL_RACE_SECONDS,
   lapsCompletedAtSim,
   leaderLapAt,
-  leaderTotalLaps,
   raceSimDuration,
   wallToSim,
 } from "./raceClock";
@@ -125,30 +124,11 @@ describe("leaderLapAt", () => {
     expect(leaderLapAt(fixture(), 30, 60)).toBe(2);
   });
 
-  it("converges to leaderTotalLaps at the end of the race when there's no tie", () => {
-    // The wall-clock display "Lap X / N" must agree once the race is over —
-    // otherwise the player sees e.g. "Lap 47 / 48" when the leader has crossed.
+  it("converges to the standings winner's lap count at the end of the race", () => {
+    // Once the race clock pins at totalRaceSec, the leader's mid-race lap
+    // count must equal the eventual P1 lapsCompleted — otherwise the
+    // wall-clock display drifts off the standings.
     const r = fixture();
-    expect(leaderLapAt(r, 60, 60)).toBe(leaderTotalLaps(r));
-  });
-});
-
-describe("leaderTotalLaps", () => {
-  it("returns the standings winner's lap count", () => {
-    expect(leaderTotalLaps(fixture())).toBe(4);
-  });
-
-  it("returns 0 when results are empty", () => {
-    const empty: RaceResultFull = {
-      results: [],
-      fastestLap: null,
-      lapSnapshots: {},
-      positionHistory: [],
-      carIndexById: {},
-      events: [],
-      stints: {},
-      modeCounters: {},
-    };
-    expect(leaderTotalLaps(empty)).toBe(0);
+    expect(leaderLapAt(r, 60, 60)).toBe(r.results[0].lapsCompleted);
   });
 });
