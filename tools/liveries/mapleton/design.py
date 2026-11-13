@@ -192,7 +192,7 @@ def mapleton_livery():
     lv.side_number(NUMBER[0], NUMBER[1], NUMBER[2], NUMBER[3], IVORY)
     # Roof: ivory with the check leaf. Bonnet: the roundel, big, read from the nose.
     roof(lv)
-    roundel(lv, "top", *lv.uv("top", (0, 0, 1.5)), 0.9, rotate=-90)
+    roundel(lv, "top", *lv.uv("top", (0, 0, 1.5)), 0.63, rotate=-90)
     # Front and rear: the shoreline carried round the bumpers.
     for view, base, h in (("front", 0.36, 0.13), ("rear", 0.36, 0.16)):
         vw = meta["views"][view]
