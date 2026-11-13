@@ -6,13 +6,14 @@ are done here per pixel the way the game's shaders do them:
   shadow   the sun's or moon's shadow as the opaque pass reads it: from a shadow map of the cars, its texels as big as
            the level's first cascade makes them. Medium filters it as URP's soft shadows do (a 5 x 5 tent); Ultra as
            ScreenShadows.shader does (a blocker search, then a 32-tap disc turned per pixel by the same noise).
-  pools    LightPool.shader: the floodlights' pools multiply the ground (after: times LampFill)
-  beams    HeadlampBeam.shader: every car's beam, the scene's colour times the brightening, eased to the cap (after:
-           times LampFill, which divides the same shadow back out)
+  pools    LightPool.shader: the floodlights' pools multiply the ground (after: times LampFill, which divides the same
+           shadow back out)
+  heads    Headlamps.hlsl: every car's headlamps in the ground's own shading, the same before and after
   mist     Volumetrics.shader: the floodlights' beams in the mist, at Ultra
   haze     Haze.shader, at Ultra: the cars' exhaust puffs (before: redrawing the opaque copy; after: scaling what is drawn)
   smoke    Smoke.shader: tyre smoke from the car ahead locking up (before: lit by the moon, the sky and the night glow,
-           blocking what is behind; after: the lamps light it too, and at night it hides only as much as it is lit)
+           blocking what is behind; after: the headlamps and floodlights light it too, and at night it hides only as
+           much as it is lit)
 then bloom and the grade.
 
 Usage: python3 render.py out_dir hour floods shot     floods 0 or 1; shot "ivan" (haze) or "lockup" (tyre smoke)
@@ -41,8 +42,8 @@ FOV = 46.0
 FLOOD = np.array([1.0, 0.95, 0.86])
 HEAD = np.array([0.9, 0.95, 1.0])
 POOL_BRIGHTENING, POOL_LIFT = 7.0, 0.035
-BEAM_BRIGHTENING, BEAM_LIFT, BEAM_CAP = 10.0, 0.03, 0.4
-BEAM_LENGTH, BEAM_NEAR, BEAM_FAR, BEAM_BELOW, BEAM_ABOVE = 24.0, 1.8, 9.0, 3.0, 0.6
+# NightLook.HeadlampGround and HeadlampReach; CarLamps' nose height.
+HEADLAMP_GROUND, HEADLAMP_REACH, NOSE_Y = 5.0, 75.0, 0.65
 BEAM_STRENGTH = 30000.0 * float(lin(0.2)) / 0.2
 FOG_REACH, MIST_DENSITY, MIST_HEIGHT = 700.0, 0.0012, 40.0
 SMOKE_TINT = lin(np.array([0.82, 0.82, 0.84]))
@@ -331,40 +332,29 @@ def shadow(p, sky, to_light, level, boxes):
 
 # ---------------------------------------------------------------- the lamps on the ground
 
-def normals_from_depth(pos, cam):
-    def step(back, ahead):
-        a, bb = ahead - pos, pos - back
-        return np.where(((a * a).sum(-1) < (bb * bb).sum(-1))[..., None], a, bb)
-    p = np.pad(pos, ((1, 1), (1, 1), (0, 0)), mode="edge")
-    dx = step(p[1:-1, :-2], p[1:-1, 2:])
-    dy = step(p[2:, 1:-1], p[:-2, 1:-1])
-    n = np.cross(dy, dx)
-    n /= np.maximum(np.linalg.norm(n, axis=-1, keepdims=True), 1e-9)
-    flip = ((cam - pos) * n).sum(-1) < 0
-    return np.where(flip[..., None], -n, n)
+def headlamps():
+    """Each car's lamps as HeadlampGround hands them over: the middle of its nose, its aim, the lamps' height."""
+    return [(np.array([x, NOSE_Y, z + HALF_LENGTH]), np.array([0, 0, 1.0]), NOSE_Y) for (x, z) in [OWN] + [c for c, _ in CARS]]
 
 
-def lamp_frames():
-    """Each car's beam: its origin on the ground under the nose, right, up and forward."""
-    out = []
-    for (x, z) in [OWN] + [c for c, _ in CARS]:
-        out.append((np.array([x, 0.0, z + HALF_LENGTH]), np.array([1.0, 0, 0]), np.array([0, 1.0, 0]), np.array([0, 0, 1.0])))
-    return out
-
-
-def beam_weight(pos, n, sky, fr):
-    origin, right, up, fwd = fr
-    rel = pos - origin
-    x, y, z = rel @ right, rel @ up, rel @ fwd
-    t = z / BEAM_LENGTH
-    inside = (t > 0) & (t < 1) & ~sky
-    tc = np.clip(t, 0, 1)
-    half = (BEAM_NEAR + (BEAM_FAR - BEAM_NEAR) * tc) * 0.5
-    u = x / half
-    v = tc ** 0.7 * 2 - 1
-    shape = np.clip(1 - u * u - v * v, 0, 1) ** 2
-    band = sm(-BEAM_BELOW, -BEAM_BELOW * 0.5, y) * (1 - sm(BEAM_ABOVE * 0.5, BEAM_ABOVE, y))
-    return np.where(inside, shape * band * sm(0.55, 0.8, n[..., 1]), 0.0)
+def ground_light(pos, nrm, sky, lamps):
+    """Headlamps.hlsl: the light the headlamps throw on the ground, per unit of albedo and of their light."""
+    e = np.zeros(pos.shape[:-1])
+    for at, fwd, h in lamps:
+        up = np.array([0.0, 1.0, 0.0]) - fwd * fwd[1]
+        up /= np.linalg.norm(up)
+        right = np.cross(up, fwd)
+        v = pos - at
+        z, x, y = v @ fwd, v @ right, v @ up
+        d = np.maximum(np.linalg.norm(v, axis=-1), 1e-3)
+        zc = np.maximum(z, 1e-3)
+        along = (0.5 + 0.5 * sm(0.5, 9.0, z)) * (1 - sm(15.0, HEADLAMP_REACH, z)) * (z > 0.2) * (z < HEADLAMP_REACH)
+        u = np.abs(x) / np.minimum(2.0 + 0.35 * zc, 6.0)
+        cut_ = (1 - sm(0.0, 0.06, y / zc)) * sm(-h - 4.0, -h - 2.5, y)
+        facing = np.clip(np.sum(nrm * -(v / d[..., None]), -1), 0, None) / np.maximum(h / d, 0.01)
+        e += along * np.exp(-1.2 * u * u) * cut_ * np.minimum(facing, 1.5)
+    # Only the ground's shaders take it: the road, its lines and the grass, not the cars.
+    return np.where(sky | (pos[..., 1] > 0.05), 0.0, e)
 
 
 def pools(pos, up_facing):
@@ -422,11 +412,11 @@ def mist(cam, d, far, jitter, beams, samples=8):
     return lit
 
 
-def lamp_fill(scene, sh, n, pos, cam, to_light, main_col, sky_up, sky_eq, smooth=0.45):
-    """LampFill.hlsl: how much brighter to take the scene's colour, the shadow divided out of all but the sky's sheen."""
+def lamp_fill(scene, sh, n, pos, cam, to_light, main_col, sky_up, sky_eq, heads, smooth=0.45):
+    """LampFill.hlsl: what a pool multiplies, as a share of the scene's colour: the night's light alone, unshadowed."""
     sh_n = sky_eq + (sky_up - sky_eq) * np.clip(n[..., 1:2], 0, 1)
     direct = main_col * np.clip(n @ to_light, 0, 1)[..., None]
-    open_, shaded = sh_n + direct, sh_n + direct * sh[..., None]
+    open_, shaded = sh_n + direct, sh_n + direct * sh[..., None] + heads
     fill = np.minimum(open_ / np.maximum(shaded, open_ / LAMP_FILL_MOST + 1e-5), LAMP_FILL_MOST)
     view = cam - pos
     view /= np.maximum(np.linalg.norm(view, axis=-1, keepdims=True), 1e-6)
@@ -436,7 +426,7 @@ def lamp_fill(scene, sh, n, pos, cam, to_light, main_col, sky_up, sky_eq, smooth
     rough = (1 - smooth) ** 2
     sheen = np.minimum(sh_r * (0.04 + (min(smooth + 0.04, 1) - 0.04) * (1 - nov) ** 4) / (rough * rough + 1), scene)
     lit = (scene - sheen) * fill + sheen
-    return np.where(sh[..., None] >= 0.999, 1.0, np.where(scene > 1e-5, lit / np.maximum(scene, 1e-5), fill))
+    return np.where(scene > 1e-5, lit / np.maximum(scene, 1e-5), fill)
 
 
 def resample(img, scale):
@@ -502,17 +492,19 @@ def project(cam, fwd, up, p):
     return sx, sy, z
 
 
-def head_at(fr, p):
-    origin, right, up, fwd = fr
-    v = p - origin
-    t = (v @ fwd) / BEAM_LENGTH
-    if t <= 0 or t >= 1: return 0.0
-    across = (BEAM_NEAR + (BEAM_FAR - BEAM_NEAR) * t) * 0.5
-    u = (v @ right) / across
-    w = t ** 0.7 * 2 - 1
-    shape = max(1 - u * u - w * w, 0) ** 2
-    y = v @ up
-    return shape * float(sm(-0.6, 0.0, y) * (1 - sm(1.4, 2.6, y)))
+def headlamps_on_smoke(lamps, p):
+    """Smoke.shader's HeadlampsOnSmoke: the ground's beam, spreading a little above the lamps' height in the air."""
+    total = 0.0
+    for at, fwd, h in lamps:
+        v = p - at
+        z = v @ fwd
+        if z <= 0.2 or z >= HEADLAMP_REACH: continue
+        up = np.array([0.0, 1.0, 0.0])
+        x, y = v @ np.cross(up, fwd), v @ up
+        along = (0.5 + 0.5 * float(sm(0.5, 9.0, z))) * (1 - float(sm(15.0, HEADLAMP_REACH, z)))
+        u = abs(x) / min(2.0 + 0.35 * z, 6.0)
+        total += along * math.exp(-1.2 * u * u) * float((1 - sm(0.0, 0.25, y / z)) * sm(-h - 4.0, -h - 2.5, y))
+    return total
 
 
 def flood_at(bm, p):
@@ -573,8 +565,7 @@ def draw_particles(rad, copy, puffs, cam, fwd, up, depth, s, level, fixed, light
         off = (right * qx[..., None] + up * qy[..., None])
         sky = sky_up * 0.6 + sky_eq * 0.4 + night_glow
         if fixed and on > 0:
-            lamps = sum(lights[0] * head_at(fr, p) for fr in heads) + sum(lights[1] * flood_at(bm, p) for bm in beams)
-            lamps = open_ * lamps
+            lamps = lights[0] * headlamps_on_smoke(heads, p) + open_ * sum(lights[1] * flood_at(bm, p) for bm in beams)
             lum = (lamps * SMOKE_TINT) @ LUMA
             sky = sky + lamps / (1 + lum / SMOKE_LAMP_CAP)
         nn = off * 0.8 + to_eye * np.sqrt(np.clip(1 - r2, 0, 1))[..., None]
@@ -638,17 +629,19 @@ def main():
     nl = np.clip(nrm @ to_light, 0, 1)
     sky_up, sky_eq = skyclock.ambient(s["amb_sky"]) * s["gain"], skyclock.ambient(s["amb_eq"]) * s["gain"]
     open_up = sky_up + main_col * max(to_light[1], 0)
-    frames = lamp_frames()
+    lamps = headlamps()
+    head_light = lin(HEAD) * HEADLAMP_GROUND * on
+    # The headlamps in the ground's own shading (Headlamps.hlsl), part of the opaque scene before and after.
+    h_ground = ground_light(pos, nrm, sky, lamps)[..., None] * head_light
+    h_up = ground_light(pos, np.broadcast_to([0, 1.0, 0], pos.shape), sky, lamps)[..., None] * head_light
     beams = flood_beams(cam) if floods else []
-    n_depth = normals_from_depth(pos, cam)
     g = skyclock.grade(s)
     rng_seed = 7
     for level, cfg in LEVELS.items():
         sh = shadow(pos, sky, to_light, level, boxes)
-        opaque = ambient_scene + albedo * main_col * (nl * sh)[..., None]
-        # LampFill: the open ground's light over the shadowed ground's, on the depth's normal (beams) or up (pools).
-        fill_beam = lamp_fill(opaque, sh, n_depth, pos, cam, to_light, main_col, sky_up, sky_eq)
-        fill_up = lamp_fill(opaque, sh, np.broadcast_to([0, 1.0, 0], pos.shape), pos, cam, to_light, main_col, sky_up, sky_eq)
+        opaque = ambient_scene + albedo * (main_col * (nl * sh)[..., None] + h_ground)
+        # LampFill for the pools: the open ground's light over the shadowed ground's, facing up.
+        fill_up = lamp_fill(opaque, sh, np.broadcast_to([0, 1.0, 0], pos.shape), pos, cam, to_light, main_col, sky_up, sky_eq, h_up)
         m = np.zeros_like(opaque)
         if cfg["mist"] and beams and on > 0.001:
             div = cfg["mist"]
@@ -664,18 +657,10 @@ def main():
             fixed = name == "after"
             pf = fill_up if fixed else 1.0
             rad = (opaque + m) * (1 + lin(FLOOD) * POOL_BRIGHTENING * lights_amount * pool * pf) + lin(FLOOD) * POOL_LIFT * lights_amount * pool
-            if lights_amount > 0.02:
-                bf = fill_beam if fixed else 1.0
-                for fr in frames:
-                    wgt = beam_weight(pos, n_depth, sky, fr)[..., None]
-                    a = opaque * bf * lin(HEAD) * BEAM_BRIGHTENING * lights_amount * wgt
-                    lum = (a @ LUMA)[..., None]
-                    rad = rad + a / (1 + lum / max(BEAM_CAP * lights_amount, 1e-4)) + lin(HEAD) * BEAM_LIFT * lights_amount * wgt
             rng = np.random.default_rng(rng_seed)
             puffs = haze_puffs(rng) + (smoke_puffs(rng) if shot == "lockup" else [])
             light = (to_light, main_col, sky_up, sky_eq, lin(FLOOD * 0.3 * on), open_up,
-                     frames[:8] if lights_amount > 0.02 else [], beams, on,
-                     (lin(HEAD) * BEAM_BRIGHTENING * lights_amount, lin(FLOOD) * POOL_BRIGHTENING * lights_amount))
+                     lamps if on > 0.001 else [], beams, on, (head_light, lin(FLOOD) * POOL_BRIGHTENING * lights_amount))
             rad = draw_particles(rad, opaque, puffs, cam, fwd, up, depth, sh, level, fixed, light)
             r = resample(rad, cfg["scale"])
             bl = bloom(r, g["exposure"]) if cfg["bloom"] else None

@@ -1,13 +1,14 @@
-// For the night's lamps that brighten the scene's own colour (HeadlampBeam, LightPool): how much brighter a point would be
-// out of the sun's or moon's shadow. The scene's colour there is its albedo times the light the opaque pass gave it, so a
-// lamp that only multiplied it would leave a car's moon shadow black inside its beam, and carry the shadow's dithered
-// penumbra into the beam at ten times the contrast. Times this, the lamp lights the shadow as brightly as the ground
-// beside it, as a real lamp does.
+// For the floodlights' pools (LightPool), which brighten the scene's own colour: how much brighter a point would be out
+// of the sun's or moon's shadow. The scene's colour there is its albedo times the light the opaque pass gave it, so a
+// pool that only multiplied it would leave a car's moon shadow nearly black in the pool, and carry the shadow's
+// dithered penumbra into it at eight times the contrast. Times this, the pool lights the shadow as brightly as the
+// ground beside it, as a real lamp does. The headlamps' light on the ground (Headlamps.hlsl) is in the scene's colour
+// too: it is taken back out, so a pool brightens the night's light on the ground and not the headlamps' as well.
 //
 // The shadow is read exactly as the opaque pass read it, so it divides out pixel for pixel, dither and all: from the
 // screen-space shadow (ScreenShadows.shader) while that is on, else from URP's shadow map with the same filter.
 // Include after Core.hlsl, with #include_with_pragmas. The scene's colour comes from the opaque copy, which the
-// pipeline makes while the headlamp beams are drawn (HeatHazeFeature).
+// pipeline makes while the pools are lit (HeatHazeFeature.LitPools).
 #ifndef TARMAC_LAMP_FILL_INCLUDED
 #define TARMAC_LAMP_FILL_INCLUDED
 
@@ -18,6 +19,7 @@
 #define _SURFACE_TYPE_TRANSPARENT 1
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareOpaqueTexture.hlsl"
+#include "Assets/Rendering/Shaders/Headlamps.hlsl"
 
 // 1 while the screen-space shadows are drawn (QualityLevels): the opaque pass read its shadow from them.
 float _TgScreenShadows;
@@ -30,8 +32,8 @@ float _TgScreenShadows;
 // road beside it at a glancing view.
 #define TARMAC_LAMP_FILL_SMOOTHNESS 0.45
 
-// How much brighter the lamp should take the scene's colour at a point than the colour itself: 1 out of the shadow,
-// more in it. scene: the opaque pass's colour there; positionWS and normalWS: the ground the lamp lights; uv: its pixel.
+// What a pool multiplies at a point, as a share of the scene's colour there: the ground under the night's light alone,
+// out of the shadow. scene: the opaque pass's colour there; positionWS and normalWS: the ground; uv: its pixel.
 half3 LampFill(half3 scene, float3 positionWS, half3 normalWS, float2 uv)
 {
     half shadow = 1;
@@ -41,12 +43,11 @@ half3 LampFill(half3 scene, float3 positionWS, half3 normalWS, float2 uv)
     else
         shadow = MainLightRealtimeShadow(TransformWorldToShadowCoord(positionWS));
 #endif
-    if (shadow >= 0.999) return 1;
     Light main = GetMainLight();
     half3 direct = main.color * saturate(dot(normalWS, main.direction));
     half3 sky = max(SampleSH(normalWS), 0);
     half3 open = sky + direct;
-    half3 shaded = sky + direct * shadow;
+    half3 shaded = sky + direct * shadow + HeadlampLight(positionWS, normalWS);
     half3 fill = min(open / max(shaded, open / TARMAC_LAMP_FILL_MOST + 1e-5), TARMAC_LAMP_FILL_MOST);
 
     half3 view = GetWorldSpaceNormalizeViewDir(positionWS);

@@ -2,8 +2,8 @@
 // round a little and shines through when the camera looks towards it; the sky fills the shade; the sun's shadow and the
 // race's lights reach it too. Soft: where the depth is drawn, a puff fades where it meets the track or a car. No texture
 // is read. The particle system sends each puff's centre (CarEffects sets the streams), so the lighting turns with nothing.
-// At night the lamps light it as they light the ground: the headlamp beams of the cars nearest the camera and the
-// floodlights' beams, each as bright on a puff as on the road under it. And at night smoke mostly scatters light rather
+// At night the lamps light it as they light the ground: the cars' headlamps (Headlamps.hlsl) and the floodlights'
+// beams, each as bright on a puff as on the road under it. And at night smoke mostly scatters light rather
 // than blocking it: a puff hides what is behind it only as far as it is lit itself, so it shows as a pale haze where a
 // lamp catches it and never as a dark blot over a lit road.
 Shader "Hidden/TarmacGauntlet/Smoke"
@@ -34,6 +34,7 @@ Shader "Hidden/TarmacGauntlet/Smoke"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
+            #include "Assets/Rendering/Shaders/Headlamps.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _Tint;
@@ -43,15 +44,6 @@ Shader "Hidden/TarmacGauntlet/Smoke"
             float _EffectsSoft;
             float3 _EffectsNight;
             float _EffectsDark;
-            // The headlamp beams of the cars nearest the camera (CarEffects): x how many, yzw their brightening, as
-            // HeadlampBeam's _Color; each one's origin on the car's ground under its nose, its forward and up; the beam's
-            // length and its width at the nose and the far end, m, as CarLamps shapes it.
-            #define TG_MOST_HEADS 8
-            float4 _TgHeads;
-            float4 _TgHeadPos[TG_MOST_HEADS];
-            float4 _TgHeadFwd[TG_MOST_HEADS];
-            float4 _TgHeadUp[TG_MOST_HEADS];
-            float4 _TgHeadShape;
             // The floodlights' beams (Atmosphere.Beams) and the pools' brightening, as LightPool's _Color.
             #define TG_MOST_BEAMS 16
             float4 _TgBeams;
@@ -66,19 +58,28 @@ Shader "Hidden/TarmacGauntlet/Smoke"
             // brightest a lit road gets, so over any lit road it adds at least as much light as it hides.
             #define SMOKE_DARK_SHOWS 0.6
 
-            // How far a headlamp beam reaches a point in the air: its footprint on the road, carried up to the height
-            // the lamps light.
-            float HeadAt(int k, float3 p)
+            // The cars' headlamps on a puff (Headlamps.hlsl's light, as the ground takes it): the same beam down the road,
+            // but in the air it spreads a little above the lamps' height before it stops.
+            float3 HeadlampsOnSmoke(float3 p)
             {
-                float3 v = p - _TgHeadPos[k].xyz;
-                float3 fwd = _TgHeadFwd[k].xyz, up = _TgHeadUp[k].xyz;
-                float t = dot(v, fwd) / _TgHeadShape.x;
-                if (t <= 0.0 || t >= 1.0) return 0.0;
-                float across = lerp(_TgHeadShape.y, _TgHeadShape.z, t) * 0.5;
-                float u = dot(v, cross(up, fwd)) / across, w = pow(t, 0.7) * 2.0 - 1.0;
-                float shape = saturate(1.0 - u * u - w * w);
-                float y = dot(v, up);
-                return shape * shape * smoothstep(-0.6, 0.0, y) * (1.0 - smoothstep(1.4, 2.6, y));
+                int count = (int)_TgHeadlamps.x;
+                float total = 0.0;
+                UNITY_LOOP
+                for (int k = 0; k < count; k++)
+                {
+                    float3 v = p - _TgHeadlampAt[k].xyz;
+                    float3 fwd = _TgHeadlampAim[k].xyz;
+                    float reach = _TgHeadlampAim[k].w, h = _TgHeadlampAt[k].w;
+                    float z = dot(v, fwd);
+                    if (z <= 0.2 || z >= reach) continue;
+                    float3 up = normalize(float3(0, 1, 0) - fwd * fwd.y);
+                    float x = dot(v, cross(up, fwd)), y = dot(v, up);
+                    float along = (0.5 + 0.5 * smoothstep(0.5, 9.0, z)) * (1.0 - smoothstep(15.0, reach, z));
+                    float u = abs(x) / min(2.0 + 0.35 * z, 6.0);
+                    float cut = (1.0 - smoothstep(0.0, 0.25, y / z)) * smoothstep(-h - 4.0, -h - 2.5, y);
+                    total += along * exp(-1.2 * u * u) * cut;
+                }
+                return _TgHeadlamps.yzw * total;
             }
 
             // How far a floodlight's beam reaches a point: 1 where it lights the middle of its pool.
@@ -97,18 +98,15 @@ Shader "Hidden/TarmacGauntlet/Smoke"
                 return min(cone * saturate(1.0 - dd / (reach * reach)) / (dd + 9.0) / atTarget, 1.5);
             }
 
-            // The lamps' light on a puff: what the night gives the open ground, brightened as the beams and pools
-            // brighten it.
+            // The lamps' light on a puff: the headlamps' as the ground takes it, and the floodlights' as their pools
+            // brighten what the night gives the open ground.
             float3 Lamps(float3 p, float3 night)
             {
-                float3 lamps = 0;
-                int heads = (int)_TgHeads.x;
+                float3 floods = 0;
+                int count = (int)_TgBeams.x;
                 UNITY_LOOP
-                for (int k = 0; k < heads; k++) lamps += _TgHeads.yzw * HeadAt(k, p);
-                int floods = (int)_TgBeams.x;
-                UNITY_LOOP
-                for (int j = 0; j < floods; j++) lamps += _EffectsFlood * FloodAt(j, p);
-                return night * lamps;
+                for (int j = 0; j < count; j++) floods += _EffectsFlood * FloodAt(j, p);
+                return HeadlampsOnSmoke(p) + night * floods;
             }
 
             struct Attributes
