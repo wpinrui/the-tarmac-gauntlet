@@ -49,6 +49,7 @@ namespace TarmacGauntlet.Raceday
             tyres = work == null ? plan.Tyres : work.ChangeTyres;
             NewTyres = tyres;
             NewDriver = work?.NewDriver != null;
+            if (NewDriver) supplies.Stint.NewStint();
             supplies.Orders.Reset();
             if (work != null) scale *= (float)work.CrewMultiplier;
             float extra = work != null ? (float)work.ExtraSeconds : 0f;
@@ -88,7 +89,11 @@ namespace TarmacGauntlet.Raceday
             Fuelled = refuel >= 1f;
             if (!Done) return;
             supplies.Fuel = startFuel + litres;
-            if (tyres) supplies.Wear = 0f;
+            if (tyres)
+            {
+                supplies.Wear = 0f;
+                supplies.Stint.NewTyres();
+            }
             supplies.Log?.PitDone(Duration, litres);
         }
     }
