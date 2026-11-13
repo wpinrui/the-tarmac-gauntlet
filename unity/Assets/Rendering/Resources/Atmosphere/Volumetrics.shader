@@ -49,6 +49,7 @@ Shader "Hidden/TarmacGauntlet/Volumetrics"
         float4 _TgHaze;        // the haze's colour, and in w its density per m
         float4 _TgMist;        // the mist's density at the ground per m, how fast it thins with height (m), the ground's height
         float4 _TgBeams;       // how many beams, and their light
+        float _TgBeamMost;     // the most light the beams in the mist ever add, linear
         float4 _TgBeamPos[TG_MOST_BEAMS];   // each lens, and in w how far its beam reaches
         float4 _TgBeamAim[TG_MOST_BEAMS];   // each beam's aim, and in w the cosine of half its cone
 
@@ -117,7 +118,9 @@ Shader "Hidden/TarmacGauntlet/Volumetrics"
 
             #define TG_BEAM_SAMPLES 8
 
-            // The floodlights' light the mist scatters towards the camera along the ray, out to far. Each beam is
+            // The floodlights' light the mist scatters towards the camera along the ray, out to far, rising one for one
+            // up to half of _TgBeamMost and then easing towards it, so however near a lens the camera is and however many
+            // beams it looks along, the mist never glows brighter than that. Each beam is
             // sampled only over the stretch of the ray that passes through it: around where the ray comes nearest the
             // beam's axis, as long as the beam is wide there. So a narrow beam far off gets as many samples as a near one,
             // and never breaks up into dots the way it did sampled at the mist's own steps.
@@ -157,7 +160,9 @@ Shader "Hidden/TarmacGauntlet/Volumetrics"
                         lit += BeamAt(k, p) * rho * exp(-rho * t) * dt;
                     }
                 }
-                return _TgBeams.yzw * (lit / (4.0 * PI));
+                float3 glow = _TgBeams.yzw * (lit / (4.0 * PI));
+                float most = max(_TgBeamMost, 1e-4), k = most * 0.5;
+                return min(glow, k) + (most - k) * (1.0 - exp(-max(glow - k, 0.0) / (most - k)));
             }
 
             // The cloud layer's base and thickness, m: lower and thicker as the sky closes into a deck.

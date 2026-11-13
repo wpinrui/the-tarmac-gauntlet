@@ -1,15 +1,12 @@
 // Lighting for the game's own lit shaders, as URP Lit does it: the sun with its shadows, the other lights and theirs, the
-// ambient light with the screen-space ambient occlusion, reflections and fog, and in a shader that defines
-// TARMAC_HEADLAMPS the cars' headlamps on the ground (Headlamps.hlsl). Also the shadow caster and depth passes for shaders that move no vertices.
+// ambient light with the screen-space ambient occlusion, reflections and fog, and the circuit's lamps at night (NightLit.hlsl). Also the shadow caster and depth passes for shaders that move no vertices.
 #ifndef TARMAC_LIT_INCLUDED
 #define TARMAC_LIT_INCLUDED
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
-#if defined(TARMAC_HEADLAMPS)
-#include "Assets/Rendering/Shaders/Headlamps.hlsl"
-#endif
+#include "Assets/Rendering/Shaders/NightLit.hlsl"
 
 // Colours and multipliers written into the shaders while the game rendered in Gamma colour space, where they were sRGB
 // values and scaled sRGB values. In Linear a colour is turned into linear light, and a multiplier on a colour is raised
@@ -72,9 +69,7 @@ half4 ShadePbr(float3 positionWS, half3 normalWS, float4 positionCS, half fogFac
     s.occlusion = 1;
     s.alpha = 1;
     half4 c = UniversalFragmentPBR(d, s);
-#if defined(TARMAC_HEADLAMPS)
-    c.rgb += albedo * (1 - metallic) * HeadlampLight(positionWS, d.normalWS);
-#endif
+    c.rgb += NightLit(positionWS, d.normalWS, albedo * (1 - metallic), 1);
     c.rgb = MixFog(c.rgb, d.fogCoord);
     return c;
 }
@@ -130,15 +125,13 @@ half4 ShadeDielectric(float3 positionWS, half3 normalWS, float4 positionCS, half
         sheen += FresnelCorrection(brdf, d.normalWS, d.viewDirectionWS, GetAdditionalLight(li, d.positionWS, d.shadowMask));
 #endif
     c.rgb = max(c.rgb + sheen, 0);
-#if defined(TARMAC_HEADLAMPS)
-    c.rgb += albedo * HeadlampLight(positionWS, d.normalWS);
-#endif
+    c.rgb += NightLit(positionWS, d.normalWS, albedo, 1);
     c.rgb = MixFog(c.rgb, d.fogCoord);
     return c;
 }
 
-// A matte surface lit by the sun and its shadows and the ambient light, both under the ambient occlusion, fogged: the
-// built-in Lambert model with no extra lights.
+// A matte surface lit by the sun and its shadows and the ambient light, both under the ambient occlusion, and the
+// night's lamps, fogged: the built-in Lambert model with no other lights.
 half3 ShadeLambert(float3 positionWS, half3 normalWS, float4 positionCS, half fogFactor, half3 albedo)
 {
     InputData d = TarmacInputData(positionWS, normalWS, positionCS, fogFactor);
@@ -146,7 +139,7 @@ half3 ShadeLambert(float3 positionWS, half3 normalWS, float4 positionCS, half fo
     Light sun = GetMainLight(d.shadowCoord, d.positionWS, d.shadowMask);
     half3 lit = sun.color * (sun.distanceAttenuation * sun.shadowAttenuation * ao.directAmbientOcclusion);
     half3 light = LightingLambert(lit, sun.direction, d.normalWS) + d.bakedGI * ao.indirectAmbientOcclusion;
-    return MixFog(albedo * light, d.fogCoord);
+    return MixFog(albedo * light + NightLit(positionWS, d.normalWS, albedo, 1), d.fogCoord);
 }
 
 // A world position into the shadow map being drawn, pushed by the light's depth and normal bias.

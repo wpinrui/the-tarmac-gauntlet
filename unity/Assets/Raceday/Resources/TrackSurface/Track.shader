@@ -96,8 +96,6 @@ Shader "Hidden/TarmacGauntlet/Track"
             #pragma multi_compile_local_fragment _ _TRACK_RUBBER
             #pragma multi_compile_local_fragment _ _TRACK_WET
             #include_with_pragmas "Assets/Rendering/Shaders/LitKeywords.hlsl"
-            // The cars' headlamps light it at night (Headlamps.hlsl).
-            #define TARMAC_HEADLAMPS
             #include "Assets/Rendering/Shaders/TarmacLit.hlsl"
             #include "Assets/Raceday/Resources/TrackSurface/TrackSurface.hlsl"
 
