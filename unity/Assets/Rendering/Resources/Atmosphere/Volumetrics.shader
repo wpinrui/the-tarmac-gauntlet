@@ -161,8 +161,8 @@ Shader "Hidden/TarmacGauntlet/Volumetrics"
                     }
                 }
                 float3 glow = _TgBeams.yzw * (lit / (4.0 * PI));
-                float most = max(_TgBeamMost, 1e-4), k = most * 0.5;
-                return min(glow, k) + (most - k) * (1.0 - exp(-max(glow - k, 0.0) / (most - k)));
+                float most = max(_TgBeamMost, 1e-4), knee = most * 0.5;
+                return min(glow, knee) + (most - knee) * (1.0 - exp(-max(glow - knee, 0.0) / (most - knee)));
             }
 
             // The cloud layer's base and thickness, m: lower and thicker as the sky closes into a deck.
