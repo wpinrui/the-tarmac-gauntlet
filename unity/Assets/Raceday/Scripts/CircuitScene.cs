@@ -152,8 +152,10 @@ namespace TarmacGauntlet.Raceday
             var floodMaterials = new FloodMaterials();
             var floods = new Floodlights(circuit, Complex, stands.RoofLamps, builder.PitWallRuns, parts, GantrySpan.Of(circuit, trackside.Placed));
             var lit = new GameObject("Floodlights");
+            // The pools are left out until they are rebuilt: they multiplied the scene, and at an overcast dusk, with the
+            // day's light still on the ground, they blew it out to white.
             foreach (CircuitPart part in floods.Build(floodMaterials.Steel, floodMaterials.Lens, floodMaterials.Pool))
-                AddPart(lit.transform, part);
+                if (part.Name != "Floodlight pools") AddPart(lit.transform, part);
             NightLights night = lit.AddComponent<NightLights>();
             night.Sky = sky;
             night.Layout = floods;

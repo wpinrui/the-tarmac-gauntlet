@@ -145,7 +145,7 @@ namespace TarmacGauntlet.Raceday
                 {
                     night = now;
                     Materials.Night(night);
-                    HeatHazeFeature.LitPools = night > 0.001f;
+                    HeatHazeFeature.LitPools = false;
                     LampMaterials.Shared.Night(night);
                     Stands?.Night(night, Materials.Tint);
                 }
@@ -157,7 +157,8 @@ namespace TarmacGauntlet.Raceday
         {
             if (floods == null) return;
             float on = NightLook.On(Mathf.Max(night, 0f));
-            Atmosphere.Beams(beamPos, beamAim, on > 0.001f ? beamCount : 0, NightLook.Flood.linear * (on * BeamStrength * BeamLinear));
+            // The beams in the mist are off until they are bounded: near a mast they whited out the screen.
+            Atmosphere.Beams(beamPos, beamAim, 0, NightLook.Flood.linear * (on * BeamStrength * BeamLinear));
             float step = Time.unscaledDeltaTime / Fade;
             foreach (Slot s in floods) Follow(s, step, on * FloodIntensity, PlaceFlood, false);
             foreach (Slot s in heads) Follow(s, step, on * HeadIntensity, PlaceHead, true);
