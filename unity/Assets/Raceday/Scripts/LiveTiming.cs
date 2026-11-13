@@ -6,8 +6,9 @@ using UnityEngine;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// The full screen live timing page, on T while a teammate drives your car and it is out of the pit lane: it closes
-    /// as the car enters the pit lane. Once your car is out of the race it opens and closes on T at any time. The race runs at the speed picked on the buttons left of the way back, 1x to 16x,
+    /// The full screen live timing page, on T while a teammate drives your car, pit lane or not: it closes as you take
+    /// the car over. Once your car is out of the race it opens and closes on T at any time. The race runs at the speed picked on the buttons left of the way back, 1x to 16x,
+    /// or stepped through them with F,
     /// and back at 1x once the page closes. The scene behind the page is not drawn. Left: every car in race order, filtered by class, your row in white, a chequered flag by each car that has finished. Right: your car's
     /// onboard and the track map, or above 2x the map alone across both, as a second view of the scene costs too much there, then your car's driver, fuel, tyres, condition and the driver's fatigue,
     /// fuel and tyres with the laps they last on the engine map in use (the one that runs out first in amber), the engine map, and
@@ -121,6 +122,7 @@ namespace TarmacGauntlet.Raceday
             if (Open && !can) Show(false);
             else if (Keys != null && Keys.Pressed(KeyCode.T) && (Open || can)) Show(!Open);
             if (!Open) return;
+            if (Keys != null && Keys.Pressed(KeyCode.F)) speed = (speed + 1) % Speeds.Length;
             order.Clear();
             for (int i = 0; i < Cars.Length; i++)
             {
@@ -141,10 +143,9 @@ namespace TarmacGauntlet.Raceday
             foreach (Standings.Car c in order) if (filter == null || c.Class == filter) shown.Add(c);
         }
 
-        /// <summary>True while a teammate drives your car and it is out of the pit lane: you are never locked out of your own wheel.</summary>
-        /// <summary>Open while a teammate drives the car out of the pit lane, or at any time once the car is out of the race.</summary>
+        /// <summary>Open from the moment a teammate takes your car, in the pit lane too, or at any time once the car is out of the race.</summary>
         private bool CanOpen => Supplies != null && Log != null && Cars[Player] != null
-            && (Log.Retired || Driver.enabled && Log.Driver.Id != RaceEntry.PlayerCharacterDriverId && !Cars[Player].InPitLane);
+            && (Log.Retired || Driver.enabled && Log.Driver.Id != RaceEntry.PlayerCharacterDriverId);
 
         private void Show(bool on)
         {
