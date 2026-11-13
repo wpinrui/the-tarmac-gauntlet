@@ -429,7 +429,20 @@ namespace TarmacGauntlet.Raceday
             // The stages before the green and after the flag, each skipped by holding Enter. Stages are added here in order.
             intro = new GameObject("Intro").AddComponent<StageSequence>();
             intro.Keys = keys;
-            outro = new GameObject("Outro").AddComponent<StageSequence>();
+            GridPresentation gridShow = new GameObject("Grid presentation").AddComponent<GridPresentation>();
+            gridShow.Cars = racing;
+            gridShow.Teams = teams;
+            gridShow.Classes = tower.Classes;
+            gridShow.Colours = tower.Colours;
+            gridShow.Models = graphics.Models;
+            gridShow.Day = day;
+            gridShow.Game = setup.Game;
+            gridShow.Player = player;
+            gridShow.Tower = tower;
+            gridShow.Hud = views.Hud;
+            gridShow.Camera = views.GetComponent<Camera>();
+            intro.Add(gridShow);
+            outro =new GameObject("Outro").AddComponent<StageSequence>();
             outro.Keys = keys;
             CooldownStage cooldown = outro.gameObject.AddComponent<CooldownStage>();
             cooldown.Director = director;
