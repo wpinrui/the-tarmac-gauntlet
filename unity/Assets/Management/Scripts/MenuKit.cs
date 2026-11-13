@@ -387,11 +387,12 @@ namespace TarmacGauntlet.Management
         /// <summary>The highest a skill goes.</summary>
         internal const int MaxSkill = 20;
 
-        internal static readonly (PlayerSkillType Type, string Name, string Tip)[] Skills =
+        /// <summary>The three skills, each with the one line under its name that says what it does.</summary>
+        internal static readonly (PlayerSkillType Type, string Name, string Line)[] Skills =
         {
-            (PlayerSkillType.Driver, "Driver", "Your own driving. All five of your driver stats are this level times 5."),
-            (PlayerSkillType.Engineer, "Engineer", "Shorter pit stops, and the car loses condition more slowly in a race."),
-            (PlayerSkillType.Business, "Business", "Discounts on purchases, salaries and repairs, and better sale prices."),
+            (PlayerSkillType.Driver, "Driver", "Your pace and racecraft when you drive"),
+            (PlayerSkillType.Engineer, "Engineer", "Faster pit stops and slower wear"),
+            (PlayerSkillType.Business, "Business", "Cheaper purchases and better sale prices"),
         };
 
         internal static int SkillLevel(PlayerSkills skills, PlayerSkillType type) => skills == null ? 0 : type switch
@@ -402,39 +403,55 @@ namespace TarmacGauntlet.Management
         };
 
         /// <summary>
-        /// Skill points to spend: a pip for each, filled while unspent, then each skill's level between a minus and a
-        /// plus. A level above where it started shows in green. <paramref name="spend"/> gets the skill and -1 or +1.
+        /// Skill points to spend: the title and the points left as a large number, then a row for each skill with its
+        /// name, what it does, its level as dots filled out of <see cref="MaxSkill"/>, and the level between a minus and
+        /// a plus. Levels above where they started show in green. <paramref name="compact"/> puts the count beside the
+        /// title instead of under it, for the new game panel. <paramref name="spend"/> gets the skill and -1 or +1.
         /// </summary>
-        internal static VisualElement SkillPicker(Tooltips tips, int points, int left, Func<PlayerSkillType, int> level,
-            Func<PlayerSkillType, int> start, Action<PlayerSkillType, int> spend)
+        internal static VisualElement SkillPicker(int left, Func<PlayerSkillType, int> level, Func<PlayerSkillType, int> start,
+            Action<PlayerSkillType, int> spend, bool compact = false)
         {
-            VisualElement picker = Box("skills");
-            VisualElement pips = Box("skill-pips");
-            for (int i = 0; i < points; i++)
+            VisualElement picker = Box("skills", compact ? "compact" : null);
+            VisualElement head = Box("skills-head");
+            head.Add(Text(compact ? "SKILL POINTS" : "Skill points", "skills-title", true));
+            VisualElement count = Box("skills-count");
+            Label number = Text(Num(left), "skills-left", true);
+            number.EnableInClassList("none", left == 0);
+            count.Add(number);
+            count.Add(Text("to spend", "skills-to-spend"));
+            head.Add(count);
+            picker.Add(head);
+
+            foreach ((PlayerSkillType type, string name, string line) in Skills)
             {
-                VisualElement pip = Box("skill-pip");
-                pip.EnableInClassList("used", i >= left);
-                pips.Add(pip);
-            }
-            picker.Add(pips);
-            VisualElement line = Box("skill-line");
-            foreach ((PlayerSkillType type, string name, string tip) in Skills)
-            {
-                int at = level(type);
-                VisualElement skill = Box("skill");
-                Label label = Text(name.ToUpperInvariant(), "skill-name");
-                tips.Attach(label, tip);
-                skill.Add(label);
+                int at = level(type), from = start(type);
+                VisualElement row = Box("skill", type == Skills[Skills.Length - 1].Type ? "last" : null);
+                VisualElement text = Box("skill-text");
+                text.Add(Text(name.ToUpperInvariant(), "skill-name", true));
+                text.Add(Text(line, "skill-line"));
+                VisualElement dots = Box("skill-dots");
+                for (int i = 0; i < MaxSkill; i++)
+                {
+                    VisualElement dot = Box("skill-dot");
+                    dot.EnableInClassList("on", i < at);
+                    dot.EnableInClassList("new", i >= from && i < at);
+                    dots.Add(dot);
+                }
+                text.Add(dots);
+                row.Add(text);
+
                 VisualElement steps = Box("skill-level");
-                steps.Add(SkillStep("minus", at > start(type), () => spend(type, -1)));
-                Label value = Text(Num(at), "skill-value", true);
-                value.EnableInClassList("v-hi", at > start(type));
+                steps.Add(SkillStep("minus", at > from, () => spend(type, -1)));
+                VisualElement value = Box("skill-value-box");
+                Label shown = Text(Num(at), "skill-value", true);
+                shown.EnableInClassList("v-hi", at > from);
+                value.Add(shown);
+                value.Add(Text("/" + Num(MaxSkill), "skill-max"));
                 steps.Add(value);
                 steps.Add(SkillStep("plus", left > 0 && at < MaxSkill, () => spend(type, 1)));
-                skill.Add(steps);
-                line.Add(skill);
+                row.Add(steps);
+                picker.Add(row);
             }
-            picker.Add(line);
             return picker;
         }
 
@@ -588,7 +605,7 @@ namespace TarmacGauntlet.Management
     }
 
     /// <summary>
-    /// Tooltips, only on stats and skills, where a number needs explaining. One shows under its target after a short
+    /// Tooltips, only on stats, where a number needs explaining. One shows under its target after a short
     /// hover, or over it when the target is low on the screen.
     /// </summary>
     internal sealed class Tooltips
