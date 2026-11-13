@@ -393,15 +393,6 @@ namespace TarmacGauntlet.Raceday
             return (handle || head) && !jaw;
         });
 
-        /// <summary>A spare part: a hex nut seen end on, its hole cut out.</summary>
-        internal static Texture2D NutIcon() => Shape(1f, 1f, (x, y) =>
-        {
-            float ax = Mathf.Abs(x - 0.5f), ay = Mathf.Abs(y - 0.5f);
-            const float r = 0.46f;
-            bool hex = ay <= 0.866f * r && 1.732f * ax + ay <= 1.732f * r;
-            return hex && ax * ax + ay * ay > 0.17f * 0.17f;
-        });
-
         /// <summary>Width over height of the chequered flag.</summary>
         internal const float FlagAspect = 1.4f;
 
