@@ -341,7 +341,7 @@ static class Preview
             float yaw = (float)(Math.Atan2(f.Out.x, f.Out.z) * 180 / Math.PI);
             foreach (GarageProp p in PitComplexBuilder.Props)
             {
-                Vector3 at = f.At(p.X, p.Y, p.Z) - focus;
+                Vector3 at = f.At(p.XIn(pc, g), p.Y, p.Z) - focus;
                 props.Add(new { id = p.Id, g, x = at.x, y = at.y, z = at.z, yaw = yaw + p.Yaw });
             }
         }
@@ -545,108 +545,124 @@ static class Interior
         }
     }
 
-    /// <summary>Footprints from the packed props' bounds, made symmetric (the packer mirrors them) and turned by the prop's yaw.</summary>
-    static List<Foot> Feet()
+    /// <summary>
+    /// Each prop's footprint in one garage, from the packed props' bounds made symmetric (the packer mirrors them) and
+    /// turned by the prop's yaw; props set against the +x wall stand off it as that garage's wall lies.
+    /// </summary>
+    static List<Foot> Feet(PitComplex pc, int g)
     {
-        string dir = Path.Combine(AppContext.BaseDirectory, "../../../unity/Assets/TeamHq/Resources/Props");
         var feet = new List<Foot>();
         foreach (GarageProp p in PitComplexBuilder.Props)
         {
-            using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, p.Id + ".json")));
-            float[] min = doc.RootElement.GetProperty("min").EnumerateArray().Select(e => e.GetSingle()).ToArray();
-            float[] max = doc.RootElement.GetProperty("max").EnumerateArray().Select(e => e.GetSingle()).ToArray();
-            float hx = Math.Max(-min[0], max[0]), hz = Math.Max(-min[2], max[2]);
+            (float hx, float hz) = Bounds(p.Id);
             float a = p.Yaw * (float)Math.PI / 180f, c = Math.Abs((float)Math.Cos(a)), s = Math.Abs((float)Math.Sin(a));
-            feet.Add(new Foot { Id = p.Id, X = p.X, Z = p.Z, HalfX = hx * c + hz * s, HalfZ = hx * s + hz * c, Y = p.Y });
+            feet.Add(new Foot { Id = p.Id, X = p.XIn(pc, g), Z = p.Z, HalfX = hx * c + hz * s, HalfZ = hx * s + hz * c, Y = p.Y });
         }
         return feet;
+    }
+
+    static readonly Dictionary<string, (float, float)> bounds = new Dictionary<string, (float, float)>();
+
+    static (float, float) Bounds(string id)
+    {
+        if (bounds.TryGetValue(id, out var b)) return b;
+        string dir = Path.Combine(AppContext.BaseDirectory, "../../../unity/Assets/TeamHq/Resources/Props");
+        using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, id + ".json")));
+        float[] min = doc.RootElement.GetProperty("min").EnumerateArray().Select(e => e.GetSingle()).ToArray();
+        float[] max = doc.RootElement.GetProperty("max").EnumerateArray().Select(e => e.GetSingle()).ToArray();
+        return bounds[id] = (Math.Max(-min[0], max[0]), Math.Max(-min[2], max[2]));
     }
 
     static bool InBay(float x, float z, float margin) =>
         x > PitComplex.CarBayFrom - margin && x < PitComplex.CarBayTo + margin && z > PitComplex.CarBayBack - margin;
 
+    /// <summary>Adds a failure once, counting the garages it is found in.</summary>
+    static void Note(Dictionary<string, int> bad, string what) => bad[what] = bad.TryGetValue(what, out int n) ? n + 1 : 1;
+
+    static List<string> Listed(Dictionary<string, int> bad) => bad.Select(kv => $"{kv.Key} ({kv.Value} garages)").ToList();
+
     public static void Check(PitComplex pc)
     {
-        List<Foot> feet = Feet();
         float door = pc.Depth * 0.5f;
+        var bay = new Dictionary<string, int>();
+        var placed = new Dictionary<string, int>();
+        var homes = new Dictionary<string, int>();
 
         // The car as GarageStart.Parked stands it, the longest and widest a car is run with, and its drive straight out.
-        var bay = new List<string>();
         const float ParkX = 3.9f, ParkAngle = 30f, NoseIn = 0.5f, ParkHalf = 2.4f, Half = 2.6f, HalfWide = 1.0f;
         float a = ParkAngle * (float)Math.PI / 180f;
         var fwd = new Vector2(-(float)Math.Sin(a), (float)Math.Cos(a));
         var left = new Vector2(-fwd.y, fwd.x);
         var parked = new Vector2(ParkX, door - NoseIn - ParkHalf * (float)Math.Cos(a) - 1f * (float)Math.Sin(a));
+        var corners = new List<Vector2>();
         for (float run = 0f; run <= 2f * ParkHalf + 0.01f; run += 0.25f)
             foreach (float u in new[] { -1f, 1f })
                 foreach (float v in new[] { -1f, 1f })
                 {
                     Vector2 c = parked + fwd * (run + u * Half) + left * (v * HalfWide);
-                    if (c.y >= door) continue;
-                    if (!InBay(c.x, c.y, 0f)) bay.Add($"the car's corner at x {c.x:0.0} z {c.y:0.0}, {run:0.0} m out");
+                    if (c.y < door) corners.Add(c);
                 }
-        // Round the bend the +x wall comes in at the door: the car still clears it there.
-        for (int g = 0; g < pc.Garages; g++)
-            for (float run = 0f; run <= 2f * ParkHalf + 0.01f; run += 0.25f)
-                foreach (float u in new[] { -1f, 1f })
-                {
-                    Vector2 c = parked + fwd * (run + u * Half) - left * HalfWide;
-                    if (c.y < door && c.x > pc.RightWall(g, c.y)) bay.Add($"the car's corner at x {c.x:0.0} z {c.y:0.0} by the +x wall of garage {g + 1}");
-                }
-        foreach (Foot f in feet)
-            if (f.X + f.HalfX > PitComplex.CarBayFrom && f.X - f.HalfX < PitComplex.CarBayTo && f.Z + f.HalfZ > PitComplex.CarBayBack)
-                bay.Add($"{f.Id} at x {f.X:0.0} z {f.Z:0.0}");
+        foreach (Vector2 c in corners)
+            if (!InBay(c.x, c.y, 0f)) Note(bay, $"the car's corner at x {c.x:0.0} z {c.y:0.0}");
         foreach (PitComplex.HomeSpot h in PitComplex.HomeSpots)
-            if (InBay(h.At.x, h.At.y, 0.3f)) bay.Add($"a crew home at x {h.At.x:0.0} z {h.At.y:0.0}");
-        Report("car bay clear", bay, $"the car and its way out, {feet.Count} props, {PitComplex.HomeSpots.Length} crew homes");
+            if (InBay(h.At.x, h.At.y, 0.3f)) Note(bay, $"a crew home at x {h.At.x:0.0} z {h.At.y:0.0}");
 
-        // Every prop inside the walls, those on the floor clear of each other.
-        var placed = new List<string>();
-        for (int g = 0; g < pc.Garages; g++)
-            foreach (Foot f in feet)
-            {
-                float right = Math.Min(pc.RightWall(g, f.Z - f.HalfZ), pc.RightWall(g, f.Z + f.HalfZ));
-                if (f.X - f.HalfX < pc.LeftWall - 0.01f || f.X + f.HalfX > right + 0.01f || f.Z - f.HalfZ < -door + 0.3f - 0.01f)
-                    placed.Add($"{f.Id} at x {f.X:0.0} z {f.Z:0.0} in a wall of garage {g + 1}");
-            }
-        for (int i = 0; i < feet.Count; i++)
-            for (int j = i + 1; j < feet.Count; j++)
-            {
-                Foot p = feet[i], q = feet[j];
-                if (p.Y > 0f || q.Y > 0f) continue;
-                if (Math.Abs(p.X - q.X) < p.HalfX + q.HalfX && Math.Abs(p.Z - q.Z) < p.HalfZ + q.HalfZ)
-                    placed.Add($"{p.Id} at x {p.X:0.0} z {p.Z:0.0} on {q.Id} at x {q.X:0.0} z {q.Z:0.0}");
-            }
-        Report("props in place", placed.Distinct().ToList(), $"{feet.Count} props in each of {pc.Garages} garages");
-
-        // Where the crew wait and the walk from there to the door.
-        var homes = new List<string>();
         PitComplex.HomeSpot[] hs = PitComplex.HomeSpots;
         for (int i = 0; i < hs.Length; i++)
-        {
-            PitComplex.HomeSpot h = hs[i];
-            bool Own(Foot f) => h.Pose >= HomePose.Sit && f.Id == "stool" && Math.Abs(f.X - h.Seat.x) < 0.01f && Math.Abs(f.Z - h.Seat.y) < 0.01f;
-            foreach (Foot f in feet)
-                if (f.Y <= 0f && !Own(f) && f.Holds(h.At.x, h.At.y, 0.2f)) homes.Add($"home {i + 1} in {f.Id} at x {f.X:0.0} z {f.Z:0.0}");
             for (int j = i + 1; j < hs.Length; j++)
-                if ((hs[j].At - h.At).magnitude < 0.6f) homes.Add($"homes {i + 1} and {j + 1} {(hs[j].At - h.At).magnitude:0.00} m apart");
-            Vector2 from = h.Via ?? h.At;
-            var legs = new List<(Vector2, Vector2)>();
-            if (h.Via != null) legs.Add((h.At, from));
-            foreach (float dx in new[] { -3f, 0.5f, 4f }) legs.Add((from, new Vector2(dx, door)));
-            foreach ((Vector2 p, Vector2 q) in legs)
-                for (int k = 1; k <= 80; k++)
+                if ((hs[j].At - hs[i].At).magnitude < 0.6f) Note(homes, $"homes {i + 1} and {j + 1} {(hs[j].At - hs[i].At).magnitude:0.00} m apart");
+
+        for (int g = 0; g < pc.Garages; g++)
+        {
+            List<Foot> feet = Feet(pc, g);
+            // Round the bend the +x wall comes in at the door: the car still clears it there.
+            foreach (Vector2 c in corners)
+                if (c.x > pc.RightWall(g, c.y)) Note(bay, $"the car's corner at z {c.y:0.0} through the +x wall");
+            foreach (Foot f in feet)
+            {
+                if (f.X + f.HalfX > PitComplex.CarBayFrom && f.X - f.HalfX < PitComplex.CarBayTo && f.Z + f.HalfZ > PitComplex.CarBayBack)
+                    Note(bay, $"{f.Id} at z {f.Z:0.0}");
+                // Inside the walls, the +x wall as this garage's lies.
+                float right = Math.Min(pc.RightWall(g, f.Z - f.HalfZ), pc.RightWall(g, f.Z + f.HalfZ));
+                if (f.X - f.HalfX < pc.LeftWall - 0.01f || f.X + f.HalfX > right + 0.01f || f.Z - f.HalfZ < -door + 0.3f - 0.01f)
+                    Note(placed, $"{f.Id} at z {f.Z:0.0} in a wall");
+            }
+            for (int i = 0; i < feet.Count; i++)
+                for (int j = i + 1; j < feet.Count; j++)
                 {
-                    Vector2 w = Vector2.Lerp(p, q, k / 80f);
-                    Foot? hit = null;
-                    foreach (Foot f in feet) if (f.Y <= 0f && !Own(f) && f.Holds(w.x, w.y, 0.15f)) hit = f;
-                    if (hit is Foot b)
-                    {
-                        homes.Add($"home {i + 1}'s walk to x {q.x:0.0} z {q.y:0.0} through {b.Id} at x {b.X:0.0} z {b.Z:0.0}");
-                        break;
-                    }
+                    Foot p = feet[i], q = feet[j];
+                    if (p.Y > 0f || q.Y > 0f) continue;
+                    if (Math.Abs(p.X - q.X) < p.HalfX + q.HalfX && Math.Abs(p.Z - q.Z) < p.HalfZ + q.HalfZ)
+                        Note(placed, $"{p.Id} at z {p.Z:0.0} on {q.Id} at z {q.Z:0.0}");
                 }
+
+            // Where the crew wait and the walk from there to the door.
+            for (int i = 0; i < hs.Length; i++)
+            {
+                PitComplex.HomeSpot h = hs[i];
+                bool Own(Foot f) => h.Pose >= HomePose.Sit && f.Id == PitComplexBuilder.Seat && Math.Abs(f.X - h.Seat.x) < 0.01f && Math.Abs(f.Z - h.Seat.y) < 0.01f;
+                foreach (Foot f in feet)
+                    if (f.Y <= 0f && !Own(f) && f.Holds(h.At.x, h.At.y, 0.2f)) Note(homes, $"home {i + 1} in {f.Id} at z {f.Z:0.0}");
+                Vector2 from = h.Via ?? h.At;
+                var legs = new List<(Vector2, Vector2)>();
+                if (h.Via != null) legs.Add((h.At, from));
+                foreach (float dx in new[] { -3f, 0.5f, 4f }) legs.Add((from, new Vector2(dx, door)));
+                foreach ((Vector2 p, Vector2 q) in legs)
+                    for (int k = 1; k <= 80; k++)
+                    {
+                        Vector2 w = Vector2.Lerp(p, q, k / 80f);
+                        Foot? hit = null;
+                        foreach (Foot f in feet) if (f.Y <= 0f && !Own(f) && f.Holds(w.x, w.y, 0.15f)) hit = f;
+                        if (hit is Foot b)
+                        {
+                            Note(homes, $"home {i + 1}'s walk to x {q.x:0.0} z {q.y:0.0} through {b.Id} at z {b.Z:0.0}");
+                            break;
+                        }
+                    }
+            }
         }
-        Report("crew homes clear", homes.Distinct().ToList(), $"{hs.Length} homes and their walks out");
+        Report("car bay clear", Listed(bay), $"the car and its way out, {PitComplexBuilder.Props.Length} props, {hs.Length} crew homes");
+        Report("props in place", Listed(placed), $"{PitComplexBuilder.Props.Length} props in each of {pc.Garages} garages");
+        Report("crew homes clear", Listed(homes), $"{hs.Length} homes and their walks out");
     }
 }

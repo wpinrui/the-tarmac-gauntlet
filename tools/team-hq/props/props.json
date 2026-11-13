@@ -107,5 +107,8 @@
  },
  "drill_press_01": {
   "keep": 0.35
+ },
+ "pit_board": {
+  "height": 1.0
  }
 }
