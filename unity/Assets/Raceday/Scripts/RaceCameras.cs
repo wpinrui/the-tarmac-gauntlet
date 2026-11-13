@@ -259,8 +259,10 @@ namespace TarmacGauntlet.Raceday
                 return;
             }
             chaseSettled = true;
-            // Looking back from the bumper camera puts it on the back bumper.
-            if (back && shown == View.Bumper) place.z = -place.z;
+            // Looking back moves the onboard cameras to the tail, so they see the road behind and not the car:
+            // the bonnet camera to the top of the tail, the bumper camera to the back bumper.
+            if (back && shown == View.Bonnet) place = CarCameraSpots.Rear(t);
+            if (back && shown == View.Bumper) place.z = CarCameraSpots.TailZ(t) + 0.05f;
             Ride(t.TransformPoint(place), t.rotation * round, tilt);
         }
 

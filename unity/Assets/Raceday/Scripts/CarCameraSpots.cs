@@ -7,7 +7,8 @@ namespace TarmacGauntlet.Raceday
     /// Where a camera sits on each car model, measured from its meshes once per model. The bonnet camera sits on the
     /// centreline just ahead of the windscreen's base, a little above the bonnet, so it looks over the bonnet and never
     /// through the glass. A car with no windscreen, such as a single seater, has it a metre behind the front axle, above
-    /// the bodywork there.
+    /// the bodywork there. Looking back, the camera moves to the tail: on the centreline just inside the car's rearmost
+    /// point, a little above the highest bodywork there (a rear wing included), so it sees the road behind, not the car.
     /// </summary>
     public static class CarCameraSpots
     {
@@ -18,7 +19,14 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Where it went before cars were measured, and for a car that can't be.</summary>
         private static readonly Vector3 Fallback = new Vector3(0f, 1.2f, 0.3f);
 
+        /// <summary>Where the looking-back camera went for a car that can't be measured.</summary>
+        private static readonly Vector3 RearFallback = new Vector3(0f, 1.2f, -2.3f);
+        /// <summary>How far inside the rearmost point the looking-back camera sits, and how long a tail is measured for height, m.</summary>
+        private const float RearInset = 0.05f, Tail = 0.5f;
+
         private static readonly Dictionary<string, Vector3> bonnets = new Dictionary<string, Vector3>();
+        private static readonly Dictionary<string, Vector3> rears = new Dictionary<string, Vector3>();
+        private static readonly Dictionary<string, float> tails = new Dictionary<string, float>();
 
         /// <summary>The bonnet camera's place in the car's own frame.</summary>
         public static Vector3 Bonnet(Transform car)
@@ -29,12 +37,52 @@ namespace TarmacGauntlet.Raceday
             return spot;
         }
 
-        private static Vector3? Measure(Transform car)
+        /// <summary>The looking-back camera's place in the car's own frame, at the tail looking rearwards.</summary>
+        public static Vector3 Rear(Transform car)
         {
-            Transform model = car.Find("Model");
-            if (model == null) return null;
+            if (rears.TryGetValue(car.name, out Vector3 spot)) return spot;
             var glass = new List<Vector3>();
             var body = new List<Vector3>();
+            spot = RearFallback;
+            if (Collect(car, glass, body))
+            {
+                float end = float.MaxValue;
+                foreach (Vector3 p in body) end = Mathf.Min(end, p.z);
+                spot = new Vector3(0f, Top(body, end - 0.01f, end + Tail, RearFallback.y - Above) + Above, end + RearInset);
+            }
+            rears[car.name] = spot;
+            return spot;
+        }
+
+        /// <summary>The car's rearmost point along its length, m, in its own frame.</summary>
+        public static float TailZ(Transform car)
+        {
+            if (tails.TryGetValue(car.name, out float z)) return z;
+            var glass = new List<Vector3>();
+            var body = new List<Vector3>();
+            z = RearFallback.z;
+            if (Collect(car, glass, body))
+            {
+                z = float.MaxValue;
+                foreach (Vector3 p in body) z = Mathf.Min(z, p.z);
+            }
+            tails[car.name] = z;
+            return z;
+        }
+
+        private static Vector3? Measure(Transform car)
+        {
+            var glass = new List<Vector3>();
+            var body = new List<Vector3>();
+            if (!Collect(car, glass, body)) return null;
+            return FromBody(car, glass, body);
+        }
+
+        /// <summary>The glass and bodywork points on the centreline strip, in the car's frame. False if there is no bodywork.</summary>
+        private static bool Collect(Transform car, List<Vector3> glass, List<Vector3> body)
+        {
+            Transform model = car.Find("Model");
+            if (model == null) return false;
             Matrix4x4 toCar = car.worldToLocalMatrix;
             foreach (MeshRenderer r in model.GetComponentsInChildren<MeshRenderer>())
             {
@@ -62,8 +110,11 @@ namespace TarmacGauntlet.Raceday
                     }
                 }
             }
-            if (body.Count == 0) return null;
+            return body.Count > 0;
+        }
 
+        private static Vector3? FromBody(Transform car, List<Vector3> glass, List<Vector3> body)
+        {
             if (glass.Count > 0)
             {
                 // The windscreen leans back, so its front edge is its base.
