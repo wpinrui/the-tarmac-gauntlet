@@ -179,36 +179,49 @@ def lamp(skins, name, prism, lens_prism, sgn, lens_mat, cutters, out):
     out.append(lens)
 
 
+def footprint(ob, fr):
+    """The outline of a mesh seen along frame fr's rays, in fr's (u, v)."""
+    o, u, v, _d = fr
+    p = np.array([vv.co for vv in ob.data.vertices]) - o
+    uv = np.column_stack([p @ u, p @ v])
+    tris = [Polygon(uv[list(f.vertices)]) for f in ob.data.polygons]
+    return unary_union([t.buffer(1e-5) for t in tris if t.area > 1e-10]).buffer(0)
+
+
 def headlamps(ref, skins, cutters, out):
     fr = front_fr()
     for sgn, side in ((1, "l"), (-1, "r")):
         lamp(skins, f"head_{side}", R["head_prism"], R["head_lens"], sgn, "head_glass", cutters, out)
-        # our own interior: two round reflector bowls, a lamp in each, on the lamp's front face
-        hd = poly(R["head"])
-        b = hd.bounds
-        for i, (k, r) in enumerate(((0.62, 0.042), (0.83, 0.034))):
-            c = Point(b[0] + k * (b[2] - b[0]), b[1] + 0.52 * (b[3] - b[1]))
-            cell = c.buffer(r, 32).intersection(hd.buffer(-0.008))
+        if sgn > 0:
+            seen = footprint(out[-1], fr)        # the lens as seen from ahead
+        # our own interior: two round reflector bowls apart from each other, a lamp in each, on the
+        # lamp's front face, kept well inside the lens and sunk square to the skin
+        b = seen.bounds
+        r0, r1 = 0.036, 0.029
+        u0, zc = b[0] + 0.58 * (b[2] - b[0]), b[1] + 0.52 * (b[3] - b[1])
+        for i, (u, r) in enumerate(((u0, r0), (u0 + r0 + r1 + 0.02, r1))):
+            cell = Point(u, zc).buffer(r, 32).intersection(seen.buffer(-0.016))
             cell = cell if sgn > 0 else flip(cell)
             out += blend.lay(ref, f"head_reflector_{side}{i}", cell.buffer(0.007).difference(cell), fr, -0.03, -0.024,
-                             "reflector", 0.004, along_ray=True)
-            out += blend.lay(ref, f"lamp_head_{side}{i}", cell.buffer(-0.002), fr, -0.03, -0.026, "lamp_head", 0.005,
-                             along_ray=True)
+                             "reflector", 0.004)
+            out += blend.lay(ref, f"lamp_head_{side}{i}", cell.buffer(-0.002), fr, -0.03, -0.026, "lamp_head", 0.005)
 
 
 def taillamps(ref, skins, cutters, out):
     fr = rear_fr()
     for sgn, side in ((1, "l"), (-1, "r")):
         lamp(skins, f"tail_{side}", R["tail_prism"], R["tail_lens"], sgn, "tail_glass", cutters, out)
+        if sgn > 0:
+            seen = flip(footprint(out[-1], fr)).buffer(-0.01)    # the lens as seen from behind
         # our own interior: the upper half glows as the tail lamp, a round brake lamp low and outboard
-        tl = poly(R["tail"])
+        tl = seen
         b = tl.bounds
         tail = tl.intersection(box(b[0], b[1] + 0.45 * (b[3] - b[1]), b[2], b[3])).buffer(-0.012, join_style=1)
         brake = Point(b[0] + 0.72 * (b[2] - b[0]), b[1] + 0.27 * (b[3] - b[1])).buffer(0.032, 32).intersection(
             tl.buffer(-0.01))
         put = (lambda g: flip(g)) if sgn > 0 else (lambda g: g)     # rear frame: u runs to the right
-        out += blend.lay(ref, f"lamp_tail_{side}", put(tail), fr, -0.03, -0.026, "lamp_tail", 0.006, along_ray=True)
-        out += blend.lay(ref, f"lamp_brake_{side}", put(brake), fr, -0.03, -0.026, "lamp_brake", 0.005, along_ray=True)
+        out += blend.lay(ref, f"lamp_tail_{side}", put(tail), fr, -0.03, -0.026, "lamp_tail", 0.006)
+        out += blend.lay(ref, f"lamp_brake_{side}", put(brake), fr, -0.03, -0.026, "lamp_brake", 0.005)
 
 
 def stop_lamp(ref, out):
@@ -248,7 +261,7 @@ def front_parts(ref, cutters, out):
         if sgn < 0:
             pk, lampd = flip(pk), flip(lampd)
         cutters += blend.lay(ref, f"cut_fog_{side}", pk, fr, -0.035, 0.006, "grille", 0.008, along_ray=True)
-        out += blend.lay(ref, f"fog_back_{side}", pk.buffer(-0.002).difference(lampd.buffer(0.004)), fr, -0.034, -0.03,
+        out += blend.lay(ref, f"fog_back_{side}", pk.buffer(-0.002).difference(lampd.buffer(0.006)), fr, -0.034, -0.03,
                          "grille", 0.008, along_ray=True)
         out += blend.lay(ref, f"fog_reflector_{side}", lampd.buffer(0.004).difference(lampd.buffer(-0.004)), fr, -0.034,
                          -0.024, "reflector", 0.004, along_ray=True)
