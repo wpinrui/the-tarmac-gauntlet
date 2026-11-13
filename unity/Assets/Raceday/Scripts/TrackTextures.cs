@@ -34,18 +34,6 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Raindrops on the ripple tile, a jittered grid of this many a side.</summary>
         private const int RippleCells = 22;
 
-        /// <summary>
-        /// How light the binder between the stones is beside the stones' 1 to 1 + speckle. Close to the stones, so that
-        /// up close, where each texel shows, the road reads as a fine grain rather than dark speckle.
-        /// </summary>
-        public const float Binder = 0.88f;
-
-        /// <summary>
-        /// How steep the tarmac's normals stand its stones. Gentle: steeper, a low sun leaves each stone's far side
-        /// black, and the road just ahead of the car turns to dark speckle.
-        /// </summary>
-        public const float TarmacBump = 0.65f;
-
         /// <summary>Tarmac's shape, shared by every tarmac: its height, and what lies at each pixel.</summary>
         public sealed class Tarmac
         {
@@ -107,7 +95,7 @@ namespace TarmacGauntlet.Raceday
             for (int i = 0; i < shade.Length; i++)
             {
                 float stone = t.Stone[i];
-                shade[i] = (1f + t.Grain[i] * 0.04f) * (stone > 0f ? 1f + stone * speckle : Binder);
+                shade[i] = (1f + t.Grain[i] * 0.04f) * (stone > 0f ? 1f + stone * speckle : 0.78f);
                 sum += shade[i];
             }
             float mean = (float)(sum / shade.Length);
