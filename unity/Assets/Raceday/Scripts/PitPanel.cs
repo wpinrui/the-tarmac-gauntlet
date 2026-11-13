@@ -76,8 +76,8 @@ namespace TarmacGauntlet.Raceday
         private void DrawGui()
         {
             if (!Open || !Usable || Event.current.type != EventType.Repaint) return;
-            // Under live timing, which has the same plan, the panel stays hidden. Over the broadcast it shows, as the stop is planned there too.
-            if (DebugMenu.Clean || Hud != null && !Hud.enabled) return;
+            // Hidden over the broadcast, and under live timing, which has the same plan.
+            if (DebugMenu.Clean || Hud != null && (Hud.Hidden || !Hud.enabled)) return;
             float k = Screen.height / 1080f;
             Style(k);
 
