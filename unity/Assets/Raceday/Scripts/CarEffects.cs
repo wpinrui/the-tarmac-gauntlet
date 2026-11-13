@@ -59,7 +59,7 @@ namespace TarmacGauntlet.Raceday
         private MaterialPropertyBlock block;
 
         private static readonly int GlowId = Shader.PropertyToID("_Glow"), SoftId = Shader.PropertyToID("_EffectsSoft"),
-            NightId = Shader.PropertyToID("_EffectsNight"), DarkId = Shader.PropertyToID("_EffectsDark");
+            DarkId = Shader.PropertyToID("_EffectsDark");
 
         private sealed class Discs
         {
@@ -161,11 +161,7 @@ namespace TarmacGauntlet.Raceday
             }
 
             float lights = Night != null ? Night() : 0f;
-            float night = NightLook.On(lights);
-            Color flood = NightLook.Flood * (0.3f * night);
-            // Set as a colour so Unity converts it to linear light.
-            Shader.SetGlobalColor(NightId, flood);
-            Shader.SetGlobalFloat(DarkId, night);
+            Shader.SetGlobalFloat(DarkId, NightBudget.On(lights));
 
             Glow(dt);
             if (dt <= 1e-5f) return;

@@ -32,14 +32,14 @@ namespace TarmacGauntlet.Raceday
         /// </summary>
         public void Night(float night, Color tint)
         {
-            Crowd.SetColor(GlowId, tint * (NightLook.StandGlow * night));
+            Crowd.SetColor(GlowId, tint * (NightBudget.StandGlow * night));
             if (!Seats.IsKeywordEnabled("_EMISSION"))
             {
                 Seats.EnableKeyword("_EMISSION");
                 Seats.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
                 Seats.SetTexture("_EmissionMap", Seats.mainTexture);
             }
-            Seats.SetColor(EmissionId, tint * (NightLook.StandGlow * night));
+            Seats.SetColor(EmissionId, tint * (NightBudget.StandGlow * night));
         }
 
         /// <summary>Steel, seat and cladding colours for each look.</summary>

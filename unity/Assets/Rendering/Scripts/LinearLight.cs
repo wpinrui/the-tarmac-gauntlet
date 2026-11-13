@@ -34,16 +34,6 @@ namespace TarmacGauntlet.Rendering
         }
 
         /// <summary>
-        /// The same for a lamp at night, where the ambient light hardly counts: <paramref name="falloff"/> is the share of
-        /// its intensity the lamp gives where it should match, at the distance it mostly lights things from.
-        /// </summary>
-        public static float Lamp(Color colour, float gammaIntensity, float falloff)
-        {
-            if (falloff <= 0f) return 0f;
-            return Match(colour, gammaIntensity * falloff, Color.black, 1f) / falloff;
-        }
-
-        /// <summary>
         /// The ambient colour to set in Linear for one set in Gamma: it lights the surface as brightly as before. Darker
         /// ambient light is lifted the most, up to about three times at night.
         /// </summary>

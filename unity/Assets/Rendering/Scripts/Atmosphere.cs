@@ -4,8 +4,7 @@ namespace TarmacGauntlet.Rendering
 {
     /// <summary>
     /// The race's sky as the sky effects draw it: the light, where the clouds are and how thick the air is. The race's
-    /// <c>TimeOfDay</c> publishes it every frame (<see cref="Publish"/>) and the floodlights their beams
-    /// (<see cref="Beams"/>). It all goes to shader globals, read by the cloud shadows (<see cref="CloudShadows"/>), the
+    /// <c>TimeOfDay</c> publishes it every frame (<see cref="Publish"/>). It all goes to shader globals, read by the cloud shadows (<see cref="CloudShadows"/>), the
     /// volumetric clouds and fog (<see cref="VolumetricsFeature"/>) and the sun's rays (<see cref="SunRaysFeature"/>).
     /// Outside a race nothing is published and those effects draw nothing.
     /// </summary>
@@ -13,8 +12,6 @@ namespace TarmacGauntlet.Rendering
     {
         /// <summary>Height the cloud map lies at, m: the clouds' bases on a fair day, and where their shadows are cast from.</summary>
         public const float CloudBase = 1500f;
-        /// <summary>Most floodlight beams drawn in the fog at once.</summary>
-        public const int MostBeams = 16;
 
         /// <summary>The sky at one moment.</summary>
         public struct Sky
@@ -49,15 +46,12 @@ namespace TarmacGauntlet.Rendering
         /// <summary>The sky last published.</summary>
         public static Sky Now { get; private set; }
 
-        private static readonly Vector4[] beamPos = new Vector4[MostBeams], beamAim = new Vector4[MostBeams];
-
         private static readonly int CloudTexId = Shader.PropertyToID("_TgCloudTex"), CloudMapId = Shader.PropertyToID("_TgCloudMap"),
             CloudOffsetId = Shader.PropertyToID("_TgCloudOffset"), CloudDriftId = Shader.PropertyToID("_TgCloudDrift"),
             SunDirId = Shader.PropertyToID("_TgSunDir"), SunLightId = Shader.PropertyToID("_TgSunLight"),
             CloudLitId = Shader.PropertyToID("_TgCloudLit"), CloudShadeId = Shader.PropertyToID("_TgCloudShade"),
             HazeId = Shader.PropertyToID("_TgHaze"), MistId = Shader.PropertyToID("_TgMist"),
-            BeamPosId = Shader.PropertyToID("_TgBeamPos"), BeamAimId = Shader.PropertyToID("_TgBeamAim"),
-            BeamsId = Shader.PropertyToID("_TgBeams"), BeamMostId = Shader.PropertyToID("_TgBeamMost"), SkyLightId = Shader.PropertyToID("_TgSkyLight"),
+            SkyLightId = Shader.PropertyToID("_TgSkyLight"),
             GroundLightId = Shader.PropertyToID("_TgGroundLight");
 
         /// <summary>The sky now. Call it every frame the race sky is up.</summary>
@@ -84,27 +78,6 @@ namespace TarmacGauntlet.Rendering
         public static void Clear()
         {
             Present = false;
-            Beams(null, null, 0, Color.black, 0f);
-        }
-
-        /// <summary>
-        /// The floodlight beams to draw in the fog, up to <see cref="MostBeams"/>: each lens's position and the beam's reach,
-        /// m, in <paramref name="positions"/>, its aim and the cosine of half its cone in <paramref name="aims"/>, and their
-        /// light, colour times strength in linear light, 0 for none. However many beams overlap and however near a lens,
-        /// the mist they light never adds more than <paramref name="most"/> of linear light.
-        /// </summary>
-        public static void Beams(Vector4[] positions, Vector4[] aims, int count, Color light, float most)
-        {
-            count = positions == null || aims == null ? 0 : Mathf.Min(count, MostBeams);
-            for (int i = 0; i < MostBeams; i++)
-            {
-                beamPos[i] = i < count ? positions[i] : Vector4.zero;
-                beamAim[i] = i < count ? aims[i] : Vector4.zero;
-            }
-            Shader.SetGlobalVectorArray(BeamPosId, beamPos);
-            Shader.SetGlobalVectorArray(BeamAimId, beamAim);
-            Shader.SetGlobalVector(BeamsId, new Vector4(count, light.r, light.g, light.b));
-            Shader.SetGlobalFloat(BeamMostId, most);
         }
     }
 }

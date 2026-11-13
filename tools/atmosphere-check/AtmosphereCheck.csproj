@@ -13,6 +13,8 @@
     <Compile Include="../../unity/Assets/Raceday/Scripts/SkyClock.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/CloudMap.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/SkyGrade.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Night/NightBudget.cs" />
+    <Compile Include="../../unity/Assets/Rendering/Scripts/LinearLight.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/WeatherSky.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/RaceWeather.cs" />
     <Compile Include="../../unity/Assets/Rendering/Scripts/CloudNoise.cs" />

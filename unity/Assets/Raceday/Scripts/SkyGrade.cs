@@ -29,7 +29,7 @@ namespace TarmacGauntlet.Raceday
             return new PostEffects.Grade
             {
                 // The tone curve presses the dark down: the night is lifted so the floodlit track and the verges read.
-                Exposure = 1f * night + 0.12f * sunny - 0.04f * shaded,
+                Exposure = NightBudget.Exposure * night + 0.12f * sunny - 0.04f * shaded,
                 Contrast = 8f + 4f * golden + 6f * night - 10f * grey + 5f * sunny - 6f * shaded,
                 Saturation = 6f + 10f * golden - 6f * blue - 22f * night - 18f * grey + 5f * sunny - 7f * shaded,
                 Temperature = 14f * golden - 10f * blue - 8f * night - 6f * grey + 4f * sunny - 4f * shaded,

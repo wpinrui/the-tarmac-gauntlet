@@ -1,0 +1,575 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Night renders</title>
+<style>html, body { margin: 0; background: #000; } canvas { display: block; }</style>
+<canvas id="c"></canvas>
+<script>
+// The race at night as the game draws it, for proof: the circuit's own meshes round the grid (tools/night-budget writes
+// them), the car models, every floodlight and the headlamps of the cars nearest the camera as URP spot lights, shaded
+// as Lamps.hlsl shades them (URP's attenuation, the low beam's cookie, URP's PBR, each lamp under its cap and all of them
+// under theirs), then the night's bloom, exposure and ACES tone curve. Deferred: a G-buffer, then one pass over every
+// light, then the post effects. render.js drives it; window.render(view) draws one view and returns a PNG.
+'use strict';
+const canvas = document.getElementById('c');
+const gl = canvas.getContext('webgl2', { antialias: false, preserveDrawingBuffer: true });
+gl.getExtension('EXT_color_buffer_float');
+gl.getExtension('OES_texture_float_linear');
+
+function compile(vs, fs) {
+  const p = gl.createProgram();
+  for (const [type, src] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, '#version 300 es\nprecision highp float;\nprecision highp int;\n' + src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s) + '\n' + src);
+    gl.attachShader(p, s);
+  }
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  const u = {};
+  const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+  for (let i = 0; i < n; i++) { const name = gl.getActiveUniform(p, i).name.replace(/\[0\]$/, ''); u[name] = gl.getUniformLocation(p, name); }
+  return { p, u };
+}
+
+// ------------------------------------------------------------------ the G-buffer
+const GBUF_VS = `
+layout(location = 0) in vec3 aPos;
+layout(location = 1) in vec3 aNrm;
+uniform mat4 uModel, uViewProj;
+out vec3 vPos; out vec3 vNrm;
+void main() {
+  vec4 w = uModel * vec4(aPos, 1.0);
+  vPos = w.xyz;
+  vNrm = mat3(uModel) * aNrm;
+  gl_Position = uViewProj * w;
+}`;
+const GBUF_FS = `
+in vec3 vPos; in vec3 vNrm;
+uniform vec3 uAlbedo, uEmission, uEye;
+uniform float uSmooth, uMetal, uFresnel;
+layout(location = 0) out vec4 oPos;
+layout(location = 1) out vec4 oNrm;
+layout(location = 2) out vec4 oAlb;
+layout(location = 3) out vec4 oEmi;
+void main() {
+  vec3 n = normalize(vNrm);
+  // Drawn both sides: a face seen from behind shades as its other side.
+  if (dot(n, uEye - vPos) < 0.0) n = -n;
+  oPos = vec4(vPos, 1.0);
+  oNrm = vec4(n, uSmooth);
+  oAlb = vec4(uAlbedo, uMetal);
+  oEmi = vec4(uEmission, 1.0 + uFresnel);
+}`;
+
+// ------------------------------------------------------------------ the lights
+const QUAD_VS = `
+out vec2 vUv;
+void main() {
+  vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
+  vUv = p;
+  gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
+}`;
+const LIGHT_FS = `
+in vec2 vUv;
+uniform sampler2D uPos, uNrm, uAlb, uEmi, uLights;
+uniform int uCount;
+uniform vec3 uEye, uMainDir, uMainColour, uAmbSky, uAmbEq, uAmbGround, uZenith, uHorizon, uFog;
+uniform float uFogDensity;
+uniform vec4 uBudget;
+uniform mat4 uInvViewProj;
+out vec4 oColour;
+
+const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
+const float PI = 3.14159265;
+
+float knee(float x, float most) {
+  float k = most * 0.5;
+  return x <= k ? x : k + (most - k) * (1.0 - exp(-(x - k) / (most - k)));
+}
+float smoothDeg(float a, float b, float x) { float t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+
+// HeadlampRig's cookie, LampLight.Beam: the low beam over URP's cookie square.
+uniform float uHeadCone, uHeadDip;
+float beam(float u, float v) {
+  float half_ = uHeadCone * 0.5, t = tan(radians(half_));
+  float across = degrees(atan(u * t)), up = degrees(atan(v * t)) - uHeadDip;
+  float side = exp(-pow(across / 30.0, 4.0));
+  float cut = 1.0 - smoothDeg(0.5, 3.0, up);
+  float low = smoothDeg(-half_ - 2.0, -14.0, up);
+  return side * cut * low;
+}
+
+// URP's BRDF (BRDF.hlsl): perceptual roughness from smoothness, the specular fit DirectBRDFSpecular.
+struct Brdf { vec3 diffuse; vec3 specular; float roughness; float roughness2; float normTerm; float r2m1; };
+Brdf brdf(vec3 albedo, float metal, float smooth_) {
+  Brdf b;
+  float oneMinusRefl = 0.96 - metal * 0.96;
+  b.diffuse = albedo * oneMinusRefl;
+  b.specular = mix(vec3(0.04), albedo, metal);
+  float pr = 1.0 - smooth_;
+  b.roughness = max(pr * pr, 0.0078125);
+  b.roughness2 = max(b.roughness * b.roughness, 6.103515625e-5);
+  b.normTerm = b.roughness * 4.0 + 2.0;
+  b.r2m1 = b.roughness2 - 1.0;
+  return b;
+}
+float directSpec(Brdf b, vec3 n, vec3 l, vec3 v) {
+  vec3 h = normalize(l + v);
+  float NoH = clamp(dot(n, h), 0.0, 1.0), LoH = clamp(dot(l, h), 0.0, 1.0);
+  float d = NoH * NoH * b.r2m1 + 1.00001;
+  float LoH2 = LoH * LoH;
+  return b.roughness2 / ((d * d) * max(0.1, LoH2) * b.normTerm);
+}
+vec3 lightPbr(Brdf b, vec3 colour, vec3 l, vec3 n, vec3 v) {
+  float NoL = clamp(dot(n, l), 0.0, 1.0);
+  vec3 radiance = colour * NoL;
+  return (b.diffuse + b.specular * directSpec(b, n, l, v)) * radiance;
+}
+
+// Lamps.hlsl's FresnelCorrection: the full GGX highlight with Smith's visibility and Schlick's Fresnel, less URP's fit.
+// The track's shader adds it for the moon only, as the game does.
+float fresnelCorrection(Brdf b, vec3 n, vec3 v, vec3 l) {
+  float NoL = clamp(dot(n, l), 0.0, 1.0);
+  if (NoL <= 0.0) return 0.0;
+  vec3 h = normalize(l + v);
+  float NoH = clamp(dot(n, h), 0.0, 1.0), LoH = clamp(dot(l, h), 0.0, 1.0), NoV = max(dot(n, v), 1e-4);
+  float a2 = b.roughness2;
+  float d = NoH * NoH * (a2 - 1.0) + 1.0;
+  float D = a2 / (d * d);
+  float vis = 0.5 / (NoL * sqrt(NoV * NoV * (1.0 - a2) + a2) + NoV * sqrt(NoL * NoL * (1.0 - a2) + a2));
+  float f0 = b.specular.x;
+  float F = f0 + (1.0 - f0) * pow(1.0 - LoH, 5.0);
+  float full = min(D * vis * F, 64.0);
+  float urp = directSpec(b, n, l, v) * f0;
+  return NoL * (full - urp);
+}
+
+void main() {
+  vec4 P = texture(uPos, vUv);
+  vec3 v;
+  if (P.w < 0.5) {
+    // The sky: the night's gradient from the horizon up.
+    vec4 far_ = uInvViewProj * vec4(vUv * 2.0 - 1.0, 1.0, 1.0);
+    vec3 dir = normalize(far_.xyz / far_.w - uEye);
+    float up = clamp(dir.y, 0.0, 1.0);
+    oColour = vec4(mix(uHorizon, uZenith, pow(up, 0.5)), 1.0);
+    return;
+  }
+  vec3 pos = P.xyz;
+  vec4 N = texture(uNrm, vUv), A = texture(uAlb, vUv);
+  vec3 n = normalize(N.xyz);
+  v = normalize(uEye - pos);
+  Brdf b = brdf(A.rgb, A.a, N.w);
+
+  // The ambient light: URP's SH from the gradient, and the sky's reflection.
+  vec3 sh = n.y > 0.0 ? mix(uAmbEq, uAmbSky, n.y) : mix(uAmbEq, uAmbGround, -n.y);
+  float NoV = clamp(dot(n, v), 0.0, 1.0);
+  float fresnel = pow(1.0 - NoV, 4.0);
+  float grazing = clamp(N.w + (1.0 - (0.96 - A.a * 0.96)), 0.0, 1.0);
+  vec3 refl = reflect(-v, n);
+  vec3 env = mix(uHorizon, uZenith, clamp(refl.y, 0.0, 1.0));
+  vec3 specGI = env * mix(b.specular, vec3(grazing), fresnel) / (b.roughness2 + 1.0);
+  vec3 colour = sh * b.diffuse + specGI;
+  bool fresnelOn = texture(uEmi, vUv).a > 1.5;
+  colour += lightPbr(b, uMainColour, uMainDir, n, v);
+  if (fresnelOn) colour = max(colour + uMainColour * fresnelCorrection(b, n, v, uMainDir), 0.0);
+
+  // Every lamp, as Lamps.hlsl's TarmacFragmentPBR loop shades it.
+  vec3 lamps = vec3(0.0);
+  float lampLight = 0.0;
+  for (int i = 0; i < uCount; i++) {
+    vec4 t0 = texelFetch(uLights, ivec2(0, i), 0), t1 = texelFetch(uLights, ivec2(1, i), 0);
+    vec4 t2 = texelFetch(uLights, ivec2(2, i), 0), t3 = texelFetch(uLights, ivec2(3, i), 0);
+    vec3 toLamp = t0.xyz - pos;
+    float dd = max(dot(toLamp, toLamp), 6.103515625e-5);
+    float range2 = t0.w * t0.w;
+    if (dd >= range2) continue;
+    vec3 l = toLamp * inversesqrt(dd);
+    float f = dd / range2;
+    float smooth_ = clamp(1.0 - f * f, 0.0, 1.0);
+    float dist = smooth_ * smooth_ / dd;
+    float cosOuter = t1.w, cosInner = t2.w;
+    float inv = 1.0 / max(cosInner - cosOuter, 0.001);
+    float spot = clamp(dot(t1.xyz, -l) * inv - cosOuter * inv, 0.0, 1.0);
+    float atten = dist * spot * spot;
+    if (atten <= 0.0) continue;
+    vec3 lc = t2.rgb;
+    if (t3.w > 0.5) {
+      // The cookie, laid over the cone as URP lays a spot light's: the tangent off the axis over the tangent of half the cone.
+      vec3 aim = t1.xyz, right = t3.xyz, upv = cross(aim, right);
+      vec3 d = -toLamp;
+      float z = dot(d, aim);
+      float t = tan(radians(uHeadCone * 0.5));
+      float u = dot(d, right) / z / t, vv = dot(d, upv) / z / t;
+      float c = (z > 0.0 && abs(u) <= 1.0 && abs(vv) <= 1.0) ? beam(u, vv) : 0.0;
+      lc *= c;
+    }
+    if (uBudget.x > 0.5) {
+      float raw = dot(lc, LUMA) * atten * clamp(dot(n, l), 0.0, 1.0);
+      float e = knee(raw, uBudget.y);
+      lc *= raw > 1e-6 ? e / raw : 1.0;
+      lampLight += e;
+    }
+    vec3 lit = lightPbr(b, lc * atten, l, n, v);
+    lamps += lit;
+  }
+  if (uBudget.x > 0.5) {
+    float s = lampLight > 1e-6 ? knee(lampLight, uBudget.z) / lampLight : 1.0;
+    vec3 c = lamps * s;
+    float lum = dot(c, LUMA);
+    lamps = lum > 1e-6 ? c * (knee(lum, uBudget.w) / lum) : c;
+  }
+  colour += lamps;
+  colour += texture(uEmi, vUv).rgb;
+  // Unity's exponential squared fog.
+  float dist = length(uEye - pos);
+  float fog = exp(-pow(uFogDensity * dist, 2.0));
+  colour = mix(uFog, colour, fog);
+  oColour = vec4(colour, 1.0);
+}`;
+
+// ------------------------------------------------------------------ bloom and the tone curve
+const DOWN_FS = `
+in vec2 vUv;
+uniform sampler2D uSrc;
+uniform vec2 uTexel;
+uniform float uThreshold;
+uniform int uPrefilter;
+out vec4 o;
+vec3 tap(vec2 uv) { return texture(uSrc, uv).rgb; }
+void main() {
+  vec3 c = (tap(vUv + uTexel * vec2(-1, -1)) + tap(vUv + uTexel * vec2(1, -1)) + tap(vUv + uTexel * vec2(-1, 1)) + tap(vUv + uTexel * vec2(1, 1))) * 0.25;
+  if (uPrefilter == 1) {
+    // URP's bloom prefilter: the brightness over the threshold, eased in with a soft knee half the threshold wide.
+    c = min(c, vec3(8.0));
+    float br = max(c.r, max(c.g, c.b));
+    float knee_ = uThreshold * 0.5;
+    float softness = clamp(br - uThreshold + knee_, 0.0, 2.0 * knee_);
+    softness = (softness * softness) / (4.0 * knee_ + 1e-4);
+    float contribution = max(softness, br - uThreshold) / max(br, 1e-4);
+    c *= contribution;
+  }
+  o = vec4(c, 1.0);
+}`;
+const UP_FS = `
+in vec2 vUv;
+uniform sampler2D uLow, uHigh;
+uniform vec2 uTexel;
+uniform float uScatter;
+out vec4 o;
+void main() {
+  vec3 low = (texture(uLow, vUv + uTexel * vec2(-0.5, -0.5)).rgb + texture(uLow, vUv + uTexel * vec2(0.5, -0.5)).rgb
+    + texture(uLow, vUv + uTexel * vec2(-0.5, 0.5)).rgb + texture(uLow, vUv + uTexel * vec2(0.5, 0.5)).rgb) * 0.25;
+  o = vec4(mix(texture(uHigh, vUv).rgb, low, uScatter), 1.0);
+}`;
+const FINAL_FS = `
+in vec2 vUv;
+uniform sampler2D uScene, uBloom;
+uniform float uBloomIntensity, uExposure, uContrast, uSaturation;
+out vec4 o;
+vec3 aces(vec3 c) {
+  // Stephen Hill's fit of the ACES reference transform and output transform, as URP's ACES tone curve.
+  const mat3 inM = mat3(0.59719, 0.07600, 0.02840, 0.35458, 0.90834, 0.13383, 0.04823, 0.01566, 0.83777);
+  const mat3 outM = mat3(1.60475, -0.10208, -0.00327, -0.53108, 1.10813, -0.07276, -0.07367, -0.00605, 1.07602);
+  vec3 v = inM * c;
+  vec3 a = v * (v + 0.0245786) - 0.000090537;
+  vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081;
+  return clamp(outM * (a / b), 0.0, 1.0);
+}
+vec3 srgb(vec3 c) { return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
+void main() {
+  vec3 c = texture(uScene, vUv).rgb + texture(uBloom, vUv).rgb * uBloomIntensity;
+  c *= uExposure;
+  // URP's contrast is a slope round middle grey in log space; its saturation a mix towards the luminance.
+  vec3 lg = log2(max(c, vec3(1e-6)) / 0.18);
+  c = 0.18 * exp2(lg * uContrast);
+  float y = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  c = mix(vec3(y), c, uSaturation);
+  o = vec4(srgb(aces(c)), 1.0);
+}`;
+
+const progs = {
+  gbuf: compile(GBUF_VS, GBUF_FS), light: compile(QUAD_VS, LIGHT_FS),
+  down: compile(QUAD_VS, DOWN_FS), up: compile(QUAD_VS, UP_FS), final: compile(QUAD_VS, FINAL_FS),
+};
+
+function tex(w, h, internal = gl.RGBA32F, filter = gl.NEAREST) {
+  const t = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texStorage2D(gl.TEXTURE_2D, 1, internal, w, h);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return t;
+}
+function fbo(textures, depth) {
+  const f = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+  textures.forEach((t, i) => gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + i, gl.TEXTURE_2D, t, 0));
+  if (depth) gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, depth);
+  gl.drawBuffers(textures.map((_, i) => gl.COLOR_ATTACHMENT0 + i));
+  return f;
+}
+
+// ------------------------------------------------------------------ maths
+const V = {
+  sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], add: (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]],
+  mul: (a, s) => [a[0] * s, a[1] * s, a[2] * s], dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+  cross: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+  norm: a => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; },
+};
+// Column-major 4x4 matrices. Unity's world: x right, y up, z forward, so right = up x forward.
+function viewProj(eye, target, fovDeg, aspect, near, far) {
+  const f = V.norm(V.sub(target, eye));
+  const r = V.norm(V.cross([0, 1, 0], f));
+  const u = V.cross(f, r);
+  const t = 1 / Math.tan(fovDeg * Math.PI / 360);
+  // Camera space x = r, y = u, depth = f; clip w = depth.
+  const a = (far + near) / (far - near), b = -2 * far * near / (far - near);
+  const m = new Float32Array(16);
+  const rows = [V.mul(r, t / aspect), V.mul(u, t), V.mul(f, a), f];
+  const off = [-V.dot(rows[0], eye), -V.dot(rows[1], eye), -V.dot(rows[2], eye) + b, -V.dot(f, eye)];
+  for (let row = 0; row < 4; row++) {
+    for (let col = 0; col < 3; col++) m[col * 4 + row] = rows[row][col];
+    m[12 + row] = off[row];
+  }
+  return m;
+}
+function invert(m) {
+  const inv = new Float32Array(16);
+  const a = m;
+  inv[0] = a[5]*a[10]*a[15]-a[5]*a[11]*a[14]-a[9]*a[6]*a[15]+a[9]*a[7]*a[14]+a[13]*a[6]*a[11]-a[13]*a[7]*a[10];
+  inv[4] = -a[4]*a[10]*a[15]+a[4]*a[11]*a[14]+a[8]*a[6]*a[15]-a[8]*a[7]*a[14]-a[12]*a[6]*a[11]+a[12]*a[7]*a[10];
+  inv[8] = a[4]*a[9]*a[15]-a[4]*a[11]*a[13]-a[8]*a[5]*a[15]+a[8]*a[7]*a[13]+a[12]*a[5]*a[11]-a[12]*a[7]*a[9];
+  inv[12] = -a[4]*a[9]*a[14]+a[4]*a[10]*a[13]+a[8]*a[5]*a[14]-a[8]*a[6]*a[13]-a[12]*a[5]*a[10]+a[12]*a[6]*a[9];
+  inv[1] = -a[1]*a[10]*a[15]+a[1]*a[11]*a[14]+a[9]*a[2]*a[15]-a[9]*a[3]*a[14]-a[13]*a[2]*a[11]+a[13]*a[3]*a[10];
+  inv[5] = a[0]*a[10]*a[15]-a[0]*a[11]*a[14]-a[8]*a[2]*a[15]+a[8]*a[3]*a[14]+a[12]*a[2]*a[11]-a[12]*a[3]*a[10];
+  inv[9] = -a[0]*a[9]*a[15]+a[0]*a[11]*a[13]+a[8]*a[1]*a[15]-a[8]*a[3]*a[13]-a[12]*a[1]*a[11]+a[12]*a[3]*a[9];
+  inv[13] = a[0]*a[9]*a[14]-a[0]*a[10]*a[13]-a[8]*a[1]*a[14]+a[8]*a[2]*a[13]+a[12]*a[1]*a[10]-a[12]*a[2]*a[9];
+  inv[2] = a[1]*a[6]*a[15]-a[1]*a[7]*a[14]-a[5]*a[2]*a[15]+a[5]*a[3]*a[14]+a[13]*a[2]*a[7]-a[13]*a[3]*a[6];
+  inv[6] = -a[0]*a[6]*a[15]+a[0]*a[7]*a[14]+a[4]*a[2]*a[15]-a[4]*a[3]*a[14]-a[12]*a[2]*a[7]+a[12]*a[3]*a[6];
+  inv[10] = a[0]*a[5]*a[15]-a[0]*a[7]*a[13]-a[4]*a[1]*a[15]+a[4]*a[3]*a[13]+a[12]*a[1]*a[7]-a[12]*a[3]*a[5];
+  inv[14] = -a[0]*a[5]*a[14]+a[0]*a[6]*a[13]+a[4]*a[1]*a[14]-a[4]*a[2]*a[13]-a[12]*a[1]*a[6]+a[12]*a[2]*a[5];
+  inv[3] = -a[1]*a[6]*a[11]+a[1]*a[7]*a[10]+a[5]*a[2]*a[11]-a[5]*a[3]*a[10]-a[9]*a[2]*a[7]+a[9]*a[3]*a[6];
+  inv[7] = a[0]*a[6]*a[11]-a[0]*a[7]*a[10]-a[4]*a[2]*a[11]+a[4]*a[3]*a[10]+a[8]*a[2]*a[7]-a[8]*a[3]*a[6];
+  inv[11] = -a[0]*a[5]*a[11]+a[0]*a[7]*a[9]+a[4]*a[1]*a[11]-a[4]*a[3]*a[9]-a[8]*a[1]*a[7]+a[8]*a[3]*a[5];
+  inv[15] = a[0]*a[5]*a[10]-a[0]*a[6]*a[9]-a[4]*a[1]*a[10]+a[4]*a[2]*a[9]+a[8]*a[1]*a[6]-a[8]*a[2]*a[5];
+  const det = a[0]*inv[0]+a[1]*inv[4]+a[2]*inv[8]+a[3]*inv[12];
+  for (let i = 0; i < 16; i++) inv[i] /= det;
+  return inv;
+}
+// Unity's Color to linear (Material.SetColor and Light.color in a Linear project): the sRGB curve, carried past 1.
+const lin = c => c.map(x => x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4));
+const IDENTITY = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+
+// ------------------------------------------------------------------ the scene
+let scene, cars, meshes = [], carModels = [];
+
+function upload(bin, m) {
+  const vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+  const pos = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, pos);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(bin, m.pos, m.vertices * 3), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+  const nrm = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, nrm);
+  gl.bufferData(gl.ARRAY_BUFFER, new Int8Array(bin, m.nrm, m.vertices * 4), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(1);
+  gl.vertexAttribPointer(1, 3, gl.BYTE, true, 4, 0);
+  const idx = gl.createBuffer();
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idx);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(bin, m.idx, m.indices), gl.STATIC_DRAW);
+  gl.bindVertexArray(null);
+  return { vao, count: m.indices };
+}
+
+// The cars' looks: linear albedo, smoothness, metallic; the lamps glow by night.
+const CAR_LOOKS = {
+  glass: { albedo: [0.02, 0.022, 0.025], smooth: 0.95, metal: 0 },
+  head: { albedo: [0.6, 0.62, 0.64], smooth: 0.92, metal: 0, glow: 'head' },
+  tail: { albedo: [0.1, 0.01, 0.01], smooth: 0.85, metal: 0, glow: 'tail' },
+  chrome: { albedo: [0.55, 0.56, 0.58], smooth: 0.85, metal: 0.9 },
+  dark: { albedo: [0.025, 0.025, 0.027], smooth: 0.35, metal: 0 },
+  tyre: { albedo: [0.02, 0.02, 0.021], smooth: 0.2, metal: 0 },
+};
+// The grid's paint, sRGB: whites and silvers among them, the worst case for the lamps.
+const PAINTS = [[0.92, 0.92, 0.9], [0.8, 0.08, 0.06], [0.75, 0.76, 0.78], [0.05, 0.1, 0.45], [0.95, 0.75, 0.1], [0.06, 0.06, 0.07],
+  [0.92, 0.92, 0.9], [0.1, 0.4, 0.2], [0.95, 0.4, 0.05], [0.92, 0.92, 0.9]];
+
+async function load(base) {
+  scene = await (await fetch(base + 'scene.json')).json();
+  const bin = await (await fetch(base + 'scene.bin')).arrayBuffer();
+  const b = scene.budget;
+  for (const m of scene.meshes) {
+    const g = upload(bin, m);
+    let emission = [0, 0, 0];
+    if (m.lens) emission = lin(V.mul(b.flood, b.FloodLens * b.on));
+    if (m.name === 'Stand seats' || m.name === 'Crowd') emission = lin(V.mul(b.flood, b.StandGlow * b.on));
+    meshes.push({ ...g, albedo: lin(m.colour), smooth: m.smooth, metal: m.metal, emission, fresnel: m.fresnel, lens: m.lens });
+  }
+  cars = await (await fetch(base + 'cars/cars.json')).json();
+  for (const c of cars) {
+    const cbin = await (await fetch(base + 'cars/' + c.name + '.bin')).arrayBuffer();
+    carModels.push({ ...c, parts: c.parts.filter(p => p.kind !== 'tailglass').map(p => ({ kind: p.kind, ...upload(cbin, p) })) });
+  }
+}
+
+function carMatrix(at, forward) {
+  const f = V.norm(forward), r = V.norm(V.cross([0, 1, 0], f));
+  return new Float32Array([r[0], r[1], r[2], 0, 0, 1, 0, 0, f[0], f[1], f[2], 0, at[0], at[1], at[2], 1]);
+}
+
+// ------------------------------------------------------------------ one view
+async function render(view) {
+  const W = view.width, H = view.height;
+  canvas.width = W; canvas.height = H;
+  const b = scene.budget, night = scene.night;
+  const depth = gl.createRenderbuffer();
+  gl.bindRenderbuffer(gl.RENDERBUFFER, depth);
+  gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT32F, W, H);
+  const G = [tex(W, H), tex(W, H), tex(W, H, gl.RGBA16F), tex(W, H, gl.RGBA16F)];
+  const gfb = fbo(G, depth);
+  const vp = viewProj(view.eye, view.target, view.fov, W / H, 0.1, 2000);
+
+  gl.viewport(0, 0, W, H);
+  gl.enable(gl.DEPTH_TEST);
+  gl.disable(gl.CULL_FACE);
+  gl.clearColor(0, 0, 0, 0);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  const P = progs.gbuf;
+  gl.useProgram(P.p);
+  gl.uniformMatrix4fv(P.u.uViewProj, false, vp);
+  gl.uniform3fv(P.u.uEye, view.eye);
+  const draw = (g, model, albedo, smooth, metal, emission, fresnel = false) => {
+    gl.uniformMatrix4fv(P.u.uModel, false, model);
+    gl.uniform1f(P.u.uFresnel, fresnel ? 1 : 0);
+    gl.uniform3fv(P.u.uAlbedo, albedo);
+    gl.uniform1f(P.u.uSmooth, smooth);
+    gl.uniform1f(P.u.uMetal, metal);
+    gl.uniform3fv(P.u.uEmission, emission);
+    gl.bindVertexArray(g.vao);
+    gl.drawElements(gl.TRIANGLES, g.count, gl.UNSIGNED_INT, 0);
+  };
+  for (const m of meshes) draw(m, IDENTITY, m.albedo, m.smooth, m.metal, m.lens && view.floods === false ? [0, 0, 0] : m.emission, m.fresnel);
+  const headGlow = lin(V.mul(b.headlamp, b.HeadlampGlow * b.on)), tailGlow = lin(V.mul(b.red, b.TailGlow * b.on));
+  const placed = scene.grid.slice(0, view.cars).map((g, i) => ({ ...g, model: carModels[(i * 3) % carModels.length], paint: PAINTS[i % PAINTS.length] }));
+  for (const car of placed) {
+    const M = carMatrix(car.at, car.forward);
+    for (const part of car.model.parts) {
+      if (part.kind === 'paint') draw(part, M, lin(car.paint), 0.9, 0, [0, 0, 0]);
+      else {
+        const L = CAR_LOOKS[part.kind];
+        draw(part, M, L.albedo, L.smooth, L.metal, L.glow === 'head' ? headGlow : L.glow === 'tail' ? tailGlow : [0, 0, 0]);
+      }
+    }
+  }
+  gl.bindVertexArray(null);
+  gl.disable(gl.DEPTH_TEST);
+
+  // The lights on: FloodlightRig's nearest the camera by their targets, HeadlampRig's cars nearest the camera.
+  const lights = [];
+  const fl = lin(b.flood);
+  const floods = scene.lights.map(l => ({ l, d: Math.hypot(...V.sub(l.target, view.eye)) })).filter(x => x.d < 600)
+    .sort((a, c) => a.d - c.d).slice(0, 200);
+  for (const { l } of floods) {
+    lights.push({ pos: l.position, range: l.range, aim: l.aim, cosOuter: Math.cos(l.cone * Math.PI / 360), cosInner: Math.cos(l.core * Math.PI / 360),
+      colour: V.mul(fl, l.intensity * b.floodLevel * (view.floods === false ? 0 : 1)), right: [1, 0, 0], beam: 0 });
+  }
+  const hl = lin(b.headlamp);
+  const byDistance = placed.map(c => ({ c, d: Math.hypot(...V.sub(c.at, view.eye)) })).sort((a, c) => a.d - c.d).slice(0, view.headlamps);
+  for (const { c } of byDistance) {
+    const f = V.norm(c.forward), r = V.norm(V.cross([0, 1, 0], f));
+    const dip = b.HeadlampDip * Math.PI / 180;
+    const aim = V.norm(V.sub(V.mul(f, Math.cos(dip)), V.mul([0, 1, 0], Math.sin(dip))));
+    const pos = V.add(V.add(c.at, V.mul([0, 1, 0], c.model.nose[1])), V.mul(f, c.model.front + b.HeadlampAhead));
+    lights.push({ pos, range: b.HeadlampRange, aim, cosOuter: Math.cos(b.HeadlampCone * Math.PI / 360), cosInner: Math.cos(b.HeadlampCore * Math.PI / 360),
+      colour: V.mul(hl, b.headlampIntensity * b.headlampLevel), right: r, beam: 1 });
+  }
+  const data = new Float32Array(lights.length * 16);
+  lights.forEach((l, i) => data.set([...l.pos, l.range, ...l.aim, l.cosOuter, ...l.colour, l.cosInner, ...l.right, l.beam], i * 16));
+  const lt = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, lt);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, 4, lights.length, 0, gl.RGBA, gl.FLOAT, data);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+  const sceneTex = tex(W, H, gl.RGBA32F, gl.LINEAR);
+  const sfb = fbo([sceneTex]);
+  const L = progs.light;
+  gl.useProgram(L.p);
+  ['uPos', 'uNrm', 'uAlb', 'uEmi'].forEach((n, i) => { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, G[i]); gl.uniform1i(L.u[n], i); });
+  gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, lt); gl.uniform1i(L.u.uLights, 4);
+  gl.uniform1i(L.u.uCount, lights.length);
+  gl.uniform3fv(L.u.uEye, view.eye);
+  gl.uniform3fv(L.u.uMainDir, night.lightDir);
+  gl.uniform3fv(L.u.uMainColour, V.mul(lin(night.lightColour), night.lightIntensity));
+  // RenderSettings colours are sRGB, as Unity takes every Color.
+  gl.uniform3fv(L.u.uAmbSky, lin(night.ambientSky));
+  gl.uniform3fv(L.u.uAmbEq, lin(night.ambientEquator));
+  gl.uniform3fv(L.u.uAmbGround, lin(night.ambientGround));
+  gl.uniform3fv(L.u.uZenith, lin(night.zenith));
+  gl.uniform3fv(L.u.uHorizon, lin(night.horizon));
+  gl.uniform3fv(L.u.uFog, lin(night.fog));
+  gl.uniform1f(L.u.uFogDensity, night.fogDensity);
+  gl.uniform4fv(L.u.uBudget, view.budget === false ? [0, 0, 0, 0] : [1, b.LampMost, b.AllMost, b.PixelMost]);
+  gl.uniform1f(L.u.uHeadCone, b.HeadlampCone);
+  gl.uniform1f(L.u.uHeadDip, b.HeadlampDip);
+  gl.uniformMatrix4fv(L.u.uInvViewProj, false, invert(vp));
+  gl.bindFramebuffer(gl.FRAMEBUFFER, sfb);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+  // Bloom: URP's, at half size down a chain of halvings and back up, scattering 0.65, threshold 1.2, clamp 8.
+  const chain = [];
+  let w = W >> 1, h = H >> 1, src = sceneTex, sw = W, sh = H;
+  for (let i = 0; i < 6 && w >= 4 && h >= 4; i++) {
+    const t = tex(w, h, gl.RGBA16F, gl.LINEAR), f = fbo([t]);
+    gl.useProgram(progs.down.p);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, src); gl.uniform1i(progs.down.u.uSrc, 0);
+    gl.uniform2f(progs.down.u.uTexel, 1 / sw, 1 / sh);
+    gl.uniform1f(progs.down.u.uThreshold, 1.2);
+    gl.uniform1i(progs.down.u.uPrefilter, i === 0 ? 1 : 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+    gl.viewport(0, 0, w, h);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    chain.push({ t, w, h });
+    src = t; sw = w; sh = h; w >>= 1; h >>= 1;
+  }
+  let low = chain[chain.length - 1];
+  for (let i = chain.length - 2; i >= 0; i--) {
+    const hi = chain[i];
+    const t = tex(hi.w, hi.h, gl.RGBA16F, gl.LINEAR), f = fbo([t]);
+    gl.useProgram(progs.up.p);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, low.t); gl.uniform1i(progs.up.u.uLow, 0);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, hi.t); gl.uniform1i(progs.up.u.uHigh, 1);
+    gl.uniform2f(progs.up.u.uTexel, 1 / low.w, 1 / low.h);
+    gl.uniform1f(progs.up.u.uScatter, 0.65);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+    gl.viewport(0, 0, hi.w, hi.h);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    low = { t, w: hi.w, h: hi.h };
+  }
+
+  const F = progs.final;
+  gl.useProgram(F.p);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, sceneTex); gl.uniform1i(F.u.uScene, 0);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, low.t); gl.uniform1i(F.u.uBloom, 1);
+  gl.uniform1f(F.u.uBloomIntensity, 0.5);
+  gl.uniform1f(F.u.uExposure, Math.pow(2, 0.45 + b.Exposure));
+  // The night's grade (SkyGrade): contrast 8 + 6, saturation 6 - 22, as URP's percentages.
+  gl.uniform1f(F.u.uContrast, 1 + 14 / 100);
+  gl.uniform1f(F.u.uSaturation, 1 - 16 / 100);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, W, H);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.finish();
+  return { lights: lights.length, floods: floods.length, headlamps: byDistance.length };
+}
+
+window.load = load;
+window.render = render;
+window.sceneInfo = () => ({ grid: scene.grid, stand: scene.stand, lights: scene.lights.length });
+</script>
