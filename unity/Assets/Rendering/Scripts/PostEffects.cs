@@ -36,6 +36,11 @@ namespace TarmacGauntlet.Rendering
         private const float ToneExposure = 0.45f;
         private const float BloomThreshold = 1.2f, BloomIntensity = 0.5f, BloomScatter = 0.65f;
         /// <summary>
+        /// The brightest linear colour the bloom takes from any pixel: above the sun's disc (about 5), so the day is
+        /// unchanged, but low enough that a blown-out patch can't flood the screen with glow.
+        /// </summary>
+        private const float BloomClamp = 8f;
+        /// <summary>
         /// Depth of field: sharp to a little past the subject, then blurring over a stretch as long again as the subject is far,
         /// m. Through a lens narrower than <see cref="LongLens"/> degrees the blur is at its widest.
         /// </summary>
@@ -65,6 +70,7 @@ namespace TarmacGauntlet.Rendering
             bloom.threshold.Override(BloomThreshold);
             bloom.intensity.Override(BloomIntensity);
             bloom.scatter.Override(BloomScatter);
+            bloom.clamp.Override(BloomClamp);
             bloom.downscale.Override(BloomDownscaleMode.Half);
             bloom.highQualityFiltering.Override(false);
             dof = profile.Add<DepthOfField>();
