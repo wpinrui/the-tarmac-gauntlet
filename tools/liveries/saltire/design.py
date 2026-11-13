@@ -53,10 +53,10 @@ SILL_Y = 0.42                        # blue below this on the sides
 NOSE_Y = 0.56                        # blue below this on the front
 TAIL_Y = 0.46                        # and on the rear
 BONNET_Z = 1.86                      # blue ahead of this on the bonnet
-THISTLE = (-0.74, 0.30, 0.64)        # rear door: z of the stem's foot, y, height
+THISTLE = (-0.74, 0.22, 0.64)        # rear door: z of the stem's foot, y, height
 SHIELD = (0.66, 0.64, 0.32)          # front door: z, y, height
-NAME = (0.06, 0.80, 0.08)           # front door: z, y, cap height
-NUMBER = (0.06, 0.54, 0.40, 0.24)    # front door: z, y, box w, h
+NAME = (0.17, 0.80, 0.075)           # front door: z, y, cap height
+NUMBER = (0.13, 0.54, 0.40, 0.24)    # front door: z, y, box w, h
 
 
 # --- rasters, in car metres ------------------------------------------------------------------------
