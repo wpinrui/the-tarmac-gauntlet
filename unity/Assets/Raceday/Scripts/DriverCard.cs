@@ -6,10 +6,10 @@ using UnityEngine;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// The driver card, bottom left beside the timing tower: the driver now in the car the cameras ride with,
+    /// The driver card, bottom left under the timing tower, which stops short to leave it room: the driver now in the car the cameras ride with,
     /// their nationality's flag, initial and surname, and their overall on a white block, over a row of their
     /// five stats, each with its number and a bar. While that car rolls through the pit lane to a stop that
-    /// changes the driver, a strip above it shows who gets in. It keeps out of the way of the broadcast, which
+    /// changes the driver, a strip above it, tabbed NEXT, shows who gets in. It keeps out of the way of the broadcast, which
     /// names its own drivers, and of live timing, the race preview and the podium, which hide the tower.
     /// Laid out on a 1920 by 1080 screen and scaled to the screen's height.
     /// </summary>
@@ -24,6 +24,7 @@ namespace TarmacGauntlet.Raceday
 
         private static readonly Color Panel = new Color32(0x1a, 0x1a, 0x1c, 0xe0);
         private static readonly Color Under = new Color(0f, 0f, 0f, 0.38f);
+        private static readonly Color Red = RaceTower.Hex(0xd8262b);
         private static readonly Color Block = new Color(0.95f, 0.95f, 0.95f);
         private static readonly Color Ink = new Color(0.07f, 0.07f, 0.08f);
         private static readonly Color InkDim = new Color(0.07f, 0.07f, 0.08f, 0.6f);
@@ -33,15 +34,14 @@ namespace TarmacGauntlet.Raceday
 
         /// <summary>Sizes on the layout, px.</summary>
         private const float CardWidth = 330f, Strip = 56f, Stats = 60f, Pad = 14f, Block58 = 58f, Radius = 6f;
-        private const float NextHeight = 40f, Gap = 8f, TowerGap = 21f;
-        /// <summary>The card's bottom, px above the bottom of the layout: above both key hint rows at the bottom centre, so a long name or a 16:10 screen never runs it into them.</summary>
-        private const float Bottom = 144f;
+        private const float NextHeight = 40f, NextTab = 66f, Gap = 8f, TowerGap = 16f, Bottom = 40f;
+        /// <summary>Height kept clear under the timing tower for the card and the next driver strip, px on the layout.</summary>
+        public const float Room = Bottom + Strip + Stats + Gap + NextHeight + TowerGap;
 
         private readonly NextDriverWatch watch = new NextDriverWatch();
         private readonly Dictionary<string, Shown> shown = new Dictionary<string, Shown>();
         private readonly Dictionary<string, Texture2D> flags = new Dictionary<string, Texture2D>();
-        private GUIStyle initial, surname, ovr, label, number, nextInitial, nextSurname, nextOvr;
-        private Texture2D helmet;
+        private GUIStyle initial, surname, ovr, label, number, nextInitial, nextSurname, nextOvr, tab;
         private float k;
 
         /// <summary>A driver's facts with their text made once, not every frame.</summary>
@@ -79,14 +79,14 @@ namespace TarmacGauntlet.Raceday
             RaceDriver nextDriver = watch.Next(car, log);
             Shown next = nextDriver != null ? Get(nextDriver) : null;
 
-            // As wide as the longest name needs, never narrower than the layout.
             float nameWidth = NameWidth(now, initial, surname);
-            float width = Mathf.Max(CardWidth, Pad + 36f + Pad + nameWidth + 18f + Block58);
-            if (next != null)
-                width = Mathf.Max(width, Pad + 24f + 10f + 28f + 10f + NameWidth(next, nextInitial, nextSurname) + 14f + Width(nextOvr, next.Ovr) + Pad);
-
+            // As wide as the tower, or as the longest name needs.
             Rect area = Tower.Area;
-            float x = area.width > 0f ? area.xMax / k + TowerGap : 40f;
+            float width = Mathf.Max(area.width > 0f ? area.width / k : CardWidth, Pad + 36f + Pad + nameWidth + 18f + Block58);
+            if (next != null)
+                width = Mathf.Max(width, NextTab + 12f + 28f + 10f + NameWidth(next, nextInitial, nextSurname) + 14f + Width(nextOvr, next.Ovr) + Pad);
+
+            float x = area.width > 0f ? area.x / k : 21f;
             float y = 1080f - Bottom - Strip - Stats;
             Card(now, x, y, width, nameWidth);
             if (next != null) Next(next, x, y - Gap - NextHeight, width);
@@ -121,13 +121,13 @@ namespace TarmacGauntlet.Raceday
             }
         }
 
-        /// <summary>The driver who gets in at the coming stop: helmet, flag, name and overall.</summary>
+        /// <summary>The driver who gets in at the coming stop: a red NEXT tab, then flag, name and overall.</summary>
         private void Next(Shown s, float x, float y, float width)
         {
             Fill(R(x, y, width, NextHeight), Panel, Vector4.one * Radius);
-            float cx = x + Pad;
-            GUI.DrawTexture(R(cx, y + (NextHeight - 24f) / 2f, 24f, 24f), helmet, ScaleMode.StretchToFill, true, 0f, Color.white, 0f, 0f);
-            cx += 24f + 10f;
+            Fill(R(x, y, NextTab, NextHeight), Red, new Vector4(Radius, 0f, 0f, Radius));
+            Text(R(x, y, NextTab, NextHeight), "NEXT", tab, Color.white, TextAnchor.MiddleCenter);
+            float cx = x + NextTab + 12f;
             Flag(s.Facts.Nation, R(cx, y + (NextHeight - 21f) / 2f, 28f, 21f));
             cx += 28f + 10f;
             cx = Name(s, cx, y, NextHeight, nextInitial, nextSurname);
@@ -195,7 +195,7 @@ namespace TarmacGauntlet.Raceday
                 nextInitial = new GUIStyle(basic) { font = semiBold };
                 nextSurname = new GUIStyle(basic) { font = bold };
                 nextOvr = new GUIStyle(basic) { font = bold };
-                helmet = RaceTower.HelmetIcon();
+                tab = new GUIStyle(basic) { font = bold };
             }
             initial.fontSize = Size(22f);
             surname.fontSize = Size(30f);
@@ -205,6 +205,7 @@ namespace TarmacGauntlet.Raceday
             nextInitial.fontSize = Size(16f);
             nextSurname.fontSize = Size(22f);
             nextOvr.fontSize = Size(18f);
+            tab.fontSize = Size(17f);
         }
 
         private int Size(float px) => Mathf.Max(1, Mathf.RoundToInt(px * k));
@@ -219,11 +220,6 @@ namespace TarmacGauntlet.Raceday
             style.alignment = anchor;
             style.normal.textColor = colour;
             GUI.Label(r, s, style);
-        }
-
-        private void OnDestroy()
-        {
-            if (helmet != null) Destroy(helmet);
         }
     }
 }

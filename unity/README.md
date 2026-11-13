@@ -150,9 +150,9 @@ The director's shots carry the broadcast graphics (`BroadcastGraphics.cs`): a ba
 fight, a driver strip the first time a car is on air in a stint, a pit timer with fuel, tyres and driver
 change lit as each is done, and the track map during helicopter shots, or always with Track map on in the settings.
 
-Off the broadcast, the driver card (`DriverCard.cs`) sits bottom left beside the timing tower: the driver now in the car
+Off the broadcast, the driver card (`DriverCard.cs`) sits bottom left under the timing tower, which stops short for it: the driver now in the car
 the cameras ride with, their flag, name and overall (the average of their five stats, as in the menus), over their
-five stats. While that car rolls through the pit lane to a stop that changes the driver, a strip above it shows who
+five stats. While that car rolls through the pit lane to a stop that changes the driver, a strip above it, tabbed NEXT, shows who
 gets in (`NextDriverWatch` in `DriverFacts.cs`). `bash tools/driver-card-check/run.sh` checks both outside Unity.
 
 `T` opens live timing while the AI drives your car (`LiveTiming.cs`), with the race at 16x behind it: every
