@@ -88,7 +88,7 @@ namespace TarmacGauntlet.Raceday
             sprayMaterial.SetFloat(ShapeId, 0f);
             sprayMaterial.SetFloat(GlowId, 0f);
             mistMaterial = new Material(drops) { name = "Mist" };
-            mistMaterial.SetFloat(ShapeId, 1f);
+            mistMaterial.SetFloat(ShapeId, 2f);
             mistMaterial.SetFloat(GlowId, 0f);
             rain = MakeRain(rainMaterial);
             sheets = new RainSheets();
@@ -437,7 +437,7 @@ namespace TarmacGauntlet.Raceday
             main.duration = 5f;
             main.startLifetime = new ParticleSystem.MinMaxCurve(1.2f, 2.2f);
             main.startSpeed = 0f;
-            main.startSize = new ParticleSystem.MinMaxCurve(2.2f, 3.6f);
+            main.startSize = new ParticleSystem.MinMaxCurve(1.8f, 3f);
             main.startRotation = new ParticleSystem.MinMaxCurve(0f, 6.283f);
             main.startColor = Color.white;
             main.maxParticles = MostMist;
@@ -447,7 +447,7 @@ namespace TarmacGauntlet.Raceday
             emission.rateOverTime = 0f;
             ParticleSystem.ShapeModule shape = ps.shape;
             shape.shapeType = ParticleSystemShapeType.Box;
-            shape.scale = new Vector3(2f, 0.5f, 1f);
+            shape.scale = new Vector3(2.6f, 0.5f, 1f);
             ParticleSystem.InheritVelocityModule inherit = ps.inheritVelocity;
             inherit.enabled = true;
             inherit.mode = ParticleSystemInheritVelocityMode.Initial;
@@ -464,12 +464,13 @@ namespace TarmacGauntlet.Raceday
             ParticleSystem.VelocityOverLifetimeModule drift = ps.velocityOverLifetime;
             drift.enabled = true;
             drift.space = ParticleSystemSimulationSpace.Local;
-            drift.x = new ParticleSystem.MinMaxCurve(-1.8f, 1.8f);
-            drift.y = new ParticleSystem.MinMaxCurve(1f, 2.2f);
+            // Out sideways more than up: a wide, low wall.
+            drift.x = new ParticleSystem.MinMaxCurve(-2.4f, 2.4f);
+            drift.y = new ParticleSystem.MinMaxCurve(0.5f, 1.4f);
             drift.z = new ParticleSystem.MinMaxCurve(-0.5f, 0.5f);
             ParticleSystem.SizeOverLifetimeModule grow = ps.sizeOverLifetime;
             grow.enabled = true;
-            grow.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 0.7f, 1f, 3f));
+            grow.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 0.7f, 1f, 2.4f));
             ParticleSystem.ColorOverLifetimeModule fade = ps.colorOverLifetime;
             fade.enabled = true;
             var gradient = new Gradient();
@@ -497,6 +498,10 @@ namespace TarmacGauntlet.Raceday
             Color tint = light;
             tint.a = 0.3f;
             sprayMaterial.SetColor(TintId, tint);
+            // Fine mist is lit by the overcast sky and can be no brighter than it.
+            Color sky = RenderSettings.fogColor * 0.95f;
+            float over = tint.maxColorComponent / Mathf.Max(sky.maxColorComponent, 1e-4f);
+            if (over > 1f) tint /= over;
             tint.a = 0.2f;
             mistMaterial.SetColor(TintId, tint);
             float amount = SkyClock.Smooth(0.15f, 0.9f, Now.Water);

@@ -1,6 +1,6 @@
 // Rain streaks and wheel spray: unlit, soft edged particles drawn in the light around them.
 // _Shape 0 draws a streak down a stretched quad: a thread _Thread of the quad's width, or a pixel wide and as much fainter
-// where that is narrower, fading to its ends. 1 draws a soft round puff. _Glow adds that share of the light rather than
+// where that is narrower, fading to its ends. 1 draws a soft round puff, 2 an evenly soft one with no bright core. _Glow adds that share of the light rather than
 // laying it over what is behind, so a fine spray of water brightens the view as it scatters the light. No texture is read.
 Shader "Hidden/TarmacGauntlet/Drops"
 {
@@ -69,8 +69,10 @@ Shader "Hidden/TarmacGauntlet/Drops"
                 float streak = min(_Thread / reach, 1.0) * saturate(1.0 - abs(across) / reach) * saturate(1.0 - abs(along));
                 float r = saturate(1.0 - length(p));
                 float puff = r * r;
+                float even = saturate(1.0 - dot(p, p));
+                even *= even;
                 half4 col = i.color;
-                col.a *= lerp(streak, puff, _Shape);
+                col.a *= _Shape < 0.5 ? streak : _Shape < 1.5 ? puff : even;
                 col.rgb = MixFog(col.rgb, i.fog);
                 return half4(col.rgb * col.a, col.a * (1.0 - _Glow));
             }

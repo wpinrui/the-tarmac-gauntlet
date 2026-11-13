@@ -386,7 +386,7 @@ def draw_streaks(img, depth, cam, pos, vel, size, alpha, tint, length_scale, vel
         over(img, ys + y0, xs + x0, rgb, alpha[k] * s[inside], glow)
 
 
-def draw_puffs(img, depth, cam, pos, size, alpha, tint, max_size, glow=0.0):
+def draw_puffs(img, depth, cam, pos, size, alpha, tint, max_size, glow=0.0, even=False):
     x, y, z = cam.view(pos)
     order = np.argsort(-z)
     for k in order:
@@ -400,8 +400,12 @@ def draw_puffs(img, depth, cam, pos, size, alpha, tint, max_size, glow=0.0):
             continue
         x0, y0, x1, y1 = max(x0, 0), max(y0, 0), min(x1, W), min(y1, H)
         gx, gy = np.meshgrid(np.arange(x0, x1) + 0.5, np.arange(y0, y1) + 0.5)
-        r = np.clip(1 - np.hypot(gx - cx, gy - cy) / max(rpx, 1e-3), 0, 1)
-        s = r * r
+        dist = np.hypot(gx - cx, gy - cy) / max(rpx, 1e-3)
+        if even:
+            s = np.clip(1 - dist * dist, 0, 1) ** 2
+        else:
+            r = np.clip(1 - dist, 0, 1)
+            s = r * r
         inside = (s > 0) & (depth[y0:y1, x0:x1] > z[k])
         if not inside.any():
             continue
@@ -498,6 +502,11 @@ def car_frame(v):
     return np.stack([v[..., 2], v[..., 1], -v[..., 0]], -1)
 
 
+def sky_capped(tint):
+    cap = FOG.max() * 0.95
+    return tint / max(tint.max() / cap, 1.0)
+
+
 class Spray:
     def __init__(self, new):
         self.new = new
@@ -534,10 +543,10 @@ class Spray:
             n = int(self.mist.acc); self.mist.acc -= n
             if n:
                 mat = at + np.array([-0.6, 0.6, 0])
-                local = (RNG.random((n, 3)) - 0.5) * np.array([2.0, 0.5, 1.0])
-                vol = np.stack([RNG.uniform(-1.8, 1.8, n), RNG.uniform(1.0, 2.2, n), RNG.uniform(-0.5, 0.5, n)], 1)
+                local = (RNG.random((n, 3)) - 0.5) * np.array([2.6, 0.5, 1.0])
+                vol = np.stack([RNG.uniform(-2.4, 2.4, n), RNG.uniform(0.5, 1.4, n), RNG.uniform(-0.5, 0.5, n)], 1)
                 self.mist.add(mat + car_frame(local), np.tile(vcar * 0.35, (n, 1)), car_frame(vol),
-                              RNG.uniform(1.2, 2.2, n), RNG.uniform(2.2, 3.6, n))
+                              RNG.uniform(1.2, 2.2, n), RNG.uniform(1.8, 3.0, n))
         else:
             at = rear + np.array([0, 0.35, 0])
             rate = 75 * amount * min(max((speed - 10) / 45, 0), 1)
@@ -570,8 +579,8 @@ class Spray:
         if self.new:
             t = self.mist.age / self.mist.life
             a = np.interp(t, [0, 0.08, 0.5, 1], [0, 1, 0.5, 0])
-            size = self.mist.size * np.interp(t, [0, 1], [0.7, 3.0])
-            draw_puffs(img, depth, cam, self.mist.pos, size, 0.2 * a, light, 0.5)
+            size = self.mist.size * np.interp(t, [0, 1], [0.7, 2.4])
+            draw_puffs(img, depth, cam, self.mist.pos, size, 0.2 * a, sky_capped(light), 0.5, even=True)
             t = self.drops.age / self.drops.life
             a = np.interp(t, [0, 0.5, 1], [1, 0.7, 0])
             draw_streaks(img, depth, cam, self.drops.pos, self.drops.vel, self.drops.size, 0.3 * a,
