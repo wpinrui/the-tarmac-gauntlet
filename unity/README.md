@@ -99,6 +99,10 @@ scene is built and `outro` once the race's time is up. A stage derives from `Ski
 hold [Enter] to skip [stage]". Holding Enter for a second fills the circle beside it, and the full circle skips that
 one stage. The next stage fills only after Enter is let go (`SkipHold.cs`).
 
+The grid presentation (`Stages/GridPresentation.cs`) shows pole and second, each class's pole and your car, each in a slow
+shot from in front of it with a strip naming its place, driver, team, model and class. Then the whole grid shows on the
+board, two by two and staggered, twenty places a page, over a crane shot across the field (`Stages/GridRunsheet.cs`).
+
 The camera starts on the broadcast when the race comes from the career, and on the chase camera when the scene runs on
 its own. `C` cycles the car cameras: TV, chase, bonnet and bumper. The TV camera is coverage locked to the car: a second
 director with `Lock` set shows mostly trackside shots and pans, a helicopter shot now and then, and an onboard about one
