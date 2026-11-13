@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Checks the race preview's camera path and figures outside Unity. Run through run.sh. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)../../out/intro-check/obj/</BaseIntermediateOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Check.cs;../ai-check/MoreStubs.cs;../circuit/geometry-check/UnityStubs.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Circuit.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/CircuitData.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/CarSpec.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/TrackSurface.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/RacingLine.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/SpeedProfile.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/AiPilot.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Racecraft.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Endurance.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Consumables.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/RaceWeather.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/PitLane.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/PitPlan.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/StopPlanner.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/PitLaneStart.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/RollingStart.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/AiRacer.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Rejoin.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/LineTuner.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Standings.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Situations.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/PathChooser.cs" />
+    <Compile Include="../../unity/Assets/Simulation/**/*.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Stages/PreviewPath.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Stages/IntroFacts.cs" />
+  </ItemGroup>
+</Project>

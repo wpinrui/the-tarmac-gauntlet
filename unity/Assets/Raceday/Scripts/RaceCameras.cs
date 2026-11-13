@@ -38,6 +38,8 @@ namespace TarmacGauntlet.Raceday
         public BroadcastDirector Locked;
         /// <summary>Gives the race order for = and -, and is seen from the car ridden with.</summary>
         public RaceTower Tower;
+        /// <summary>True while a stage before the green or after the flag places the camera itself, later in the frame (<see cref="SkippableStage"/>).</summary>
+        [System.NonSerialized] public bool Held;
 
         private View view = View.Chase;
         private bool broadcast = true;
@@ -144,6 +146,9 @@ namespace TarmacGauntlet.Raceday
             return -1;
         }
 
+        /// <summary>The cars were moved, as at a cut in the start: the chase view starts afresh where its car is now, with no swing.</summary>
+        public void Cut() => chaseSettled = false;
+
         public void Watch(CarController next)
         {
             if (next == null) return;
@@ -197,7 +202,7 @@ namespace TarmacGauntlet.Raceday
 
         private void LateUpdate()
         {
-            if (Car == null) return;
+            if (Held || Car == null) return;
             Transform t = Car.transform;
             if (CameraPresets.Preview != null)
             {

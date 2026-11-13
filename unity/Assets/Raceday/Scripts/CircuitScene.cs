@@ -20,13 +20,16 @@ namespace TarmacGauntlet.Raceday
     /// the race through normal speed, 4x and 16x while the AI drives your car, and ends the pit lane
     /// start's fast forward. Cars away from the camera glide without physics (<see cref="PhysicsRange"/>).
     /// The field is shown on the timing tower (<see cref="RaceTower"/>). T opens live timing while the AI drives
-    /// your car, with the controls for its next stop (<see cref="LiveTiming"/>). While a teammate drives, N
+    /// your car, with the controls for its next stop (<see cref="LiveTiming"/>). F steps the speed there too, and closing it
+    /// puts the race back to normal speed. While a teammate drives, N
     /// (or the button beside live timing's way back) fast forwards at 32x to your next stint and hands you the
     /// wheel once you are back on track. A stop that puts a teammate in hands the car back to the AI. Past the
-    /// chequered flag the AI takes your car round its cooldown lap and into its box, and Delete still takes it back.
+    /// chequered flag whoever has the wheel drives the cooldown lap into the box: you, if you took the flag, and Delete
+    /// still hands it back and forth.
     /// A race saved part way (<see cref="RaceWeekend.Resuming"/>) carries on from the save: every car where it was, on its
     /// lap, fuel and tyres, the clocks and the weather as they were. A car that was in the pit lane goes back on track
-    /// beside where it was, at the edge on the pit side. Saved before the green, the race starts again.
+    /// beside where it was, at the edge on the pit side. Saved before the green, the race starts again. The stages before the
+    /// green and after the flag run in turn (<see cref="StageSequence"/>), and holding Enter skips the one on screen.
     /// </summary>
     public sealed class CircuitScene : MonoBehaviour
     {
@@ -45,6 +48,8 @@ namespace TarmacGauntlet.Raceday
         private AiDriver ai;
         private static readonly float[] Speeds = { 1f, 4f, 16f };
         private int speed;
+        /// <summary>Live timing was open last frame: closing it drops the race back to normal speed.</summary>
+        private bool timingWasOpen;
         /// <summary>Speed of the pit lane start's fast forward.</summary>
         private const float SkipSpeed = 32f;
         private PitLaneStart pitLaneStart;
@@ -52,6 +57,12 @@ namespace TarmacGauntlet.Raceday
         private DebugMenu debug;
         private RaceDay day;
         private RaceDirector director;
+        /// <summary>The stages before the green (<see cref="StageSequence"/>), played once the scene is built.</summary>
+        private StageSequence intro;
+        /// <summary>The end of the formation lap, the last stage before the green, or null without a rolling start.</summary>
+        private FinalFormation finalFormation;
+        /// <summary>The stages after the chequered flag, played once the race's time is up.</summary>
+        private StageSequence outro;
         private LiveTiming timing;
         /// <summary>The player's car in the race, or -1 for none.</summary>
         private int playerIndex = -1;
@@ -61,8 +72,9 @@ namespace TarmacGauntlet.Raceday
         private string lastDriver;
         /// <summary>True once the race has handed you the wheel at the start.</summary>
         private bool handedOver;
-        /// <summary>True once the AI has been given your car for its cooldown lap.</summary>
+        /// <summary>True once your car has taken the flag and fast forward to your stint is let go.</summary>
         private bool cooldownHanded;
+        private PitCrews pitCrews;
         private RaceTower raceTower;
         private CarController[] carControllers;
         private Circuit circuit;
@@ -194,6 +206,8 @@ namespace TarmacGauntlet.Raceday
             var cars = new CarController[field.Length];
             var racing = new RaceCar[field.Length];
             var drivers = new AiDriver[field.Length];
+            // Each car's lap at its starting driver's limit, for the race preview's lap times and favourites.
+            var predicted = new float[field.Length];
             if (start == StartMode.PitLane) pitLaneStart = new PitLaneStart(pits, line, field.Length);
             Starter starter = start == StartMode.Rolling ? new GameObject("Race start").AddComponent<RaceStart>()
                 : start == StartMode.PitLane ? new GameObject("Pit lane start").AddComponent<PitStart>()
@@ -218,7 +232,9 @@ namespace TarmacGauntlet.Raceday
                 car.Spec.Stats = stats;
                 DriverStats starter0 = grid[i].Lineup[0].Stats;
                 float pace = (float)starter0.Pace;
-                car.Supplies = Consumables.For(car.Spec, new SpeedProfile(line, car.Spec, AiPilot.LimitFor(pace)), (float)starter0.Smoothness);
+                var profile = new SpeedProfile(line, car.Spec, AiPilot.LimitFor(pace));
+                predicted[i] = profile.LapTime;
+                car.Supplies = Consumables.For(car.Spec, profile, (float)starter0.Smoothness);
                 car.Supplies.Log = day.Cars[i];
                 car.Supplies.PowerTrim = model.Power > 0 ? (float)(stats.Power / model.Power) : 1f;
                 car.Supplies.GripTrim = (float)((1.0 + 0.006 * stats.Handling) / (1.0 + 0.006 * model.Handling));
@@ -282,7 +298,12 @@ namespace TarmacGauntlet.Raceday
             if (!career) views.StartInChase();
             RaceTower tower = Tower(circuit, racing, field, teams, watched, starter);
             raceTower = tower;
-            if (day != null) tower.Flagged = i => day.Cars[i].Flagged;
+            if (day != null)
+            {
+                tower.Flagged = i => day.Cars[i].Flagged;
+                tv.Flagged = tower.Flagged;
+                locked.Flagged = tower.Flagged;
+            }
             if (resumed) tower.SetRaceTime(resume.RaceTime);
             views.Tower = tower;
             if (player >= 0 && TeamColour(setup.Game, grid[player].TeamId) is Color own) tower.Colours[player] = own;
@@ -292,6 +313,7 @@ namespace TarmacGauntlet.Raceday
             for (int i = 0; i < grid.Count; i++) crewSizes[i] = grid[i].CrewSize;
             PitCrews crews = new GameObject("Pit crews").AddComponent<PitCrews>();
             crews.Build(Complex, pits, racing, drivers, tower.Colours, crewSizes);
+            pitCrews = crews;
             // The crews handle the kit at their stops: the fuel hose, the guns, the tyres, the jacks and the lollipop.
             PitKitWork kitWork = crews.gameObject.AddComponent<PitKitWork>();
             kitWork.Build(Complex, crews, view.Kit, racing);
@@ -416,9 +438,48 @@ namespace TarmacGauntlet.Raceday
                 rolling.PaceCar = paceCar;
                 rolling.Pits = pits;
             }
+            // The stages before the green and after the flag, each skipped by holding Enter. Stages are added here in order.
+            intro = new GameObject("Intro").AddComponent<StageSequence>();
+            intro.Keys = keys;
+            BroadcastIntro preview = new GameObject("Race preview").AddComponent<BroadcastIntro>();
+            preview.Circuit = circuit;
+            preview.Cameras = views;
+            preview.Tower = tower;
+            preview.Facts = IntroFacts.From(setup, predicted);
+            intro.Add(preview);
+            GridPresentation gridShow = new GameObject("Grid presentation").AddComponent<GridPresentation>();
+            gridShow.Cars = racing;
+            gridShow.Teams = teams;
+            gridShow.Classes = tower.Classes;
+            gridShow.Colours = tower.Colours;
+            gridShow.Models = graphics.Models;
+            gridShow.Day = day;
+            gridShow.Game = setup.Game;
+            gridShow.Player = player;
+            gridShow.Tower = tower;
+            gridShow.Hud = views.Hud;
+            gridShow.Camera = views.GetComponent<Camera>();
+            gridShow.Cameras = views;
+            intro.Add(gridShow);
+            if (starter is RaceStart rollingStart)
+            {
+                finalFormation = intro.gameObject.AddComponent<FinalFormation>();
+                finalFormation.Formation = rollingStart;
+                finalFormation.Cameras = views;
+                intro.Add(finalFormation);
+            }
+            outro = new GameObject("Outro").AddComponent<StageSequence>();
+            outro.Keys = keys;
+            CooldownStage cooldown = outro.gameObject.AddComponent<CooldownStage>();
+            cooldown.Director = director;
+            cooldown.Crews = pitCrews;
+            cooldown.Player = playerIndex;
+            outro.Add(cooldown);
             Lap("race");
             built = true;
             SceneLoader.Release();
+            if (resumed) intro.MarkPlayed();   // a race saved after the green has had its intro
+            else intro.Play();
             var report = new System.Text.StringBuilder("Raceday built in ");
             long total = 0;
             foreach ((string Stage, long Ms) t in buildTimes) total += t.Ms;
@@ -605,6 +666,11 @@ namespace TarmacGauntlet.Raceday
         private void Update()
         {
             if (!built || keys == null || ai == null) return;
+            if (director.SinceTimeUp.HasValue) outro.Play();
+            // Leaving live timing puts the race back to normal speed.
+            bool timingOpen = timing != null && timing.Open;
+            if (timingWasOpen && !timingOpen) speed = 0;
+            timingWasOpen = timingOpen;
             if (RaceWeekend.Paused) return;   // the pause menu holds the clock
             if (director.Finished) return;   // the race summary is up, at normal speed
             if (keys.Pressed(KeyCode.Delete))
@@ -631,8 +697,7 @@ namespace TarmacGauntlet.Raceday
             }
             if (skipping && pitLaneStart.Time >= pitLaneStart.FastForwardTo) skipping = false;
             if (debug != null && debug.Speed.HasValue) return;   // the debug menu holds the speed
-            // Live timing runs the race at the top speed behind it.
-            float scale = skipping || stintSkip ? SkipSpeed : timing != null && timing.Open ? Speeds[Speeds.Length - 1] : Speeds[speed];
+            float scale = skipping || stintSkip ? SkipSpeed : Speeds[speed];
             if (Time.timeScale != scale)
             {
                 Time.timeScale = scale;
@@ -659,8 +724,9 @@ namespace TarmacGauntlet.Raceday
         /// while you drive gives the car to the AI once you have driven out of the pit lane.
         /// </summary>
         /// <summary>
-        /// When you start the race in your own car, you drive it from the green, or from the pit exit after a pit lane
-        /// start. The AI only has it for the formation lap and the queue. Delete still hands it back and forth.
+        /// When you start the race in your own car, you drive it from the end of the formation lap, on its limiter to
+        /// the line, or from the green without one, or from the pit exit after a pit lane start. The AI only has it for
+        /// the rest of the formation lap and the queue. Delete still hands it back and forth.
         /// </summary>
         private void TakeTheStart()
         {
@@ -671,18 +737,18 @@ namespace TarmacGauntlet.Raceday
                 return;
             }
             bool green = raceTower.Racing == null || raceTower.Racing();
-            if (!green || racingCars[playerIndex].InPitLane) return;
+            bool final = finalFormation != null && finalFormation.Begun;
+            if (!(green || final) || racingCars[playerIndex].InPitLane) return;
             handedOver = true;
             ai.enabled = false;
         }
 
-        /// <summary>Past the flag, the AI drives your car round its cooldown lap and into its box, once.</summary>
+        /// <summary>Past the flag there's no stint left to skip to: whoever has the wheel drives the cooldown lap.</summary>
         private void Cooldown()
         {
             if (cooldownHanded || playerIndex < 0 || day == null || !day.Cars[playerIndex].Flagged) return;
             cooldownHanded = true;
             stintSkip = false;
-            ai.enabled = true;
         }
 
         private void Stints()

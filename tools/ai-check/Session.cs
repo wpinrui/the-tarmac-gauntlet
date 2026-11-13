@@ -178,6 +178,35 @@ sealed class Session
 
     public string Name(SessionCar c) => $"{c.Model}#{c.Id}";
 
+    /// <summary>
+    /// The grid slot an eager stand-in for a player drives, or -1 for none: in the formation it runs flat out on
+    /// its column at its own pace, held back only by RaceStart's limiter for a car someone drives.
+    /// </summary>
+    public int Player = -1;
+    float playerLimit = float.PositiveInfinity;
+
+    /// <summary>RaceStart.CutToFinal: the pace car gone, the field two by two in grid order, the leader at race distance leader.</summary>
+    public void CutToFinal(float leader)
+    {
+        Start.CutToFinal();
+        PaceCarGone = true;
+        paceOnRoute = true;
+        foreach (SessionCar s in Cars)
+        {
+            float d = RollingStart.PlaceOf(leader, s.Slot);
+            int k = circuit.IndexOf(Mathf.Repeat(d, circuit.Lap));
+            bool gliding = s.Racer.Active.Gliding;
+            if (gliding) s.Racer.Active.StopGlide();
+            s.Car.TrackIndex = -1;   // found again from scratch, as RaceCar does after a jump
+            s.Car.Wake(circuit.Surface(k, RollingStart.ColumnOf(s.Slot)), circuit.Forward[k], Start.SpeedAt(d), 0f, 0f);
+            s.Racer.Lost();
+            s.Racer.Active.Relocate(k);
+            s.Laps = (int)Math.Floor(d / circuit.Lap);
+            s.Last = k;
+            if (gliding && s.Racer.CanGlide) Sleep(s);
+        }
+    }
+
     public void Step()
     {
         Measure();
@@ -214,6 +243,14 @@ sealed class Session
                 r.Formation = f;
                 r.InFormation = true;
                 r.FormationCap = caps[s.Slot];
+                if (s.Slot == Player)
+                {
+                    r.FormationCap = float.PositiveInfinity;
+                    float before = s.Slot > 0 ? traffic[i - 1].Distance : float.NaN;
+                    float beforeSpeed = s.Slot > 0 ? traffic[i - 1].Speed : 0f;
+                    playerLimit = RollingStart.Limiter(s.Slot, caps[s.Slot], traffic[i].Distance, before, beforeSpeed);
+                    car.SpeedLimit = Math.Min(car.SpeedLimit, playerLimit);
+                }
             }
             else r.InFormation = false;
             if (r.Active.Gliding)
@@ -243,6 +280,8 @@ sealed class Session
                 if (StopLog) Console.WriteLine($"STOP {Clock(Time)} {Name(s)} at {r.Pilot.Index * circuit.Step:0} m {car.Speed * 3.6f:0} km/h {(r.Craft.Braking ? "BRK" : "")} {r.Craft.State} tspd {r.Pilot.TargetSpeed * 3.6f:0} cap {Math.Min(r.Pilot.SpeedCap, 99f) * 3.6f:0} scale {r.Pilot.SpeedScale:0.00} off {r.Pilot.Offset:0.0} shift {r.Pilot.Shift:0.0} lat {car.Lateral:0.0} side {(r.Pilot.SideFilter ? r.Pilot.SideWeight.ToString("0.00") : "-")} thr {c.Throttle:0.00} brk {c.Brake:0.00} str {c.Steer:0.00} hold {r.Craft.HoldingLine} def {r.Craft.Defending}");
             }
             car.Reverse = c.Reverse;
+            // CarController's limiter brakes for a car someone drives in the formation.
+            if (s.Slot == Player && held) c.Brake = Math.Max(c.Brake, RollingStart.LimiterBrake(traffic[i].Speed, playerLimit + RollingStart.LimiterGrace));
             car.Step(Dt, c.Throttle, c.Brake, c.Steer);
 
             if (s.InPitLane) inLane++;

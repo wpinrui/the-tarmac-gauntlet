@@ -186,6 +186,22 @@ namespace TarmacGauntlet.Raceday
             if (AllParked() || (timeUpAt >= 0f && Time.time - timeUpAt > FlagWait + CooldownWait)) Finish();
         }
 
+        /// <summary>
+        /// True once every car still in the race has taken the flag, or been given up on after <see cref="FlagWait"/>:
+        /// the results stand, whatever is left of the cooldown laps.
+        /// </summary>
+        public bool FieldFlagged
+        {
+            get
+            {
+                if (Day == null || timeUpAt < 0f) return false;
+                if (Time.time - timeUpAt > FlagWait) return true;
+                foreach (CarRaceLog log in Day.Cars)
+                    if (!log.Retired && !log.Flagged) return false;
+                return true;
+            }
+        }
+
         /// <summary>True once every car still in the race has taken the flag and parked in its box.</summary>
         private bool AllParked()
         {

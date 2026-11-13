@@ -93,6 +93,30 @@ target speed for every 2 m sample (`SpeedProfile.cs`, from the car's grip, downf
 brakes). After a hard crash, or when stuck or spun, it puts the car back on track itself. The console
 shows its predicted lap time and each lap it drives.
 
+The stages before the green and after the chequered flag run in turn (`Stages/StageSequence.cs`): `intro` plays once the
+scene is built and `outro` once the race's time is up. A stage derives from `SkippableStage` and is added in
+`CircuitScene` with `intro.Add` or `outro.Add`. While one runs, the hint at the bottom of the screen reads "Press and
+hold [Enter] to skip [stage]". Holding Enter for a second fills the circle beside it, and the full circle skips that
+one stage. The next stage fills only after Enter is let go (`SkipHold.cs`).
+
+The race preview (`Stages/BroadcastIntro.cs`) comes first. It opens over the start line with the event and the year
+(year 1 is 2026), flies a lap beside a diagram of the circuit with each turn called out (`Stages/PreviewPath.cs`), then
+shows each class's expected lap time, last year's class podiums, past winners and each class's favourite
+(`Stages/IntroFacts.cs`). A stage that places the camera sets `RaceCameras.Held` and runs after it in the frame. After
+changing the preview, run `bash tools/intro-check/run.sh`: it flies the camera over the real circuit, checking it keeps
+clear of the ground, sees the road and turns smoothly, and checks the figures from a career.
+
+The grid presentation (`Stages/GridPresentation.cs`) shows pole and second, each class's pole and your car, each in a slow
+shot from in front of it with a strip naming its place, driver, team, model and class. Then the whole grid shows on the
+board, two by two and staggered, twenty places a page, over a crane shot across the field (`Stages/GridRunsheet.cs`).
+
+The last stage before the green is the end of the formation lap (`Stages/FinalFormation.cs`). It cuts to the leader
+200 m short of the last corner, the pace car gone into the pit lane and the field behind two by two in grid order, and
+ends at the green. It is the start of the race, so it can't be skipped. From the cut you drive your own car, on a limiter until
+you cross the line: past the speed that holds your place the power is cut, and a little over it the brakes come on, so
+you can't pass the car before you in grid order. `bash tools/ai-check/run.sh final` runs it with 100 cars, with and
+without a player driving flat out against the limiter.
+
 The camera starts on the broadcast when the race comes from the career, and on the chase camera when the scene runs on
 its own. `C` cycles the car cameras: TV, chase, bonnet and bumper. The TV camera is coverage locked to the car: a second
 director with `Lock` set shows mostly trackside shots and pans, a helicopter shot now and then, and an onboard about one
