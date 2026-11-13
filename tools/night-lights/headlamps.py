@@ -40,7 +40,7 @@ NOSE_Y, NOSE_Z, FRONT_Z = 0.65, 1.8, 2.3
 # The beam on the road.
 BEFORE_GAIN, BEFORE_CAP, BEFORE_LIFT, BEFORE_SCENE = 10.0, 0.4, 0.03, 0.5
 # Headlamps.hlsl and NightLook: the light the headlamps throw on the ground, and how far.
-GROUND_LIGHT, GROUND_REACH = float(os.environ.get("GROUND_LIGHT", "5.0")), 95.0
+GROUND_LIGHT, GROUND_REACH = float(os.environ.get("GROUND_LIGHT", "5.0")), 75.0
 
 # Each frame: floodlights on, the camera (position, a point it looks at), the other cars (x, z of their middles, colour),
 # and which cars carry a real headlamp light (the nearest the camera: 0 is our own).
@@ -202,9 +202,9 @@ def ground_light(pos, nrm, sky, lamps):
         y = v @ up
         d = np.maximum(np.linalg.norm(v, axis=-1), 1e-3)
         zc = np.maximum(z, 1e-3)
-        along = (0.5 + 0.5 * sm(0.5, 9.0, z)) * (1 - sm(12.0, GROUND_REACH, z)) * (z > 0.2)
-        a = np.arctan2(np.abs(x), zc)
-        side = 0.85 * np.exp(-(a / 0.38) ** 2) + 0.15 * np.exp(-(a / 0.7) ** 2)
+        along = (0.5 + 0.5 * sm(0.5, 9.0, z)) * (1 - sm(15.0, GROUND_REACH, z)) * (z > 0.2)
+        u = np.abs(x) / np.minimum(2.0 + 0.35 * zc, 6.0)
+        side = np.exp(-1.2 * u * u)
         cut = (1 - sm(0.0, 0.06, y / zc)) * sm(-h - 4.0, -h - 2.5, y)
         facing = np.clip(np.sum(nrm * -(v / d[..., None]), -1), 0, None) / np.maximum(h / d, 0.01)
         e += along * side * cut * np.minimum(facing, 1.5)

@@ -19,11 +19,11 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Light a pool adds to the blackest ground at its middle.</summary>
         public const float PoolLift = 0.035f;
         /// <summary>
-        /// The light a car's headlamps throw on the ground at their brightest, 9 to 12 m ahead, per unit of the ground's
+        /// The light a car's headlamps throw on the ground at their brightest, 9 to 15 m ahead, per unit of the ground's
         /// colour (<see cref="HeadlampGround"/>): with no circuit lights the road reads clearly lit and the white lines
-        /// stay short of white. It fades to nothing at the reach, m, lighting the road out to 50 to 70 m.
+        /// stay short of white. It fades to nothing at the reach, m, lighting the road out to about 60 m.
         /// </summary>
-        public const float HeadlampGround = 5f, HeadlampReach = 95f;
+        public const float HeadlampGround = 5f, HeadlampReach = 75f;
         /// <summary>A floodlight lens's glow, and a headlamp's.</summary>
         public const float LensGlow = 2f, HeadlampGlow = 2.2f;
         /// <summary>Tail lamps at night, and brake lamps whenever the brakes are on.</summary>
