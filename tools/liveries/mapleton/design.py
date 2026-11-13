@@ -36,6 +36,7 @@ MAPLE = "#a8392d"          # maple red
 IVORY = "#efe4cf"          # warm ivory
 BARK = "#4a3328"           # dark brown ink
 PINE = "#4d6350"           # pine green
+CHAR = "#1f2620"           # the flannel's dark bands
 # Cottage.
 SAGE = "#7f977b"
 LAKE = "#2e4a55"
@@ -74,14 +75,32 @@ def nose_dir(view):
 _ids = iter(range(10 ** 6))
 
 
-def roundel(lv, view, u, v, h, rotate=0, ink=MAPLE):
-    """Logo 1: a maple leaf in a ring, the name round the top, 192 units across. ink: ring and leaf, maple red by default."""
+def flannel(pid, ground, dark, cell):
+    """A washed buffalo check, cells cell units square (3 cm on the car): dark bands both ways, darker where they cross,
+    a little pale lint across it."""
+    c = cell
+    r = random.Random(pid)
+    lint = "".join(f'<rect x="{r.random() * 2 * c:.2f}" y="{r.random() * 2 * c:.2f}" width="{c * 0.4:.2f}" height="{c * 0.08:.2f}" '
+                   f'fill="{IVORY}" opacity="0.14"/>' for _ in range(24))
+    return (f'<pattern id="{pid}" width="{2 * c}" height="{2 * c}" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
+            f'<rect width="{2 * c}" height="{2 * c}" fill="{ground}"/>'
+            f'<rect width="{c}" height="{2 * c}" fill="{dark}" opacity="0.5"/>'
+            f'<rect width="{2 * c}" height="{c}" fill="{dark}" opacity="0.5"/>{lint}</pattern>')
+
+
+def roundel(lv, view, u, v, h, rotate=0, ink=MAPLE, cloth=False):
+    """Logo 1: a maple leaf in a ring, the name round the top, 192 units across. ink: ring and leaf,
+    maple red by default. cloth: ring and leaf cut from a green flannel and stitched on instead."""
     k = next(_ids)
     s = h / 192
+    fill = f"url(#cloth{k})" if cloth else ink
+    stitch = (f'<g fill="none" stroke="{IVORY}" stroke-width="1.6" stroke-dasharray="5 3.5" stroke-linecap="round">'
+              f'<circle r="91"/><circle r="67"/><path transform="translate(0 2) scale(0.93)" d="{LEAF_D}" stroke-linejoin="round"/></g>'
+              if cloth else "")
     lv.raw(view, f'<g transform="translate({f(u)} {f(v)}) rotate({rotate}) scale({s:.6f})">'
-                 f'<defs><path id="ring{k}" d="M-82,0 A82,82 0 0 1 82,0"/></defs>'
-                 f'<circle r="96" fill="{ink}"/><circle r="62" fill="{IVORY}"/>'
-                 f'<path transform="translate(0 2) scale(1.02)" d="{LEAF_D}" fill="{ink}"/>'
+                 f'<defs><path id="ring{k}" d="M-80,0 A80,80 0 0 1 80,0"/>{flannel(f"cloth{k}", PINE, CHAR, round(0.03 / s, 2)) if cloth else ""}</defs>'
+                 f'<circle r="96" fill="{fill}"/><circle r="62" fill="{IVORY}"/>'
+                 f'<path transform="translate(0 2) scale(1.02)" d="{LEAF_D}" fill="{fill}"/>{stitch}'
                  f'<text font-family="Fraunces" font-size="15" letter-spacing="2.2" fill="{IVORY}">'
                  f'<textPath href="#ring{k}" startOffset="50%" text-anchor="middle">MAPLETON AUTOSPORT</textPath></text></g>')
 
@@ -214,12 +233,12 @@ def mapleton_livery():
         # A cream pinstripe under the glass, rising with the belt.
         a, b = side_uv(lv, view, 0.74, 0.885), side_uv(lv, view, -1.75, 0.975)
         lv.raw(view, f'<line x1="{f(a[0])}" y1="{f(a[1])}" x2="{f(b[0])}" y2="{f(b[1])}" stroke="{IVORY}" stroke-width="0.007"/>')
-        roundel(lv, view, *side_uv(lv, view, ROUNDEL[0], ROUNDEL[1]), ROUNDEL[2])
+        roundel(lv, view, *side_uv(lv, view, ROUNDEL[0], ROUNDEL[1]), ROUNDEL[2], cloth=True)
     lv.side_text("Mapleton Autosport", NAME[0], NAME[1], NAME[2] * 1.35, IVORY, font="Caveat")
     lv.side_number(NUMBER[0], NUMBER[1], NUMBER[2], NUMBER[3], IVORY)
     # Roof: the lake map. Bonnet: the roundel, the tagline under it, read from the nose.
     lv.raw("top", lake_contours(-0.57, 0, 0.6, 0.46, 9, IVORY, 5))
-    roundel(lv, "top", *lv.uv("top", BONNET_ROUNDEL), 0.63, rotate=-90, ink=PINE)
+    roundel(lv, "top", *lv.uv("top", BONNET_ROUNDEL), 0.63, rotate=-90, cloth=True)
     tagline(lv, "top", *lv.uv("top", BONNET_ROUNDEL), 0.63, "From Mapleton, with love", rotate=-90)
     # Front and rear: the shoreline carried round the bumpers.
     for view, base, h in (("front", 0.36, 0.13), ("rear", 0.36, 0.16)):
