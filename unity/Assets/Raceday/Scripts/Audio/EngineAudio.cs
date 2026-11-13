@@ -32,6 +32,14 @@ namespace TarmacGauntlet.Raceday
         private float[] mono = new float[4096];
         private int lastGear;
         private volatile bool playing;
+        /// <summary>Switched off: the race is over and the car parked, so it makes no sound.</summary>
+        private bool off;
+
+        /// <summary>Switches every car's engine off, for good: the race is over and the cars are parked.</summary>
+        public static void SwitchOffAll()
+        {
+            foreach (EngineAudio e in all) e.off = true;
+        }
 
         public void Setup(string modelId, int seed)
         {
@@ -110,7 +118,7 @@ namespace TarmacGauntlet.Raceday
             {
                 EngineAudio e = all[i];
                 float sq = (e.transform.position - ear).sqrMagnitude;
-                bool on = i < voices && sq < Range * Range;
+                bool on = !e.off && i < voices && sq < Range * Range;
                 if (i == 0 && on) Mix.Engine(Mix.Closeness(Mathf.Sqrt(sq), Mathf.Abs(e.car.Speed)));
                 if (on == e.playing) continue;
                 e.playing = on;

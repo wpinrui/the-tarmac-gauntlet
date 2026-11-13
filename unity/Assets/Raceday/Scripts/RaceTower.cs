@@ -12,7 +12,7 @@ namespace TarmacGauntlet.Raceday
     /// it, one row per car: position, a slash in the team's colour, team name, class badge and fake laps
     /// completed (<see cref="Standings"/>). Class leaders have their position on a red block, and the
     /// player's row is white. It shows every class leader and the four cars either side of the player,
-    /// then fills the screen height with the fastest class. Once the leader takes the flag, after the
+    /// then fills the screen down to the driver card with the fastest class. Once the leader takes the flag, after the
     /// time runs out, the countdown gives way to a chequered flag, and each car that has taken the flag has one beside its laps. As the
     /// watched car takes it, a chequered flag and its finishing position show at the top of the screen for
     /// <see cref="BannerTime"/>. Sizes are in design units, a hundredth of the width of a 16:9 screen.
@@ -139,11 +139,12 @@ namespace TarmacGauntlet.Raceday
         /// <summary>True once the leader has taken the chequered flag, after the race time ran out.</summary>
         public bool FlagOut => finishers > 0;
 
-        /// <summary>How many rows fit between the top of the screen and the bottom margin.</summary>
+        /// <summary>How many rows fit between the top of the screen and the driver card below the tower.</summary>
         private static int Fit()
         {
             float u = Unit();
-            float room = Screen.height / u - 2f * Margin - TabHeight - 2f * BodyPad - HeaderHeight - BreakHeight;
+            float card = DriverCard.Room / (19.2f * Scale);
+            float room = Screen.height / u - Margin - card - TabHeight - 2f * BodyPad - HeaderHeight - BreakHeight;
             return Mathf.Max(1, Mathf.FloorToInt(room / RowHeight));
         }
 

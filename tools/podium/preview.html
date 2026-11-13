@@ -1,0 +1,430 @@
+<!doctype html>
+<!-- The podium ceremony as the check plays it (run.sh <folder>): the podium and the pit building round it, the crew
+     body posed from its own clips with the same arm reach as the game, the props, the champagne and confetti, through
+     the show's own camera. Serve the folder over http and open preview.html. ?c=1 plays the second sample ceremony,
+     ?t=12 starts 12 s in, ?free=1 frees the camera to orbit. window.seek(c, t) is for screenshots. -->
+<html>
+<head>
+<meta charset="utf-8">
+<title>Podium Preview</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #9bb7d4; overflow: hidden; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
+<script src="podium.js"></script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const P = window.PODIUM;
+const q = new URLSearchParams(location.search);
+let cer = +(q.get('c') || 0), clock = +(q.get('t') || 0), free = q.get('free') === '1', paused = q.get('pause') === '1';
+const M = v => new THREE.Vector3(v[0], v[1], -v[2]);       // Unity's frame mirrored into three's
+const V = (a, i) => new THREE.Vector3(a[i], a[i + 1], -a[i + 2]);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x9bb7d4);
+scene.fog = new THREE.Fog(0x9bb7d4, 120, 400);
+const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.05, 900);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enabled = free;
+scene.add(new THREE.HemisphereLight(0xdfe9f5, 0x8a8070, 2.4));
+const sun = new THREE.DirectionalLight(0xfff1dc, 2.6);
+sun.position.set(40, 70, 25);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 30, bottom: -30, near: 1, far: 200 });
+sun.shadow.bias = -0.0004;
+scene.add(sun, sun.target);
+
+// ------------------------------------------------------------------ the scene's meshes
+
+const looks = {
+  'Podium slab': [0xa8a59e, 0.8, 0], 'Podium steel': [0x33363a, 0.45, 0.7], 'Podium steps': [0xe6e6e0, 0.55, 0],
+  'Podium board': [0x1a2d5c, 0.65, 0], 'Podium chequer': [0xeaeae5, 0.7, 0], 'Podium doorway': [0x030303, 0.9, 0],
+  'Podium lamps': [0xffffff, 0.7, 0, 0xfff6e8], 'Podium band 1': [0xd4a845, 0.25, 1], 'Podium band 2': [0xc8cacf, 0.25, 1],
+  'Podium band 3': [0x9e6638, 0.3, 1],
+};
+function Material(name) {
+  const l = looks[name];
+  if (name === 'Podium glass') return new THREE.MeshStandardMaterial({ color: 0x9fb0b8, transparent: true, opacity: 0.22, roughness: 0.05, side: THREE.DoubleSide, depthWrite: false });
+  if (l) return new THREE.MeshStandardMaterial({ color: l[0], roughness: l[1], metalness: l[2], emissive: l[3] || 0, side: THREE.DoubleSide });
+  const n = name.toLowerCase();
+  if (n.includes('glass')) return new THREE.MeshStandardMaterial({ color: 0x1b2229, roughness: 0.15, metalness: 0.3, side: THREE.DoubleSide });
+  if (n.includes('steel')) return new THREE.MeshStandardMaterial({ color: 0x29483a, roughness: 0.55, metalness: 0.3, side: THREE.DoubleSide });
+  if (n.includes('grass') || n.includes('verge') || n.includes('terrain')) return new THREE.MeshStandardMaterial({ color: 0x4f6b35, roughness: 1, side: THREE.DoubleSide });
+  if (n.includes('white') || n.includes('line')) return new THREE.MeshStandardMaterial({ color: 0xe0e0e0, roughness: 0.8, side: THREE.DoubleSide });
+  if (n.includes('asphalt') || n.includes('road') || n.includes('pit lane') || n.includes('lane')) return new THREE.MeshStandardMaterial({ color: 0x45474b, roughness: 0.92, side: THREE.DoubleSide });
+  if (n.includes('team')) return new THREE.MeshStandardMaterial({ color: 0x8a2f35, roughness: 0.6, side: THREE.DoubleSide });
+  if (n.includes('light') || n.includes('lamp')) return new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff8ee, side: THREE.DoubleSide });
+  return new THREE.MeshStandardMaterial({ color: 0x9c9a94, roughness: 0.85, side: THREE.DoubleSide });
+}
+function Geometry(m) {
+  const g = new THREE.BufferGeometry();
+  const p = new Float32Array(m.p.length), n = new Float32Array(m.n.length);
+  for (let i = 0; i < m.p.length; i += 3) { p[i] = m.p[i]; p[i + 1] = m.p[i + 1]; p[i + 2] = -m.p[i + 2]; n[i] = m.n[i]; n[i + 1] = m.n[i + 1]; n[i + 2] = -m.n[i + 2]; }
+  g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(n, 3));
+  g.setIndex(m.i);
+  return g;
+}
+for (const m of P.meshes) {
+  const mesh = new THREE.Mesh(Geometry(m), Material(m.name));
+  mesh.castShadow = !m.name.includes('glass') && !m.name.includes('Glass');
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+}
+
+// ------------------------------------------------------------------ the crew body
+
+const info = await (await fetch('crew_suit.json')).json();
+const meshBytes = await (await fetch('crew_suit_mesh.bytes')).arrayBuffer();
+const anim = new DataView(await (await fetch('crew_suit_anim.bytes')).arrayBuffer());
+const textures = {};
+const loader = new THREE.TextureLoader();
+function Tex(name) {
+  if (!name) return null;
+  if (!textures[name]) { textures[name] = loader.load('crew/' + name + '.jpg'); textures[name].colorSpace = THREE.SRGBColorSpace; textures[name].flipY = false; }
+  return textures[name];
+}
+const clips = {};
+for (const c of info.clips) {
+  const nr = c.rot.length, np = c.pos.length;
+  const rot = new Float32Array(c.frames * nr * 4), pos = new Float32Array(c.frames * np * 3);
+  for (let k = 0; k < c.frames * nr; k++) {
+    const o = c.off + k * 8, s = 1 / 32767;
+    const x = anim.getInt16(o, true) * s, y = anim.getInt16(o + 2, true) * s, z = anim.getInt16(o + 4, true) * s, w = anim.getInt16(o + 6, true) * s;
+    const l = Math.hypot(x, y, z, w) || 1;
+    rot[k * 4] = -x / l; rot[k * 4 + 1] = -y / l; rot[k * 4 + 2] = z / l; rot[k * 4 + 3] = w / l;
+  }
+  for (let k = 0; k < c.frames * np; k++) {
+    const o = c.posOff + k * 12;
+    pos[k * 3] = anim.getFloat32(o, true); pos[k * 3 + 1] = anim.getFloat32(o + 4, true); pos[k * 3 + 2] = -anim.getFloat32(o + 8, true);
+  }
+  clips[c.name] = { fps: c.fps, frames: c.frames, duration: (c.frames - 1) / c.fps, rotNodes: c.rot, posNodes: c.pos, rot, pos };
+}
+const S = new THREE.Matrix4().makeScale(1, 1, -1);
+const restT = info.nodes.map(n => new THREE.Vector3(n.t[0], n.t[1], -n.t[2]));
+const restR = info.nodes.map(n => new THREE.Quaternion(-n.r[0], -n.r[1], n.r[2], n.r[3]));
+const restS = info.nodes.map(n => new THREE.Vector3(n.s[0], n.s[1], n.s[2]));
+const ibm = info.joints.map((_, j) => {
+  const m = new THREE.Matrix4();
+  const a = info.ibm.slice(j * 16, j * 16 + 16);
+  m.set(...a);
+  return new THREE.Matrix4().multiplyMatrices(S, m).multiply(S);
+});
+const bodyParts = info.parts.map(p => {
+  const f = (o, n) => new Float32Array(meshBytes.slice(o, o + n * 4));
+  const pos = f(p.pos, p.n * 3), nrm = f(p.nrm, p.n * 3), uv = f(p.uv, p.n * 2);
+  for (let i = 0; i < p.n; i++) { pos[i * 3 + 2] *= -1; nrm[i * 3 + 2] *= -1; }
+  const joints = new Uint16Array(new Uint8Array(meshBytes.slice(p.joints, p.joints + p.n * 4)));
+  const weights = f(p.weights, p.n * 4);
+  const idx = new Uint32Array(meshBytes.slice(p.idx, p.idx + p.i * 4));
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  g.setAttribute('skinIndex', new THREE.BufferAttribute(joints, 4));
+  g.setAttribute('skinWeight', new THREE.BufferAttribute(weights, 4));
+  g.setIndex(new THREE.BufferAttribute(idx, 1));
+  return { g, mat: info.mats[p.mat] };
+});
+
+const teams = [0xc8202a, 0x1f5fbf, 0x1e8a4a];
+function Person(role, place) {
+  const root = new THREE.Group();
+  const nodes = info.nodes.map((n, i) => i === 0 ? root : new THREE.Bone());
+  info.nodes.forEach((n, i) => {
+    if (i === 0) return;
+    nodes[i].name = n.name;
+    nodes[n.parent].add(nodes[i]);
+    nodes[i].position.copy(restT[i]); nodes[i].quaternion.copy(restR[i]); nodes[i].scale.copy(restS[i]);
+  });
+  const bones = info.joints.map(j => nodes[j]);
+  const skeleton = new THREE.Skeleton(bones, ibm);
+  const team = new THREE.Color(teams[place]);
+  const cloth = role === 0 ? team : role === 1 ? new THREE.Color(0x22242a) : team;
+  for (const part of bodyParts) {
+    const name = part.mat.name;
+    if (role === 0 && (name.includes('Glasses'))) continue;
+    const kit = name.includes('Outfit_Top') || name.includes('Outfit_Bottom');
+    const mat = new THREE.MeshStandardMaterial({ map: Tex(part.mat.col), roughness: 0.75, side: THREE.DoubleSide });
+    if (kit) { mat.map = null; mat.color = cloth; }
+    const sk = new THREE.SkinnedMesh(part.g, mat);
+    sk.castShadow = true;
+    sk.frustumCulled = false;
+    sk.bind(skeleton, new THREE.Matrix4());
+    root.add(sk);
+  }
+  const find = n => nodes[info.nodes.findIndex(x => x.name === n)];
+  scene.add(root);
+  const fingers = side => [...['Index', 'Middle', 'Ring', 'Pinky'].flatMap(f => [1, 2, 3].map(j => find(side + 'Hand' + f + j))), find(side + 'HandThumb2'), find(side + 'HandThumb3')];
+  return { root, nodes, L: [find('LeftArm'), find('LeftForeArm'), find('LeftHand')], R: [find('RightArm'), find('RightForeArm'), find('RightHand')],
+    LF: fingers('Left'), RF: fingers('Right') };
+}
+
+function Pose(rig, layers) {
+  const n = rig.nodes.length;
+  const rot = new Array(n), rw = new Float32Array(n), pos = new Array(n), pw = new Float32Array(n);
+  for (const [clip, time, weight] of layers) {
+    if (weight <= 0) continue;
+    const f = Math.min(Math.max(time * clip.fps, 0), clip.frames - 1);
+    const a = Math.min(Math.floor(f), clip.frames - 1), b = Math.min(a + 1, clip.frames - 1), k = f - a;
+    const nr = clip.rotNodes.length, np = clip.posNodes.length;
+    for (let i = 0; i < nr; i++) {
+      const node = clip.rotNodes[i];
+      const qa = new THREE.Quaternion().fromArray(clip.rot, (a * nr + i) * 4), qb = new THREE.Quaternion().fromArray(clip.rot, (b * nr + i) * 4);
+      const qq = qa.slerp(qb, k);
+      if (rw[node] === 0) { rot[node] = qq; rw[node] = weight; } else { rw[node] += weight; rot[node].slerp(qq, weight / rw[node]); }
+    }
+    for (let i = 0; i < np; i++) {
+      const node = clip.posNodes[i];
+      const pa = new THREE.Vector3().fromArray(clip.pos, (a * np + i) * 3), pb = new THREE.Vector3().fromArray(clip.pos, (b * np + i) * 3);
+      const pp = pa.lerp(pb, k);
+      if (pw[node] === 0) { pos[node] = pp; pw[node] = weight; } else { pw[node] += weight; pos[node].lerp(pp, weight / pw[node]); }
+    }
+  }
+  for (let i = 1; i < n; i++) {
+    const b = rig.nodes[i];
+    b.quaternion.copy(rw[i] >= 1 ? rot[i] : rw[i] <= 0 ? restR[i] : rot[i].clone().slerp(restR[i], 1 - rw[i]));
+    b.position.copy(pw[i] >= 1 ? pos[i] : pw[i] <= 0 ? restT[i] : pos[i].clone().lerp(restT[i], 1 - pw[i]));
+  }
+}
+
+const wp = o => o.getWorldPosition(new THREE.Vector3());
+function SetWorldRotation(obj, qWorld) {
+  const parent = obj.parent.getWorldQuaternion(new THREE.Quaternion());
+  obj.quaternion.copy(parent.invert().multiply(qWorld));
+  obj.updateMatrixWorld(true);
+}
+// The game's arm reach (Podium.Reach), in three's frame.
+function Reach([upper, lower, end], target, pole, weight) {
+  if (weight <= 0) return;
+  const u0 = upper.quaternion.clone(), l0 = lower.quaternion.clone();
+  const a = wp(upper), b = wp(lower), c = wp(end);
+  const la = a.distanceTo(b), lb = b.distanceTo(c);
+  const to = target.clone().sub(a);
+  const d = Math.min(Math.max(to.length(), Math.abs(la - lb) + 1e-3), (la + lb) * 0.999);
+  const dir = to.normalize();
+  let bend = pole.clone().sub(dir.clone().multiplyScalar(pole.dot(dir)));
+  if (bend.lengthSq() < 1e-6) bend = b.clone().sub(a);
+  bend.normalize();
+  const cosA = Math.min(Math.max((la * la + d * d - lb * lb) / (2 * la * d), -1), 1), sinA = Math.sqrt(1 - cosA * cosA);
+  const elbow = a.clone().add(dir.clone().multiplyScalar(cosA * la)).add(bend.clone().multiplyScalar(sinA * la));
+  const qu = new THREE.Quaternion().setFromUnitVectors(b.clone().sub(a).normalize(), elbow.clone().sub(a).normalize());
+  SetWorldRotation(upper, qu.multiply(upper.getWorldQuaternion(new THREE.Quaternion())));
+  const b2 = wp(lower), c2 = wp(end);
+  const ql = new THREE.Quaternion().setFromUnitVectors(c2.clone().sub(b2).normalize(), a.clone().add(dir.clone().multiplyScalar(d)).sub(b2).normalize());
+  SetWorldRotation(lower, ql.multiply(lower.getWorldQuaternion(new THREE.Quaternion())));
+  if (weight < 1) { upper.quaternion.copy(u0.slerp(upper.quaternion, weight)); lower.quaternion.copy(l0.slerp(lower.quaternion, weight)); upper.updateMatrixWorld(true); }
+}
+
+// The game's grip (Podium.Hold), in three's frame: the game's local z is three's -z, and its turns about x run the other way.
+const PalmSign = -1, PalmLength = 0.075, CurlThin = [70, 85, 60], CurlThick = [45, 60, 45];
+function Hold(arm, fingers, rightHand, at, bar, radius, pole, weight) {
+  if (weight <= 0) return;
+  const hand = arm[2];
+  if (bar.lengthSq() < 1e-6) { Reach(arm, at, pole(at), weight); return; }
+  bar.normalize();
+  const hq = hand.getWorldQuaternion(new THREE.Quaternion());
+  const thumbSide = new THREE.Vector3(rightHand ? 1 : -1, 0, 0).applyQuaternion(hq);
+  const held = new THREE.Quaternion().setFromUnitVectors(thumbSide, bar).multiply(hq);
+  const palm = new THREE.Vector3(0, PalmLength, -PalmSign * (radius + 0.012)).applyQuaternion(held);
+  const wrist = at.clone().sub(palm);
+  Reach(arm, wrist, pole(wrist), weight);
+  const now = hand.getWorldQuaternion(new THREE.Quaternion());
+  SetWorldRotation(hand, now.slerp(held, weight));
+  const curl = radius > 0.025 ? CurlThick : CurlThin;
+  fingers.forEach((j, i) => {
+    if (!j) return;
+    const angle = (i >= 12 ? 30 : curl[i % 3]) * PalmSign * weight * Math.PI / 180;
+    j.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -angle));
+  });
+  hand.updateMatrixWorld(true);
+}
+
+// The root faces like Unity's LookRotation(-face): built in Unity's frame, then mirrored.
+function RootRotation(faceU) {
+  const z = new THREE.Vector3(-faceU.x, 0, -faceU.z).normalize();
+  const x = new THREE.Vector3(z.z, 0, -z.x);   // Unity's cross(up, z)
+  const m = new THREE.Matrix4().makeBasis(x, new THREE.Vector3(0, 1, 0), z);
+  const mm = new THREE.Matrix4().multiplyMatrices(S, m).multiply(S);
+  return new THREE.Quaternion().setFromRotationMatrix(mm);
+}
+
+// ------------------------------------------------------------------ props, spray and confetti
+
+function PropMesh(parts, mats) {
+  const g = new THREE.Group();
+  parts.forEach((m, i) => { const mesh = new THREE.Mesh(Geometry(m), mats[i]); mesh.castShadow = true; g.add(mesh); });
+  scene.add(g);
+  return g;
+}
+const gilt = new THREE.MeshStandardMaterial({ color: 0xd8b04a, metalness: 1, roughness: 0.22, side: THREE.DoubleSide });
+const plinth = new THREE.MeshStandardMaterial({ color: 0x0b0b0c, roughness: 0.4, side: THREE.DoubleSide });
+const glassM = new THREE.MeshStandardMaterial({ color: 0x0b2a14, roughness: 0.08, metalness: 0.1, side: THREE.DoubleSide });
+const foilM = new THREE.MeshStandardMaterial({ color: 0xdcb44f, metalness: 1, roughness: 0.3, side: THREE.DoubleSide });
+const steelM = new THREE.MeshStandardMaterial({ color: 0xb9bbc0, metalness: 1, roughness: 0.2, side: THREE.DoubleSide });
+const trophies = [0, 1, 2].map(p => PropMesh(P.trophy[p], [gilt, plinth]));
+const bottles = [0, 1, 2].map(() => PropMesh(P.bottle, [glassM, foilM]));
+const buckets = [0, 1, 2].map(() => PropMesh(P.bucket, [steelM, steelM]));
+
+const MAXP = 9000;
+const sprayGeo = new THREE.BufferGeometry();
+const sprayPos = new Float32Array(MAXP * 3);
+sprayGeo.setAttribute('position', new THREE.BufferAttribute(sprayPos, 3));
+const spray = new THREE.Points(sprayGeo, new THREE.PointsMaterial({ color: 0xfff3d2, size: 0.05, transparent: true, opacity: 0.8, depthWrite: false }));
+spray.frustumCulled = false;
+scene.add(spray);
+const confGeo = new THREE.BufferGeometry();
+const confPos = new Float32Array(4000 * 3), confCol = new Float32Array(4000 * 3);
+confGeo.setAttribute('position', new THREE.BufferAttribute(confPos, 3));
+confGeo.setAttribute('color', new THREE.BufferAttribute(confCol, 3));
+const conf = new THREE.Points(confGeo, new THREE.PointsMaterial({ size: 0.045, vertexColors: true }));
+conf.frustumCulled = false;
+scene.add(conf);
+// Deterministic particles: each is a function of time, so a seek shows the same spray as playing does.
+function rnd(i) { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
+
+// ------------------------------------------------------------------ the ceremony
+
+let people = [];
+function Load(c) {
+  for (const p of people) scene.remove(p.root);
+  people = P.ceremonies[c].actors.map(a => Object.assign(Person(a.role, a.place), { a }));
+}
+Load(cer);
+const F = 1 / 30;
+
+function Step(t) {
+  const C = P.ceremonies[cer];
+  const k = Math.min(Math.floor(t / F), C.cams.length - 1);
+  for (const p of people) {
+    const f = p.a.f, o = k * 29;
+    const shown = p.a.role !== 0 || t >= p.a.start;
+    p.root.visible = shown;
+    if (!shown) continue;
+    p.root.position.copy(V(f, o));
+    p.root.scale.setScalar(p.a.size || 1);
+    p.root.quaternion.copy(RootRotation(new THREE.Vector3(f[o + 3], 0, f[o + 5])));
+    p.root.updateMatrixWorld(true);
+    const clip = n => clips[C.clips[n]];
+    const T = (n, time, loop) => loop ? time % clip(n).duration : Math.min(time, clip(n).duration);
+    const layers = [];
+    if (f[o + 9] >= 0 && f[o + 12] > 0) layers.push([clip(f[o + 9]), T(f[o + 9], f[o + 10], f[o + 11]), f[o + 12]]);
+    layers.push([clip(f[o + 6]), T(f[o + 6], f[o + 7], f[o + 8]), 1 - (f[o + 9] >= 0 ? f[o + 12] : 0)]);
+    Pose(p, layers);
+    p.root.updateMatrixWorld(true);
+    const faceM = new THREE.Vector3(f[o + 3], 0, -f[o + 5]).normalize();
+    const right = new THREE.Vector3().crossVectors(faceM, new THREE.Vector3(0, 1, 0)).normalize();
+    const pole = (side, target, shoulder) => {
+      const high = Math.min(Math.max((target.y - shoulder.y + 0.1) / 0.4, 0), 1);
+      return new THREE.Vector3(0, -(1 - high), 0).add(side.clone().multiplyScalar(0.6 + 0.6 * high)).add(faceM.clone().multiplyScalar(-0.25)).normalize();
+    };
+    const lt = V(f, o + 13), rt = V(f, o + 17);
+    Hold(p.L, p.LF, false, lt, V(f, o + 21), f[o + 24], w => pole(right.clone().negate(), w, wp(p.L[0])), f[o + 16]);
+    Hold(p.R, p.RF, true, rt, V(f, o + 25), f[o + 28], w => pole(right, w, wp(p.R[0])), f[o + 20]);
+  }
+  const props = C.props[k];
+  for (let pl = 0; pl < 3; pl++) {
+    const on = props[pl] !== null;
+    trophies[pl].visible = bottles[pl].visible = buckets[pl].visible = on;
+    if (!on) continue;
+    const r = props[pl];
+    trophies[pl].position.copy(V(r, 0));
+    const side = V(r, 3);
+    trophies[pl].quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), side.normalize());
+    bottles[pl].position.copy(V(r, 6));
+    bottles[pl].quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), V(r, 9).normalize());
+    buckets[pl].position.copy(M(C.buckets[pl]));
+  }
+  // The champagne: each droplet left the mouth at its own moment and flies under gravity since.
+  let n = 0;
+  for (let pl = 0; pl < 3 && n < MAXP; pl++) {
+    for (let i = 0; i < 1100 && n < MAXP; i++) {
+      const age = rnd(i * 3 + pl) * 0.95;
+      const born = t - age;
+      const kb = Math.floor(born / F);
+      if (kb < 0 || !C.props[kb] || !C.props[kb][pl] || !C.props[kb][pl][12]) continue;
+      const r = C.props[kb][pl];
+      const mouth = V(r, 13), aim = V(r, 16);
+      const sp = 5.5 + 3 * rnd(i + 17), spread = 0.12;
+      const d = aim.clone().add(new THREE.Vector3(rnd(i + 5) - 0.5, rnd(i + 9) - 0.5, rnd(i + 13) - 0.5).multiplyScalar(spread)).normalize();
+      const p = mouth.add(d.multiplyScalar(sp * age)); p.y -= 0.5 * 9.81 * 0.7 * age * age;
+      sprayPos.set([p.x, p.y, p.z], n * 3); n++;
+    }
+  }
+  sprayGeo.setDrawRange(0, n);
+  sprayGeo.attributes.position.needsUpdate = true;
+  // Confetti from the canopy's edge, drifting down.
+  const since = t - 36.0;
+  let m = 0;
+  if (since > 0) {
+    const al = new THREE.Vector3(P.frame.along[0], 0, -P.frame.along[2]), out = new THREE.Vector3(P.frame.out[0], 0, -P.frame.out[2]);
+    const cols = [[0.83, 0.66, 0.27], [0.93, 0.93, 0.92], [0.8, 0.1, 0.12], [0.78, 0.79, 0.81]];
+    for (let i = 0; i < 3200; i++) {
+      const life = 4 + 2.5 * rnd(i + 400);
+      if (since > life) continue;
+      const x = (rnd(i + 900) - 0.5) * 14.2, v = 1.5 + 3 * rnd(i + 1300);
+      const tt = Math.min(since, 0.8);
+      const outward = v * 0.85 * tt + 0.4 * (since - tt), up = v * 0.55 * tt - 0.35 * Math.max(0, since - tt);
+      const wob = Math.sin(since * 3 + i) * 0.15;
+      const base = new THREE.Vector3(0, 7.9 + 4.7 - 0.4, 11.5);
+      const p = al.clone().multiplyScalar(x + wob).add(out.clone().multiplyScalar(base.z + outward));
+      p.y = base.y + up;
+      confPos.set([p.x, p.y, p.z], m * 3);
+      confCol.set(cols[i % 4], m * 3);
+      m++;
+    }
+  }
+  confGeo.setDrawRange(0, m);
+  confGeo.attributes.position.needsUpdate = true;
+  confGeo.attributes.color.needsUpdate = true;
+  if (!free) {
+    const c = C.cams[k];
+    camera.position.copy(V(c, 0));
+    camera.lookAt(V(c, 3));
+    camera.fov = c[6];
+    camera.updateProjectionMatrix();
+  }
+}
+
+window.seek = (c, t) => { if (c !== cer) { cer = c; Load(c); } clock = t; paused = true; Step(clock); renderer.render(scene, camera); return true; };
+// A close look at a person's hand, for screenshots: from where the shot's camera is, d metres from the hand.
+window.closeUp = (role, place, side, d) => {
+  const p = people.find(x => x.a.role === role && x.a.place === place);
+  const h = wp((side ? p.R : p.L)[2]);
+  const dir = camera.position.clone().sub(h).normalize();
+  free = true; camera.position.copy(h.clone().add(dir.multiplyScalar(d))); camera.lookAt(h); camera.fov = 40; camera.updateProjectionMatrix();
+  renderer.render(scene, camera);
+};
+window.freeView = (eye, look) => { free = true; camera.position.set(eye[0], eye[1], -eye[2]); camera.lookAt(look[0], look[1], -look[2]); camera.fov = 40; camera.updateProjectionMatrix(); };
+if (free) { const c = P.ceremonies[cer].cams[0]; camera.position.copy(V(c, 0)); controls.target.copy(V(c, 3)); controls.update(); }
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+addEventListener('keydown', e => { if (e.key === ' ') paused = !paused; });
+let last = performance.now();
+function frame(now) {
+  const dt = (now - last) / 1000; last = now;
+  if (!paused || free) {
+    if (!paused) { clock += dt; if (clock > P.length) clock = 0; }
+    Step(clock);
+    renderer.render(scene, camera);
+  }
+  requestAnimationFrame(frame);
+}
+window.ready = true;
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

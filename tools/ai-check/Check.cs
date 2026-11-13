@@ -125,7 +125,6 @@ static partial class Check
             if (only == null || only == "ff") FastForward();
             if (only == null || only == "pits") PitStopsCheck("gliding pit stops", i => i % 2 == 1, verbose: only != null, glide: true);
             if (only == null || only == "start") RollingStartCheck(100, verbose: false, glide: true);
-            if (only == null || only == "pitstart") PitLaneStartCheck(verbose: false);
             return failed ? 1 : 0;
         }
         if (args.Length > 1 && args[1] == "tuner")
@@ -155,9 +154,20 @@ static partial class Check
             SceneTrace(args.Length > 2 ? float.Parse(args[2]) : 120f);
             return 0;
         }
-        if (args.Length > 1 && args[1] == "pitstart")
+        if (args.Length > 1 && args[1] == "garageslow")
         {
-            PitLaneStartCheck(verbose: true);
+            RollingStartCheck(100, verbose: false, glide: Environment.GetEnvironmentVariable("GARAGE_PHYSICS") == null, garages: true, slowPlayer: 40);
+            return failed ? 1 : 0;
+        }
+        if (args.Length > 1 && args[1] == "garagestart")
+        {
+            RollingStartCheck(args.Length > 2 ? int.Parse(args[2]) : 100, verbose: true, glide: Environment.GetEnvironmentVariable("GARAGE_GLIDE") != null, garages: true);
+            return failed ? 1 : 0;
+        }
+        if (args.Length > 1 && args[1] == "final")
+        {
+            FinalFormationCheck(100, -1, skipped: false, verbose: true);
+            foreach (int slot in new[] { 0, 7, 10 }) FinalFormationCheck(100, slot, skipped: false, verbose: true);
             return failed ? 1 : 0;
         }
         if (args.Length > 1 && args[1] == "start")

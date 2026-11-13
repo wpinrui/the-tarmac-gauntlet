@@ -65,8 +65,6 @@ namespace TarmacGauntlet.Simulation
         public Func<double>? Random { get; init; }
         /// <summary>Mechanical issue template catalogue. Null means none.</summary>
         public IReadOnlyList<IssueTemplate>? IssueTemplates { get; init; }
-        /// <summary>Crash issue template catalogue. Null means none.</summary>
-        public IReadOnlyList<IssueTemplate>? CrashTemplates { get; init; }
     }
 
     /// <summary>Final result for one car.</summary>
@@ -268,9 +266,7 @@ namespace TarmacGauntlet.Simulation
             int lapCap = options.TotalLaps ?? SafetyLapCap;
             Func<double> random = options.Random ?? DefaultRandom.Next;
             IReadOnlyList<IssueTemplate> issueTemplates = options.IssueTemplates ?? Array.Empty<IssueTemplate>();
-            IReadOnlyList<IssueTemplate> crashTemplates = options.CrashTemplates ?? Array.Empty<IssueTemplate>();
-            // All templates combined, for pit stop issue fix lookups.
-            IReadOnlyList<IssueTemplate> allTemplates = issueTemplates.Concat(crashTemplates).ToArray();
+            IReadOnlyList<IssueTemplate> allTemplates = issueTemplates;
 
             List<CarWorkingState> states = cars.Select(entry => new CarWorkingState
             {
@@ -374,7 +370,6 @@ namespace TarmacGauntlet.Simulation
                         InstructionMode = state.InstructionMode,
                         ActiveIssues = state.ActiveIssues,
                         IssueTemplates = issueTemplates,
-                        CrashTemplates = crashTemplates,
                         Random = random,
                     });
 

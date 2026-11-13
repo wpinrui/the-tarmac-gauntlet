@@ -126,13 +126,14 @@ namespace TarmacGauntlet.Simulation
         /// <param name="carAge">Car's age in years (0 = new).</param>
         /// <param name="engineerSkill">Player's Engineer skill level (0 to 20; use 0 for AI teams).</param>
         /// <param name="mode">Current driver instruction mode.</param>
+        /// <param name="laps">How many of the race maths' laps the wear covers (1 for one lap).</param>
         /// <returns>New condition, clamped to a minimum of 0.</returns>
-        public static double UpdateCarCondition(double current, int carAge, int engineerSkill, InstructionMode mode)
+        public static double UpdateCarCondition(double current, int carAge, int engineerSkill, InstructionMode mode, double laps = 1)
         {
             double ageFactor = Math.Min(MaxAgeFactor, 1 + carAge * AgeConditionRate);
             double engineerFactor = 1 - (engineerSkill / MaxEngineerSkill) * MaxEngineerReduction;
             double decayPerLap =
-                BaseConditionDecayPerLap * ageFactor * engineerFactor * ModeDegradationScale(mode);
+                BaseConditionDecayPerLap * ageFactor * engineerFactor * ModeDegradationScale(mode) * Math.Max(0, laps);
             return Math.Max(0, current - decayPerLap);
         }
     }

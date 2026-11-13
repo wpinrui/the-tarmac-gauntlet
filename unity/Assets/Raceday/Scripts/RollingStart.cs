@@ -36,6 +36,14 @@ namespace TarmacGauntlet.Raceday
         private const float Catch = 6f;           // most a car may run over the formation speed to get back in place
         private const float Follow = 10f;         // closest a car runs behind the one ahead of it in its column, m
         private const float Headway = 0.3f;       // and that much more per m/s
+        /// <summary>The last part of the formation lap starts with the leader this far short of the last corner, m.</summary>
+        public const float FinalApproach = 200f;
+        /// <summary>Gap the player's limiter keeps to the car before it in grid order, m: just behind a car beside it, the follow gap to one a row ahead.</summary>
+        private const float Beside = 3f;
+        /// <summary>Speed over the player's limit at which the limiter starts to brake, m/s; the power is cut from the limit itself.</summary>
+        public const float LimiterGrace = 0.5f;
+        /// <summary>Speed further over at which the limiter brakes fully, m/s.</summary>
+        private const float LimiterBand = 2f;
 
         /// <summary>Formation speed at each track sample, m/s.</summary>
         public readonly float[] Speeds;
@@ -81,6 +89,27 @@ namespace TarmacGauntlet.Raceday
 
         public void PeelOff() => PaceCarIn = true;
 
+        /// <summary>
+        /// Cuts to the last part of the formation lap: the pace car is in and the field follows the
+        /// leader at the formation speed to the green.
+        /// </summary>
+        public void CutToFinal()
+        {
+            if (State == Phase.Grid) State = Phase.Formation;
+            PaceCarIn = true;
+        }
+
+        /// <summary>Race distance of the leader as the last part of the formation lap starts: just short of the last corner, on the formation lap.</summary>
+        public static float FinalStart(Circuit circuit)
+        {
+            float last = 0f;
+            foreach (CornerData corner in circuit.Data.corners) last = Mathf.Max(last, corner.s);
+            return last - FinalApproach;
+        }
+
+        /// <summary>Where a grid slot runs in the formation, as a race distance, with the leader at <c>leader</c>.</summary>
+        public static float PlaceOf(float leader, int slot) => leader - (slot / 2) * RowGap;
+
         public void Green() => State = Phase.Green;
 
         /// <summary>
@@ -125,5 +154,20 @@ namespace TarmacGauntlet.Raceday
             }
             return cap;
         }
+
+        /// <summary>
+        /// The limiter on a car the player drives in the formation: its formation limit (<c>cap</c>),
+        /// and never past the car before it in grid order (<c>before</c>, a race distance, or NaN for
+        /// pole). It stays just behind a car beside it and the follow gap behind one a row ahead.
+        /// </summary>
+        public static float Limiter(int slot, float cap, float mine, float before, float beforeSpeed)
+        {
+            if (slot == 0 || float.IsNaN(before)) return cap;
+            float keep = slot % 2 == 1 ? Beside : Follow;
+            return Mathf.Min(cap, Mathf.Max(0f, beforeSpeed + Gain * (before - keep - mine)));
+        }
+
+        /// <summary>Brake the limiter applies to a car going at <c>speed</c> with its brakes set to come on above <c>above</c>, 0 to 1.</summary>
+        public static float LimiterBrake(float speed, float above) => speed > above ? Mathf.Clamp01((speed - above) / LimiterBand) : 0f;
     }
 }

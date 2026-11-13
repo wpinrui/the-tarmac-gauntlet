@@ -192,7 +192,7 @@ namespace TarmacGauntlet.Raceday
                     }
                 GUILayout.EndHorizontal();
                 GUILayout.BeginHorizontal();
-                foreach ((CircuitScene.StartMode mode, string name) in new[] { (CircuitScene.StartMode.Grid, "Grid"), (CircuitScene.StartMode.Rolling, "Rolling"), (CircuitScene.StartMode.PitLane, "Pit lane") })
+                foreach ((CircuitScene.StartMode mode, string name) in new[] { (CircuitScene.StartMode.Grid, "Grid"), (CircuitScene.StartMode.Rolling, "Rolling") })
                     if (Button(name, DebugSettings.Start == mode))
                     {
                         DebugSettings.Start = mode;
@@ -221,9 +221,15 @@ namespace TarmacGauntlet.Raceday
                 if (log != null && !log.Retired && Director != null && !Director.Finished)
                 {
                     GUILayout.BeginHorizontal();
-                    if (Button("Fix", log.ActiveIssues.Count > 0))
+                    if (Button("Fix", log.ActiveIssues.Count > 0 || log.Damage > 0))
                     {
                         log.ClearIssues();
+                        log.SetDamage(0);
+                        supplies.Effects = log.Effects;
+                    }
+                    if (Button("Damage"))
+                    {
+                        log.SetDamage(log.Damage + 25);
                         supplies.Effects = log.Effects;
                     }
                     if (Button("Issue")) page = Page.Issues;

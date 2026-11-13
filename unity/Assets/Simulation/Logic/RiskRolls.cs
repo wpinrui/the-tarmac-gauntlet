@@ -35,19 +35,22 @@ namespace TarmacGauntlet.Simulation
         public IReadOnlyList<ActiveIssue> ActiveIssues { get; init; } = Array.Empty<ActiveIssue>();
         /// <summary>Mechanical issue templates for the weighted draw.</summary>
         public IReadOnlyList<IssueTemplate> IssueTemplates { get; init; } = Array.Empty<IssueTemplate>();
-        /// <summary>Crash issue templates for non-terminal crash draws.</summary>
-        public IReadOnlyList<IssueTemplate> CrashTemplates { get; init; } = Array.Empty<IssueTemplate>();
         /// <summary>
         /// Injectable random source for deterministic testing.
         /// Roll result &lt; probability → event occurs.
         /// Null uses <see cref="DefaultRandom"/>.
         /// </summary>
         public Func<double>? Random { get; init; }
+        /// <summary>
+        /// How many of the race maths' laps this roll covers: 1 for one lap, 0.5 for half the time.
+        /// Each chance is compounded over it, so the risk follows time on track, not laps counted.
+        /// </summary>
+        public double Exposure { get; init; } = 1;
     }
 
     public sealed record LapRiskResult
     {
-        /// <summary>Issues that newly occurred this lap (mechanical or crash).</summary>
+        /// <summary>Issues that newly occurred this lap.</summary>
         public IReadOnlyList<ActiveIssue> NewIssues { get; init; } = Array.Empty<ActiveIssue>();
         /// <summary>
         /// Race-ending failure type, or null if none occurred.
@@ -115,22 +118,6 @@ namespace TarmacGauntlet.Simulation
             _ => throw new ArgumentOutOfRangeException(nameof(mode)),
         };
 
-        /// <summary>
-        /// When a failure occurs, the probability it is a crash (vs. a mechanical failure).
-        /// The remaining probability (1 − CrashProbability) produces a mechanical failure.
-        /// </summary>
-        private const double CrashProbability = 0.25;
-
-        // --- Non-terminal crash modifiers ---
-        /// <summary>
-        /// Base probability that a crash is survivable (non-terminal).
-        /// Modified by driver safety: high safety drivers are much more likely to survive.
-        /// </summary>
-        private const double BaseCrashSurvivalProb = 0.20;
-
-        /// <summary>At Safety=100, crash survival probability is boosted by this much (additive).</summary>
-        private const double MaxSafetySurvivalBonus = 0.50; // safety 100 → 0.20 + 0.50 = 70% survival
-
         // ---------------------------------------------------------------------------
         // Probability helpers (public for testing, as in TS)
         // ---------------------------------------------------------------------------
@@ -167,13 +154,12 @@ namespace TarmacGauntlet.Simulation
                 FailureModeScale(mode);
         }
 
-        /// <summary>
-        /// Probability that a crash is survivable (non-terminal).
-        /// Higher driver safety = more likely to limp back to pits.
-        /// </summary>
-        public static double CrashSurvivalProbability(double driverSafety)
+        /// <summary>The chance of at least one event in <paramref name="exposure"/> laps, at <paramref name="perLap"/> a lap.</summary>
+        public static double Over(double perLap, double exposure)
         {
-            return BaseCrashSurvivalProb + (driverSafety / 100) * MaxSafetySurvivalBonus;
+            if (exposure <= 0) return 0;
+            if (exposure == 1) return perLap;
+            return 1 - Math.Pow(1 - Math.Min(1, Math.Max(0, perLap)), exposure);
         }
 
         /// <summary>
@@ -201,20 +187,15 @@ namespace TarmacGauntlet.Simulation
         }
 
         /// <summary>
-        /// Rolls for mechanical issues and race-ending failures for one lap (GDD §2).
+        /// Rolls for mechanical issues and race-ending mechanical failures for one lap (GDD §2).
         ///
         /// Two-step issue system:
         ///   1. Roll base issue probability (modified by condition, reliability, mode).
         ///   2. If triggered, weighted pick from the mechanical issue catalogue.
         ///
-        /// Failure system:
-        ///   1. Roll for terminal failure (modified by condition, age, reliability, safety, mode).
-        ///   2. If failure: determine crash vs mechanical.
-        ///   3. If crash: roll for survival (modified by safety).
-        ///      - Survived: pick a crash issue from crash templates.
-        ///      - Fatal: terminal crash retirement.
-        ///
-        /// Failure is rolled first. Terminal failures take precedence.
+        /// Failure: one roll for a terminal mechanical failure (modified by condition, age,
+        /// reliability, safety, mode), rolled first and taking precedence. Crashes are never rolled:
+        /// they come only from real hits on track.
         /// </summary>
         public static LapRiskResult RollLapRisks(LapRiskContext ctx)
         {
@@ -227,40 +208,14 @@ namespace TarmacGauntlet.Simulation
                 ctx.Reliability,
                 ctx.DriverSafety,
                 ctx.InstructionMode);
-            if (random() < failureProb)
-            {
-                bool isCrash = random() < CrashProbability;
-
-                if (isCrash)
-                {
-                    // Roll for crash survival: driver safety determines if they limp back
-                    double survivalProb = CrashSurvivalProbability(ctx.DriverSafety);
-                    if (random() < survivalProb)
-                    {
-                        // Non-terminal crash: pick a crash issue
-                        var crashIssue = WeightedPick(ctx.CrashTemplates, ctx.ActiveIssues, random);
-                        if (crashIssue != null)
-                        {
-                            return new LapRiskResult
-                            {
-                                NewIssues = new[] { new ActiveIssue { TemplateId = crashIssue.Id, LapOccurred = ctx.CurrentLap } },
-                                Failure = null,
-                            };
-                        }
-                    }
-                    // Terminal crash
-                    return new LapRiskResult { NewIssues = Array.Empty<ActiveIssue>(), Failure = FailureType.Crash };
-                }
-
-                // Terminal mechanical failure
+            if (random() < Over(failureProb, ctx.Exposure))
                 return new LapRiskResult { NewIssues = Array.Empty<ActiveIssue>(), Failure = FailureType.Mechanical };
-            }
 
             // 2. Two-step issue roll: does something break?
             double issueProb = IssueEffectiveProbability(ctx.Condition, ctx.Reliability, ctx.InstructionMode);
             var newIssues = new List<ActiveIssue>();
 
-            if (random() < issueProb)
+            if (random() < Over(issueProb, ctx.Exposure))
             {
                 // Weighted pick from mechanical catalogue
                 var picked = WeightedPick(ctx.IssueTemplates, ctx.ActiveIssues, random);

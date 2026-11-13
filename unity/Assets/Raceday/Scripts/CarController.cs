@@ -42,6 +42,11 @@ namespace TarmacGauntlet.Raceday
         /// <summary>True while the car is held on its brakes, stopped in its box.</summary>
         public bool Hold;
         public bool Limiting => !float.IsPositiveInfinity(SpeedLimit);
+        /// <summary>
+        /// Above this speed along the car the brakes come on by themselves (<see cref="RollingStart.LimiterBrake"/>),
+        /// as the formation's limiter holds a car someone drives in its place. Set each physics step.
+        /// </summary>
+        public float BrakeAbove = float.PositiveInfinity;
 
         public bool Automatic { get; private set; } = true;
         public bool SteeringHelp => DriveSettings.SteeringHelp;
@@ -266,7 +271,8 @@ namespace TarmacGauntlet.Raceday
             body.AddForceAtPosition(down * 0.4f, transform.TransformPoint(new Vector3(0, 0, Spec.HalfWheelbase)));
             body.AddForceAtPosition(down * 0.6f, transform.TransformPoint(new Vector3(0, 0, -Spec.HalfWheelbase)));
 
-            float brakeTotal = brake * Spec.BrakeDecel * Spec.Mass * Gravity;
+            float braking = Mathf.Max(brake, RollingStart.LimiterBrake(along, BrakeAbove));
+            float brakeTotal = braking * Spec.BrakeDecel * Spec.Mass * Gravity;
             gripUsed = 0f;
             gripCount = 0;
             for (int i = 0; i < 4; i++)
@@ -547,13 +553,22 @@ namespace TarmacGauntlet.Raceday
 
         // ---------------------------------------------------------------- crashes and resets
 
+        /// <summary>
+        /// The car hit a barrier or another car, with the speed into it, m/s: the part of the two bodies' closing
+        /// speed along the contact's normal. A scrape along a barrier is slow into it, however fast the car.
+        /// </summary>
+        public event System.Action<float> Hit;
+
         private void OnCollisionEnter(Collision collision)
         {
-            if (Crashed || SurfaceOf(collision.collider) != SurfaceKind.Barrier) return;
+            bool barrier = SurfaceOf(collision.collider) == SurfaceKind.Barrier;
+            bool car = collision.rigidbody != null && collision.rigidbody != body && collision.rigidbody.GetComponent<CarController>() != null;
+            if (!barrier && !car) return;
             float into = 0f;
             for (int i = 0; i < collision.contactCount; i++)
                 into = Mathf.Max(into, Mathf.Abs(Vector3.Dot(collision.relativeVelocity, collision.GetContact(i).normal)));
-            if (into < HardHit) return;
+            Hit?.Invoke(into);
+            if (Crashed || !barrier || into < HardHit) return;
             Crashed = true;
             Stop();
         }

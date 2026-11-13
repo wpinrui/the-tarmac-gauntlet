@@ -69,13 +69,20 @@ namespace TarmacGauntlet.Simulation
         /// when a stop puts in another driver.
         /// </summary>
         public double Fatigue { get; private set; }
+        /// <summary>Damage from real hits, 0 untouched to 100 wrecked (<see cref="CarDamage"/>). It costs grip until the crew repair it.</summary>
+        public double Damage { get; private set; }
+        /// <summary>True once a hit has totalled the car: it is out, and goes back to the garage at 0% condition.</summary>
+        public bool Totalled { get; private set; }
+
+        /// <summary>The car's condition as it goes back to the garage: what the race left, less the damage still on it, or 0 if totalled.</summary>
+        public double ConditionAfterRace => Totalled ? 0 : Math.Max(0, Condition - Damage);
 
         /// <summary>
-        /// Driven seconds that build one lap's worth of the race maths' fatigue: the GDD's 48 laps over
-        /// the 24 hours, which the driven race runs in 8,640 s. Fatigue follows time, so a fast car's
-        /// driver tires no quicker per hour than a slow one's.
+        /// Driven seconds that count as one lap of the race maths: the GDD's 48 laps over the 24 hours,
+        /// which the driven race runs in 8,640 s. Fatigue, condition wear and the chances of an issue or
+        /// a failure all follow time on track, so a fast car is no worse off per hour than a slow one.
         /// </summary>
-        public const double FatigueLapSeconds = 180;
+        public const double MathsLapSeconds = 180;
 
         public RaceDriver Driver => Car.Lineup[DriverIndex];
         public IReadOnlyList<ActiveIssue> ActiveIssues => active;
@@ -128,6 +135,7 @@ namespace TarmacGauntlet.Simulation
             CloseStint();
 
             CarStats stats = Debuffed(Stats);
+            double exposure = Math.Max(lapSeconds, 0) / MathsLapSeconds;
             LapRiskResult risk = RiskRolls.RollLapRisks(new LapRiskContext
             {
                 CurrentLap = Laps,
@@ -138,12 +146,12 @@ namespace TarmacGauntlet.Simulation
                 InstructionMode = mode,
                 ActiveIssues = active,
                 IssueTemplates = IssueTemplates.MechanicalIssues,
-                CrashTemplates = IssueTemplates.CrashIssueTemplates,
                 Random = random,
+                Exposure = exposure,
             });
-            Condition = Degradation.UpdateCarCondition(Condition, Car.Car.Age, Car.EngineerSkill, mode);
+            Condition = Degradation.UpdateCarCondition(Condition, Car.Car.Age, Car.EngineerSkill, mode, exposure);
             double fatiguePerLap = Degradation.UpdateDriverFatigue(0, stats.Comfort, Driver.Stats.Stamina, mode);
-            Fatigue = Math.Min(100, Fatigue + fatiguePerLap * Math.Max(lapSeconds, 0) / FatigueLapSeconds);
+            Fatigue = Math.Min(100, Fatigue + fatiguePerLap * exposure);
             if (risk.Failure.HasValue)
             {
                 Retire(raceTime, risk.Failure.Value);
@@ -166,6 +174,24 @@ namespace TarmacGauntlet.Simulation
             CloseStint();
         }
 
+        /// <summary>
+        /// The car hit a barrier or another car at <paramref name="impact"/> m/s into it. Adds the damage, and a hit
+        /// hard enough totals the car and takes it out of the race. Returns true if it did.
+        /// </summary>
+        public bool Hit(double raceTime, double impact)
+        {
+            if (Retired || Flagged) return false;
+            Damage = Math.Min(100, Damage + CarDamage.FromImpact(impact));
+            if (!CarDamage.Totals(impact)) return false;
+            Damage = 100;
+            Totalled = true;
+            Retire(raceTime, FailureType.Crash);
+            return true;
+        }
+
+        /// <summary>Sets the damage, 0 to 100. For the debug menu.</summary>
+        public void SetDamage(double damage) => Damage = Math.Max(0, Math.Min(100, damage));
+
         /// <summary>Gives the car an issue now, as if it had come up on this lap. For the debug menu.</summary>
         public void AddIssue(string templateId)
         {
@@ -185,36 +211,40 @@ namespace TarmacGauntlet.Simulation
         /// <summary>Sets how tired the driver at the wheel is, 0 to 100. For the debug menu.</summary>
         public void SetFatigue(double fatigue) => Fatigue = Math.Max(0, Math.Min(100, fatigue));
 
-        /// <summary>How the active issues scale the car's stats.</summary>
+        /// <summary>How the active issues scale the car's stats, with the grip damage takes off folded into Handling.</summary>
         public IssueEffects Effects
         {
             get
             {
-                if (active.Count == 0) return IssueEffects.None;
+                double grip = CarDamage.Grip(Damage);
+                if (active.Count == 0) return grip >= 1 ? IssueEffects.None : new IssueEffects(1, grip, 1, 1);
                 var one = new CarStats { Power = 1, Handling = 1, FuelEfficiency = 1, TyreDurability = 1 };
                 CarStats s = Debuffed(one);
-                return new IssueEffects(s.Power, s.Handling, s.FuelEfficiency, s.TyreDurability);
+                return new IssueEffects(s.Power, s.Handling * grip, s.FuelEfficiency, s.TyreDurability);
             }
         }
 
         /// <summary>
         /// The car stops in its box. The crew changes the tyres if the car wants them and a set is
-        /// left, puts in the next driver, and fixes the active issues in <paramref name="fix"/> the spares
-        /// allow, or every one with no list.
+        /// left, puts in the next driver, fixes the active issues in <paramref name="fix"/> the spares
+        /// allow, or every one with no list, then repairs the damage down to <paramref name="damageTo"/>
+        /// (all of it with none given) while spares last.
         /// </summary>
-        public PitWork Pit(bool wantTyres, IReadOnlyList<string>? fix = null)
+        public PitWork Pit(bool wantTyres, IReadOnlyList<string>? fix = null, double? damageTo = null)
         {
             bool tyres = wantTyres && TyreSets > 0;
             int next = NextDriverIndex;
             string? nextId = next != DriverIndex ? Car.Lineup[next].Id : null;
             PitStopResult work = Work(nextId, fix);
+            (double repaired, int parts, double repairSeconds) = Repair(work.SparePartsRemaining, damageTo);
 
             var fixedIds = active.Select(i => i.TemplateId).Except(work.ActiveIssues.Select(i => i.TemplateId)).ToArray();
             for (int i = 0; i < issues.Count; i++)
                 if (issues[i].FixedLap == null && fixedIds.Contains(issues[i].TemplateId)) issues[i] = issues[i] with { FixedLap = Laps };
             active.Clear();
             active.AddRange(work.ActiveIssues);
-            SpareParts = work.SparePartsRemaining;
+            SpareParts = work.SparePartsRemaining - parts;
+            Damage -= repaired;
             if (tyres) TyreSets--;
 
             string driverOut = Driver.Id;
@@ -237,14 +267,27 @@ namespace TarmacGauntlet.Simulation
             {
                 ChangeTyres = tyres,
                 NewDriver = nextId != null ? Driver : null,
-                ExtraSeconds = work.Duration,
+                ExtraSeconds = work.Duration + repairSeconds,
                 CrewMultiplier = PitStop.CrewMultiplier(Car.CrewSize, Car.EngineerSkill),
             };
         }
 
         /// <summary>Seconds of driver change and repairs a stop would add now, scaled by the crew, as <see cref="Pit"/> would work them.</summary>
-        public double WorkSeconds(IReadOnlyList<string>? fix = null) =>
-            Work(NextDriverIndex != DriverIndex ? Car.Lineup[NextDriverIndex].Id : null, fix).Duration;
+        public double WorkSeconds(IReadOnlyList<string>? fix = null, double? damageTo = null)
+        {
+            PitStopResult work = Work(NextDriverIndex != DriverIndex ? Car.Lineup[NextDriverIndex].Id : null, fix);
+            return work.Duration + Repair(work.SparePartsRemaining, damageTo).Seconds;
+        }
+
+        /// <summary>The damage a stop would repair down to <paramref name="damageTo"/> with <paramref name="parts"/> spares, the spares it takes and the crew's seconds.</summary>
+        private (double Points, int Parts, double Seconds) Repair(int parts, double? damageTo)
+        {
+            double points = Math.Max(0, Damage - Math.Max(0, damageTo ?? 0));
+            points = Math.Min(points, CarDamage.PointsFrom(parts));
+            if (points <= 0) return (0, 0, 0);
+            double seconds = points * CarDamage.RepairSecondsPerPoint * PitStop.CrewMultiplier(Car.CrewSize, Car.EngineerSkill);
+            return (points, CarDamage.PartsFor(points), seconds);
+        }
 
         private PitStopResult Work(string? nextId, IReadOnlyList<string>? fix) => PitStop.ExecutePitStop(
             new PitStopContext
@@ -292,6 +335,8 @@ namespace TarmacGauntlet.Simulation
             BestLap = BestLap,
             FuelLeft = FuelLeft,
             Fatigue = Fatigue,
+            Damage = Damage,
+            Totalled = Totalled,
             Modes = Modes,
             ActiveIssues = active.ToArray(),
             Issues = issues.ToArray(),
@@ -318,6 +363,8 @@ namespace TarmacGauntlet.Simulation
             BestLap = s.BestLap;
             FuelLeft = s.FuelLeft;
             Fatigue = s.Fatigue;
+            Damage = s.Damage;
+            Totalled = s.Totalled;
             Modes = s.Modes;
             active.Clear();
             active.AddRange(s.ActiveIssues);

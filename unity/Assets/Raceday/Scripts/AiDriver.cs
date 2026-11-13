@@ -39,8 +39,6 @@ namespace TarmacGauntlet.Raceday
         public int Garage = -1;
         /// <summary>The start this car takes part in, if any.</summary>
         public Starter Starter;
-        /// <summary>True once the car is out of the race and limps to its box: it keeps its physics, so it drives at its limping pace.</summary>
-        [System.NonSerialized] public bool Limping;
         /// <summary>A pilot built beforehand, on its tuned line: the car drives with it from the start, with no tuning.</summary>
         [System.NonSerialized] public AiPilot Given;
 
@@ -91,6 +89,9 @@ namespace TarmacGauntlet.Raceday
         {
             if (Racer == null) Begin();
         }
+
+        /// <summary>The AI has just taken the wheel in the pit lane: it carries on the stop from where the car is (<see cref="AiRacer.TakeOverInPits"/>).</summary>
+        public void TakeOverInPits(int k, PitService service) => Racer?.TakeOverInPits(k, service);
 
         private void OnEnable()
         {
@@ -205,6 +206,13 @@ namespace TarmacGauntlet.Raceday
             }
             crashTimer = 0f;
 
+            if (Starter != null && Starter.Steers(this, out AiPilot.Controls own, out bool held))
+            {
+                car.SetControls(own.Throttle, own.Brake, own.Steer);
+                car.Hold = held;
+                stuckTimer = 0f;
+                return;
+            }
             if (Starter != null) Starter.Brief(this);
             Racer.Active.Towed = car.DragScale < 0.97f;
             TrafficCar me = race != null ? race.Traffic : new TrafficCar { Id = -1 - Seed };
@@ -239,7 +247,7 @@ namespace TarmacGauntlet.Raceday
         /// Whether the car can leave physics now: driven by the AI, racing or in the formation, and
         /// not making a pit stop or waiting to be put back after a crash.
         /// </summary>
-        public bool CanGlide => enabled && Racer != null && Racer.CanGlide && !Gliding && !car.Crashed && !car.Asleep;
+        public bool CanGlide => enabled && Racer != null && Racer.CanGlide && !Gliding && !car.Crashed && !car.Asleep && (Starter == null || !Starter.Pinned(this));
 
         /// <summary>Takes the car off physics. It glides on from where it is, at its speed along the track.</summary>
         public void Glide()
@@ -266,6 +274,26 @@ namespace TarmacGauntlet.Raceday
             car.Wake(at, Quaternion.LookRotation(forward, up), p.GlideSpeed, p.GlideSpeed * p.GlideCurvature, p.GlideSteer);
             p.StopGlide();
             stuckTimer = crashTimer = 0f;
+        }
+
+        /// <summary>
+        /// Moves the car to a pose, rolling straight ahead at a speed, as at a cut in the start. A car
+        /// that was gliding glides on from there; the racer finds its place from track sample k.
+        /// </summary>
+        public void Place(Vector3 at, Quaternion facing, float speed, int k)
+        {
+            bool gliding = Gliding;
+            if (gliding) Racer.Active.StopGlide();
+            car.Wake(at, facing, speed, 0f, 0f);
+            if (Racer != null)
+            {
+                Racer.Lost();
+                Racer.Active.Relocate(k);
+            }
+            stuckTimer = crashTimer = 0f;
+            lastIndex = -1;
+            lapStart = -1f;
+            if (gliding) Glide();
         }
 
         private void Recover()

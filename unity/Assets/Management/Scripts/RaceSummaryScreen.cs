@@ -11,7 +11,7 @@ using static TarmacGauntlet.Management.MenuKit;
 namespace TarmacGauntlet.Management
 {
     /// <summary>
-    /// The race summary, shown over the circuit when the race is settled (<see cref="RaceWeekend.Finished"/>), with
+    /// The race summary, shown over the circuit once the race is settled and its podium is over (<see cref="RaceWeekend.SummaryDue"/>), with
     /// the player's car parked in its box. The results overall, by class and as class podiums sit on the left. The
     /// player's race sits on the right: the finish, a lap-by-lap position chart with each driver's stints shaded, and
     /// the stints, stops and issues. While there are skill points to spend, Continue opens the Skill points step, where
@@ -29,8 +29,8 @@ namespace TarmacGauntlet.Management
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Hook()
         {
-            RaceWeekend.Finished -= OnFinished;
-            RaceWeekend.Finished += OnFinished;
+            RaceWeekend.SummaryDue -= OnFinished;
+            RaceWeekend.SummaryDue += OnFinished;
         }
 
         private static void OnFinished()

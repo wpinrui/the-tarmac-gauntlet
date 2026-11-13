@@ -15,6 +15,7 @@ namespace TarmacGauntlet.Simulation
             { "f-01", "Assets/Art/Vehicles/NusaCarrier/NusaCarrier.obj" },
             { "f-02", "Assets/Art/Vehicles/LibertyOmaha/LibertyOmaha.obj" },
             { "f-03", "Assets/Art/Vehicles/ToraDaruma/ToraDaruma.obj" },
+            { "f-04", "Assets/Art/Vehicles/KaiserFirefly/KaiserFirefly.obj" },
             { "f-06", "Assets/Art/Vehicles/NusaFox/NusaFox.obj" },
             { "e-07", "Assets/Art/Vehicles/LibertyFantasy/LibertyFantasy.obj" },
             { "d-12", "Assets/Art/Vehicles/SeorakHoeori/SeorakHoeori.obj" },
@@ -51,6 +52,7 @@ namespace TarmacGauntlet.Simulation
             { "Greystone Archer", "Assets/Art/Liveries/GreystoneArcher" },
             { "Lo-fi Racing", "Assets/Art/Liveries/LofiRacing" },
             { "Shed Monozukuri Co.", "Assets/Art/Liveries/ShedMonozukuriCo" },
+            { "Saltire Racing", "Assets/Art/Liveries/SaltireRacing" },
         };
 
         /// <summary>The team's livery folder, or null for a team with no livery yet.</summary>

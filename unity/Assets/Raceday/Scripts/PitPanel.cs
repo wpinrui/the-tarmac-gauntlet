@@ -6,11 +6,13 @@ using UnityEngine;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// The next stop's plan while you drive, on P: beside the HUD, a red PIT tab with the time the stop would
-    /// stand the car in its box, over four rows, each with its keys. 4 and 5 take a lap of fuel off and put one
-    /// on, up to a full tank. 6 swaps new tyres and keep. 7 steps through the lineup for the next driver, your
-    /// own name to stay in. 8 steps the repairs through the crew's call, all and none. A row left alone is the
-    /// crew's call (<see cref="StopPlanner"/>). Laid out on a 1920 by 1080 screen and scaled to the screen's height.
+    /// The next stop's plan for your car, on P, through your own stint and a teammate's: beside the HUD, a red PIT tab
+    /// with the time the stop would stand the car in its box, over four rows, each with its keys. 4 and 5 take a lap
+    /// of fuel off and put one on, up to a full tank. 6 swaps new tyres and keep. 7 steps through the lineup for the
+    /// next driver. 8 steps the repairs through the crew's call, all and none. A row left alone is the crew's call
+    /// (<see cref="StopPlanner"/>). While a teammate drives, a fifth row calls the car in on 9, as live timing's
+    /// Pit now does (<see cref="PitOrders.Requested"/>), and 9 again calls it off. Laid out on a 1920 by 1080 screen
+    /// and scaled to the screen's height.
     /// </summary>
     public sealed class PitPanel : MonoBehaviour
     {
@@ -30,8 +32,10 @@ namespace TarmacGauntlet.Raceday
         private static readonly Color Dim = new Color(1f, 1f, 1f, 0.35f);
         private static readonly RepairMode[] RepairSteps = { RepairMode.Crew, RepairMode.All, RepairMode.None };
 
-        /// <summary>Panel size and place, px on the layout: its right edge clears the HUD by 40.</summary>
-        private const float Width = 380f, Header = 56f, Row = 38f, Right = 240f, Bottom = 40f;
+        /// <summary>Panel size and place, px on the layout: its right edge clears the HUD's cards by 16.</summary>
+        private const float Width = 380f, Header = 56f, Row = 38f, Right = DriveHud.CardsWidth + 16f, Bottom = 32f;
+        /// <summary>Space above the Pit now row, px on the layout.</summary>
+        private const float CallGap = 10f;
 
         private GUIStyle tab, time, unit, row, key;
         private Texture2D fuel, tyre, helmet, spanner;
@@ -39,8 +43,11 @@ namespace TarmacGauntlet.Raceday
         private Consumables Supplies => Car.Supplies;
         private CarRaceLog Log => Supplies?.Log;
 
-        /// <summary>True while you drive a car with a stop to plan.</summary>
-        private bool Usable => Car != null && !Car.AiDriving && Car.InputEnabled && Planner != null && Supplies != null && !Supplies.RaceOver;
+        /// <summary>True while your car races on with a stop to plan, whoever drives it.</summary>
+        private bool Usable => Car != null && Car.InputEnabled && Planner != null && Supplies != null && !Supplies.RaceOver;
+
+        /// <summary>True while a teammate drives your car: you can call it in.</summary>
+        private bool Teammate => Log != null && Log.Driver.Id != RaceEntry.PlayerCharacterDriverId;
 
         private void Update()
         {
@@ -49,6 +56,7 @@ namespace TarmacGauntlet.Raceday
                 Open = false;
                 return;
             }
+            if (Hud != null && Hud.Hidden) return;   // nothing to see over the broadcast, so its keys do nothing there
             if (Keys.Pressed(KeyCode.P)) Open = !Open;
             if (!Open) return;
             PitOrders orders = Supplies.Orders;
@@ -58,6 +66,7 @@ namespace TarmacGauntlet.Raceday
             if (Keys.Pressed(KeyCode.Alpha7) && Log != null) Log.NextDriverIndex = (Log.NextDriverIndex + 1) % Log.Car.Lineup.Count;
             if (Keys.Pressed(KeyCode.Alpha8))
                 orders.Repairs = RepairSteps[(System.Array.IndexOf(RepairSteps, orders.Repairs) + 1) % RepairSteps.Length];
+            if (Keys.Pressed(KeyCode.Alpha9) && Teammate) orders.Requested = !orders.Requested;
         }
 
         private void OnGUI()
@@ -68,6 +77,7 @@ namespace TarmacGauntlet.Raceday
         private void DrawGui()
         {
             if (!Open || !Usable || Event.current.type != EventType.Repaint) return;
+            // Hidden over the broadcast, and under live timing, which has the same plan.
             if (DebugMenu.Clean || Hud != null && (Hud.Hidden || !Hud.enabled)) return;
             float k = Screen.height / 1080f;
             Style(k);
@@ -81,10 +91,11 @@ namespace TarmacGauntlet.Raceday
             {
                 IReadOnlyList<RaceDriver> lineup = Log.Car.Lineup;
                 rows.Add((helmet, Name(lineup[Log.NextDriverIndex].Id), lineup.Count > 1, new[] { "7" }));
-                rows.Add((spanner, Supplies.Orders.Repairs.ToString().ToUpperInvariant(), Log.ActiveIssues.Count > 0, new[] { "8" }));
+                rows.Add((spanner, Supplies.Orders.Repairs.ToString().ToUpperInvariant(), Log.ActiveIssues.Count > 0 || Log.Damage > 0, new[] { "8" }));
             }
 
-            float height = Header + 8f + rows.Count * Row + 14f;
+            bool callIn = Teammate;
+            float height = Header + 8f + rows.Count * Row + (callIn ? CallGap + Row : 0f) + 14f;
             var panel = new Rect(Screen.width - (Right + Width) * k, Screen.height - (Bottom + height) * k, Width * k, height * k);
             Fill(panel, Panel, 9f * k, Vector4.one);
             Fill(new Rect(panel.x, panel.y, 72f * k, Header * k), Red, 9f * k, new Vector4(1f, 0f, 0f, 0f));
@@ -112,6 +123,18 @@ namespace TarmacGauntlet.Raceday
                     kx -= 4f * k;
                 }
                 y += Row * k;
+            }
+
+            if (callIn)
+            {
+                // Pit now: filled red, or outlined once the car is called in.
+                y += CallGap * k;
+                var box = new Rect(panel.x + 12f * k, y, panel.width - 24f * k, Row * k);
+                bool called = Supplies.Orders.Requested;
+                if (called) GUI.DrawTexture(box, Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, Red, Vector4.one * Mathf.Max(1f, 2f * k), Vector4.one * 7f * k);
+                else Fill(box, Red, 7f * k, Vector4.one);
+                Text(new Rect(x, y, right - x, Row * k), called ? "BOXING THIS LAP" : "PIT NOW", row, Color.white, TextAnchor.MiddleLeft);
+                KeyCap(new Rect(right - 26f * k, y + (Row - 26f) / 2f * k, 26f * k, 26f * k), "9", k);
             }
         }
 

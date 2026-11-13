@@ -14,14 +14,13 @@ namespace TarmacGauntlet.Management
 {
     /// <summary>
     /// The race's pause menu, on Escape until the race is settled: the race stops dead (<see cref="RaceWeekend.Paused"/>),
-    /// its graphics with it, and its sound plays on muffled and low behind the menu (<see cref="Mix.Paused"/>), under the
+    /// its graphics with it, and its engines and tyres cut out and the track's sound plays on muffled and low behind the menu (<see cref="Mix.Paused"/>), under the
     /// same glass menu as the hub's Escape menu. Save writes the race as it stands into the career
     /// (<see cref="GameSession.SaveRace"/>), and continuing the career carries on from there.
     /// Retire takes the player's car out and settles the race from where every car is (<see cref="RaceWeekend.Withdraw"/>),
     /// on to the race summary. Camera tunes the car cameras with the race seen through the one being tuned, the panel
-    /// at the side and nothing dimmed. Escape steps back out of settings or camera, then out of the menu. Once the
-    /// player's race is over and only the cooldown laps are left (<see cref="RaceWeekend.CanSkipToEnd"/>), Escape skips
-    /// them to the race summary instead.
+    /// at the side and nothing dimmed. Escape steps back out of settings or camera, then out of the menu. The
+    /// cooldown laps are skipped by holding Enter, not here.
     /// </summary>
     public sealed class RacePauseMenu : MonoBehaviour
     {
@@ -147,7 +146,7 @@ namespace TarmacGauntlet.Management
         {
             RaceWeekend.Paused = true;
             Time.timeScale = 0f;
-            Mix.Paused = true;   // the race plays on behind the menu, muffled and low
+            Mix.Paused = true;   // the cars cut out; the track plays on behind the menu, muffled and low
             Camera cam = Camera.main;
             if (cam != null && cam.GetComponent<GlassBackdrop>() == null) cam.gameObject.AddComponent<GlassBackdrop>();
         }
@@ -221,7 +220,6 @@ namespace TarmacGauntlet.Management
             if (ev.keyCode != KeyCode.Escape) return;
             if (overlay == Overlay.Settings || overlay == Overlay.Camera) SetOverlay(Overlay.Pause);
             else if (overlay == Overlay.Pause) SetOverlay(Overlay.None);
-            else if (RaceWeekend.CanSkipToEnd) RaceWeekend.SkipToEnd();
             else if (CanPause) SetOverlay(Overlay.Pause);
             else return;
             ev.Use();
