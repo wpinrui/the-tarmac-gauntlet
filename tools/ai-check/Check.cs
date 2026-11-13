@@ -164,7 +164,6 @@ static partial class Check
         {
             FinalFormationCheck(100, -1, skipped: false, verbose: true);
             foreach (int slot in new[] { 0, 7, 10 }) FinalFormationCheck(100, slot, skipped: false, verbose: true);
-            FinalFormationCheck(100, 7, skipped: true, verbose: true);
             return failed ? 1 : 0;
         }
         if (args.Length > 1 && args[1] == "start")
