@@ -49,6 +49,7 @@ namespace TarmacGauntlet.Raceday
             tyres = work == null ? plan.Tyres : work.ChangeTyres;
             NewTyres = tyres;
             NewDriver = work?.NewDriver != null;
+            if (NewDriver) supplies.Stint.NewStint();
             supplies.Orders.Reset();
             if (work != null) scale *= (float)work.CrewMultiplier;
             float extra = work != null ? (float)work.ExtraSeconds : 0f;
@@ -88,7 +89,11 @@ namespace TarmacGauntlet.Raceday
             Fuelled = refuel >= 1f;
             if (!Done) return;
             supplies.Fuel = startFuel + litres;
-            if (tyres) supplies.Wear = 0f;
+            if (tyres)
+            {
+                supplies.Wear = 0f;
+                supplies.Stint.NewTyres();
+            }
             supplies.Log?.PitDone(Duration, litres);
         }
     }
@@ -176,6 +181,25 @@ namespace TarmacGauntlet.Raceday
             RacingLine route = Lane.Route(racing.Line, Garage);
             Route = new AiPilot(route, racing.Spec, racing.Pace, 100f, 100f, seed, lanes: false, maxSpeed: limits);
             State = Stage.ToBox;
+        }
+
+        /// <summary>
+        /// Takes over a car someone else drove into the pit lane, at track sample <paramref name="k"/>: on to the box
+        /// if it is still ahead, on with the <paramref name="service"/> already under way in it, or out of the lane
+        /// once the box is behind or the stop is done.
+        /// </summary>
+        public void TakeOver(AiPilot racing, int seed, int k, PitService service)
+        {
+            Box(racing, seed);
+            if (service != null)
+            {
+                Service = service;
+                State = service.Done ? Stage.Leaving : Stage.Stopped;
+                return;
+            }
+            Circuit c = Lane.Circuit;
+            int ahead = c.Wrap(boxSample - k);
+            if (ahead == 0 || ahead > c.Count / 2) State = Stage.Leaving;
         }
 
         /// <summary>Gives up on the stop, after the car is moved back to the track.</summary>

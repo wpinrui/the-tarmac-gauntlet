@@ -6,7 +6,8 @@ namespace TarmacGauntlet.Raceday
 {
     /// <summary>
     /// Keeps the race for the career (<see cref="RaceDay"/>). Each time a car crosses the line it
-    /// logs the lap, which ages the car and may give it an issue or retire it: issues cut the car's
+    /// teaches the stint's fuel and tyre estimate the lap just driven, unless the car was in the pit lane
+    /// (<see cref="Consumables.Stint"/>), and logs the lap, which ages the car and may give it an issue or retire it: issues cut the car's
     /// power, grip, fuel efficiency and tyre life until a stop fixes them, and a retired car limps to
     /// its box, or stops beside the track after a fatal crash (<see cref="Retire"/>). After a stop's driver change, the new driver drives at their own pace.
     /// The driver at the wheel tires lap by lap (<see cref="CarRaceLog.Fatigue"/>), which slows the car until a stop puts in someone fresh. When the
@@ -42,7 +43,7 @@ namespace TarmacGauntlet.Raceday
         public RaceTower Tower;
 
         public bool Finished { get; private set; }
-        /// <summary>True once the race is under way: from the green, or the first car out of the pit lane.</summary>
+        /// <summary>True once the race is under way: from the green.</summary>
         public bool Started => started;
         /// <summary>Seconds since the green.</summary>
         public float Elapsed => started ? Time.time - startTime : 0f;
@@ -54,6 +55,8 @@ namespace TarmacGauntlet.Raceday
         private CarController[] controllers;
         private int[] counted;
         private int[] driverShown;
+        /// <summary>True for a car that has been in the pit lane since it last crossed the line: that lap teaches its stint nothing.</summary>
+        private bool[] pitLap;
         private float[] crossed;
         private bool started;
         private float startTime;
@@ -123,6 +126,7 @@ namespace TarmacGauntlet.Raceday
             counted = new int[Cars.Length];
             driverShown = new int[Cars.Length];
             crossed = new float[Cars.Length];
+            pitLap = new bool[Cars.Length];
             for (int i = 0; i < Cars.Length; i++) controllers[i] = Cars[i].GetComponent<CarController>();
         }
 
@@ -153,6 +157,7 @@ namespace TarmacGauntlet.Raceday
                 if (log.Retired || log.Flagged) continue;
                 Consumables supplies = controllers[i].Supplies;
                 log.FuelLeft = supplies.Fuel;
+                pitLap[i] |= Cars[i].InPitLane;
                 // Until the first lap is in, follow the count down too: the formation lap comes off it at the green.
                 if (log.Laps == 0 && Cars[i].Laps < counted[i]) counted[i] = Cars[i].Laps;
                 if (Cars[i].Laps > counted[i])
@@ -160,6 +165,8 @@ namespace TarmacGauntlet.Raceday
                     counted[i] = Cars[i].Laps;
                     float lap = Time.time - crossed[i];
                     crossed[i] = Time.time;
+                    supplies.Stint.Line(supplies.Fuel, supplies.Wear, !pitLap[i]);
+                    pitLap[i] = Cars[i].InPitLane;
                     Day.CompleteLap(i, Time.time - startTime, lap, supplies.Mode, timeUp);
                     supplies.Effects = log.Effects;
                     if (log.Retired)
