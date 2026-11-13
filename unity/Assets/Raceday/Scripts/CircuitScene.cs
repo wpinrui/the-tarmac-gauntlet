@@ -23,7 +23,8 @@ namespace TarmacGauntlet.Raceday
     /// your car, with the controls for its next stop (<see cref="LiveTiming"/>). While a teammate drives, N
     /// (or the button beside live timing's way back) fast forwards at 32x to your next stint and hands you the
     /// wheel once you are back on track. A stop that puts a teammate in hands the car back to the AI. Past the
-    /// chequered flag the AI takes your car round its cooldown lap and into its box, and Delete still takes it back.
+    /// chequered flag whoever has the wheel drives the cooldown lap into the box: you, if you took the flag, and Delete
+    /// still hands it back and forth.
     /// A race saved part way (<see cref="RaceWeekend.Resuming"/>) carries on from the save: every car where it was, on its
     /// lap, fuel and tyres, the clocks and the weather as they were. A car that was in the pit lane goes back on track
     /// beside where it was, at the edge on the pit side. Saved before the green, the race starts again. The stages before the
@@ -68,8 +69,9 @@ namespace TarmacGauntlet.Raceday
         private string lastDriver;
         /// <summary>True once the race has handed you the wheel at the start.</summary>
         private bool handedOver;
-        /// <summary>True once the AI has been given your car for its cooldown lap.</summary>
+        /// <summary>True once your car has taken the flag and fast forward to your stint is let go.</summary>
         private bool cooldownHanded;
+        private PitCrews pitCrews;
         private RaceTower raceTower;
         private CarController[] carControllers;
         private Circuit circuit;
@@ -308,6 +310,7 @@ namespace TarmacGauntlet.Raceday
             for (int i = 0; i < grid.Count; i++) crewSizes[i] = grid[i].CrewSize;
             PitCrews crews = new GameObject("Pit crews").AddComponent<PitCrews>();
             crews.Build(Complex, pits, racing, drivers, tower.Colours, crewSizes);
+            pitCrews = crews;
             // The crews handle the kit at their stops: the fuel hose, the guns, the tyres, the jacks and the lollipop.
             PitKitWork kitWork = crews.gameObject.AddComponent<PitKitWork>();
             kitWork.Build(Complex, crews, view.Kit, racing);
@@ -466,6 +469,8 @@ namespace TarmacGauntlet.Raceday
             outro.Keys = keys;
             CooldownStage cooldown = outro.gameObject.AddComponent<CooldownStage>();
             cooldown.Director = director;
+            cooldown.Crews = pitCrews;
+            cooldown.Player = playerIndex;
             outro.Add(cooldown);
             Lap("race");
             built = true;
@@ -732,13 +737,12 @@ namespace TarmacGauntlet.Raceday
             ai.enabled = false;
         }
 
-        /// <summary>Past the flag, the AI drives your car round its cooldown lap and into its box, once.</summary>
+        /// <summary>Past the flag there's no stint left to skip to: whoever has the wheel drives the cooldown lap.</summary>
         private void Cooldown()
         {
             if (cooldownHanded || playerIndex < 0 || day == null || !day.Cars[playerIndex].Flagged) return;
             cooldownHanded = true;
             stintSkip = false;
-            ai.enabled = true;
         }
 
         private void Stints()
