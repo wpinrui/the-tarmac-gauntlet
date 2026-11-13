@@ -7,7 +7,7 @@ shaders' functions are ported per pixel, with screen derivatives taken from neig
 
     python3 tools/rain-preview/preview.py out_dir [shot ...]
 
-Shots: cut, onboard, longlens, spray-tv, spray-onboard. Each writes before and after images at Medium and Ultra, and a
+Shots: tv, cut, onboard, longlens, spray-tv, spray-onboard (16 m behind), spray-follow (30 m behind). Each writes before and after images at Medium and Ultra, and a
 side-by-side sheet. Keep the constants below in step with the C# and the shaders.
 """
 import math
@@ -513,7 +513,7 @@ class Spray:
             at = rear + np.array([0, 0.3, 0])
             pace = min(max((speed - 8) / 47, 0), 1)
             mult = (0.5 + 0.7 * pace) * (1 + 0.6 * standing)
-            rate = 900 * amount * pace * (1 + 0.5 * standing)
+            rate = 250 * amount * pace * (1 + 0.5 * standing)
             self.drops.acc += rate * dt
             n = int(self.drops.acc); self.drops.acc -= n
             if n:
@@ -527,17 +527,17 @@ class Spray:
                 pos = at + car_frame(local)
                 age = RNG.random(n) * dt
                 vel = vcar * 0.45 + car_frame(d) * spd[:, None]
-                self.drops.add(pos - vcar * age[:, None], vel, np.zeros((n, 3)), RNG.uniform(0.25, 0.5, n),
+                self.drops.add(pos - vcar * age[:, None], vel, np.zeros((n, 3)), RNG.uniform(0.2, 0.35, n),
                                RNG.uniform(0.03, 0.07, n), age)
-            mrate = 60 * amount * min(max((speed - 18) / 37, 0), 1) * (1 + 0.5 * standing)
+            mrate = 130 * amount * min(max((speed - 15) / 40, 0), 1) * (1 + 0.6 * standing)
             self.mist.acc += mrate * dt
             n = int(self.mist.acc); self.mist.acc -= n
             if n:
-                mat = at + np.array([-0.6, 0.5, 0])
-                local = (RNG.random((n, 3)) - 0.5) * np.array([1.8, 0.3, 1.0])
-                vol = np.stack([RNG.uniform(-1.6, 1.6, n), RNG.uniform(0.1, 0.6, n), RNG.uniform(-0.5, 0.5, n)], 1)
+                mat = at + np.array([-0.6, 0.6, 0])
+                local = (RNG.random((n, 3)) - 0.5) * np.array([2.0, 0.5, 1.0])
+                vol = np.stack([RNG.uniform(-1.8, 1.8, n), RNG.uniform(1.0, 2.2, n), RNG.uniform(-0.5, 0.5, n)], 1)
                 self.mist.add(mat + car_frame(local), np.tile(vcar * 0.35, (n, 1)), car_frame(vol),
-                              RNG.uniform(0.7, 1.3, n), RNG.uniform(1.2, 2.2, n))
+                              RNG.uniform(1.2, 2.2, n), RNG.uniform(2.2, 3.6, n))
         else:
             at = rear + np.array([0, 0.35, 0])
             rate = 75 * amount * min(max((speed - 10) / 45, 0), 1)
@@ -569,13 +569,13 @@ class Spray:
         light = LIGHT
         if self.new:
             t = self.mist.age / self.mist.life
-            a = np.interp(t, [0, 0.1, 1], [0, 1, 0])
-            size = self.mist.size * np.interp(t, [0, 1], [0.6, 2.2])
-            draw_puffs(img, depth, cam, self.mist.pos, size, 0.22 * a, np.clip(light * 1.15, 0, 1), 0.5, glow=0.3)
+            a = np.interp(t, [0, 0.08, 0.5, 1], [0, 1, 0.5, 0])
+            size = self.mist.size * np.interp(t, [0, 1], [0.7, 3.0])
+            draw_puffs(img, depth, cam, self.mist.pos, size, 0.2 * a, light, 0.5)
             t = self.drops.age / self.drops.life
             a = np.interp(t, [0, 0.5, 1], [1, 0.7, 0])
-            draw_streaks(img, depth, cam, self.drops.pos, self.drops.vel, self.drops.size, 0.5 * a,
-                         np.clip(light * 1.15, 0, 1), 1.0, 0.03, thread=1.0, glow=0.4, max_size=0.012)
+            draw_streaks(img, depth, cam, self.drops.pos, self.drops.vel, self.drops.size, 0.3 * a,
+                         light, 1.0, 0.03, thread=1.0, max_size=0.012)
         else:
             t = self.mist.age / self.mist.life
             a = np.interp(t, [0, 0.25, 1], [0, 1, 0])
@@ -742,7 +742,8 @@ def shot_spray(out, view):
         cams = [Cam((end - 30, 4.0, -22), look=(car_x(k) - 4, 0.8, 6), fov=24) for k in range(n)]
         cars = lambda k: [(car_x(k), 6.0, CAR)]
     else:
-        cams = [Cam((car_x(k) - 16, 1.15, 6.0), yaw=90, pitch=-2, fov=70) for k in range(n)]
+        back = 16 if view == "onboard" else 30
+        cams = [Cam((car_x(k) - back, 1.15, 6.0), yaw=90, pitch=-2, fov=70) for k in range(n)]
         cars = lambda k: [(car_x(k), 6.0, CAR)]
     tiles = []
     for new, level in ((False, "Medium"), (True, "Medium"), (True, "Ultra")):
@@ -756,10 +757,10 @@ def shot_spray(out, view):
 def main():
     out = sys.argv[1]
     os.makedirs(out, exist_ok=True)
-    shots = sys.argv[2:] or ["tv", "cut", "onboard", "longlens", "spray-tv", "spray-onboard"]
+    shots = sys.argv[2:] or ["tv", "cut", "onboard", "longlens", "spray-tv", "spray-onboard", "spray-follow"]
     for s in shots:
         {"tv": shot_ivan, "cut": shot_cut, "onboard": shot_onboard, "longlens": shot_longlens,
-         "spray-tv": lambda o: shot_spray(o, "tv"), "spray-onboard": lambda o: shot_spray(o, "onboard")}[s](out)
+         "spray-tv": lambda o: shot_spray(o, "tv"), "spray-onboard": lambda o: shot_spray(o, "onboard"), "spray-follow": lambda o: shot_spray(o, "follow")}[s](out)
         print("done", s, flush=True)
 
 

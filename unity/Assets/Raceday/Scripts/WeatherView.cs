@@ -51,7 +51,7 @@ namespace TarmacGauntlet.Raceday
         private static readonly int[] SpraysAt = { 6, 12, 16, 24 };
         private const float SprayRange = 250f;
         /// <summary>Most particles in one car's spray, and in its mist.</summary>
-        private const int MostSpray = 500, MostMist = 80;
+        private const int MostSpray = 160, MostMist = 280;
         /// <summary>Real seconds the drawn water takes to catch up with the weather's, so a sudden change washes in.</summary>
         private const float WaterLag = 1.5f;
         /// <summary>Real seconds between choosing which cars throw spray.</summary>
@@ -86,10 +86,10 @@ namespace TarmacGauntlet.Raceday
             rainMaterial.SetFloat(ShapeId, 0f);
             sprayMaterial = new Material(drops) { name = "Spray" };
             sprayMaterial.SetFloat(ShapeId, 0f);
-            sprayMaterial.SetFloat(GlowId, 0.4f);
+            sprayMaterial.SetFloat(GlowId, 0f);
             mistMaterial = new Material(drops) { name = "Mist" };
             mistMaterial.SetFloat(ShapeId, 1f);
-            mistMaterial.SetFloat(GlowId, 0.3f);
+            mistMaterial.SetFloat(GlowId, 0f);
             rain = MakeRain(rainMaterial);
             sheets = new RainSheets();
             sprays = new Plume[SpraysAt[Mathf.Clamp(QualityLevels.Level, 0, SpraysAt.Length - 1)]];
@@ -360,9 +360,8 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>
-        /// A car's spray: fine droplets flung up and back off the tyres in a low, wide rooster tail. The air stops them
-        /// within a few metres and they fall, so the car runs away from its own spray and leaves a tail that thins out
-        /// behind it in under a second. Drawn as thin bright streaks along their flight.
+        /// A car's droplets: the coarse water flung up and back off the tyres, a glint of streaks by the wheels that the air
+        /// stops and drops within a few metres. The mist is the spray proper.
         /// </summary>
         private ParticleSystem MakeSpray(Material material, int index)
         {
@@ -374,7 +373,7 @@ namespace TarmacGauntlet.Raceday
             main.loop = true;
             main.playOnAwake = false;
             main.duration = 5f;
-            main.startLifetime = new ParticleSystem.MinMaxCurve(0.25f, 0.5f);
+            main.startLifetime = new ParticleSystem.MinMaxCurve(0.2f, 0.35f);
             // Up and back off the tyres: scaled each frame by the car's speed and the water standing on the track.
             main.startSpeed = new ParticleSystem.MinMaxCurve(4f, 11f);
             main.startSize = new ParticleSystem.MinMaxCurve(0.03f, 0.07f);
@@ -422,8 +421,9 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>
-        /// A car's mist: the finest of the spray, a bright haze kicked up behind it that spreads low and wide, hangs a moment
-        /// and is gone within a second. A pack leaves the air pale behind it.
+        /// A car's spray: a wall of fine mist thrown up behind it, wider and taller than the car, densest at the rear tyres.
+        /// The air stops it within a few metres, so the car runs away from it and leaves a long, low tail that rises and
+        /// thins out over a second or two. A pack leaves the air grey behind it.
         /// </summary>
         private ParticleSystem MakeMist(Material material, int index)
         {
@@ -435,9 +435,9 @@ namespace TarmacGauntlet.Raceday
             main.loop = true;
             main.playOnAwake = false;
             main.duration = 5f;
-            main.startLifetime = new ParticleSystem.MinMaxCurve(0.7f, 1.3f);
+            main.startLifetime = new ParticleSystem.MinMaxCurve(1.2f, 2.2f);
             main.startSpeed = 0f;
-            main.startSize = new ParticleSystem.MinMaxCurve(1.2f, 2.2f);
+            main.startSize = new ParticleSystem.MinMaxCurve(2.2f, 3.6f);
             main.startRotation = new ParticleSystem.MinMaxCurve(0f, 6.283f);
             main.startColor = Color.white;
             main.maxParticles = MostMist;
@@ -447,7 +447,7 @@ namespace TarmacGauntlet.Raceday
             emission.rateOverTime = 0f;
             ParticleSystem.ShapeModule shape = ps.shape;
             shape.shapeType = ParticleSystemShapeType.Box;
-            shape.scale = new Vector3(1.8f, 0.3f, 1f);
+            shape.scale = new Vector3(2f, 0.5f, 1f);
             ParticleSystem.InheritVelocityModule inherit = ps.inheritVelocity;
             inherit.enabled = true;
             inherit.mode = ParticleSystemInheritVelocityMode.Initial;
@@ -464,17 +464,17 @@ namespace TarmacGauntlet.Raceday
             ParticleSystem.VelocityOverLifetimeModule drift = ps.velocityOverLifetime;
             drift.enabled = true;
             drift.space = ParticleSystemSimulationSpace.Local;
-            drift.x = new ParticleSystem.MinMaxCurve(-1.6f, 1.6f);
-            drift.y = new ParticleSystem.MinMaxCurve(0.1f, 0.6f);
+            drift.x = new ParticleSystem.MinMaxCurve(-1.8f, 1.8f);
+            drift.y = new ParticleSystem.MinMaxCurve(1f, 2.2f);
             drift.z = new ParticleSystem.MinMaxCurve(-0.5f, 0.5f);
             ParticleSystem.SizeOverLifetimeModule grow = ps.sizeOverLifetime;
             grow.enabled = true;
-            grow.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 0.6f, 1f, 2.2f));
+            grow.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 0.7f, 1f, 3f));
             ParticleSystem.ColorOverLifetimeModule fade = ps.colorOverLifetime;
             fade.enabled = true;
             var gradient = new Gradient();
             gradient.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
-                new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.1f), new GradientAlphaKey(0f, 1f) });
+                new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.08f), new GradientAlphaKey(0.5f, 0.5f), new GradientAlphaKey(0f, 1f) });
             fade.color = gradient;
             var renderer = go.GetComponent<ParticleSystemRenderer>();
             renderer.material = material;
@@ -493,11 +493,11 @@ namespace TarmacGauntlet.Raceday
         /// </summary>
         private void Spray(Vector3 camera, Color light)
         {
-            // Water scatters the light it is lit by: brighter than the rain, and partly added to the view behind.
-            Color tint = light * 1.15f;
-            tint.a = 0.5f;
+            // Lit by the sky as the rain is. The mist is most of it; the droplets a glint by the wheels.
+            Color tint = light;
+            tint.a = 0.3f;
             sprayMaterial.SetColor(TintId, tint);
-            tint.a = 0.22f;
+            tint.a = 0.2f;
             mistMaterial.SetColor(TintId, tint);
             float amount = SkyClock.Smooth(0.15f, 0.9f, Now.Water);
             float standing = Mathf.Clamp01((Now.Water - 0.8f) / 1.5f);
@@ -527,19 +527,19 @@ namespace TarmacGauntlet.Raceday
                 {
                     s.Fresh = false;
                     s.System.transform.SetPositionAndRotation(at, car.rotation);
-                    s.Mist.transform.SetPositionAndRotation(at + car.up * 0.5f - car.forward * 0.6f, car.rotation);
+                    s.Mist.transform.SetPositionAndRotation(at + car.up * 0.6f - car.forward * 0.6f, car.rotation);
                     emission.rateOverTime = 0f;
                     haze.rateOverTime = 0f;
                     continue;
                 }
                 s.System.transform.SetPositionAndRotation(at, car.rotation);
-                s.Mist.transform.SetPositionAndRotation(at + car.up * 0.5f - car.forward * 0.6f, car.rotation);
+                s.Mist.transform.SetPositionAndRotation(at + car.up * 0.6f - car.forward * 0.6f, car.rotation);
                 float pace = Mathf.Clamp01((speed - 8f) / 47f);
                 ParticleSystem.MainModule main = s.System.main;
                 main.startSpeedMultiplier = (0.5f + 0.7f * pace) * (1f + 0.6f * standing);
-                emission.rateOverTime = spray ? 900f * amount * pace * (1f + 0.5f * standing) : 0f;
+                emission.rateOverTime = spray ? 250f * amount * pace * (1f + 0.5f * standing) : 0f;
                 // The mist only comes off a car at speed.
-                haze.rateOverTime = mist ? 60f * amount * Mathf.Clamp01((speed - 18f) / 37f) * (1f + 0.5f * standing) : 0f;
+                haze.rateOverTime = mist ? 130f * amount * Mathf.Clamp01((speed - 15f) / 40f) * (1f + 0.6f * standing) : 0f;
             }
         }
 
