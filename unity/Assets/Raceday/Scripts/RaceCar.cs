@@ -97,6 +97,7 @@ namespace TarmacGauntlet.Raceday
                 Count(c, active.Index);
                 InPitLane = Pits != null && Pits.OffTrackInLane(active.Index, active.GlideLateral);
                 car.SpeedLimit = float.PositiveInfinity;
+                car.BrakeAbove = float.PositiveInfinity;
                 velocity = active.Line.Tangent[active.Index] * active.GlideSpeed;
                 active.GlidePose(0f, out _, out Vector3 heading, out _);
                 Traffic = Describe(pilot, Laps * c.Lap + active.GlideDistance, active.GlideLateral, active.GlideSpeed, 0f, Mathf.Atan2(heading.z, heading.x));
@@ -113,6 +114,7 @@ namespace TarmacGauntlet.Raceday
             float lateral = d.x * c.Left[k].x + d.z * c.Left[k].z;
             InPitLane = Pits != null && Pits.OffTrackInLane(k, lateral);
             car.SpeedLimit = Pits != null && Pits.InLimitZone(p, k) ? Pits.LimitSpeed : float.PositiveInfinity;
+            car.BrakeAbove = float.PositiveInfinity;
             Vector3 ahead = transform.forward;
             Traffic = Describe(pilot, Laps * c.Lap + c.DistanceAt(k, p), lateral, v.x * f.x + v.z * f.z,
                 v.x * c.Left[k].x + v.z * c.Left[k].z, Mathf.Atan2(ahead.z, ahead.x));
@@ -159,6 +161,13 @@ namespace TarmacGauntlet.Raceday
         {
             FirstLap = laps;
             Laps = laps;
+        }
+
+        /// <summary>The car was moved to track sample k on lap <paramref name="laps"/>: the lap count carries on from there.</summary>
+        public void Moved(int laps, int k)
+        {
+            Laps = laps;
+            index = k;
         }
 
         /// <summary>Takes one lap off every car's count, at the green: the formation lap doesn't count.</summary>

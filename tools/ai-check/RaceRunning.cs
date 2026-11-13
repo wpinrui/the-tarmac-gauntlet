@@ -78,6 +78,64 @@ static partial class Check
 
     static readonly bool QuickestFirst = Environment.GetEnvironmentVariable("START_QUICKEST_FIRST") != null;
 
+    /// <summary>
+    /// The end of the formation lap (FinalFormation): the field cut to the leader just short of the last corner, or
+    /// to the line when skipped, two by two behind it. It must go green with every car in its place and no contacts,
+    /// and a player's car on its limiter, driven flat out on its column, must never get past the car before it in
+    /// grid order nor out of its place until it crosses the line.
+    /// </summary>
+    static void FinalFormationCheck(int cars, int player, bool skipped, bool verbose)
+    {
+        List<string> order = SceneField();
+        var entries = order.Take(cars).Select(m => (m, 1f)).ToList();
+        var s = new Session(circuit, line, entries, rolling: true, LineFor, 11) { Player = player };
+        Watch(s, s.Cars[Math.Max(player, 0)]);
+        float leaderStart = skipped ? circuit.Lap - 3f : RollingStart.FinalStart(circuit);
+        s.CutToFinal(leaderStart);
+        float worstSlip = 0f, worstAhead = float.NegativeInfinity, worstOver = 0f;
+        string worstCar = "";
+        int contactsAtGreen = -1;
+        float allRacing = -1f;
+        SessionCar me = player >= 0 ? s.Cars[player] : null;
+        // Off the track before crossing the line: the racing after it is the racing checks' business.
+        var offInFormation = new Dictionary<SessionCar, float>();
+        while (s.Time < 4f * 60f && allRacing < 0f)
+        {
+            if (s.GreenTime >= 0f && !s.Cars.Any(c => s.Start.Holds(c.Laps))) allRacing = s.Time;
+            bool before = s.GreenTime < 0f;
+            s.Step();
+            if (me != null && s.Start.Holds(me.Laps))
+            {
+                if (player > 0) worstAhead = Math.Max(worstAhead, me.Distance - s.Cars[player - 1].Distance);
+                worstOver = Math.Max(worstOver, me.Distance - RollingStart.PlaceOf(s.Cars[0].Distance, player));
+            }
+            foreach (SessionCar c in s.Cars)
+                if (c.OffTime >= 0f && s.Start.Holds(c.Laps) && !offInFormation.ContainsKey(c)) offInFormation[c] = c.OffWhere;
+            if (before && s.GreenTime >= 0f)
+            {
+                contactsAtGreen = s.Contacts.Count;
+                float leader = s.Cars[0].Distance;
+                foreach (SessionCar c in s.Cars)
+                {
+                    float slip = Math.Abs(c.Distance - RollingStart.PlaceOf(leader, c.Slot));
+                    if (slip > worstSlip) { worstSlip = slip; worstCar = s.Name(c); }
+                }
+            }
+        }
+        var problems = new List<string>();
+        if (s.GreenTime < 0f) problems.Add("never went green");
+        if (allRacing < 0f) problems.Add("not every car crossed the line");
+        int formationContacts = contactsAtGreen < 0 ? s.Contacts.Count : contactsAtGreen;
+        if (formationContacts > 0) problems.Add($"{formationContacts} contacts before the green, first {Describe(s.Contacts[0])}");
+        if (worstSlip > 30f) problems.Add($"{worstCar} was {worstSlip:0} m out of place at the green");
+        if (player > 0 && worstAhead > 0f) problems.Add($"the player got {worstAhead:0.0} m past the car before it before the line");
+        if (me != null && worstOver > 30f) problems.Add($"the player got {worstOver:0.0} m ahead of its place before the line");
+        foreach (KeyValuePair<SessionCar, float> off in offInFormation) problems.Add($"{s.Name(off.Key)} left the track at {off.Value:0} m before crossing the line");
+        string who = player < 0 ? "no player" : $"player in slot {player}, at most {worstAhead:0.0} m on the car before, {worstOver:0.0} m ahead of its place";
+        Report($"{(skipped ? "skipped " : "")}final formation ({cars} cars, {who}: green at {Session.Clock(Math.Max(s.GreenTime, 0f))}, all racing at {Session.Clock(Math.Max(allRacing, 0f))}, worst place {worstSlip:0.0} m out)", problems);
+        if (verbose) foreach (Contact c in s.Contacts) Console.WriteLine("  contact " + Describe(c));
+    }
+
     static void RollingStartCheck(int cars, bool verbose, bool glide = false)
     {
         List<string> order = SceneField();

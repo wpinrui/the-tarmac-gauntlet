@@ -268,6 +268,26 @@ namespace TarmacGauntlet.Raceday
             stuckTimer = crashTimer = 0f;
         }
 
+        /// <summary>
+        /// Moves the car to a pose, rolling straight ahead at a speed, as at a cut in the start. A car
+        /// that was gliding glides on from there; the racer finds its place from track sample k.
+        /// </summary>
+        public void Place(Vector3 at, Quaternion facing, float speed, int k)
+        {
+            bool gliding = Gliding;
+            if (gliding) Racer.Active.StopGlide();
+            car.Wake(at, facing, speed, 0f, 0f);
+            if (Racer != null)
+            {
+                Racer.Lost();
+                Racer.Active.Relocate(k);
+            }
+            stuckTimer = crashTimer = 0f;
+            lastIndex = -1;
+            lapStart = -1f;
+            if (gliding) Glide();
+        }
+
         private void Recover()
         {
             car.ResetToTrack();
