@@ -61,7 +61,7 @@ Shader "Hidden/TarmacGauntlet/Crowd"
             float raise;       // 0 arms down, 1 arms up
         };
 
-        float Hash(float2 p)
+        float CrowdHash(float2 p)
         {
             return frac(sin(dot(p, float2(12.9898, 78.233))) * 43758.5453);
         }
@@ -83,10 +83,10 @@ Shader "Hidden/TarmacGauntlet/Crowd"
             float3 foot = corner - right * ((cx - 0.5) * CARD_WIDTH) - up * (cy * CARD_HEIGHT);
 
             // Now and then, for a few seconds at a time, a fan throws their arms up and bounces.
-            float phase = Hash(foot.xz);
+            float phase = CrowdHash(foot.xz);
             float t = time / 4.0 + phase * 7.0;
             float epoch = floor(t);
-            float cheer = step(0.9, Hash(foot.xz + epoch));
+            float cheer = step(0.9, CrowdHash(foot.xz + epoch));
             float within = t - epoch;
             float raise = cheer * smoothstep(0.0, 0.08, within) * (1.0 - smoothstep(0.85, 1.0, within));
             foot.y += raise * 0.04 * abs(sin((time + phase * 3.0) * 7.0));
