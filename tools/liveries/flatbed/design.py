@@ -1,11 +1,10 @@
 """Flatbed Legends on the Kaiser Firefly: Tow Yard. Arrive on a flatbed, leave on a flatbed, so the
 car is painted like the truck that keeps bringing it home. Safety yellow with a black greenhouse
 and black sills, hazard chevrons on the rear wings and across the tail, the name in shaded slab
-letters like a tow company's door, and the team's hazard badge. Independent: no maker's logo.
+letters like a tow company's door. Independent: no maker's logo.
 
-Two layouts of it, as options:
-  letters  the name on the door in two shaded lines, the number under it, chevrons on the rear wings.
-  badge    the hazard badge large on the door with the number in its plate, the name on the rear wing.
+The name is on each door in two shaded lines with the race number under it, chevrons run down the
+rear wings, and the hazard badge sits on the bonnet.
 
 Run: node ../common/views.js ../../../unity/Assets/Art/Vehicles/KaiserFirefly/KaiserFirefly.obj out/views
      node ../common/digits.js --font font/AlfaSlabOne-Regular.ttf --out out/digits
@@ -83,16 +82,15 @@ def rounded_box(z, x, z0, z1, hw, r):
     return -out
 
 
-def ground(view, meta, wing_chevrons):
+def ground(view, meta):
     """Yellow, the black greenhouse and sills, and the chevrons."""
     z, x, y = grid(view, meta)
     shape = (z if z is not None else x).shape
     black = np.zeros(shape)
     if view in ("left", "right"):
         black = np.maximum(soft(y - BELT_Y), soft(SILL_Y - y))
-        if wing_chevrons:
-            band = soft(WING_Z - z) * soft(y - SILL_Y) * soft(BELT_Y - y)
-            black = np.maximum(black, band * np.maximum(stripes(y + z), soft(CORNER_Z - z)))
+        band = soft(WING_Z - z) * soft(y - SILL_Y) * soft(BELT_Y - y)
+        black = np.maximum(black, band * np.maximum(stripes(y + z), soft(CORNER_Z - z)))
     elif view == "top":
         z0, z1, hw, r = GLASS
         black = soft(rounded_box(z, x, z0, z1, hw, r))
@@ -115,12 +113,10 @@ def uri(rgba):
 
 
 # --- marks -------------------------------------------------------------------------------------------
-def badge_svg(plate=True):
-    """The team's logo: a hazard-striped badge with a yellow plate in the middle. plate=True writes
-    F/L in it; False leaves it clear for the race number."""
+def badge_svg():
+    """The team's logo: a hazard-striped badge with F/L on a yellow plate in the middle."""
     stripes_ = "".join(f'<path d="M{-40 + i * 40} 0 h20 l-120 120 h-20 Z" fill="{INK}"/>' for i in range(10))
-    letters = (f'<text x="90" y="76" font-family="Slab" font-size="34" fill="{INK}" text-anchor="middle">F/L</text>'
-               if plate else "")
+    letters = f'<text x="90" y="76" font-family="Slab" font-size="34" fill="{INK}" text-anchor="middle">F/L</text>'
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 120">'
             f'<defs><clipPath id="hz"><rect width="180" height="120" rx="10"/></clipPath></defs>'
             f'<g clip-path="url(#hz)"><rect width="180" height="120" fill="{YELLOW}"/>{stripes_}</g>'
@@ -132,8 +128,7 @@ def badge_svg(plate=True):
 def write_marks():
     out = HERE / "out" / "marks"
     out.mkdir(parents=True, exist_ok=True)
-    (out / "badge.svg").write_text(badge_svg(True))
-    (out / "badge-blank.svg").write_text(badge_svg(False))
+    (out / "badge.svg").write_text(badge_svg())
     return out
 
 
@@ -147,10 +142,10 @@ def shaded(lv, view, s, p, h, spacing=0.04):
                      f'dominant-baseline="central">{s}</text>')
 
 
-def common(lv, wing_chevrons):
+def common(lv):
     meta = json.loads((VIEWS / "views.json").read_text())
     for view in meta["views"]:
-        lv.image(view, uri(ground(view, meta, wing_chevrons)))
+        lv.image(view, uri(ground(view, meta)))
     # Tail: the name on a yellow plate in the chevrons, under the boot lid.
     u, v = lv.uv("rear", (0, 0.48, 0))
     lv.raw("rear", f'<rect x="{u - 0.30:.4f}" y="{v - 0.13:.4f}" width="0.60" height="0.26" rx="0.03" '
@@ -159,10 +154,10 @@ def common(lv, wing_chevrons):
     shaded(lv, "rear", "LEGENDS", (0, 0.425, 0), 0.075)
 
 
-def letters_livery():
+def tow_yard():
     lv = Livery(VIEWS / "views.json", YELLOW)
     marks = write_marks()
-    common(lv, wing_chevrons=True)
+    common(lv)
     mid = (DOOR[0] + DOOR[1]) / 2
     for view in ("left", "right"):
         shaded(lv, view, "FLATBED", Livery._side(view, mid, 0.79), 0.12)
@@ -173,22 +168,7 @@ def letters_livery():
     return lv
 
 
-def badge_livery():
-    lv = Livery(VIEWS / "views.json", YELLOW)
-    marks = write_marks()
-    common(lv, wing_chevrons=False)
-    lv.number("top", (0, 0, 1.58), 0.50, 0.28, INK, rotate=-90)
-    mid = (DOOR[0] + DOOR[1]) / 2
-    for view in ("left", "right"):
-        lv.mark(view, marks / "badge-blank.svg", Livery._side(view, mid, 0.58), 0.56)
-        shaded(lv, view, "FLATBED", Livery._side(view, -0.95, 0.86), 0.085)
-        shaded(lv, view, "LEGENDS", Livery._side(view, -0.95, 0.73), 0.085)
-    # The number sits in the badge's plate: 124 by 48 of the badge's 180 by 120.
-    lv.side_number(mid, 0.58, 0.56 * 180 / 120 * 124 / 180 - 0.05, 0.56 * 48 / 120 - 0.05, INK)
-    return lv
-
-
-OPTIONS = {"letters": letters_livery, "badge": badge_livery}
+OPTIONS = {"towyard": tow_yard}
 
 if __name__ == "__main__":
     for name, build in OPTIONS.items():
