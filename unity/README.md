@@ -99,6 +99,13 @@ scene is built and `outro` once the race's time is up. A stage derives from `Ski
 hold [Enter] to skip [stage]". Holding Enter for a second fills the circle beside it, and the full circle skips that
 one stage. The next stage fills only after Enter is let go (`SkipHold.cs`).
 
+The race preview (`Stages/BroadcastIntro.cs`) comes first. It opens over the start line with the event and the year
+(year 1 is 2026), flies a lap beside a diagram of the circuit with each turn called out (`Stages/PreviewPath.cs`), then
+shows each class's expected lap time, last year's class podiums, past winners and each class's favourite
+(`Stages/IntroFacts.cs`). A stage that places the camera sets `RaceCameras.Held` and runs after it in the frame. After
+changing the preview, run `bash tools/intro-check/run.sh`: it flies the camera over the real circuit, checking it keeps
+clear of the ground, sees the road and turns smoothly, and checks the figures from a career.
+
 The grid presentation (`Stages/GridPresentation.cs`) shows pole and second, each class's pole and your car, each in a slow
 shot from in front of it with a strip naming its place, driver, team, model and class. Then the whole grid shows on the
 board, two by two and staggered, twenty places a page, over a crane shot across the field (`Stages/GridRunsheet.cs`).
