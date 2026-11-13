@@ -8,27 +8,29 @@ namespace TarmacGauntlet.Simulation
     /// (wrecked) with the speed of each hit. It is not condition: it costs grip, more at the end of the car that was
     /// hit (a nose hit understeers, a tail hit oversteers), and adds drag from the broken bodywork. The crew can
     /// repair it at a stop, all of it or some, at a cost in time and spare parts for each point. One hit hard enough
-    /// totals the car: it is out of the race and goes back to the garage at 0% condition. A share of the damage still
-    /// on the car at the flag comes off its condition (<see cref="ConditionPerPoint"/>).
+    /// totals the car: it is out of the race and goes back to the garage at 0% condition. Damage still on the car at
+    /// the flag comes off its condition, one for one (<see cref="ConditionPerPoint"/>).
     /// </summary>
     public static class CarDamage
     {
         /// <summary>Hits slower than this, m/s into what was hit, do no damage: a touch, or brushing a barrier.</summary>
-        public const double MinImpact = 3;
-        /// <summary>Damage for each m/s of a hit above <see cref="MinImpact"/>: 18 m/s into a barrier is about 38.</summary>
-        public const double DamagePerImpact = 2.5;
-        /// <summary>A hit at least this hard, m/s into what was hit (about 145 km/h), totals the car.</summary>
-        public const double TotalImpact = 40;
-        /// <summary>Share of its grip a car loses at 100 damage spread evenly, in proportion to the damage.</summary>
-        public const double MaxGripLoss = 0.45;
-        /// <summary>Drag added at 100 damage, as a share of the car's own: 0.6 is 60% more.</summary>
-        public const double MaxDrag = 0.6;
-        /// <summary>Condition a point of damage still on the car at the flag takes off: a fifth of it.</summary>
-        public const double ConditionPerPoint = 0.2;
+        public const double MinImpact = 5;
+        /// <summary>Damage for each m/s of a hit above <see cref="MinImpact"/>: 18 m/s into a barrier is 7.8.</summary>
+        public const double DamagePerImpact = 0.6;
+        /// <summary>A hit at least this hard, m/s into what was hit (about 160 km/h), totals the car.</summary>
+        public const double TotalImpact = 45;
+        /// <summary>Share of its grip a car loses for each point of damage spread evenly: 15 damage, a heavy hit, costs 17%.</summary>
+        public const double GripLossPerPoint = 0.01125;
+        /// <summary>Grip an axle keeps however damaged: a wreck still crawls back to its box.</summary>
+        public const double MinGrip = 0.3;
+        /// <summary>Drag added for each point of damage, as a share of the car's own: 15 damage adds 22.5%.</summary>
+        public const double DragPerPoint = 0.015;
+        /// <summary>Condition a point of damage still on the car at the flag takes off: one for one.</summary>
+        public const double ConditionPerPoint = 1;
         /// <summary>Crew seconds to repair one point of damage, before the crew's size and the Engineer skill scale it.</summary>
-        public const double RepairSecondsPerPoint = 1.2;
+        public const double RepairSecondsPerPoint = 3;
         /// <summary>Points of damage one spare part repairs.</summary>
-        public const double PointsPerPart = 10;
+        public const double PointsPerPart = 4;
         /// <summary>Share of a lap's time spent where grip sets the speed, for weighing a repair against the laps to come.</summary>
         private const double GripShare = 0.6;
         /// <summary>Share of a lap's time spent where drag sets the speed.</summary>
@@ -36,7 +38,7 @@ namespace TarmacGauntlet.Simulation
 
         /// <summary>
         /// Damaging hits a car takes per hour of driving, for a car far from the camera, which runs without physics and
-        /// can't hit anything: in a pack the AI makes about this many contacts over 3 m/s an hour.
+        /// can't hit anything: in a pack the AI makes about this many contacts over 5 m/s an hour.
         /// </summary>
         public const double HitsPerHour = 3;
         /// <summary>Mean m/s above <see cref="MinImpact"/> of a rolled hit: most are knocks, a very few total the car.</summary>
@@ -60,7 +62,7 @@ namespace TarmacGauntlet.Simulation
         /// <summary>True for a hit hard enough to total the car.</summary>
         public static bool Totals(double impact) => impact >= TotalImpact;
 
-        private static double Share(double damage) => Math.Max(0, Math.Min(100, damage)) / 100;
+        private static double Points(double damage) => Math.Max(0, Math.Min(100, damage));
 
         /// <summary>
         /// How damage scales one axle's grip. <paramref name="front"/> is the share of the damage at the front, 0 all at
@@ -70,14 +72,14 @@ namespace TarmacGauntlet.Simulation
         {
             double f = Math.Max(0, Math.Min(1, front));
             double weight = frontAxle ? 0.5 + f : 1.5 - f;
-            return Math.Max(0.1, 1 - MaxGripLoss * Share(damage) * weight);
+            return Math.Max(MinGrip, 1 - GripLossPerPoint * Points(damage) * weight);
         }
 
         /// <summary>How damage scales the grip of the car as a whole, spread evenly.</summary>
-        public static double Grip(double damage) => 1 - MaxGripLoss * Share(damage);
+        public static double Grip(double damage) => Math.Max(MinGrip, 1 - GripLossPerPoint * Points(damage));
 
-        /// <summary>How damage scales the car's drag: 1 untouched, 1 + <see cref="MaxDrag"/> at 100.</summary>
-        public static double Drag(double damage) => 1 + MaxDrag * Share(damage);
+        /// <summary>How damage scales the car's drag: 1 untouched, more for each point.</summary>
+        public static double Drag(double damage) => 1 + DragPerPoint * Points(damage);
 
         /// <summary>Share by which damage slows a lap: 0 untouched.</summary>
         public static double LapSlowdown(double damage) =>

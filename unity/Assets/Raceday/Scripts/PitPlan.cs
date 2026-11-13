@@ -118,7 +118,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>The car comes in before its tyres are this worn.</summary>
         public const float WearLimit = 0.9f;
         /// <summary>A car this damaged or worse comes in for repairs (<see cref="CarDamage"/>).</summary>
-        public const double DamageLimit = 40;
+        public const double DamageLimit = 12;
 
         public readonly PitLane Lane;
         public readonly int Garage;
