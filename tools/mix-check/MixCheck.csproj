@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Checks the game's mixer outside Unity and renders a race lap and the menus, before and after it. Run through run.sh. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)../../out/mix-check/obj/</BaseIntermediateOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Check.cs;Render.cs" />
+    <Compile Include="../../unity/Assets/Audio/Scripts/Mix.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/RaceVoices.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/SfxVoices.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/AmbienceMix.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/EngineSound.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/EngineSounds.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/EngineSynth.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/TyreSynth.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/WetRoadSynth.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/WindSynth.cs" />
+    <Compile Include="../../unity/Assets/Simulation/**/*.cs" />
+  </ItemGroup>
+</Project>

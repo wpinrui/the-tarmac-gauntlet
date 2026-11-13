@@ -10,3 +10,7 @@
 
 ## GitHub Actions
 - GitHub Actions are banned. Never add a workflow under `.github/`, and never wait on or rely on CI. Run checks locally before merging.
+
+## Unity APIs
+- Never call `GetInstanceID()`. Unity 6.6 treats it as a compile error and the build fails. For a dictionary key or a stable tie-break, use the object itself as the key, or `GetHashCode()`.
+- Before merging any Unity C#, search the diff for APIs marked obsolete in Unity 6.6, and replace them.

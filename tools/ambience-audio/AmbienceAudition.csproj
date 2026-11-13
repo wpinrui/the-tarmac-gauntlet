@@ -13,5 +13,8 @@
     <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/WindSynth.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/WetRoadSynth.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/AmbienceMix.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/SfxVoices.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/RaceVoices.cs" />
+    <Compile Include="../../unity/Assets/Audio/Scripts/Mix.cs" />
   </ItemGroup>
 </Project>

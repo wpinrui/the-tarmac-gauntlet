@@ -6,7 +6,8 @@
         "TarmacGauntlet.Career",
         "TarmacGauntlet.TeamHq",
         "TarmacGauntlet.Visuals",
-        "TarmacGauntlet.Rendering"
+        "TarmacGauntlet.Rendering",
+        "TarmacGauntlet.Audio"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

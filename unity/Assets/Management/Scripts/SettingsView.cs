@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using TarmacGauntlet.Audio;
 using TarmacGauntlet.Visuals;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -9,7 +10,7 @@ using static TarmacGauntlet.Management.MenuKit;
 
 namespace TarmacGauntlet.Management
 {
-    /// <summary>The settings panel, the same from the main menu, the hub's Escape menu and the race's pause menu: graphics, race, camera, then audio.</summary>
+    /// <summary>The settings panel, the same from the main menu, the hub's Escape menu and the race's pause menu: graphics, race, then audio.</summary>
     internal static class SettingsView
     {
         /// <summary>
@@ -53,23 +54,25 @@ namespace TarmacGauntlet.Management
             race.Add(Stepper("Track map", new[] { "Off", "On" }, GameSettings.TrackMap ? 1 : 0, i => GameSettings.TrackMap = i == 1));
             scroll.Add(race);
 
-            scroll.Add(CameraGroup());
-
-            VisualElement audio = SettingsGroup(3);
-            audio.Add(Slider("Volume", GameSettings.Volume, v => GameSettings.Volume = v));
-            audio.Add(Slider("Music", GameSettings.Music, v => GameSettings.Music = v));
+            VisualElement audio = SettingsGroup(2);
+            foreach (VolumeSlider slider in GameSettings.Sliders)
+                audio.Add(Slider(SliderName(slider), GameSettings.Level(slider), v => GameSettings.SetLevel(slider, v)));
             scroll.Add(audio);
             settingsPanel.Add(scroll);
         }
 
         /// <summary>
-        /// One car camera at a time from <see cref="CameraPresets.All"/>: a slider for each of its values, and a reset to
-        /// its own place. Picking another camera or resetting draws the sliders again.
+        /// The race's camera settings, emptying the panel first: one car camera at a time from
+        /// <see cref="CameraPresets.All"/>, starting on the one in use, with a slider for each of its values and a reset to
+        /// its own place. The camera picked is <see cref="CameraPresets.Preview"/>, so the race shows it live behind the panel.
         /// </summary>
-        private static VisualElement CameraGroup()
+        internal static void FillCamera(VisualElement panel)
         {
-            VisualElement group = SettingsGroup(2);
-            int picked = 0;
+            MenuDropdown.Close();
+            panel.Query<VisualElement>(className: "settings-group").ForEach(g => g.RemoveFromHierarchy());
+            VisualElement group = SettingsGroup(0);
+            int picked = Mathf.Max(0, CameraPresets.All.ToList().IndexOf(CameraPresets.InUse));
+            CameraPresets.Preview = CameraPresets.All[picked];
             var shown = new List<VisualElement>();
             void Draw()
             {
@@ -97,11 +100,18 @@ namespace TarmacGauntlet.Management
             group.Add(Stepper("Camera", CameraPresets.All.Select(c => c.Name).ToArray(), picked, i =>
             {
                 picked = i;
+                CameraPresets.Preview = CameraPresets.All[i];
                 Draw();
             }));
             Draw();
-            return group;
+            panel.Add(group);
         }
+
+        private static string SliderName(VolumeSlider slider) => slider switch
+        {
+            VolumeSlider.Ui => "UI",
+            _ => slider.ToString(),
+        };
 
         /// <summary>An on/off row is a stepper, a count a slider.</summary>
         private static VisualElement Row(GraphicsRow row)

@@ -163,6 +163,13 @@ namespace TarmacGauntlet.Management
             mainColumn.Add(MainItem("New game", NewGame));
             mainColumn.Add(MainItem("Settings", OpenSettings));
             mainColumn.Add(MainItem("Quit game", Quit));
+            string built = BuildStamp.Text();
+            if (built != null)
+            {
+                Label stamp = Text(built, "build-stamp");
+                stamp.style.unityFontDefinition = FontDefinition.FromFont(mainRegular);
+                mainColumn.Add(stamp);
+            }
             mainLayer.Add(mainColumn);
 
             // The game: top bar, hub menu, car tag, Race and the docked panel.

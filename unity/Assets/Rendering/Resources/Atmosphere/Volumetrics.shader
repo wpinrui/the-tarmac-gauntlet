@@ -102,23 +102,59 @@ Shader "Hidden/TarmacGauntlet/Volumetrics"
                 return SAMPLE_TEXTURE2D_LOD(_TgCloudShadowTex, sampler_LinearClamp, uv, 0).r;
             }
 
-            // The floodlights' light falling on this point of the air.
-            float3 Beams(float3 p)
+            // How much of floodlight k's light falls on this point of the air, before its colour and strength.
+            float BeamAt(int k, float3 p)
+            {
+                float3 v = p - _TgBeamPos[k].xyz;
+                float dd = dot(v, v);
+                float reach = _TgBeamPos[k].w;
+                if (dd >= reach * reach) return 0.0;
+                float c = dot(v * rsqrt(dd + 1e-4), _TgBeamAim[k].xyz);
+                float edge = _TgBeamAim[k].w;
+                float cone = smoothstep(edge, lerp(edge, 1.0, 0.4), c);
+                return cone * saturate(1.0 - dd / (reach * reach)) / (dd + 9.0);
+            }
+
+            #define TG_BEAM_SAMPLES 8
+
+            // The floodlights' light the mist scatters towards the camera along the ray, out to far. Each beam is
+            // sampled only over the stretch of the ray that passes through it: around where the ray comes nearest the
+            // beam's axis, as long as the beam is wide there. So a narrow beam far off gets as many samples as a near one,
+            // and never breaks up into dots the way it did sampled at the mist's own steps.
+            float3 BeamMist(float3 cam, float3 d, float far, float jitter)
             {
                 float lit = 0.0;
                 int n = (int)_TgBeams.x;
                 UNITY_LOOP
                 for (int k = 0; k < n; k++)
                 {
-                    float3 v = p - _TgBeamPos[k].xyz;
-                    float dd = dot(v, v);
+                    float3 lens = _TgBeamPos[k].xyz, aim = _TgBeamAim[k].xyz;
                     float reach = _TgBeamPos[k].w;
-                    if (dd < reach * reach)
+                    // The ray inside the beam's reach.
+                    float3 w0 = cam - lens;
+                    float b = dot(w0, d), c = dot(w0, w0) - reach * reach;
+                    float disc = b * b - c;
+                    if (disc <= 0.0) continue;
+                    float root = sqrt(disc);
+                    float t0 = max(-b - root, 0.0), t1 = min(-b + root, far);
+                    // Where the ray comes nearest the axis, and how long it stays as near as the beam is wide there.
+                    float da = dot(d, aim), e = dot(aim, w0);
+                    float side = max(1.0 - da * da, 1e-4);
+                    float tNear = (da * e - b) / side;
+                    float sNear = max((e - da * b) / side, 0.0);
+                    float cosEdge = _TgBeamAim[k].w;
+                    float wide = sNear * sqrt(max(1.0 - cosEdge * cosEdge, 0.0)) / max(cosEdge, 0.05) + 2.0;
+                    float stay = wide / max(sqrt(side), 0.05);
+                    float ta = max(t0, tNear - stay), tb = min(t1, tNear + stay);
+                    if (tb <= ta) continue;
+                    float dt = (tb - ta) / TG_BEAM_SAMPLES;
+                    UNITY_LOOP
+                    for (int i = 0; i < TG_BEAM_SAMPLES; i++)
                     {
-                        float c = dot(v * rsqrt(dd + 1e-4), _TgBeamAim[k].xyz);
-                        float edge = _TgBeamAim[k].w;
-                        float cone = smoothstep(edge, lerp(edge, 1.0, 0.4), c);
-                        lit += cone * saturate(1.0 - dd / (reach * reach)) / (dd + 9.0);
+                        float t = ta + dt * (i + jitter);
+                        float3 p = cam + d * t;
+                        float rho = _TgMist.x * exp(-max(p.y - _TgMist.z, 0.0) / _TgMist.y);
+                        lit += BeamAt(k, p) * rho * exp(-rho * t) * dt;
                     }
                 }
                 return _TgBeams.yzw * (lit / (4.0 * PI));
@@ -254,11 +290,11 @@ Shader "Hidden/TarmacGauntlet/Volumetrics"
                     float rho = _TgMist.x * exp(-max(p.y - _TgMist.z, 0.0) / _TgMist.y);
                     if (rho < 1e-7) continue;
                     float3 light = _TgHaze.rgb + _TgSunLight.rgb * (sunPhase * SunShadow(p) * CloudShadow(p));
-                    if (beams) light += Beams(p);
                     float through = exp(-rho * (t1 - t0));
                     fogLight += fogT * light * (1.0 - through);
                     fogT *= through;
                 }
+                if (beams && fogSteps > 0) fogLight += BeamMist(cam, d, reach, jitter);
 
                 // The clouds, for a ray that climbs past the scene.
                 float3 cloudLight = 0.0;

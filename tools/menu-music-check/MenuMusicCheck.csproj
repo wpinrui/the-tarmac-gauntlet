@@ -10,6 +10,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Check.cs;Stubs.cs" />
+    <Compile Include="../../unity/Assets/Audio/Scripts/Mix.cs" />
     <Compile Include="../../unity/Assets/Management/Scripts/MenuMusic.cs" />
   </ItemGroup>
 </Project>

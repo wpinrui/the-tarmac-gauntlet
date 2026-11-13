@@ -1,3 +1,4 @@
+using TarmacGauntlet.Audio;
 using TarmacGauntlet.Rendering;
 using UnityEngine;
 
@@ -8,7 +9,8 @@ namespace TarmacGauntlet.Raceday
     /// 3D from a small pool of voices sized by the quality level (<see cref="SfxVoices"/>). A one-shot plays once
     /// (<see cref="Play"/>); a held sound loops while its owner holds it each frame and fades out once let go
     /// (<see cref="Hold"/>). When every voice is busy the quietest at the listener gives way to a louder sound, and a
-    /// quieter one is dropped. Made on first use in the race scene and gone with it.
+    /// quieter one is dropped. All of it plays in the effects' group of the <see cref="Mix"/>. Made on first use in
+    /// the race scene and gone with it.
     /// </summary>
     public sealed class RaceSfx : MonoBehaviour
     {
@@ -142,7 +144,7 @@ namespace TarmacGauntlet.Raceday
             s.Stop();
             s.transform.position = at;
             s.clip = takes[take];
-            s.volume = Mathf.Clamp01(volume);
+            s.volume = Mathf.Clamp01(volume) * Mix.Gain(SoundGroup.Effects);
             s.pitch = pitch * (1f + Spread * (2f * (float)random.NextDouble() - 1f));
             s.minDistance = minDistance;
             s.maxDistance = maxDistance;
@@ -196,6 +198,7 @@ namespace TarmacGauntlet.Raceday
         {
             if (Time.unscaledTime - levelRead > 1f) ReadLevel();
             float step = Time.unscaledDeltaTime / Release;
+            float gain = Mix.Gain(SoundGroup.Effects);
             for (int i = 0; i < loops.Length; i++)
             {
                 Voice v = loops[i];
@@ -203,15 +206,20 @@ namespace TarmacGauntlet.Raceday
                 bool held = v.Held >= Time.frameCount - 1 && i < loopCount;
                 v.Gain = Mathf.MoveTowards(v.Gain, held ? 1f : 0f, step);
                 // Volume follows quickly but smoothly, so a scrape swells and dies with the speed rather than jumping.
-                v.Source.volume = Mathf.Lerp(v.Source.volume, Mathf.Clamp01(v.Volume) * v.Gain, Smooth());
+                v.Source.volume = Mathf.Lerp(v.Source.volume, Mathf.Clamp01(v.Volume) * v.Gain * gain, Smooth());
                 if (!held && v.Gain <= 0f)
                 {
                     v.Source.Stop();
                     v.Owner = null;
                 }
             }
-            for (int i = shotCount; i < shots.Length; i++)
-                if (shots[i].Source.isPlaying) shots[i].Source.Stop();
+            for (int i = 0; i < shots.Length; i++)
+            {
+                AudioSource s = shots[i].Source;
+                if (!s.isPlaying) continue;
+                if (i >= shotCount) s.Stop();
+                else s.volume = Mathf.Clamp01(shots[i].Volume) * gain;   // a slider or the pause moving under a ringing hit
+            }
         }
 
         /// <summary>The share of the way a held sound's volume and pitch move to where they are going this frame.</summary>

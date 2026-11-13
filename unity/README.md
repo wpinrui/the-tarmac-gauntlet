@@ -95,13 +95,15 @@ shows its predicted lap time and each lap it drives.
 
 The camera starts on the broadcast when the race comes from the career, and on the chase camera when the scene runs on
 its own. `C` cycles the car cameras: TV, chase, bonnet and bumper. The TV camera is coverage locked to the car: a second
-director with `Lock` set cuts between trackside shots and onboards from the roll hoop, the nose, the wing mirror, the back of
-the car and the driver's seat. `V` puts the broadcast on, and `V` or `C` takes it off. Holding `B` looks back on every
+director with `Lock` set shows mostly trackside shots and pans, a helicopter shot now and then, and an onboard about one
+shot in ten (roll hoop, driver's seat or wing mirror, in turn, never down at the bumpers). `V` puts the broadcast on, and `V` or `C` takes it off. Holding `B` looks back on every
 camera. While you are not driving your own car, the car camera is yours to move and still rides along with the car. Hold
 the right mouse button and drag to look, `W` `A` `S` `D` move, `Q` and `E` go down and up, `Shift` is 5x faster and the
 wheel changes speed. On the TV camera the drag orbits the car and the wheel zooms, within each shot. Switching camera or
-car, or taking the wheel, puts the view back. The settings menu's Camera group sets the chase, bonnet and bumper cameras'
-field of view, position and tilt (`Visuals/CameraPresets.cs`). On the broadcast the director (`BroadcastDirector.cs`) picks
+car, or taking the wheel, puts the view back. Camera in the race's pause menu sets the chase, bonnet and bumper cameras'
+field of view, position and tilt (`Visuals/CameraPresets.cs`). The bonnet camera's position is moved from each car's own
+bonnet spot, just ahead of the windscreen's base and over the bonnet, measured from its model (`CarCameraSpots.cs`), with the race seen through the camera being tuned beside the
+panel, changing as each slider moves. On the broadcast the director (`BroadcastDirector.cs`) picks
 the story once a real second: a car stopped off the track, a fight for a class lead, any fight within a class under
 0.5 s, your car, a class leader's stop or yours, a car rejoining, the leader. It cuts between trackside, pan,
 helicopter, onboard and pit lane shots.

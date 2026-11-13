@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TarmacGauntlet.Audio;
 using TarmacGauntlet.Rendering;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -9,8 +10,8 @@ namespace TarmacGauntlet.Management
     /// The Team HQ's music: the tracks in Resources/Music, shuffled. Every track plays once before any plays again, and
     /// no track plays twice running. The music fades in as the HQ loads and fades out as soon as the game starts loading
     /// another scene (<see cref="SceneLoader.Leaving"/>), so it never plays in a race. It lives across scenes, so the
-    /// shuffle carries on with a fresh track when the player comes back. Its level is <see cref="GameSettings.Music"/>,
-    /// under the master volume.
+    /// shuffle carries on with a fresh track when the player comes back. It plays in the music's group of the
+    /// <see cref="Mix"/>, under the master volume, and past the listener's effects.
     /// </summary>
     public sealed class MenuMusic : MonoBehaviour
     {
@@ -67,13 +68,14 @@ namespace TarmacGauntlet.Management
             source.loop = false;
             source.spatialBlend = 0;
             source.volume = 0;
+            source.bypassListenerEffects = true;
         }
 
         private void Update()
         {
             float dt = Time.unscaledDeltaTime;
             fade = Mathf.MoveTowards(fade, wanted ? 1 : 0, dt / (wanted ? FadeInSeconds : FadeOutSeconds));
-            source.volume = fade * GameSettings.Music;
+            source.volume = fade * Mix.Gain(SoundGroup.Music);
             if (!wanted)
             {
                 // Faded out: stop, so coming back starts a fresh track at once.

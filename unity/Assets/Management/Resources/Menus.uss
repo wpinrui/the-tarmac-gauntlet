@@ -96,8 +96,8 @@
 .grip { width: 10px; height: 14px; margin-right: 12px; flex-shrink: 0; -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(255, 255, 255, 0.219); }
 .drag-row:hover .grip { -unity-background-image-tint-color: rgba(255, 255, 255, 0.809); }
 .pin { position: absolute; left: 0; right: 0; background-color: rgb(74, 77, 77); }
-.pin.top { top: 28px; }
-.pin.bottom { bottom: 0; }
+.pin-top { top: 28px; }
+.pin-bottom { bottom: 0; }
 
 /* Columns before the name */
 .c-pos { width: 30px; margin-right: 12px; }
@@ -296,6 +296,7 @@
 .main-item { height: auto; padding: 12px 18px; margin-left: -18px; border-radius: 14px; font-size: 24px; letter-spacing: 0; }
 .main-item:hover { background-color: rgba(255, 255, 255, 0.059); }
 .main-item .label { font-size: 24px; }
+.build-stamp { position: absolute; left: 56px; bottom: 40px; font-size: 14px; color: rgba(255, 255, 255, 0.392); }
 .main-item .sub { font-size: 14px; color: rgba(255, 255, 255, 0.392); margin-top: 2px; }
 
 /* Settings */
@@ -314,6 +315,10 @@
 .slider-value { width: 32px; font-size: 15px; -unity-text-align: middle-right; }
 .slider-value.wide { width: 46px; }
 .settings-reset { width: 250px; height: 36px; }
+/* The race's pause menu holds the camera tuner at the right edge, clear of the car in the middle of the screen.
+   Its own class: .side is the Team HQ side pane, and a shared name squeezed that pane's tables into one column. */
+.right-edge { align-items: flex-end; justify-content: center; padding-right: 32px; }
+.camera-settings { width: 460px; }
 .settings-reset > .ghost-label { font-size: 14px; letter-spacing: 1.1px; }
 
 /* Skill points: pips for the points left, then each skill between a minus and a plus */
@@ -404,9 +409,9 @@
 .prize-col.last { margin-right: 0; }
 .prize-cell { flex-direction: row; align-items: center; height: 26px; padding-left: 8px; padding-right: 8px; border-radius: 8px; font-size: 13px; }
 .prize-cell.me { background-color: rgba(255, 255, 255, 0.059); }
-.prize-pos { width: 22px; margin-right: 6px; color: rgba(255, 255, 255, 0.194); }
+.prize-pos { width: 22px; margin-right: 6px; white-space: nowrap; color: rgba(255, 255, 255, 0.194); }
 .prize-cell.me .prize-pos { color: rgb(255, 255, 255); }
-.prize-amount { flex-grow: 1; -unity-text-align: middle-right; }
+.prize-amount { flex-grow: 1; white-space: nowrap; -unity-text-align: middle-right; }
 
 /* Garage: the car workshop and both dealers (WorkshopPanel.cs, DealerPanel.cs, GarageUi.cs) */
 .frame { flex-grow: 1; min-height: 0; }

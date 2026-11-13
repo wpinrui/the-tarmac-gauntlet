@@ -1,8 +1,10 @@
 using System;
 using System.Linq;
+using TarmacGauntlet.Audio;
 using TarmacGauntlet.Career;
 using TarmacGauntlet.Rendering;
 using TarmacGauntlet.Simulation;
+using TarmacGauntlet.Visuals;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UIElements;
@@ -12,10 +14,12 @@ namespace TarmacGauntlet.Management
 {
     /// <summary>
     /// The race's pause menu, on Escape until the race is settled: the race stops dead (<see cref="RaceWeekend.Paused"/>),
-    /// its sound and graphics with it, under the same glass menu as the hub's Escape menu. Save writes the race as it
-    /// stands into the career (<see cref="GameSession.SaveRace"/>), and continuing the career carries on from there.
+    /// its graphics with it, and its sound plays on muffled and low behind the menu (<see cref="Mix.Paused"/>), under the
+    /// same glass menu as the hub's Escape menu. Save writes the race as it stands into the career
+    /// (<see cref="GameSession.SaveRace"/>), and continuing the career carries on from there.
     /// Retire takes the player's car out and settles the race from where every car is (<see cref="RaceWeekend.Withdraw"/>),
-    /// on to the race summary. Escape steps back out of settings, then out of the menu.
+    /// on to the race summary. Camera tunes the car cameras with the race seen through the one being tuned, the panel
+    /// at the side and nothing dimmed. Escape steps back out of settings or camera, then out of the menu.
     /// </summary>
     public sealed class RacePauseMenu : MonoBehaviour
     {
@@ -36,11 +40,11 @@ namespace TarmacGauntlet.Management
                 new GameObject("Pause menu").AddComponent<RacePauseMenu>();
         }
 
-        private enum Overlay { None, Pause, Settings }
+        private enum Overlay { None, Pause, Settings, Camera }
 
         private Overlay overlay = Overlay.None;
         private MenuGlass glass;
-        private VisualElement root, dimmer, pauseLayer, settingsLayer, settingsPanel, save, retire;
+        private VisualElement root, dimmer, pauseLayer, settingsLayer, settingsPanel, cameraLayer, cameraPanel, save, retire;
 
         private void Start()
         {
@@ -73,6 +77,11 @@ namespace TarmacGauntlet.Management
                 SettingsView.Fill(settingsPanel);
                 SetOverlay(Overlay.Settings);
             }));
+            items.Add(MenuItem("Camera", () =>
+            {
+                SettingsView.FillCamera(cameraPanel);
+                SetOverlay(Overlay.Camera);
+            }));
             items.Add(retire = MenuItem("Retire", Retire));
             items.Add(MenuItem("Quit to main menu", QuitToMainMenu));
             items.Add(MenuItem("Quit game", Menus.Quit));
@@ -82,6 +91,10 @@ namespace TarmacGauntlet.Management
             settingsLayer = Layer("centre");
             settingsPanel = glass.Make("settings");
             settingsLayer.Add(settingsPanel);
+
+            cameraLayer = Layer("right-edge");
+            cameraPanel = glass.Make("settings", "camera-settings");
+            cameraLayer.Add(cameraPanel);
             Render();
         }
 
@@ -102,6 +115,7 @@ namespace TarmacGauntlet.Management
         private void OnDestroy()
         {
             if (overlay != Overlay.None) Unfreeze();
+            CameraPresets.Preview = null;
         }
 
         // ------------------------------------------------------------------ pausing
@@ -112,7 +126,8 @@ namespace TarmacGauntlet.Management
         private void SetOverlay(Overlay next)
         {
             // Opening the pause menu or settings slides a panel in; leaving either steps back.
-            if (next == Overlay.Settings || (overlay == Overlay.None && next != Overlay.None)) MenuSounds.Play(UiCue.Panel);
+            if (next == Overlay.Settings || next == Overlay.Camera || (overlay == Overlay.None && next != Overlay.None)) MenuSounds.Play(UiCue.Panel);
+            if (next != Overlay.Camera) CameraPresets.Preview = null;
             else if (next != overlay) MenuSounds.Play(UiCue.Back);
             if (next != Overlay.None && overlay == Overlay.None) Freeze();
             else if (next == Overlay.None && overlay != Overlay.None)
@@ -130,7 +145,7 @@ namespace TarmacGauntlet.Management
         {
             RaceWeekend.Paused = true;
             Time.timeScale = 0f;
-            AudioListener.pause = true;
+            Mix.Paused = true;   // the race plays on behind the menu, muffled and low
             Camera cam = Camera.main;
             if (cam != null && cam.GetComponent<GlassBackdrop>() == null) cam.gameObject.AddComponent<GlassBackdrop>();
         }
@@ -140,15 +155,16 @@ namespace TarmacGauntlet.Management
         {
             RaceWeekend.Paused = false;
             Time.timeScale = 1f;
-            AudioListener.pause = false;
+            Mix.Paused = false;
         }
 
         private void Render()
         {
             if (root == null) return;
-            dimmer.style.display = overlay != Overlay.None ? DisplayStyle.Flex : DisplayStyle.None;
+            dimmer.style.display = overlay != Overlay.None && overlay != Overlay.Camera ? DisplayStyle.Flex : DisplayStyle.None;
             pauseLayer.style.display = overlay == Overlay.Pause ? DisplayStyle.Flex : DisplayStyle.None;
             settingsLayer.style.display = overlay == Overlay.Settings ? DisplayStyle.Flex : DisplayStyle.None;
+            cameraLayer.style.display = overlay == Overlay.Camera ? DisplayStyle.Flex : DisplayStyle.None;
             // Saving needs a career to save into, and retiring a car of the player's in the race.
             save.style.display = GameSession.CareerId != null ? DisplayStyle.Flex : DisplayStyle.None;
             bool racing = RaceWeekend.Setup?.Grid.Any(c => c.Player) ?? false;
@@ -201,7 +217,7 @@ namespace TarmacGauntlet.Management
                 return;
             }
             if (ev.keyCode != KeyCode.Escape) return;
-            if (overlay == Overlay.Settings) SetOverlay(Overlay.Pause);
+            if (overlay == Overlay.Settings || overlay == Overlay.Camera) SetOverlay(Overlay.Pause);
             else if (overlay == Overlay.Pause) SetOverlay(Overlay.None);
             else if (CanPause) SetOverlay(Overlay.Pause);
             else return;

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using TarmacGauntlet.Audio;
 using TarmacGauntlet.Rendering;
 using UnityEngine;
 
@@ -14,7 +15,8 @@ namespace TarmacGauntlet.Raceday
     /// listener: the rain from the weather, thunder in its storms, birds by day and crickets by night away from the
     /// stands. The wind is synthesised from the camera's own speed (<see cref="WindSynth"/>), so it rushes on the bonnet
     /// and barely stirs on a TV camera. The mix rules are <see cref="AmbienceMix"/>; the voices each quality level may
-    /// play are its <see cref="AmbienceBudget"/>. The clips are public-domain field recordings in Resources/Ambience,
+    /// play are its <see cref="AmbienceBudget"/>. It all plays in the ambience's group of the <see cref="Mix"/>, and the
+    /// crowd and PA dip under a close engine pass (<see cref="Mix.CrowdDuck"/>). The clips are public-domain field recordings in Resources/Ambience,
     /// built by tools/ambience/build.py.
     /// </summary>
     public sealed class RaceAmbience : MonoBehaviour
@@ -44,6 +46,9 @@ namespace TarmacGauntlet.Raceday
         private const float Fade = 0.6f;
         /// <summary>Camera speed past which a move is a cut, not motion, m/s.</summary>
         private const float CutSpeed = 160f;
+        /// <summary>From the loudness pass: the wind on the bonnet sits 8 dB under the engine, and the nearest thunder's
+        /// loudest moment 4 dB under it, as the recordings peak over full scale.</summary>
+        private const float WindLevel = 0.4f, ThunderNear = 0.5f, ThunderFar = 0.2f;
 
         private sealed class Stand
         {
@@ -61,6 +66,11 @@ namespace TarmacGauntlet.Raceday
         private readonly List<Stand> byDistance = new List<Stand>();
         private AudioClip[] roars, announcements, thunders;
         private AudioSource[] roarVoices;
+        /// <summary>Each roar voice's own level, and the PA's and thunder's, before the mix's gain.</summary>
+        private float[] roarLevels;
+        private float paLevel, thunderLevel;
+        /// <summary>The ambience group's gain this frame, and the crowd's and PA's under the ducking.</summary>
+        private float gain, crowdGain;
         private AudioSource pa, rainLight, rainHeavy, thunder, countryDay, countryNight, windSource;
         private AudioLowPassFilter thunderTone;
         private WindVoice wind;
@@ -100,6 +110,7 @@ namespace TarmacGauntlet.Raceday
                 }
             }
             roarVoices = new AudioSource[Math.Max(1, budget.Roars)];
+            roarLevels = new float[roarVoices.Length];
             for (int i = 0; i < roarVoices.Length; i++) roarVoices[i] = Voice("Roar", null, true, 44, loop: false);
             pa = Voice("PA", null, true, 48, loop: false);
             pa.minDistance = 35f;
@@ -177,6 +188,12 @@ namespace TarmacGauntlet.Raceday
             lastEar = ear;
             haveEar = true;
 
+            gain = Mix.Gain(SoundGroup.Ambience);
+            crowdGain = gain * Mix.CrowdDuck;
+            for (int i = 0; i < roarVoices.Length; i++) roarVoices[i].volume = roarLevels[i] * crowdGain;
+            pa.volume = paLevel * crowdGain;
+            thunder.volume = thunderLevel * gain;
+
             WeatherState weather = RaceWeather.Now;
             float night = Sky != null ? Sky.Lights : 0f;
             float nearest = Crowds(ear, weather.Rain, night);
@@ -234,8 +251,8 @@ namespace TarmacGauntlet.Raceday
                 (float calm, float lively) = AmbienceMix.Crowd(s.Excitement, night, rain);
                 s.Calm.transform.position = s.Nearest;
                 s.Lively.transform.position = s.Nearest;
-                Level(s.Calm, heard ? calm : 0f);
-                Level(s.Lively, heard ? lively * 0.9f : 0f);
+                Level(s.Calm, heard ? calm * crowdGain : 0f);
+                Level(s.Lively, heard ? lively * 0.9f * crowdGain : 0f);
             }
             return byDistance[0].Distance;
         }
@@ -288,16 +305,18 @@ namespace TarmacGauntlet.Raceday
         {
             if (!force && Time.time - s.LastRoar < RoarRest) return;
             s.LastRoar = Time.time;
-            AudioSource voice = roarVoices[0];
+            int k = 0;
             int voices = Mathf.Min(roarVoices.Length, Math.Max(1, budget.Roars));
             for (int i = 0; i < voices; i++)
             {
-                if (!roarVoices[i].isPlaying) { voice = roarVoices[i]; break; }
-                if (roarVoices[i].time > voice.time) voice = roarVoices[i];
+                if (!roarVoices[i].isPlaying) { k = i; break; }
+                if (roarVoices[i].time > roarVoices[k].time) k = i;
             }
+            AudioSource voice = roarVoices[k];
             voice.transform.position = s.Nearest;
             voice.clip = roars[UnityEngine.Random.Range(0, roars.Length)];
-            voice.volume = (s.Main ? 1f : 0.85f) * (1f - 0.4f * (Sky != null ? Sky.Lights : 0f));
+            roarLevels[k] = (s.Main ? 1f : 0.85f) * (1f - 0.4f * (Sky != null ? Sky.Lights : 0f));
+            voice.volume = roarLevels[k] * crowdGain;
             voice.Play();
         }
 
@@ -315,7 +334,8 @@ namespace TarmacGauntlet.Raceday
             lastAnnouncement = pick;
             pa.transform.position = main.Nearest + Vector3.up * 6f;   // the speakers hang under the stand's roof
             pa.clip = announcements[pick];
-            pa.volume = 0.9f;
+            paLevel = 0.9f;
+            pa.volume = paLevel * crowdGain;
             pa.Play();
         }
 
@@ -324,8 +344,8 @@ namespace TarmacGauntlet.Raceday
         private void Rain(float mmPerHour)
         {
             (float light, float heavy) = AmbienceMix.Rain(mmPerHour, budget.RainLayers);
-            Level(rainLight, 0.8f * light);
-            Level(rainHeavy, 0.9f * heavy);
+            Level(rainLight, 0.8f * light * gain);
+            Level(rainHeavy, 0.9f * heavy * gain);
         }
 
         private void Thunder(float mmPerHour)
@@ -342,7 +362,8 @@ namespace TarmacGauntlet.Raceday
             // Near strikes are loud and bright, far ones a dull rumble.
             float near = UnityEngine.Random.value;
             thunder.clip = thunders[UnityEngine.Random.Range(0, thunders.Length)];
-            thunder.volume = Mathf.Lerp(0.4f, 1f, near);
+            thunderLevel = Mathf.Lerp(ThunderFar, ThunderNear, near);
+            thunder.volume = thunderLevel * gain;
             thunderTone.cutoffFrequency = Mathf.Lerp(900f, 16000f, near * near);
             thunder.Play();
         }
@@ -350,8 +371,8 @@ namespace TarmacGauntlet.Raceday
         private void Country(float metresToStand, float night, float mmPerHour)
         {
             (float day, float dark) = AmbienceMix.Country(AmbienceMix.Away(metresToStand), night, mmPerHour, budget.CountryLayers);
-            Level(countryDay, 0.7f * day);
-            Level(countryNight, 0.6f * dark);
+            Level(countryDay, 0.7f * day * gain);
+            Level(countryNight, 0.6f * dark * gain);
         }
 
         private void Wind(float breeze)
@@ -361,7 +382,7 @@ namespace TarmacGauntlet.Raceday
             wind.Synth.Speed = cameraSpeed;
             wind.Synth.Exposure = AmbienceMix.Exposure(onboard, chase);
             wind.Synth.Breeze = breeze;
-            Level(windSource, 1f);
+            Level(windSource, WindLevel * gain);
         }
 
         // ---------------------------------------------------------------- helpers

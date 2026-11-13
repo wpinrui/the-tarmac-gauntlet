@@ -1,0 +1,21 @@
+"""Writes viewer.html, the orbitable viewer of out/LibertyOmaha.obj with every option.
+
+Run: python3 export.py out && python3 publish.py"""
+import sys
+from pathlib import Path
+
+import bpy  # noqa: F401  (parts needs Blender loaded)
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(HERE.parent / "common"))
+import viewer  # noqa: E402
+from parts import GROUPS, LAMPS, MATERIALS, R, SHOW, door_hinge  # noqa: E402
+
+DOORS = [{"label": "Doors", "parts": f"door_{side}",
+          "styles": {"Hinged at the front": {"axis": list(door_hinge(sgn)[:2]), "open": door_hinge(sgn)[2]}}}
+         for sgn, side in ((1, "l"), (-1, "r"))]
+
+if __name__ == "__main__":
+    viewer.write(HERE / "out" / f"{R['name']}.obj", HERE / "viewer.html", "Liberty Omaha",
+                 MATERIALS, R["picks"], LAMPS, GROUPS, show=SHOW, doors=DOORS)
