@@ -81,6 +81,8 @@ namespace TarmacGauntlet.Raceday
         /// moves no faster than <see cref="LightsRate"/> a second so a sudden change of weather fades rather than flicks.
         /// </summary>
         public float Lights { get; private set; }
+        /// <summary>The sun's height over the horizon now, degrees: below zero after sunset.</summary>
+        public float SunElevation { get; private set; }
         private const float LightsRate = 0.25f;
         private bool lightsSet;
         /// <summary>
@@ -193,6 +195,7 @@ namespace TarmacGauntlet.Raceday
             float shadeNow = map.Shading(spot, s.LightDir) * Mathf.Clamp01(CloudMap.Strength(overcast) / 0.85f);
             shade = float.IsNaN(shade) ? shadeNow : Mathf.Lerp(shade, shadeNow, 1f - Mathf.Exp(-Time.unscaledDeltaTime / ShadeEase));
             // The first sky with its weather sets the lights outright; after that they ease towards it.
+            SunElevation = s.SunElevation;
             Lights = lightsSet ? Mathf.MoveTowards(Lights, s.Lights, LightsRate * Time.unscaledDeltaTime) : s.Lights;
             lightsSet |= Weather != null;
             PostEffects.Current?.Set(SkyGrade.For(s, overcast, rain, shade, SkyGrade.Patchy(share, overcast)));

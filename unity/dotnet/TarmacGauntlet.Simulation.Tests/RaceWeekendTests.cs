@@ -458,10 +458,14 @@ namespace TarmacGauntlet.Simulation.Tests
             RaceWeekend.Finished += count;
             try
             {
+                RaceWeekend.CanSkipToEnd = true;
                 RaceSetup setup = RaceWeekend.Begin(game);
+                Assert.That(RaceWeekend.CanSkipToEnd, Is.False, "a new race can't skip to its end");
                 Assert.That(RaceWeekend.Setup, Is.SameAs(setup));
                 var race = new RaceDay(setup, Never);
+                RaceWeekend.CanSkipToEnd = true;
                 RaceWeekend.Finish(race);
+                Assert.That(RaceWeekend.CanSkipToEnd, Is.False, "a settled race has nothing left to skip");
                 Assert.That(fired, Is.EqualTo(1));
                 Assert.That(RaceWeekend.Setup, Is.Null);
                 Assert.That(RaceWeekend.Settled!.Phase, Is.EqualTo(GamePhase.PostRace));
@@ -470,6 +474,23 @@ namespace TarmacGauntlet.Simulation.Tests
             finally
             {
                 RaceWeekend.Finished -= count;
+            }
+        }
+
+        [Test]
+        public void SkipToEndAsksTheRaceScene()
+        {
+            int fired = 0;
+            Action count = () => fired++;
+            RaceWeekend.SkippingToEnd += count;
+            try
+            {
+                RaceWeekend.SkipToEnd();
+                Assert.That(fired, Is.EqualTo(1));
+            }
+            finally
+            {
+                RaceWeekend.SkippingToEnd -= count;
             }
         }
     }

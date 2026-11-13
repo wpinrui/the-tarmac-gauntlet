@@ -22,7 +22,8 @@ namespace TarmacGauntlet.Raceday
     /// The field is shown on the timing tower (<see cref="RaceTower"/>). T opens live timing while the AI drives
     /// your car, with the controls for its next stop (<see cref="LiveTiming"/>). While a teammate drives, N
     /// (or the button beside live timing's way back) fast forwards at 32x to your next stint and hands you the
-    /// wheel once you are back on track. A stop that puts a teammate in hands the car back to the AI.
+    /// wheel once you are back on track. A stop that puts a teammate in hands the car back to the AI. Past the
+    /// chequered flag the AI takes your car round its cooldown lap and into its box, and Delete still takes it back.
     /// A race saved part way (<see cref="RaceWeekend.Resuming"/>) carries on from the save: every car where it was, on its
     /// lap, fuel and tyres, the clocks and the weather as they were. A car that was in the pit lane goes back on track
     /// beside where it was, at the edge on the pit side. Saved before the green, the race starts again.
@@ -60,6 +61,8 @@ namespace TarmacGauntlet.Raceday
         private string lastDriver;
         /// <summary>True once the race has handed you the wheel at the start.</summary>
         private bool handedOver;
+        /// <summary>True once the AI has been given your car for its cooldown lap.</summary>
+        private bool cooldownHanded;
         private RaceTower raceTower;
         private CarController[] carControllers;
         private Circuit circuit;
@@ -279,6 +282,7 @@ namespace TarmacGauntlet.Raceday
             if (!career) views.StartInChase();
             RaceTower tower = Tower(circuit, racing, field, teams, watched, starter);
             raceTower = tower;
+            if (day != null) tower.Flagged = i => day.Cars[i].Flagged;
             if (resumed) tower.SetRaceTime(resume.RaceTime);
             views.Tower = tower;
             if (player >= 0 && TeamColour(setup.Game, grid[player].TeamId) is Color own) tower.Colours[player] = own;
@@ -617,6 +621,7 @@ namespace TarmacGauntlet.Raceday
             if (keys.Pressed(KeyCode.N) && CanSkip()) stintSkip = true;
             TakeTheStart();
             Stints();
+            Cooldown();
             // Fast forward is for watching: taking the wheel drops back to normal speed.
             if (!ai.enabled)
             {
@@ -669,6 +674,15 @@ namespace TarmacGauntlet.Raceday
             if (!green || racingCars[playerIndex].InPitLane) return;
             handedOver = true;
             ai.enabled = false;
+        }
+
+        /// <summary>Past the flag, the AI drives your car round its cooldown lap and into its box, once.</summary>
+        private void Cooldown()
+        {
+            if (cooldownHanded || playerIndex < 0 || day == null || !day.Cars[playerIndex].Flagged) return;
+            cooldownHanded = true;
+            stintSkip = false;
+            ai.enabled = true;
         }
 
         private void Stints()

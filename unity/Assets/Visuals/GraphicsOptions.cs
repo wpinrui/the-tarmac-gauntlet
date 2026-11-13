@@ -121,11 +121,8 @@ namespace TarmacGauntlet.Visuals
         /// <summary>Raindrops ringing the puddles and the water on the track. Needs the wet track. Changes live.</summary>
         public static readonly GraphicsOption RainRipples = Toggle("settings.rainripples", true);
 
-        /// <summary>Water thrown up behind the cars nearest the camera on a wet track. Changes live.</summary>
+        /// <summary>A wall of fine mist thrown up behind the fast cars nearest the camera on a wet track. Changes live.</summary>
         public static readonly GraphicsOption Spray = Toggle("settings.spray", true);
-
-        /// <summary>A fine mist hanging in the air behind fast cars on a wet track. Changes live.</summary>
-        public static readonly GraphicsOption SprayMist = Toggle("settings.spraymist", true);
 
         /// <summary>Smoke off locked and spinning tyres, lit by the sun and the sky. Changes live.</summary>
         public static readonly GraphicsOption TyreSmoke = Toggle("settings.tyresmoke", true);
@@ -170,7 +167,7 @@ namespace TarmacGauntlet.Visuals
             new GraphicsRow("Depth of field", OffAtLow, DepthOfField),
             new GraphicsRow("Car detail", OffAtLow, Clearcoat, PaintFlake, CarGlass, LampLenses, CarTrims, CarReflections, BrakeGlow),
             new GraphicsRow("Track detail", AlwaysOn, TarmacDetail, RubberedLine, KerbWear, SkidMarks, Mowing, ArmcoDetail, TracksideProps),
-            new GraphicsRow("Rain effects", OffAtLow, WetTrack, Puddles, RainRipples, Spray, SprayMist),
+            new GraphicsRow("Rain effects", OffAtLow, WetTrack, Puddles, RainRipples, Spray),
             new GraphicsRow("Smoke and sparks", OffAtLow, TyreSmoke, Sparks),
             new GraphicsRow("Heat haze", OnFromHigh, ExhaustHaze, TarmacShimmer),
             new GraphicsRow("Screen-space reflections", OnFromHigh, ScreenReflections),

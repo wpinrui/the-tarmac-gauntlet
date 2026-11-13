@@ -14,3 +14,7 @@
 ## Unity APIs
 - Never call `GetInstanceID()`. Unity 6.6 treats it as a compile error and the build fails. For a dictionary key or a stable tie-break, use the object itself as the key, or `GetHashCode()`.
 - Before merging any Unity C#, search the diff for APIs marked obsolete in Unity 6.6, and replace them.
+
+## Menu text
+- Menu text never wraps. `Menus.uss` sets every Label to `white-space: nowrap` and `flex-shrink: 0`. Only text meant to run as a paragraph gets `white-space: normal` on its own class.
+- Before merging menu UI, check every new label at its longest real value. It must sit on one line and must not be squeezed. Give it room, or clip it with an ellipsis.

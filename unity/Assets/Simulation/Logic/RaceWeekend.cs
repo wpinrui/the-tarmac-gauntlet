@@ -33,6 +33,18 @@ namespace TarmacGauntlet.Simulation
         /// </summary>
         public static void Withdraw() => Withdrawing?.Invoke();
 
+        /// <summary>
+        /// True while the race waits only on the cooldown laps: the time is up and the player's race is over.
+        /// The race scene keeps it up to date; the pause menu's key skips to the race summary while it holds.
+        /// </summary>
+        public static bool CanSkipToEnd { get; set; }
+
+        /// <summary>Fires when the player asks to skip the cooldown laps (<see cref="SkipToEnd"/>).</summary>
+        public static event Action? SkippingToEnd;
+
+        /// <summary>Settles the race now, without waiting for the cooldown laps. The race scene does it on <see cref="SkippingToEnd"/>.</summary>
+        public static void SkipToEnd() => SkippingToEnd?.Invoke();
+
         /// <summary>The race save the race scene carries on from, or null for a race from its start.</summary>
         public static RaceSave? Resuming { get; private set; }
 
@@ -45,6 +57,7 @@ namespace TarmacGauntlet.Simulation
             Setup = save.Setup;
             Resuming = save;
             Paused = false;
+            CanSkipToEnd = false;
             Settled = null;
             Summary = null;
         }
@@ -59,6 +72,7 @@ namespace TarmacGauntlet.Simulation
             Setup = BuildSetup(game, lineup);
             Resuming = null;
             Paused = false;
+            CanSkipToEnd = false;
             Settled = null;
             Summary = null;
             return Setup;
@@ -73,6 +87,7 @@ namespace TarmacGauntlet.Simulation
             Setup = null;
             Resuming = null;
             Paused = false;
+            CanSkipToEnd = false;
             Finished?.Invoke();
         }
 

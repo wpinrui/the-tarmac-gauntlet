@@ -48,6 +48,7 @@ namespace TarmacGauntlet.Simulation
             { "Green Goat Racing", "Assets/Art/Liveries/GreenGoatRacing" },
             { "Duct Tape Dynamics", "Assets/Art/Liveries/DuctTapeDynamics" },
             { "Greystone Archer", "Assets/Art/Liveries/GreystoneArcher" },
+            { "Lo-fi Racing", "Assets/Art/Liveries/LofiRacing" },
             { "Shed Monozukuri Co.", "Assets/Art/Liveries/ShedMonozukuriCo" },
         };
 

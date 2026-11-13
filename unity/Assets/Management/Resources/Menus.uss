@@ -9,6 +9,10 @@
    text is 39%, which shows as 62% blended in sRGB did). Pick a colour's alpha as if blending in sRGB, then convert it
    with tools/linear-preview/ui_alpha.py. */
 
+/* Text never wraps or shrinks unless its class asks to (white-space: normal, flex-shrink: 1). The menus' theme is
+   empty, so without this a label squeezed by its row breaks one letter per line. */
+Label, TextElement { white-space: nowrap; flex-shrink: 0; }
+
 .root { position: absolute; left: 0; top: 0; right: 0; bottom: 0; color: rgb(255, 255, 255); }
 .layer { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
 .centre { align-items: center; justify-content: center; }
@@ -321,16 +325,36 @@
 .camera-settings { width: 460px; }
 .settings-reset > .ghost-label { font-size: 14px; letter-spacing: 1.1px; }
 
-/* Skill points: pips for the points left, then each skill between a minus and a plus */
+/* Skill points: the title and the points left, then a row per skill: its name, what it does and its level as dots
+   out of 20, with the level between a minus and a plus. Levels gained here are green. */
 .skills { flex-shrink: 0; }
-.skill-pips { flex-direction: row; justify-content: center; margin-bottom: 10px; }
-.skill-pip { width: 10px; height: 10px; margin-left: 3.5px; margin-right: 3.5px; border-radius: 5px; background-color: rgb(255, 255, 255); border-width: 1.5px; border-color: rgb(255, 255, 255); }
-.skill-pip.used { background-color: rgba(255, 255, 255, 0); border-color: rgba(255, 255, 255, 0.11); }
-.skill-line { flex-direction: row; }
-.skill { flex-grow: 1; flex-basis: 0; align-items: center; }
-.skill-name { margin-bottom: 4px; font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.392); }
-.skill-level { flex-direction: row; align-items: center; }
-.skill-value { min-width: 38px; font-size: 28px; -unity-text-align: middle-center; }
+.skills-head { flex-shrink: 0; margin-bottom: 14px; padding-left: 4px; }
+.skills-title { font-size: 26px; letter-spacing: 0.5px; }
+.skills-count { flex-direction: row; align-items: flex-end; margin-top: 2px; }
+.skills-left { font-size: 46px; color: rgb(61, 220, 132); }
+.skills-left.none { color: rgb(255, 255, 255); }
+.skills-to-spend { margin-left: 10px; margin-bottom: 11px; font-size: 15px; letter-spacing: 0.9px; color: rgba(255, 255, 255, 0.392); }
+.skills.compact > .skills-head { flex-direction: row; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.skills.compact .skills-title { font-size: 12px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.392); }
+.skills.compact .skills-count { align-items: center; margin-top: 0; }
+.skills.compact .skills-left { font-size: 22px; }
+.skills.compact .skills-to-spend { margin-bottom: 0; margin-left: 8px; font-size: 14px; }
+.skills.compact .skill { margin-bottom: 6px; padding-top: 9px; padding-bottom: 9px; }
+.skills.compact .skill.last { margin-bottom: 0; }
+.skills.compact .skill-dots { margin-top: 7px; }
+.skill { flex-direction: row; align-items: center; flex-shrink: 0; margin-bottom: 8px; padding: 12px 14px 12px 16px; border-radius: 12px; background-color: rgba(255, 255, 255, 0.012); }
+.skill.last { margin-bottom: 0; }
+.skill-text { flex-grow: 1; flex-shrink: 1; min-width: 0; }
+.skill-name { font-size: 15px; letter-spacing: 1.2px; }
+.skill-line { margin-top: 1px; font-size: 14px; color: rgba(255, 255, 255, 0.392); }
+.skill-dots { flex-direction: row; margin-top: 9px; }
+.skill-dot { width: 10px; height: 10px; margin-right: 4px; border-radius: 5px; border-width: 1.5px; border-color: rgba(255, 255, 255, 0.194); }
+.skill-dot.on { background-color: rgb(255, 255, 255); border-color: rgb(255, 255, 255); }
+.skill-dot.new { background-color: rgb(61, 220, 132); border-color: rgb(61, 220, 132); }
+.skill-level { flex-direction: row; align-items: center; flex-shrink: 0; margin-left: 16px; }
+.skill-value-box { flex-direction: row; align-items: flex-end; justify-content: center; min-width: 74px; }
+.skill-value { font-size: 28px; }
+.skill-max { margin-left: 2px; margin-bottom: 6px; font-size: 14px; color: rgba(255, 255, 255, 0.194); }
 .skill-step { width: 28px; height: 28px; border-radius: 9px; align-items: center; justify-content: center; background-color: rgba(255, 255, 255, 0.035); }
 .skill-step:hover { background-color: rgba(255, 255, 255, 0.088); }
 .skill-step-icon { width: 14px; height: 14px; -unity-background-scale-mode: scale-to-fit; }
@@ -365,7 +389,7 @@
 .summary-box { flex-shrink: 0; margin-bottom: 16px; padding: 14px 20px; }
 .summary-box > .hero, .summary-box > .legend { margin-bottom: 0; }
 .summary-log { flex-grow: 1; min-height: 0; padding: 12px; }
-.summary-skills { position: absolute; left: 908px; bottom: 32px; width: 420px; height: 116px; padding: 10px 16px; justify-content: center; }
+.skills-panel { width: 620px; border-radius: 24px; padding: 24px; }
 
 /* Drivers */
 .roster { flex-direction: row; flex-shrink: 0; margin-bottom: 12px; }
