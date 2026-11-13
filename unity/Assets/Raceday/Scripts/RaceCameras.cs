@@ -11,6 +11,7 @@ namespace TarmacGauntlet.Raceday
     /// V puts the broadcast on (<see cref="BroadcastDirector"/>) and V or C takes it off again. Holding B
     /// looks back on every camera, the broadcast showing the chase view turned round. = rides
     /// with the car behind in race order and - with the car ahead, leaving the broadcast for the chase view.
+    /// Backspace comes back to your own car, in the chase view.
     /// While you are not driving your own car, the camera is yours to move: hold the right mouse button and
     /// drag to look, W A S D move, Q and E go down and up, Shift is 5x faster and the wheel changes speed.
     /// All of it stays relative to the car, so you still ride along. The locked TV camera takes the mouse
@@ -99,6 +100,7 @@ namespace TarmacGauntlet.Raceday
             }
             if (Keys.Pressed(KeyCode.Equals)) Step(+1);
             if (Keys.Pressed(KeyCode.Minus)) Step(-1);
+            if (Keys.Pressed(KeyCode.Backspace) && Own != null && (Car != Own || broadcast)) Watch(Own);
             if (Driving && (offset != Vector3.zero || yaw != 0f || pitch != 0f || orbit != 0f || rise != 0f || zoom != 1f)) Apply();   // taking the wheel puts the view back
         }
 

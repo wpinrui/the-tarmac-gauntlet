@@ -380,6 +380,13 @@ namespace TarmacGauntlet.Raceday
             graphics.Circuit = circuit;
             graphics.Player = player;
             graphics.Tower = tower;
+            DriverCard card = views.gameObject.AddComponent<DriverCard>();
+            card.Views = views;
+            card.Cars = cars;
+            card.Racing = racing;
+            card.Day = day;
+            card.Game = setup.Game;
+            card.Tower = tower;
             debug = new GameObject("Debug menu").AddComponent<DebugMenu>();
             debug.Keys = keys;
             debug.Cameras = views;
