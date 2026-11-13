@@ -6,9 +6,9 @@ using UnityEngine;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// The full screen live timing page, on T while the AI drives your car. The race runs at 16x behind
-    /// it. Left: every car in race order, filtered by class, your row in white, a chequered flag by each car that has finished. Right: your car's
-    /// onboard and the track map, then your car's driver, fuel, tyres, condition and the driver's fatigue,
+    /// The full screen live timing page, on T while the AI drives your car. The race runs at whatever speed F picks,
+    /// and the scene behind the page is not drawn. Left: every car in race order, filtered by class, your row in white, a chequered flag by each car that has finished. Right: your car's
+    /// onboard and the track map, or above 2x the map alone across both, as a second view of the scene costs too much there, then your car's driver, fuel, tyres, condition and the driver's fatigue,
     /// fuel and tyres with the laps they last on the engine map in use (the one that runs out first in amber), the engine map, and
     /// the next stop: laps of fuel, tyres, repairs, next driver and Pit now (<see cref="PitOrders"/>), the same plan
     /// as the pit panel's (<see cref="PitPanel"/>). Left alone the car still pits and the crew choose (<see cref="StopPlanner"/>).
@@ -45,7 +45,9 @@ namespace TarmacGauntlet.Raceday
         private static readonly RepairMode[] RepairChoices = { RepairMode.Crew, RepairMode.All, RepairMode.None };
         /// <summary>Where the timing columns start along a row, px on the 1920 layout.</summary>
         private const float ClassX = 560f, LapX = 676f, PitX = 740f;
-        private const int PipWidth = 880, PipHeight = 496, MapWidth = 1040, MapHeight = 496;
+        private const int PipWidth = 880, PipHeight = 496, MapWidth = 1040, WideMapWidth = 1960, MapHeight = 496;
+        /// <summary>Above this speed the onboard is off and the track map takes its place.</summary>
+        private const float FeedTopSpeed = 2f;
 
         private static readonly Color Ground = new Color32(0x0b, 0x0b, 0x0d, 0xff);
         private static readonly Color Panel = new Color32(0x1a, 0x1a, 0x1c, 0xe6);
@@ -72,9 +74,15 @@ namespace TarmacGauntlet.Raceday
         private Font bold, semiBold;
         private GUIStyle big, text, small, right;
         private Texture2D slash, disc, arrow, flag;
-        private TrackMap map;
+        private TrackMap map, wideMap;
         private RenderTexture pip;
         private Camera onboard;
+        /// <summary>The race camera while the page covers it, drawing nothing, and what it drew before.</summary>
+        private Camera behind;
+        private int behindMask;
+        private CameraClearFlags behindClear;
+
+        private static bool Feed => Time.timeScale <= FeedTopSpeed;
 
         private CarController Car => Driver.Car;
         private Consumables Supplies => Car.Supplies;
@@ -94,6 +102,7 @@ namespace TarmacGauntlet.Raceday
             arrow = RaceTower.Shape(0.72f, 1f, (x, y) => x <= 0.72f * (1f - 2f * Mathf.Abs(y - 0.5f)));
             disc = RaceTower.Shape(1f, 1f, (x, y) => (x - 0.5f) * (x - 0.5f) + (y - 0.5f) * (y - 0.5f) < 0.25f);
             map = new TrackMap(Circuit, MapWidth, MapHeight);
+            wideMap = new TrackMap(Circuit, WideMapWidth, MapHeight);
             pip = new RenderTexture(PipWidth, PipHeight, 24) { hideFlags = HideFlags.DontSave };
             onboard = new GameObject("Onboard camera").AddComponent<Camera>();
             onboard.transform.SetParent(transform, false);
@@ -136,12 +145,34 @@ namespace TarmacGauntlet.Raceday
             Open = on;
             if (Tower != null) Tower.Hidden = on;
             if (Hud != null) Hud.enabled = !on;
-            if (onboard != null) onboard.enabled = on;
             centre = on;
+            // The page covers the screen: the race camera draws nothing behind it.
+            if (on)
+            {
+                behind = Camera.main;
+                if (behind != null)
+                {
+                    behindMask = behind.cullingMask;
+                    behindClear = behind.clearFlags;
+                    behind.cullingMask = 0;
+                    behind.clearFlags = CameraClearFlags.SolidColor;
+                }
+            }
+            else Uncover();
+        }
+
+        /// <summary>The race camera draws the scene again.</summary>
+        private void Uncover()
+        {
+            if (behind == null) return;
+            behind.cullingMask = behindMask;
+            behind.clearFlags = behindClear;
+            behind = null;
         }
 
         private void LateUpdate()
         {
+            if (onboard != null) onboard.enabled = Open && Car != null && Feed;
             if (!Open || Car == null) return;
             Transform t = Car.transform;
             onboard.transform.SetPositionAndRotation(t.TransformPoint(new Vector3(0f, 1.2f, 0.3f)), t.rotation);
@@ -191,7 +222,8 @@ namespace TarmacGauntlet.Raceday
             Timing(R(40f, 104f, 820f, 936f), paint);
 
             Rect pipRect = R(900f, 104f, 440f, 248f);
-            if (paint)
+            bool feed = Feed;
+            if (paint && feed)
             {
                 GUI.DrawTexture(pipRect, pip, ScaleMode.ScaleAndCrop, false, 0f, Color.white, 0f, 9f * k);
                 Standings.Car me = entries[Player];
@@ -201,8 +233,11 @@ namespace TarmacGauntlet.Raceday
                 GUI.DrawTexture(new Rect(tag.x + 8f * k, tag.y + 5f * k, 10f * k, 16f * k), slash, ScaleMode.StretchToFill, true, 0f, White, 0f, 0f);
                 Label(new Rect(tag.x + 22f * k, tag.y, tag.width - 22f * k, tag.height), me.Position.ToString(), text, Color.white, TextAnchor.MiddleLeft);
             }
-            Rect mapRect = R(1360f, 104f, 520f, 248f);
-            if (paint) Map(mapRect);
+            if (paint)
+            {
+                if (feed) Map(R(1360f, 104f, 520f, 248f), map);
+                else Map(R(900f, 104f, 980f, 248f), wideMap);
+            }
 
             Status(R(900f, 372f, 480f, 668f), paint);
             Stop(R(1400f, 372f, 480f, 668f), paint);
@@ -297,7 +332,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>A column of a row, from <paramref name="x"/> px along the 1920 layout's row.</summary>
         private Rect Col(Rect r, float x, float w) => new Rect(r.x + x * k, r.y, w * k, r.height);
 
-        private void Map(Rect r)
+        private void Map(Rect r, TrackMap map)
         {
             Fill(r, Panel, 9f);
             Rect inner = map.Fit(r);
@@ -305,16 +340,16 @@ namespace TarmacGauntlet.Raceday
             for (int i = 0; i < Cars.Length; i++)
             {
                 if (Cars[i] == null || i == Player) continue;
-                Dot(inner, TrackMap.OnTrack(Circuit, Cars[i]), 9f, RaceTower.ClassColour(Classes[i]));
+                Dot(map, inner, TrackMap.OnTrack(Circuit, Cars[i]), 9f, RaceTower.ClassColour(Classes[i]));
             }
             if (Cars[Player] != null)
             {
-                Dot(inner, TrackMap.OnTrack(Circuit, Cars[Player]), 18f, Ground);
-                Dot(inner, TrackMap.OnTrack(Circuit, Cars[Player]), 13f, Color.white);
+                Dot(map, inner, TrackMap.OnTrack(Circuit, Cars[Player]), 18f, Ground);
+                Dot(map, inner, TrackMap.OnTrack(Circuit, Cars[Player]), 13f, Color.white);
             }
         }
 
-        private void Dot(Rect inner, Vector3 p, float size, Color colour)
+        private void Dot(TrackMap map, Rect inner, Vector3 p, float size, Color colour)
         {
             Vector2 at = map.At(inner, p);
             float s = size * k;
@@ -556,7 +591,9 @@ namespace TarmacGauntlet.Raceday
             if (disc != null) Destroy(disc);
             if (arrow != null) Destroy(arrow);
             if (map != null) Destroy(map.Texture);
+            if (wideMap != null) Destroy(wideMap.Texture);
             if (pip != null) pip.Release();
+            Uncover();
         }
     }
 }

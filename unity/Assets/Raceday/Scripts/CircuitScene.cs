@@ -20,7 +20,8 @@ namespace TarmacGauntlet.Raceday
     /// the race through normal speed, 4x and 16x while the AI drives your car, and ends the pit lane
     /// start's fast forward. Cars away from the camera glide without physics (<see cref="PhysicsRange"/>).
     /// The field is shown on the timing tower (<see cref="RaceTower"/>). T opens live timing while the AI drives
-    /// your car, with the controls for its next stop (<see cref="LiveTiming"/>). While a teammate drives, N
+    /// your car, with the controls for its next stop (<see cref="LiveTiming"/>). F steps the speed there too, and closing it
+    /// puts the race back to normal speed. While a teammate drives, N
     /// (or the button beside live timing's way back) fast forwards at 32x to your next stint and hands you the
     /// wheel once you are back on track. A stop that puts a teammate in hands the car back to the AI. Past the
     /// chequered flag the AI takes your car round its cooldown lap and into its box, and Delete still takes it back.
@@ -46,6 +47,8 @@ namespace TarmacGauntlet.Raceday
         private AiDriver ai;
         private static readonly float[] Speeds = { 1f, 4f, 16f };
         private int speed;
+        /// <summary>Live timing was open last frame: closing it drops the race back to normal speed.</summary>
+        private bool timingWasOpen;
         /// <summary>Speed of the pit lane start's fast forward.</summary>
         private const float SkipSpeed = 32f;
         private PitLaneStart pitLaneStart;
@@ -659,6 +662,10 @@ namespace TarmacGauntlet.Raceday
         {
             if (!built || keys == null || ai == null) return;
             if (director.SinceTimeUp.HasValue) outro.Play();
+            // Leaving live timing puts the race back to normal speed.
+            bool timingOpen = timing != null && timing.Open;
+            if (timingWasOpen && !timingOpen) speed = 0;
+            timingWasOpen = timingOpen;
             if (RaceWeekend.Paused) return;   // the pause menu holds the clock
             if (director.Finished) return;   // the race summary is up, at normal speed
             if (keys.Pressed(KeyCode.Delete))
@@ -685,8 +692,7 @@ namespace TarmacGauntlet.Raceday
             }
             if (skipping && pitLaneStart.Time >= pitLaneStart.FastForwardTo) skipping = false;
             if (debug != null && debug.Speed.HasValue) return;   // the debug menu holds the speed
-            // Live timing runs the race at the top speed behind it.
-            float scale = skipping || stintSkip ? SkipSpeed : timing != null && timing.Open ? Speeds[Speeds.Length - 1] : Speeds[speed];
+            float scale = skipping || stintSkip ? SkipSpeed : Speeds[speed];
             if (Time.timeScale != scale)
             {
                 Time.timeScale = scale;
