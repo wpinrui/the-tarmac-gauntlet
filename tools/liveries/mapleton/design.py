@@ -47,8 +47,7 @@ TAIL, NOSE = -1.84, 2.12
 SHORE_Y = 0.33                       # sides: lake below, pines rise from here
 NUMBER = (0.15, 0.56, 0.40, 0.24)    # door: z, y, box w, h
 NAME = (0.15, 0.80, 0.062)           # door: z, y, cap height
-BONNET_ROUNDEL = (0, 0, 1.30)        # bonnet: up towards the windscreen, the tagline under it
-TAGLINE = (0, 0, 1.75, 0.075)        # bonnet: x, y, z, cap height
+BONNET_ROUNDEL = (0, 0, 1.30)        # bonnet: up towards the windscreen, the tagline curved under it
 ROUNDEL = (-0.68, 0.72, 0.27)        # rear quarter, just behind the door gap and clear of the shoulder: z, y, height
 
 LEAF = [(50, 5), (56, 20), (64, 16), (61, 40), (75, 26), (78, 34), (92, 31), (87, 46), (95, 50), (73, 66), (76, 76),
@@ -75,16 +74,27 @@ def nose_dir(view):
 _ids = iter(range(10 ** 6))
 
 
-def roundel(lv, view, u, v, h, rotate=0):
-    """Logo 1: a maple leaf in a red ring, the name round the top. 192 units across."""
+def roundel(lv, view, u, v, h, rotate=0, ink=MAPLE):
+    """Logo 1: a maple leaf in a ring, the name round the top, 192 units across. ink: ring and leaf, maple red by default."""
     k = next(_ids)
     s = h / 192
     lv.raw(view, f'<g transform="translate({f(u)} {f(v)}) rotate({rotate}) scale({s:.6f})">'
                  f'<defs><path id="ring{k}" d="M-82,0 A82,82 0 0 1 82,0"/></defs>'
-                 f'<circle r="96" fill="{MAPLE}"/><circle r="62" fill="{IVORY}"/>'
-                 f'<path transform="translate(0 2) scale(1.02)" d="{LEAF_D}" fill="{MAPLE}"/>'
+                 f'<circle r="96" fill="{ink}"/><circle r="62" fill="{IVORY}"/>'
+                 f'<path transform="translate(0 2) scale(1.02)" d="{LEAF_D}" fill="{ink}"/>'
                  f'<text font-family="Fraunces" font-size="15" letter-spacing="2.2" fill="{IVORY}">'
                  f'<textPath href="#ring{k}" startOffset="50%" text-anchor="middle">MAPLETON AUTOSPORT</textPath></text></g>')
+
+
+def tagline(lv, view, u, v, h, words, rotate=0):
+    """A line in the hand, curved under a roundel h metres across centred on (u, v), its letters
+    standing towards the roundel's centre."""
+    k = next(_ids)
+    s = h / 192
+    lv.raw(view, f'<g transform="translate({f(u)} {f(v)}) rotate({rotate}) scale({s:.6f})">'
+                 f'<defs><path id="tag{k}" d="M-124,0 A124,124 0 0 0 124,0"/></defs>'
+                 f'<text font-family="Caveat" font-size="23" fill="{IVORY}">'
+                 f'<textPath href="#tag{k}" startOffset="50%" text-anchor="middle">{words}</textPath></text></g>')
 
 
 def town_sign(lv, view, u, v, h, post=0.0):
@@ -209,8 +219,8 @@ def mapleton_livery():
     lv.side_number(NUMBER[0], NUMBER[1], NUMBER[2], NUMBER[3], IVORY)
     # Roof: the lake map. Bonnet: the roundel, the tagline under it, read from the nose.
     lv.raw("top", lake_contours(-0.57, 0, 0.6, 0.46, 9, IVORY, 5))
-    roundel(lv, "top", *lv.uv("top", BONNET_ROUNDEL), 0.63, rotate=-90)
-    lv.text("top", "From Mapleton, with love", TAGLINE[:3], TAGLINE[3], IVORY, rotate=-90, font="Caveat")
+    roundel(lv, "top", *lv.uv("top", BONNET_ROUNDEL), 0.63, rotate=-90, ink=PINE)
+    tagline(lv, "top", *lv.uv("top", BONNET_ROUNDEL), 0.63, "From Mapleton, with love", rotate=-90)
     # Front and rear: the shoreline carried round the bumpers.
     for view, base, h in (("front", 0.36, 0.13), ("rear", 0.36, 0.16)):
         vw = meta["views"][view]
