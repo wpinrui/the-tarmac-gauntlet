@@ -310,8 +310,10 @@
     mats["Pit building glass"].emissive = lin(WINDOW_GLOW, 1.4 * n);
     mats["Crowd"].emissive = lin(floodTint, L.StandGlow * n);
     mats["Stand seats"].emissive = new THREE.Color().copy(lin(floodTint, L.StandGlow * n)).multiply(lin(COLOURS["Stand seats"]));
-    floodPools.multiply.uniforms.uColor.value = linMul(floodTint, L.PoolBrightening * n);
-    floodPools.lift.uniforms.uColor.value = linMul(floodTint, L.PoolLift * n);
+    if (floodPools) {
+      floodPools.multiply.uniforms.uColor.value = linMul(floodTint, L.PoolBrightening * n);
+      floodPools.lift.uniforms.uColor.value = linMul(floodTint, L.PoolLift * n);
+    }
     for (const b of beamMats) {
       b.multiply.uniforms.uColor.value = linMul(headTint, 0);
       b.lift.uniforms.uColor.value = linMul(headTint, L.HeadlampGround * lin(COLOURS["Road"]).r * n);

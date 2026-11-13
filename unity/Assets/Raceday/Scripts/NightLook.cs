@@ -14,10 +14,23 @@ namespace TarmacGauntlet.Raceday
         public static readonly Color Headlamps = new Color(0.9f, 0.95f, 1f);
         public static readonly Color Red = new Color(1f, 0.06f, 0.03f);
 
-        /// <summary>How much a floodlight's pool brightens the ground at its middle: 1 doubles it.</summary>
-        public const float PoolBrightening = 7f;
-        /// <summary>Light a pool adds to the blackest ground at its middle.</summary>
-        public const float PoolLift = 0.035f;
+        /// <summary>
+        /// The floodlights' light on flat ground where their map (<see cref="FloodField"/>) holds 1, per unit of the
+        /// ground's colour: the asphalt reads clearly lit and the white lines stay short of white.
+        /// </summary>
+        public const float FloodGround = 1.5f;
+        /// <summary>
+        /// How far the floodlights light things for the sun's height, degrees: none while the sun is up, faint at an
+        /// overcast dusk with the lights just on, all of it once the sky is dark. The lenses glow whenever they are on.
+        /// </summary>
+        public static float FloodDark(float sunElevation) => SkyClock.Smooth(3f, 13f, -sunElevation);
+        /// <summary>
+        /// The most linear light the circuit's lamps give back from any surface, floodlights and headlamps together
+        /// (NightLit.hlsl): with the night's exposure a white line under them comes out a little short of white.
+        /// </summary>
+        public const float NightMost = 0.5f;
+        /// <summary>The most linear light the floodlights' beams add in the mist, however near a lens and however many overlap.</summary>
+        public const float BeamMost = 0.06f;
         /// <summary>
         /// The light a car's headlamps throw on the ground at their brightest, 9 to 15 m ahead, per unit of the ground's
         /// colour (<see cref="HeadlampGround"/>): with no circuit lights the road reads clearly lit and the white lines

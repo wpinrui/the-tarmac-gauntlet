@@ -57,7 +57,7 @@ namespace TarmacGauntlet.Rendering
             CloudLitId = Shader.PropertyToID("_TgCloudLit"), CloudShadeId = Shader.PropertyToID("_TgCloudShade"),
             HazeId = Shader.PropertyToID("_TgHaze"), MistId = Shader.PropertyToID("_TgMist"),
             BeamPosId = Shader.PropertyToID("_TgBeamPos"), BeamAimId = Shader.PropertyToID("_TgBeamAim"),
-            BeamsId = Shader.PropertyToID("_TgBeams"), SkyLightId = Shader.PropertyToID("_TgSkyLight"),
+            BeamsId = Shader.PropertyToID("_TgBeams"), BeamMostId = Shader.PropertyToID("_TgBeamMost"), SkyLightId = Shader.PropertyToID("_TgSkyLight"),
             GroundLightId = Shader.PropertyToID("_TgGroundLight");
 
         /// <summary>The sky now. Call it every frame the race sky is up.</summary>
@@ -90,9 +90,10 @@ namespace TarmacGauntlet.Rendering
         /// <summary>
         /// The floodlight beams to draw in the fog, up to <see cref="MostBeams"/>: each lens's position and the beam's reach,
         /// m, in <paramref name="positions"/>, its aim and the cosine of half its cone in <paramref name="aims"/>, and their
-        /// light, colour times strength in linear light, 0 for none.
+        /// light, colour times strength in linear light, 0 for none. However many beams overlap and however near a lens,
+        /// the mist they light never adds more than <paramref name="most"/> of linear light.
         /// </summary>
-        public static void Beams(Vector4[] positions, Vector4[] aims, int count, Color light)
+        public static void Beams(Vector4[] positions, Vector4[] aims, int count, Color light, float most)
         {
             count = positions == null || aims == null ? 0 : Mathf.Min(count, MostBeams);
             for (int i = 0; i < MostBeams; i++)
@@ -103,6 +104,7 @@ namespace TarmacGauntlet.Rendering
             Shader.SetGlobalVectorArray(BeamPosId, beamPos);
             Shader.SetGlobalVectorArray(BeamAimId, beamAim);
             Shader.SetGlobalVector(BeamsId, new Vector4(count, light.r, light.g, light.b));
+            Shader.SetGlobalFloat(BeamMostId, most);
         }
     }
 }
