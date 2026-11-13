@@ -1,7 +1,8 @@
 // Rain streaks and wheel spray: unlit, soft edged particles drawn in the light around them.
 // _Shape 0 draws a streak down a stretched quad: a thread _Thread of the quad's width, or a pixel wide and as much fainter
-// where that is narrower, fading to its ends. 1 draws a soft round puff, 2 an evenly soft one with no bright core. _Glow adds that share of the light rather than
-// laying it over what is behind, so a fine spray of water brightens the view as it scatters the light. No texture is read.
+// where that is narrower, fading to its ends. 1 draws a soft round puff, 2 an evenly soft one with no bright core, which
+// also fades where it meets the road or a car while the scene's depth is drawn (_SpraySoft, set by WeatherView), so the
+// spray's mist never shows a hard edge along the ground. No texture is read.
 Shader "Hidden/TarmacGauntlet/Drops"
 {
     Properties
@@ -9,7 +10,6 @@ Shader "Hidden/TarmacGauntlet/Drops"
         _Tint ("Tint", Color) = (1, 1, 1, 1)
         _Shape ("Shape", Float) = 0
         _Thread ("Streak width, share of the quad's", Float) = 1
-        _Glow ("Share added", Float) = 0
     }
     SubShader
     {
@@ -25,13 +25,17 @@ Shader "Hidden/TarmacGauntlet/Drops"
             #pragma fragment frag
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Fog.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _Tint;
                 float _Shape;
                 float _Thread;
-                float _Glow;
             CBUFFER_END
+            // 1 while the scene's depth is drawn for the spray to fade into.
+            float _SpraySoft;
+            // How far in front of the road or a car the mist has faded in, m.
+            #define SOFT_DEPTH 1.2
 
             struct Attributes
             {
@@ -46,12 +50,15 @@ Shader "Hidden/TarmacGauntlet/Drops"
                 float4 color : COLOR;
                 float2 uv : TEXCOORD0;
                 float fog : TEXCOORD1;
+                float eye : TEXCOORD2;
             };
 
             Varyings vert(Attributes v)
             {
                 Varyings o;
-                o.positionCS = TransformObjectToHClip(v.positionOS.xyz);
+                float3 world = TransformObjectToWorld(v.positionOS.xyz);
+                o.positionCS = TransformWorldToHClip(world);
+                o.eye = -TransformWorldToView(world).z;
                 o.color = v.color * _Tint;
                 o.uv = v.uv;
                 o.fog = ComputeFogFactor(o.positionCS.z);
@@ -73,8 +80,15 @@ Shader "Hidden/TarmacGauntlet/Drops"
                 even *= even;
                 half4 col = i.color;
                 col.a *= _Shape < 0.5 ? streak : _Shape < 1.5 ? puff : even;
+                if (_Shape > 1.5 && _SpraySoft > 0.5)
+                {
+                    float scene = LinearEyeDepth(SampleSceneDepth(GetNormalizedScreenSpaceUV(i.positionCS)), _ZBufferParams);
+                    col.a *= smoothstep(0.0, 1.0, saturate((scene - i.eye) / SOFT_DEPTH));
+                }
+                // Mist right at the lens thins out instead of filling the screen.
+                if (_Shape > 1.5) col.a *= saturate((i.eye - 0.4) / 1.6);
                 col.rgb = MixFog(col.rgb, i.fog);
-                return half4(col.rgb * col.a, col.a * (1.0 - _Glow));
+                return half4(col.rgb * col.a, col.a);
             }
             ENDHLSL
         }
