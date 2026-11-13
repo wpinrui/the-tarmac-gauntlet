@@ -11,10 +11,10 @@ namespace TarmacGauntlet.Raceday
     /// with a strip bottom left: its place, driver, team, model and class. Pole and each class pole carry a tab
     /// saying so, and your car's strip is light, as your row is on the timing tower. Then the whole grid shows on
     /// the board, staggered two by two as the cars line up, a page at a time, over a crane shot across the field.
-    /// The stage has the camera and hides the timing tower and the HUD while it runs, and gives them back when it ends or is skipped.
+    /// The stage holds the race's cameras (<see cref="RaceCameras.Held"/>), has the camera itself, and hides the timing tower and the HUD while it runs, and gives them back when it ends or is skipped.
     /// Laid out on a 1920 by 1080 screen, like <see cref="BroadcastGraphics"/>.
     /// </summary>
-    [DefaultExecutionOrder(100)]   // after RaceCameras, so this stage's shot is the one drawn
+    [DefaultExecutionOrder(100)]   // after RaceCameras
     public sealed class GridPresentation : SkippableStage
     {
         public RaceCar[] Cars;
@@ -30,6 +30,8 @@ namespace TarmacGauntlet.Raceday
         public RaceTower Tower;
         public DriveHud Hud;
         public Camera Camera;
+        /// <summary>Held while the stage runs, so the race's own cameras and the broadcast director leave the shot alone.</summary>
+        public RaceCameras Cameras;
 
         public override string Name => "grid";
         public override bool Done => done;
@@ -75,6 +77,7 @@ namespace TarmacGauntlet.Raceday
             clock = 0f;
             done = beats.Count == 0 || Cars == null;
             if (Tower != null) towerWas = Tower.Hidden;
+            if (!done && Cameras != null) Cameras.Held = true;
             if (!done) Place();
         }
 
@@ -85,6 +88,7 @@ namespace TarmacGauntlet.Raceday
             if (done) return;
             done = true;
             if (Tower != null) Tower.Hidden = towerWas;
+            if (Cameras != null) Cameras.Held = false;
         }
 
         private bool Running => beats != null && !done;
@@ -434,7 +438,8 @@ namespace TarmacGauntlet.Raceday
 
         private void OnDestroy()
         {
-            if (Tower != null && Running) Tower.Hidden = towerWas;
+            if (Running && Tower != null) Tower.Hidden = towerWas;
+            if (Running && Cameras != null) Cameras.Held = false;
             if (slash != null) Destroy(slash);
             if (lead != null) Destroy(lead);
         }
