@@ -61,7 +61,8 @@ namespace TarmacGauntlet.Rendering
                 ViewProjId = Shader.PropertyToID("_SsrViewProj"), InvViewProjId = Shader.PropertyToID("_SsrInvViewProj"),
                 CameraId = Shader.PropertyToID("_SsrCamera"), ForwardId = Shader.PropertyToID("_SsrForward"),
                 SizeId = Shader.PropertyToID("_SsrSize"), NearId = Shader.PropertyToID("_SsrNear"), ReachId = Shader.PropertyToID("_SsrReach"),
-                StepsId = Shader.PropertyToID("_SsrSteps"), ThicknessId = Shader.PropertyToID("_SsrThickness");
+                StepsId = Shader.PropertyToID("_SsrSteps"), ThicknessId = Shader.PropertyToID("_SsrThickness"),
+                FrameId = Shader.PropertyToID("_SsrFrame");
 
             public Material Material;
 
@@ -124,6 +125,8 @@ namespace TarmacGauntlet.Rendering
                 Camera camera = cameraData.camera;
                 Matrix4x4 viewProj = GL.GetGPUProjectionMatrix(cameraData.GetProjectionMatrix(), false) * cameraData.GetViewMatrix();
                 int steps = StepsAt[Mathf.Clamp(QualityLevels.Level, 0, StepsAt.Length - 1)];
+                // The trace's jitter turns each frame so STP averages it out; without compute shaders there is no STP, so it stays still.
+                int frame = SystemInfo.supportsComputeShaders ? Time.frameCount & 63 : 0;
 
                 Draw(renderGraph, "Screen reflections copy", CopyPass, scene, null, (SourceId, colour));
                 Draw(renderGraph, "Screen reflections trace", TracePass, trace, p =>
@@ -137,6 +140,7 @@ namespace TarmacGauntlet.Rendering
                     p.SetFloat(ReachId, Reach);
                     p.SetFloat(StepsId, steps);
                     p.SetFloat(ThicknessId, Thickness);
+                    p.SetFloat(FrameId, frame);
                 }, (SceneId, scene), (DepthId, depthTexture), (SurfaceId, surface));
                 Draw(renderGraph, "Screen reflections composite", CompositePass, colour,
                     p => p.SetVector(SizeId, new Vector4(w, h, 1f / w, 1f / h)),

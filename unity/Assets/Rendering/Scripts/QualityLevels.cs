@@ -76,7 +76,8 @@ namespace TarmacGauntlet.Rendering
         /// <summary>1 while the screen-space shadows are on, for the night lamps that read them (LampFill.hlsl).</summary>
         private static readonly int ScreenShadowsId = Shader.PropertyToID("_TgScreenShadows");
         private static readonly int SoftId = Shader.PropertyToID("_TarmacShadowSoft"),
-            ContactId = Shader.PropertyToID("_TarmacShadowContact"), BlendId = Shader.PropertyToID("_TarmacShadowBlend");
+            ContactId = Shader.PropertyToID("_TarmacShadowContact"), BlendId = Shader.PropertyToID("_TarmacShadowBlend"),
+            FrameId = Shader.PropertyToID("_TarmacShadowFrame");
 
         private static readonly UniversalRenderPipelineAsset[] assets = new UniversalRenderPipelineAsset[4];
         private static int level = -1;
@@ -178,6 +179,9 @@ namespace TarmacGauntlet.Rendering
         private static void Configure(ScriptableRenderContext context, Camera camera)
         {
             if (camera.cameraType != CameraType.Game || level < 0) return;
+            // The screen shadows' noise turns each frame, and STP averages it out. STP needs compute shaders; without them
+            // nothing averages it, so it stays still rather than crawl.
+            Shader.SetGlobalFloat(FrameId, SystemInfo.supportsComputeShaders ? Time.frameCount & 63 : 0);
             UniversalAdditionalCameraData data = camera.GetUniversalAdditionalCameraData();
             if (!data.renderPostProcessing) data.renderPostProcessing = true;
             if (data.antialiasing != AntialiasingMode.SubpixelMorphologicalAntiAliasing) data.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;

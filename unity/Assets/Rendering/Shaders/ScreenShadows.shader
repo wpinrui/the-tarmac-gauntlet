@@ -6,6 +6,8 @@
 //  - cascades blended across a band at each one's edge, so no seam shows where the shadow map's detail changes;
 //  - contact shadows: a short march towards the sun through the depth buffer, for detail finer than the shadow map
 //    (wheel arches, under the cars, kerbs, armco).
+// Both test each pixel against its own surface's plane, rebuilt from the depth buffer, so a flat road or verge never
+// shadows itself; and their noise turns each frame, so STP averages it away instead of leaving a fixed dot pattern.
 // The quality level sets how much of each (QualityLevels.ShadowQuality).
 Shader "Hidden/TarmacGauntlet/ScreenShadows"
 {
@@ -27,6 +29,8 @@ Shader "Hidden/TarmacGauntlet/ScreenShadows"
         float4 _TarmacShadowContact;
         // x: the share of each cascade's radius, at its edge, blended into the next one.
         float4 _TarmacShadowBlend;
+        // The frame, 0 to 63, that turns the noise while STP runs; 0 where it cannot, so the pattern stays still.
+        float _TarmacShadowFrame;
 
         static const float2 Disc[16] =
         {
@@ -40,7 +44,45 @@ Shader "Hidden/TarmacGauntlet/ScreenShadows"
 
         float Noise(float2 pixel)
         {
+            pixel += 5.588238 * _TarmacShadowFrame;
             return frac(52.9829189 * frac(dot(pixel, float2(0.06711056, 0.00583715))));
+        }
+
+        // The surface a pixel shows: its world position, its normal, and the step in eye depth to its nearer neighbours.
+        struct Surface
+        {
+            float3 position;
+            float3 normal;
+            float slope;
+        };
+
+        float3 WorldAt(float2 uv, float raw)
+        {
+        #if !UNITY_REVERSED_Z
+            raw = raw * 2.0 - 1.0;
+        #endif
+            return ComputeWorldSpacePosition(uv, raw, unity_MatrixInvVP);
+        }
+
+        // uvX and uvY: the step in uv to the next pixel across and down, whichever way up the target is.
+        Surface SurfaceAt(float2 pixel, float2 uv, float2 uvX, float2 uvY, float raw)
+        {
+            Surface o;
+            o.position = WorldAt(uv, raw);
+            float eye = LinearEyeDepth(raw, _ZBufferParams);
+            float rawR = LoadSceneDepth(pixel + float2(1, 0)), rawL = LoadSceneDepth(pixel - float2(1, 0));
+            float rawU = LoadSceneDepth(pixel + float2(0, 1)), rawD = LoadSceneDepth(pixel - float2(0, 1));
+            float r = abs(LinearEyeDepth(rawR, _ZBufferParams) - eye), l = abs(LinearEyeDepth(rawL, _ZBufferParams) - eye);
+            float u = abs(LinearEyeDepth(rawU, _ZBufferParams) - eye), d = abs(LinearEyeDepth(rawD, _ZBufferParams) - eye);
+            // Each axis takes the nearer neighbour, so an edge to something else never bends the surface.
+            float3 across = r < l ? WorldAt(uv + uvX, rawR) - o.position : o.position - WorldAt(uv - uvX, rawL);
+            float3 down = u < d ? WorldAt(uv + uvY, rawU) - o.position : o.position - WorldAt(uv - uvY, rawD);
+            float3 toCamera = _WorldSpaceCameraPos - o.position;
+            float3 n = cross(across, down);
+            n = dot(n, n) > 1e-12 ? normalize(n) : normalize(toCamera);
+            o.normal = dot(n, toCamera) < 0.0 ? -n : n;
+            o.slope = max(min(r, l), min(u, d));
+            return o;
         }
 
         float Radius2(int c)
@@ -65,11 +107,26 @@ Shader "Hidden/TarmacGauntlet/ScreenShadows"
         }
 
         // The sun's shadow on a point from cascade c, 1 lit to 0 shadowed, with a penumbra as wide as the gap to its caster.
-        float SoftShadow(int c, float3 positionWS, float2x2 spin)
+        float SoftShadow(int c, Surface surface, float2x2 spin)
         {
             float4x4 m = _MainLightWorldToShadow[c];
-            float3 coord = mul(m, float4(positionWS, 1.0)).xyz;
+            float3 coord = mul(m, float4(surface.position, 1.0)).xyz;
             if (coord.z <= 0.0 || coord.z >= 1.0) return 1.0;
+        #if UNITY_REVERSED_Z
+            const float towardSun = 1.0;
+        #else
+            const float towardSun = -1.0;
+        #endif
+            // The receiver's own plane in the shadow map: how its depth changes across the map, so each sample is
+            // compared with the surface where that sample lands rather than the flat depth of the pixel's centre.
+            // Steep to the sun is held at a quarter, where the plane alone would push the samples too far.
+            float3 n = surface.normal;
+            float det = dot(m[0].xyz, cross(m[1].xyz, n));
+            float least = 0.25 * length(m[0].xyz) * length(m[1].xyz);
+            det = det < 0.0 ? min(det, -least) : max(det, least);
+            float2 plane = float2(dot(m[2].xyz, cross(m[1].xyz, n)), dot(m[2].xyz, cross(n, m[0].xyz))) / det;
+            // One texel's depth change along the plane more, for the texel the map rounds the surface to.
+            float margin = towardSun * (abs(plane.x) + abs(plane.y)) * _MainLightShadowmapSize.x;
 
             // Shadow map units per metre across (x, y) and in depth (z), from the cascade's orthographic matrix.
             float2 uvPerMetre = float2(length(m[0].xyz), length(m[1].xyz));
@@ -88,9 +145,10 @@ Shader "Hidden/TarmacGauntlet/ScreenShadows"
             [loop] for (int i = 0; i < search; i++)
             {
                 float2 o = mul(spin, Disc[i & 15]) * (i < 16 ? 1.0 : 0.5);
-                float2 uv = clamp(coord.xy + o * reach * uvPerMetre, tile - extent, tile + extent);
+                float2 offset = o * reach * uvPerMetre;
+                float2 uv = clamp(coord.xy + offset, tile - extent, tile + extent);
                 float d = SAMPLE_TEXTURE2D_LOD(_MainLightShadowmapTexture, sampler_PointClamp, uv, 0).r;
-                if (Closer(d, coord.z)) { sum += d; count += 1.0; }
+                if (Closer(d, coord.z + dot(plane, offset) + margin)) { sum += d; count += 1.0; }
             }
             if (count == 0.0) return 1.0;
 
@@ -103,18 +161,23 @@ Shader "Hidden/TarmacGauntlet/ScreenShadows"
                 // Past 16 taps the disc turns and shrinks, so 32 fill it twice as densely.
                 float2 o = mul(spin, Disc[j & 15]);
                 if (j >= 16) o = float2(o.y, -o.x) * 0.6;
-                float2 uv = clamp(coord.xy + o * radius * uvPerMetre, tile - extent, tile + extent);
-                lit += SAMPLE_TEXTURE2D_SHADOW(_MainLightShadowmapTexture, sampler_LinearClampCompare, float3(uv, coord.z));
+                float2 offset = o * radius * uvPerMetre;
+                float2 uv = clamp(coord.xy + offset, tile - extent, tile + extent);
+                float z = coord.z + dot(plane, offset) + margin;
+                lit += SAMPLE_TEXTURE2D_SHADOW(_MainLightShadowmapTexture, sampler_LinearClampCompare, float3(uv, z));
             }
             return LerpWhiteTo(lit / taps, GetMainLightShadowParams().x);
         }
 
         // 1 lit to 0 shadowed by something between the point and the sun that the depth buffer shows within reach.
-        float ContactShadow(float3 positionWS, float noise)
+        float ContactShadow(Surface surface, float noise)
         {
-            float distance = length(positionWS - _WorldSpaceCameraPos);
+            float distance = length(surface.position - _WorldSpaceCameraPos);
             float far = _TarmacShadowContact.z;
             if (_TarmacShadowContact.w <= 0.0 || distance > far) return 1.0;
+            // The march starts two pixels' width off the surface, so it cannot begin inside the ground the pixel shows.
+            float pixel = 2.0 * distance * _ScreenSize.w / abs(UNITY_MATRIX_P._m11);
+            float3 start = surface.position + surface.normal * 2.0 * pixel;
             int steps = (int)max(_TarmacShadowContact.y, 1.0);
             // A little longer further off, where a pixel covers more.
             float reach = _TarmacShadowContact.x * (1.0 + distance * 0.02);
@@ -124,13 +187,14 @@ Shader "Hidden/TarmacGauntlet/ScreenShadows"
             [loop] for (int i = 0; i < steps; i++)
             {
                 float t = reach * (i + noise) / steps;
-                float3 p = positionWS + toSun * t;
+                float3 p = start + toSun * t;
                 float3 ndc = ComputeNormalizedDeviceCoordinatesWithZ(p, vp);
                 if (any(ndc.xy < 0.0) || any(ndc.xy > 1.0)) break;
                 float scene = LinearEyeDepth(SampleSceneDepth(ndc.xy), _ZBufferParams);
                 float ray = LinearEyeDepth(ndc.z, _ZBufferParams);
                 float behind = ray - scene;
-                float bias = 0.01 + 0.0015 * ray;
+                // Past a pixel's own depth step too, which the depth buffer cannot tell apart from the surface itself.
+                float bias = max(0.01 + 0.0015 * ray, surface.slope * Sq(ray / max(distance, 1e-3)) * 1.5);
                 // Thin enough to be a real caster, not the far side of something in front.
                 if (behind > bias && behind < 0.25 + 0.01 * ray)
                 {
@@ -139,21 +203,24 @@ Shader "Hidden/TarmacGauntlet/ScreenShadows"
                 }
             }
             float fade = 1.0 - smoothstep(far * 0.6, far, distance);
-            return 1.0 - hit * fade * _TarmacShadowContact.w;
+            // As faint as the sun's own shadow under cloud: 0.85 is its strength under a clear sky (CloudMap.Strength).
+            float strength = _TarmacShadowContact.w * saturate(GetMainLightShadowParams().x / 0.85);
+            return 1.0 - hit * fade * strength;
         }
 
         half4 Fragment(Varyings input) : SV_Target
         {
             UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+            float2 uvX = ddx(input.texcoord.xy), uvY = ddy(input.texcoord.xy);
 
             float deviceDepth = LoadSceneDepth(input.positionCS.xy);
         #if UNITY_REVERSED_Z
             if (deviceDepth <= 0.0) return 1;
         #else
             if (deviceDepth >= 1.0) return 1;
-            deviceDepth = deviceDepth * 2.0 - 1.0;
         #endif
-            float3 positionWS = ComputeWorldSpacePosition(input.texcoord.xy, deviceDepth, unity_MatrixInvVP);
+            Surface surface = SurfaceAt(input.positionCS.xy, input.texcoord.xy, uvX, uvY, deviceDepth);
+            float3 positionWS = surface.position;
 
             float noise = Noise(input.positionCS.xy);
             float s, co;
@@ -166,7 +233,7 @@ Shader "Hidden/TarmacGauntlet/ScreenShadows"
         #else
             int c = 0;
         #endif
-            float shadow = SoftShadow(c, positionWS, spin);
+            float shadow = SoftShadow(c, surface, spin);
 
         #if defined(_MAIN_LIGHT_SHADOWS_CASCADE)
             float band = _TarmacShadowBlend.x;
@@ -176,11 +243,11 @@ Shader "Hidden/TarmacGauntlet/ScreenShadows"
                 float t = saturate((edge - (1.0 - band)) / band);
                 float3 next = positionWS - Centre(c + 1);
                 if (t > 0.0 && dot(next, next) < Radius2(c + 1))
-                    shadow = lerp(shadow, SoftShadow(c + 1, positionWS, spin), t);
+                    shadow = lerp(shadow, SoftShadow(c + 1, surface, spin), t);
             }
         #endif
 
-            return min(shadow, ContactShadow(positionWS, noise));
+            return min(shadow, ContactShadow(surface, noise));
         }
         ENDHLSL
 
