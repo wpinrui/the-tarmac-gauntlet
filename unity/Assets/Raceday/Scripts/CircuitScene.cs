@@ -16,7 +16,7 @@ namespace TarmacGauntlet.Raceday
     /// grid at once, behind the pace car, or from the pit lane, where the cars queue in the fast lane
     /// and leave three seconds apart, moving up to the pit exit line (<see cref="PitLaneStart"/>). The pit lane start fast forwards
     /// until the car ahead of the player's is about to leave. Tab opens the debug menu (<see cref="DebugMenu"/>), whose race set-up (<see cref="DebugSettings"/>) picks the start, the weather, the start hour, the field and your car. You drive your own car from the green when you start the race, and Delete hands it to the AI and
-    /// back. = rides with the car behind the one you watch and - with the car ahead. While you drive, P opens the plan for your next stop (<see cref="PitPanel"/>), and your box is marked once you are in the pit lane (<see cref="BoxMarker"/>). F steps
+    /// back. = rides with the car behind the one you watch and - with the car ahead. P opens the plan for your car's next stop, whoever drives it, and calls it in while a teammate drives (<see cref="PitPanel"/>), and your box is marked once you are in the pit lane (<see cref="BoxMarker"/>). F steps
     /// the race through normal speed, 4x and 16x while the AI drives your car, and ends the pit lane
     /// start's fast forward. Cars away from the camera glide without physics (<see cref="PhysicsRange"/>).
     /// The field is shown on the timing tower (<see cref="RaceTower"/>). T opens live timing while the AI drives
