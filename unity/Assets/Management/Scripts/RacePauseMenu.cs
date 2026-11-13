@@ -14,7 +14,7 @@ namespace TarmacGauntlet.Management
 {
     /// <summary>
     /// The race's pause menu, on Escape until the race is settled: the race stops dead (<see cref="RaceWeekend.Paused"/>),
-    /// its graphics with it, and its sound plays on muffled and low behind the menu (<see cref="Mix.Paused"/>), under the
+    /// its graphics with it, and its engines and tyres cut out and the track's sound plays on muffled and low behind the menu (<see cref="Mix.Paused"/>), under the
     /// same glass menu as the hub's Escape menu. Save writes the race as it stands into the career
     /// (<see cref="GameSession.SaveRace"/>), and continuing the career carries on from there.
     /// Retire takes the player's car out and settles the race from where every car is (<see cref="RaceWeekend.Withdraw"/>),
@@ -146,7 +146,7 @@ namespace TarmacGauntlet.Management
         {
             RaceWeekend.Paused = true;
             Time.timeScale = 0f;
-            Mix.Paused = true;   // the race plays on behind the menu, muffled and low
+            Mix.Paused = true;   // the cars cut out; the track plays on behind the menu, muffled and low
             Camera cam = Camera.main;
             if (cam != null && cam.GetComponent<GlassBackdrop>() == null) cam.gameObject.AddComponent<GlassBackdrop>();
         }

@@ -83,6 +83,7 @@ namespace TarmacGauntlet.Simulation
         public double FuelLeft { get; init; }
         public double Fatigue { get; init; }
         public double Damage { get; init; }
+        public double DamageFront { get; init; } = 0.5;
         public bool Totalled { get; init; }
         public ModeCounter Modes { get; init; } = new ModeCounter();
         public IReadOnlyList<ActiveIssue> ActiveIssues { get; init; } = Array.Empty<ActiveIssue>();

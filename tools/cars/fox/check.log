@@ -1,0 +1,80 @@
+OBJ import of 'NusaFox.obj' took 711.77 ms
+OBJ import of 'NusaFox.obj' took 661.26 ms
+floating: wing_plate_l
+floating: wing_plate_r
+intersecting: body x exhaust
+intersecting: body x firewall
+intersecting: body x rear_base
+intersecting: body x scoop
+intersecting: body x scoop_mouth
+intersecting: body x seat_base_l
+intersecting: body x seat_base_r
+intersecting: body x splitter
+intersecting: body x steering
+intersecting: body x vent_l
+intersecting: body x vent_r
+intersecting: body x wing
+intersecting: dash x door_l_card
+intersecting: dash x door_r_card
+intersecting: dash x steering
+intersecting: door_l x door_l_mirror
+intersecting: door_l_mirror x door_l_trim
+intersecting: door_r x door_r_mirror
+intersecting: door_r_mirror x door_r_trim
+intersecting: exhaust x exhaust_in
+intersecting: firewall x steering
+intersecting: rear_back x rear_base
+intersecting: rear_trim x wing
+intersecting: scoop x scoop_mouth
+intersecting: vent_l x vent_slat_l
+intersecting: vent_l x vent_slat_l_1
+intersecting: vent_l x vent_slat_l_2
+intersecting: vent_r x vent_slat_r
+intersecting: vent_r x vent_slat_r_1
+intersecting: vent_r x vent_slat_r_2
+intersecting: wheel_rim_fl x wheel_spokes_fl
+intersecting: wheel_rim_fr x wheel_spokes_fr
+intersecting: wheel_rim_rl x wheel_spokes_rl
+intersecting: wheel_rim_rr x wheel_spokes_rr
+intersecting: wing x wing_plate_l
+intersecting: wing x wing_plate_r
+door open, floating: opt_name_2_0
+door open, floating: opt_name_2_1
+door open, floating: opt_name_2_4
+door open, floating: opt_name_2_5
+door open, floating: wing_plate_l
+door open, floating: wing_plate_r
+door open, intersecting: body x exhaust
+door open, intersecting: body x firewall
+door open, intersecting: body x rear_base
+door open, intersecting: body x scoop
+door open, intersecting: body x scoop_mouth
+door open, intersecting: body x seat_base_l
+door open, intersecting: body x seat_base_r
+door open, intersecting: body x splitter
+door open, intersecting: body x steering
+door open, intersecting: body x vent_l
+door open, intersecting: body x vent_r
+door open, intersecting: body x wing
+door open, intersecting: dash x steering
+door open, intersecting: door_l x door_l_mirror
+door open, intersecting: door_l_mirror x door_l_trim
+door open, intersecting: door_r x door_r_mirror
+door open, intersecting: door_r_mirror x door_r_trim
+door open, intersecting: exhaust x exhaust_in
+door open, intersecting: firewall x steering
+door open, intersecting: rear_back x rear_base
+door open, intersecting: rear_trim x wing
+door open, intersecting: scoop x scoop_mouth
+door open, intersecting: vent_l x vent_slat_l
+door open, intersecting: vent_l x vent_slat_l_1
+door open, intersecting: vent_l x vent_slat_l_2
+door open, intersecting: vent_r x vent_slat_r
+door open, intersecting: vent_r x vent_slat_r_1
+door open, intersecting: vent_r x vent_slat_r_2
+door open, intersecting: wheel_rim_fl x wheel_spokes_fl
+door open, intersecting: wheel_rim_fr x wheel_spokes_fr
+door open, intersecting: wheel_rim_rl x wheel_spokes_rl
+door open, intersecting: wheel_rim_rr x wheel_spokes_rr
+door open, intersecting: wing x wing_plate_l
+door open, intersecting: wing x wing_plate_r
