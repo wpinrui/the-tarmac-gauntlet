@@ -228,7 +228,7 @@ def taillamps(ref, cutters, out):
     """Each tail lamp is the traced outline wrapping the tail's corner. Our own interior: the tail
     lamp a slim band along the top edge running round onto the side, the brake lamp filling the
     lamp's broad part on the tail."""
-    shp = tail_outline(ref)
+    shp = soft(tail_outline(ref), 0.01)          # opened, so no thin sliver survives at the pointed tip
     b = shp.bounds
     inner = shp.buffer(-0.007)
     band = inner.difference(inner.buffer(-0.016).union(box(b[0] - 1, b[1] - 1, b[2] + 1, (b[1] + b[3]) / 2)))
@@ -417,16 +417,11 @@ def door_path():
 
 
 def bonnet_path(ref):
-    """The bonnet's shut line in plan: from the windscreen's foot on the right, back along the
-    wing, across the nose above the grille and the lamps' tops, and back along the left side to
-    the windscreen. The nose part is traced from ahead, found on the body, and read in plan."""
-    nose = []
-    for u, z in smooth_line(R["bonnet_nose"], 40):
-        loc, _n = blend.cast(ref, front_fr(), u, z)
-        nose.append((loc[0], loc[1]))
-    side = np.array(R["bonnet"], float)
-    left = np.vstack([nose, side])               # nose middle first, out and back to the left windscreen corner
-    return np.vstack([(left * [1, -1])[::-1], left[1:]])
+    """The bonnet's shut line in plan, one smooth curve: from the windscreen's foot on the right,
+    back along the wing, across the nose above the grille, and back along the left side."""
+    left = np.array(R["bonnet"], float)           # nose middle first, out and back to the left windscreen corner
+    path = np.vstack([(left * [1, -1])[::-1], left[1:]])
+    return geom.catmull_open(path, 8)
 
 
 def hatch_paths(ref):
@@ -444,13 +439,19 @@ def hatch_paths(ref):
 
 
 def back_door_path():
-    """The rear door's shut line: down its rear edge from the window's foot, round the front of
-    the rear arch, then its bottom straight forward to the front door's rear edge."""
-    bd = R["back_door"]
+    """The rear door's shut line: one straight run down from the window's foot, one circle round
+    the front of the rear arch about the wheel centre, then its bottom straight forward to the
+    front door's rear edge."""
+    (x0, z0), (x1, z1) = R["back_door"]
+    xc, zc, r = W["rear_x"], W["r"], R["back_arch_r"]
     zb = R["door_bottom"]
+    a0 = np.arctan2(z1 - zc, x1 - xc)
+    a1 = np.arcsin((zb - zc) / r)                  # the circle's front, down to the bottom line
+    arc = [[xc + r * np.cos(a), zc + r * np.sin(a)] for a in np.linspace(a0, a1, 24)]
     x_b = R["rear_door"][2][0]
-    pts = list(bd) + [[bd[-1][0] - 0.15, zb], [x_b - 0.02, zb]]
-    return fillet(pts, R["shut_round"])
+    head = fillet([[x0, z0], arc[0], arc[3]], R["shut_round"])[:-1]
+    tail = fillet([arc[-4], arc[-1], [x_b - 0.02, zb]], R["shut_round"])[1:]
+    return head + arc[3:-4] + tail
 
 
 def grooves(ref):

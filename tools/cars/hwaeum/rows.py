@@ -110,7 +110,8 @@ TUCK = [(-2.200, 0.050), (-1.600, 0.040), (-0.800, 0.050), (0.900, 0.050), (1.60
 # Shoulder along the cabin (the belt) and how far it sits in from the widest point.
 # Over the bonnet the shoulder is the wing's top (CREST); behind the cabin it is the quarter's top.
 SHOULDER = [(-1.170, 0.982), (-1.000, 0.972), (-0.800, 0.958), (-0.680, 0.950), (-0.300, 0.968), (0.250, 0.993),
-            (0.700, 1.022), (1.080, 1.052), (1.400, 1.072), (1.700, 1.078), (1.850, 1.068), (1.950, 1.000),
+            (0.700, 1.022), (1.080, 1.052), (1.400, 1.072), (1.600, 1.080), (1.750, 1.090), (1.850, 1.100),
+            (1.900, 1.080), (1.950, 1.000),
             (2.000, 0.850), (2.076, 0.500)]
 SHOULDER_IN = [(-2.200, 0.060), (-1.600, 0.060), (-1.000, 0.070), (-0.700, 0.080), (1.000, 0.080), (1.700, 0.080),
                (2.076, 0.060)]
@@ -179,10 +180,11 @@ def belt(y):
 
 # The side window opening (glass and its black frame), from the side render: the A-pillar edge a
 # straight line, the roof edge one even curve and the quarter window's rear edge a straight line.
-DLO = {"a_foot": (-0.70, belt(-0.70)), "a_head": (-0.14, 1.395), "roof": [(-0.14, 1.395), (0.30, 1.410),
-       (0.70, 1.410), (1.00, 1.400), (1.30, 1.355)], "c_head": (1.34, 1.340), "c_foot": (1.17, belt(1.17))}
+# Its top stays under the roof's edge, so the black band never climbs onto the roof.
+DLO = {"a_foot": (-0.70, belt(-0.70)), "a_head": (-0.12, 1.362), "roof": [(-0.12, 1.362), (0.30, 1.392),
+       (0.70, 1.396), (1.00, 1.386), (1.30, 1.342)], "c_head": (1.34, 1.328), "c_foot": (1.17, belt(1.17))}
 VENT_Y = -0.45                                     # the black corner ahead of the door glass ends here
-B_PILLAR = ((0.280, belt(0.280)), (0.340, 1.400), 0.12)    # the black division's foot, head and width
+B_PILLAR = ((0.280, belt(0.280)), (0.335, 1.385), 0.12)    # the black division's foot, head and width
 C_POST = ((1.075, belt(1.075)), (1.020, 1.400), 0.05)      # the rear door glass's rear post
 
 # Door shut lines (side render), straight runs and plain arcs. Only the front doors open; the rear
@@ -190,9 +192,10 @@ C_POST = ((1.075, belt(1.075)), (1.020, 1.400), 0.05)      # the rear door glass
 DOOR_BOTTOM = 0.290                               # the doors' bottom edge, one straight line
 FRONT_DOOR = [(-0.790, belt(-0.790) - 0.006), (-0.848, 0.700), (-0.835, DOOR_BOTTOM)]   # front edge
 REAR_DOOR = [(0.280, belt(0.280)), (0.262, 0.620), (0.255, DOOR_BOTTOM)]   # rear edge, from the division's middle
-# The rear door's rear edge: from the window's rear foot down round the front of the rear arch.
-BACK_DOOR = [(1.190, belt(1.190) - 0.004), (1.235, 0.910), (1.200, 0.770), (1.100, 0.590), (1.030, 0.460),
-             (0.970, 0.350), (0.900, 0.305)]
+# The rear door's rear edge: one straight run from the window's foot down to the rear arch, then
+# one circle round the arch about the wheel centre (its radius), down to the doors' bottom line.
+BACK_DOOR = [(1.190, belt(1.190) - 0.004), (1.215, 0.700)]
+BACK_ARCH_R = 0.430
 SHUT_ROUND = 0.05                                 # the doors' bottom corners rounded this much
 EDGE_ROUND = 0.20                                 # their front and rear edges bow this gently
 # Windscreen (top render: Y, half width): its foot and head are even curves, its sides straight.
@@ -201,12 +204,11 @@ SCREEN = {"y_base_mid": -1.17, "y_base_edge": -1.00, "w_base": 0.700, "y_top_mid
 # Hatch glass (top render): head and foot.
 REAR_GLASS = {"y_top_mid": 1.52, "y_top_edge": 1.50, "w_top": 0.550, "y_base_mid": 1.88, "y_base_edge": 1.78,
               "w_base": 0.630}
-# Bonnet shut line. Its front (front render: U, Z) runs across the nose above the grille, rises to
-# the headlamp's top edge and follows it out. From there (top render: Y, half width) it runs back
-# along the wing's inner edge, then bends in to the windscreen's foot, inside its corner.
-BONNET_NOSE = [(0.0, 0.735), (0.30, 0.735), (0.45, 0.728), (0.53, 0.712), (0.60, 0.775), (0.70, 0.812),
-               (0.78, 0.815), (0.82, 0.800)]
-BONNET = [(-1.62, 0.800), (-1.50, 0.787), (-1.30, 0.778), (-1.10, 0.768), (-1.045, 0.760), (-1.025, 0.640)]
+# Bonnet shut line, all traced from above (top render: Y, half width): from the nose's middle above
+# the grille, one even sweep out over the headlamps' inner edges to the wing, back along the wing's
+# inner edge, then bending in to the windscreen's foot, inside its corner.
+BONNET = [(-2.030, 0.0), (-2.025, 0.250), (-2.000, 0.420), (-1.930, 0.580), (-1.800, 0.720), (-1.660, 0.790),
+          (-1.500, 0.787), (-1.300, 0.778), (-1.100, 0.768), (-1.045, 0.760), (-1.025, 0.640)]
 
 # ---------------------------------------------------------------- front (front render, left half)
 HEAD = [(0.470, 0.612), (0.520, 0.690), (0.600, 0.760), (0.700, 0.798), (0.780, 0.800), (0.810, 0.750),
@@ -221,11 +223,11 @@ FOG = [(0.580, 0.425), (0.730, 0.430), (0.750, 0.400), (0.740, 0.300), (0.620, 0
 # ---------------------------------------------------------------- rear (rear render, left half)
 # Each tail lamp wraps round the tail's corner onto the side. Its outline on the tail (rear render:
 # U, Z), from the inner top corner down and out along the bottom to the corner...
-TAIL = [(0.620, 1.050), (0.600, 1.000), (0.570, 0.920), (0.535, 0.790), (0.600, 0.783), (0.700, 0.785),
+TAIL = [(0.620, 1.050), (0.600, 1.000), (0.570, 0.920), (0.540, 0.800), (0.600, 0.792), (0.700, 0.790),
         (0.780, 0.800)]
 # ...then on the side (side render: Y, Z) along the bottom forward to the pointed tip and back
 # along the top to the corner...
-TAIL_SIDE = [(1.960, 0.800), (1.860, 0.855), (1.760, 0.910), (1.660, 0.950), (1.700, 1.000), (1.735, 1.045),
+TAIL_SIDE = [(1.960, 0.800), (1.860, 0.855), (1.760, 0.905), (1.690, 0.938), (1.668, 0.962), (1.690, 1.000), (1.735, 1.045),
              (1.800, 1.052), (1.880, 1.052)]
 # ...and on the tail again along the top back to the start.
 TAIL_TOP = [(0.760, 1.052), (0.680, 1.053)]
@@ -263,6 +265,7 @@ data = {
     "door_bottom": Z(DOOR_BOTTOM),
     "rear_door": side(REAR_DOOR),
     "back_door": side(BACK_DOOR),
+    "back_arch_r": L(BACK_ARCH_R),
     "shut_round": L(SHUT_ROUND),
     "edge_round": L(EDGE_ROUND),
     "screen": {"x_base_mid": X(SCREEN["y_base_mid"]), "x_base_edge": X(SCREEN["y_base_edge"]),
@@ -271,7 +274,6 @@ data = {
     "rear_glass": {"x_top_mid": X(REAR_GLASS["y_top_mid"]), "x_top_edge": X(REAR_GLASS["y_top_edge"]),
                    "w_top": H(REAR_GLASS["w_top"]), "x_base_mid": X(REAR_GLASS["y_base_mid"]),
                    "x_base_edge": X(REAR_GLASS["y_base_edge"]), "w_base": H(REAR_GLASS["w_base"])},
-    "bonnet_nose": end(BONNET_NOSE),
     "bonnet": plan(BONNET),
     "head": end(HEAD),
     "grille": end(GRILLE),
@@ -292,7 +294,7 @@ data = {
     "exhaust_x": X(EXHAUST_END),
     "mirror": {"x_back": X(MIRROR["y1"]), "x_front": X(MIRROR["y0"]), "y_in": H(MIRROR["w0"]),
                "y_out": H(MIRROR["w1"]), "z0": Z(MIRROR["z0"]), "z1": Z(MIRROR["z1"])},
-    "picks": {"frontbadge": 1, "rearbadge": 1, "name": 1},   # placeholders until Ivan picks in the viewer
+    "picks": {"frontbadge": 1, "rearbadge": 1, "name": 1},   # Ivan's picks, 2026-11-13
 }
 # belt line z(x) in build space, sampled for parts to interpolate
 _ys = np.linspace(-0.80, 1.25, 48)
