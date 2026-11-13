@@ -18,6 +18,8 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
 float4 _TgLampBudget;
+// How grass takes the lamps' light (NightBudget.GrassLamp): x its brightness, y its colour, 1 its own albedo.
+float4 _TgLampGrass;
 
 #define TG_LAMP_LUMA half3(0.2126, 0.7152, 0.0722)
 
@@ -74,11 +76,21 @@ half3 FresnelCorrection(BRDFData brdf, half3 n, half3 v, Light light)
     return lit * (half)(full - urp);
 }
 
+// Grass's albedo as the lamps light it: dimmer and less green than by day, so a floodlit verge sits near the road
+// rather than glaring beside it. Untouched while the budget is off.
+half3 LampGrassAlbedo(half3 albedo)
+{
+    if (_TgLampBudget.x < 0.5) return albedo;
+    half y = dot(albedo, TG_LAMP_LUMA);
+    return lerp(half3(y, y, y), albedo, (half)_TgLampGrass.y) * (half)_TgLampGrass.x;
+}
+
 // URP's UniversalFragmentPBR (URP 17.6), line for line, but for the other lights: with the budget on they are the
 // lamps, each under its cap and all of them under the cap together. fresnel adds FresnelCorrection for the sun or the
 // moon only: on the lamps, whose light grazes the road from every side at once, the full sheen turned a floodlit road
 // white from end to end (tools/night-budget's renders), where URP's own fit gives it a soft shine.
-half4 TarmacFragmentPBR(InputData inputData, SurfaceData surfaceData, bool fresnel)
+// grass shades the lamps with LampGrassAlbedo.
+half4 TarmacFragmentPBR(InputData inputData, SurfaceData surfaceData, bool fresnel, bool grass)
 {
     #if defined(_SPECULARHIGHLIGHTS_OFF)
     bool specularHighlightsOff = true;
@@ -87,6 +99,13 @@ half4 TarmacFragmentPBR(InputData inputData, SurfaceData surfaceData, bool fresn
     #endif
     BRDFData brdfData;
     InitializeBRDFData(surfaceData, brdfData);
+    BRDFData lampBrdf = brdfData;
+    if (grass)
+    {
+        SurfaceData lampSurface = surfaceData;
+        lampSurface.albedo = LampGrassAlbedo(surfaceData.albedo);
+        InitializeBRDFData(lampSurface, lampBrdf);
+    }
 
     #if defined(DEBUG_DISPLAY)
     half4 debugColor;
@@ -146,7 +165,7 @@ half4 TarmacFragmentPBR(InputData inputData, SurfaceData surfaceData, bool fresn
         {
             float e = 0;
             if (budget) light.color *= LampShare(light, inputData.normalWS, e);
-            half3 lit = LightingPhysicallyBased(brdfData, brdfDataClearCoat, light, inputData.normalWS,
+            half3 lit = LightingPhysicallyBased(budget ? lampBrdf : brdfData, brdfDataClearCoat, light, inputData.normalWS,
                                                 inputData.viewDirectionWS, surfaceData.clearCoatMask, specularHighlightsOff);
             if (budget) { lamps += lit; lampLight += e; }
             else lightingData.additionalLightsColor += lit;
@@ -166,9 +185,24 @@ half4 TarmacFragmentPBR(InputData inputData, SurfaceData surfaceData, bool fresn
 #endif
 }
 
+half4 TarmacFragmentPBR(InputData inputData, SurfaceData surfaceData, bool fresnel)
+{
+    return TarmacFragmentPBR(inputData, surfaceData, fresnel, false);
+}
+
 half4 TarmacFragmentPBR(InputData inputData, SurfaceData surfaceData)
 {
-    return TarmacFragmentPBR(inputData, surfaceData, false);
+    return TarmacFragmentPBR(inputData, surfaceData, false, false);
+}
+
+// The game's copy of URP Lit: grass where the material turns _TG_GRASS on.
+half4 TarmacFragmentPBRLit(InputData inputData, SurfaceData surfaceData)
+{
+    #if defined(_TG_GRASS)
+    return TarmacFragmentPBR(inputData, surfaceData, false, true);
+    #else
+    return TarmacFragmentPBR(inputData, surfaceData, false, false);
+    #endif
 }
 
 // The lamps' light on a matte surface, Lambert, irradiance under the budget: what ShadeLambert multiplies its colour by.

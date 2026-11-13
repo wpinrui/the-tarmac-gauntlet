@@ -87,7 +87,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Heads of a kind this near one another share a real light, m: the gantry's and the stands' nearest; a mast's and the pit roof's are each a light.</summary>
         private const float ShareStand = 8f, SharePitRoof = 1f, ShareMast = 1f, ShareStart = 6f;
         /// <summary>The radius each kind's light must cover round its target, m.</summary>
-        private const float PoolStand = 24f, PoolPitRoof = 24f, PoolMast = 30f, PoolStart = 26f;
+        private const float PoolStand = 32f, PoolPitRoof = 24f, PoolMast = 30f, PoolStart = 26f;
         /// <summary>A light reaches this many times as far as its target, plus a margin, m.</summary>
         private const float RangeTimes = 2.2f, RangeMargin = 10f;
         /// <summary>
@@ -284,7 +284,7 @@ namespace TarmacGauntlet.Raceday
             float cone = Mathf.Clamp(2f * half, 40f, 130f);
             return new FloodSource
             {
-                Kind = heads[0].Kind, Position = p, Target = t, Cone = cone, Core = cone * 0.3f,
+                Kind = heads[0].Kind, Position = p, Target = t, Cone = cone, Core = cone * 0.1f,
                 Range = reach * RangeTimes + RangeMargin, Intensity = Mathf.Pow(reach, 2f) * NightBudget.Floodlit,
             };
         }

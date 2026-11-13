@@ -27,7 +27,7 @@ All of it lives in `unity/Assets/Raceday/Scripts/Night/` and `unity/Assets/Rende
   with up to 256 lights on screen.
 - **Floodlights.** `FloodlightLayout` places the lamp heads on the stands' roofs, the pit building's roof, the start
   gantry and masts along the pit wall. Each mast head and pit roof head is its own URP spot light; neighbouring stand
-  and gantry heads share one. `Balance` fits every light's intensity by least squares so the track and the pit lane
+  and gantry heads share one. Each light's beam fades softly from its axis to its edge, so neighbouring pools blend. `Balance` fits every light's intensity by least squares so the track and the pit lane
   take `NightBudget.Floodlit` as evenly as the lights can give it. `FloodlightRig` turns on the 200 nearest the camera.
   With the light shadows option on, the four nearest the camera's view cast soft shadows.
 - **Headlamps.** `HeadlampRig` puts one URP spot light on each of the cars nearest the camera, as many as the "Real
@@ -41,6 +41,9 @@ All of it lives in `unity/Assets/Raceday/Scripts/Night/` and `unity/Assets/Rende
   - a lamp-lit pixel gives back at most `PixelMost` (1.6), its sheen included.
 
   Each cap eases in from half its value and never quite reaches it, so nothing clips.
+- **Grass.** Grass takes the lamps' light dimmer and less green than its own colour (`NightBudget.GrassLamp`,
+  `GrassColour`), so a floodlit verge sits near the road's brightness. The ground shader, the grass blades and Lit
+  materials with `_TG_GRASS` (verges, runoff, terrain, stand banks) shade it so.
 - **Sheen.** The track shader's full Fresnel highlight is applied to the sun and the moon only. On the lamps it turned
   the whole floodlit road white, because their light grazes the road from every side at once. The lamps keep URP's
   own softer shine.

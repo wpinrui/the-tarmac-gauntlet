@@ -17,10 +17,14 @@ namespace TarmacGauntlet.Raceday
         public HeadlampRig Headlamps;
         public StandMaterials Stands;
 
-        private static readonly int BudgetId = Shader.PropertyToID("_TgLampBudget");
+        private static readonly int BudgetId = Shader.PropertyToID("_TgLampBudget"), GrassId = Shader.PropertyToID("_TgLampGrass");
         private float shown = -1f;
 
-        private void OnEnable() => Shader.SetGlobalVector(BudgetId, NightBudget.ShaderBudget);
+        private void OnEnable()
+        {
+            Shader.SetGlobalVector(BudgetId, NightBudget.ShaderBudget);
+            Shader.SetGlobalVector(GrassId, NightBudget.ShaderGrass);
+        }
 
         private void OnDisable() => Shader.SetGlobalVector(BudgetId, Vector4.zero);
 
