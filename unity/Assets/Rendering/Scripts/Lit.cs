@@ -23,6 +23,9 @@ namespace TarmacGauntlet.Rendering
             SrcBlendAlphaId = UnityEngine.Shader.PropertyToID("_SrcBlendAlpha"), DstBlendAlphaId = UnityEngine.Shader.PropertyToID("_DstBlendAlpha"),
             ZWriteId = UnityEngine.Shader.PropertyToID("_ZWrite");
 
+        /// <summary>The keyword that has the game's Lit shade a material as grass under the night's lamps (Lamps.hlsl).</summary>
+        public const string GrassKeyword = "_TG_GRASS";
+
         private static Shader shader;
 
         /// <summary>The game's copy of URP Lit, or URP's own if it is missing.</summary>

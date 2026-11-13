@@ -69,6 +69,15 @@ namespace TarmacGauntlet.Raceday
         public static float Luma(Color c) =>
             0.2126f * LinearLight.Linear(c.r) + 0.7152f * LinearLight.Linear(c.g) + 0.0722f * LinearLight.Linear(c.b);
 
+        /// <summary>
+        /// How grass takes the lamps' light: its albedo this bright and with this much of its colour, against its own (1).
+        /// A floodlit verge then sits near the road's brightness, a deep green, rather than glaring beside it.
+        /// </summary>
+        public const float GrassLamp = 0.45f, GrassColour = 0.6f;
+
+        /// <summary>Grass's response as Lamps.hlsl reads it.</summary>
+        public static Vector4 ShaderGrass => new Vector4(GrassLamp, GrassColour, 0f, 0f);
+
         /// <summary>The budget as Lamps.hlsl reads it: on, and the three caps.</summary>
         public static Vector4 ShaderBudget => new Vector4(1f, LampMost, AllMost, PixelMost);
     }

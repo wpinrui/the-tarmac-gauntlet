@@ -74,6 +74,21 @@ half4 ShadePbr(float3 positionWS, half3 normalWS, float4 positionCS, half fogFac
     return c;
 }
 
+// Grass, lit as ShadePbr lights it, but taking the lamps' light as Lamps.hlsl's LampGrassAlbedo has it.
+half4 ShadeGrass(float3 positionWS, half3 normalWS, float4 positionCS, half fogFactor, half3 albedo, half smoothness)
+{
+    InputData d = TarmacInputData(positionWS, normalWS, positionCS, fogFactor);
+    SurfaceData s = (SurfaceData)0;
+    s.albedo = albedo;
+    s.smoothness = smoothness;
+    s.normalTS = half3(0, 0, 1);
+    s.occlusion = 1;
+    s.alpha = 1;
+    half4 c = TarmacFragmentPBR(d, s, false, true);
+    c.rgb = MixFog(c.rgb, d.fogCoord);
+    return c;
+}
+
 // A dielectric surface (a road, a kerb) lit as ShadePbr lights it, with the Fresnel sheen URP's fit leaves out added
 // for the sun and every other light: the surface shines as it turns from the eye.
 half4 ShadeDielectric(float3 positionWS, half3 normalWS, float4 positionCS, half fogFactor, half3 albedo, half smoothness)

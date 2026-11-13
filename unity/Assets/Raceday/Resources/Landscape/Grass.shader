@@ -233,7 +233,7 @@ Shader "Hidden/TarmacGauntlet/Grass"
 
             half4 frag(Varyings i) : SV_Target
             {
-                return ShadePbr(i.positionWS, normalize(i.normalWS), i.positionCS, i.fog, i.albedo, 0, _Smoothness);
+                return ShadeGrass(i.positionWS, normalize(i.normalWS), i.positionCS, i.fog, i.albedo, _Smoothness);
             }
             ENDHLSL
         }

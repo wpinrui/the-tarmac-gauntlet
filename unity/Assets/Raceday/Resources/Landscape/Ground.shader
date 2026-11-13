@@ -109,7 +109,7 @@ Shader "Hidden/TarmacGauntlet/Ground"
                     half lean = dot(view, along) / max(length(view), 1e-3);
                     albedo *= GammaScale(1 + _StripeContrast * wave * fade * (0.35 + 0.65 * lean));
                 #endif
-                return ShadePbr(i.positionWS, i.normalWS, i.positionCS, i.fog, albedo, 0, _Smoothness);
+                return ShadeGrass(i.positionWS, i.normalWS, i.positionCS, i.fog, albedo, _Smoothness);
             }
             ENDHLSL
         }

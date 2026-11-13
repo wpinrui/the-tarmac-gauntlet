@@ -60,6 +60,9 @@ static class Scene
     /// <summary>The parts drawn with the track's own shader, which adds the full Fresnel sheen (Lamps.hlsl's FresnelCorrection).</summary>
     static readonly HashSet<string> Track = new HashSet<string> { "Road", "Road edges", "Pit lane", "Paddock", "Kerbs" };
 
+    /// <summary>The parts that take the lamps' light as grass (Lamps.hlsl's LampGrassAlbedo).</summary>
+    static readonly HashSet<string> Grass = new HashSet<string> { "Verges", "Grass runoff", "Ground" };
+
     static float[] Xyz(Vector3 v) => new[] { v.x, v.y, v.z };
     static float[] Rgb(Color c) => new[] { c.r, c.g, c.b };
 
@@ -126,7 +129,7 @@ static class Scene
             {
                 name = g.Key, vertices = pos.Count, indices = idx.Count, pos = at, nrm = nAt, idx = iAt,
                 colour = new[] { look.r, look.g, look.b }, smooth = look.smooth, metal = look.metal,
-                lens = g.Key == "Floodlight lenses", fresnel = Track.Contains(g.Key),
+                lens = g.Key == "Floodlight lenses", fresnel = Track.Contains(g.Key), grass = Grass.Contains(g.Key),
             });
         }
 
@@ -159,7 +162,7 @@ static class Scene
 
         var budget = new
         {
-            NightBudget.Exposure, NightBudget.Floodlit, NightBudget.LampMost, NightBudget.AllMost, NightBudget.PixelMost,
+            NightBudget.Exposure, NightBudget.Floodlit, NightBudget.GrassLamp, NightBudget.GrassColour, NightBudget.LampMost, NightBudget.AllMost, NightBudget.PixelMost,
             headlampIntensity = NightBudget.HeadlampIntensity / NightBudget.Luma(NightBudget.Headlamp),
             NightBudget.HeadlampRange, NightBudget.HeadlampCone, NightBudget.HeadlampCore, NightBudget.HeadlampAhead, NightBudget.HeadlampDip,
             flood = Rgb(NightBudget.Flood), headlamp = Rgb(NightBudget.Headlamp), red = Rgb(NightBudget.Red),

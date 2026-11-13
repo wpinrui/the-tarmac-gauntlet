@@ -17,6 +17,7 @@ namespace TarmacGauntlet.Raceday
             Seats = Make("Stand seats", Noise(seats, 0.04f, 13), 0.3f);
             Roof = Make("Stand roof", Noise(new Color(0.36f, 0.37f, 0.38f), 0.03f, 14), 0.25f);
             Bank = Make("Stand bank", Noise(new Color(0.23f, 0.41f, 0.15f), 0.08f, 4), 0.05f);
+            Bank.EnableKeyword(Lit.GrassKeyword);
             Crowd = CrowdMaterial();
             FencePosts = Make("Catch fence posts", null, 0.5f, new Color(0.6f, 0.62f, 0.63f), 0.6f);
             FenceMesh = Make("Catch fence", Mesh(), 0.4f, new Color(0.62f, 0.64f, 0.64f), 0.5f);
