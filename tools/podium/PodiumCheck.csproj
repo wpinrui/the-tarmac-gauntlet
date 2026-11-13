@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Builds the podium and plays its ceremony with the game's own code outside Unity, checks it and writes the preview's data. Run through run.sh. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)../../out/podium/obj/</BaseIntermediateOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Check.cs;../circuit/geometry-check/UnityStubs.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Circuit.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/CircuitData.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/CircuitBuilder.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/CircuitPart.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/MeshKit.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/PitComplex.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/PitComplexBuilder.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/PitBoxKit.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/PitLane.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/RacingLine.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/CarSpec.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/SpeedProfile.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/PitStopSpots.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Podium/PodiumPlan.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Podium/PodiumShow.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Podium/PodiumBuilder.cs" />
+    <Compile Include="../../unity/Assets/Simulation/**/*.cs" />
+  </ItemGroup>
+</Project>
