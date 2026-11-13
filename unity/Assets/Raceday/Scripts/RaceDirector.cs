@@ -8,8 +8,9 @@ namespace TarmacGauntlet.Raceday
     /// Keeps the race for the career (<see cref="RaceDay"/>). Each time a car crosses the line it
     /// teaches the stint's fuel and tyre estimate the lap just driven, unless the car was in the pit lane
     /// (<see cref="Consumables.Stint"/>), and logs the lap, which ages the car and may give it an issue or retire it: issues cut the car's
-    /// power, grip, fuel efficiency and tyre life until a stop fixes them, and a retired car limps to
-    /// its box, or stops beside the track after a fatal crash (<see cref="Retire"/>). After a stop's driver change, the new driver drives at their own pace.
+    /// power, grip, fuel efficiency and tyre life until a stop fixes them. Hits on barriers and other cars damage it, and a
+    /// big enough hit totals it (<see cref="CarDamage"/>); a car far from the camera, with no physics, takes its hits by chance.
+    /// A car out of the race stops, and a moment later is in its garage (<see cref="Retire"/>). After a stop's driver change, the new driver drives at their own pace.
     /// The driver at the wheel tires lap by lap (<see cref="CarRaceLog.Fatigue"/>), which slows the car until a stop puts in someone fresh. When the
     /// race clock runs out the leader takes the chequered flag the next time it crosses the line, and every car
     /// after it as each crosses the line (<see cref="RaceDay.CompleteLap"/>). Past the flag a car drives a
@@ -27,11 +28,7 @@ namespace TarmacGauntlet.Raceday
         public const float CooldownWait = 700f;
         /// <summary>Share of its racing speed a car drives its cooldown lap at.</summary>
         public const float CooldownSpeed = 0.6f;
-        /// <summary>Share of its power a car limping back to the pits has.</summary>
-        public const float LimpPower = 0.6f;
-        /// <summary>Share of its racing speed a car limping back to the pits drives at.</summary>
-        public const float LimpSpeed = 0.45f;
-        /// <summary>Seconds a totalled car stays where it came to rest before it is taken back to its garage.</summary>
+        /// <summary>Seconds a car out of the race stays where it stopped before it is taken back to its garage.</summary>
         public const float WreckWait = 5f;
         /// <summary>How far across the pit lane the summary's camera stands from the player's box, m.</summary>
         public const float SummaryDistance = 11f;
@@ -62,6 +59,7 @@ namespace TarmacGauntlet.Raceday
         private float startTime;
         private float timeUpAt = -1f;
         private RaceSave resume;
+        private readonly System.Random hitRoll = new System.Random();
 
         /// <summary>Carries on a saved race: its clocks pick up where the save left them.</summary>
         public void Resume(RaceSave save) => resume = save;
@@ -197,6 +195,12 @@ namespace TarmacGauntlet.Raceday
                         continue;
                     }
                 }
+                // A car far from the camera runs with no physics, so it can't hit anything: it takes its hits by chance.
+                if (controllers[i].Asleep && !Cars[i].InPitLane && CarDamage.RollHit(Time.deltaTime, hitRoll.NextDouble) is double impact)
+                {
+                    OnHit(i, (float)impact);
+                    if (log.Retired) continue;
+                }
                 if (log.DriverIndex != driverShown[i])
                 {
                     driverShown[i] = log.DriverIndex;
@@ -265,24 +269,16 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>
-        /// Car i is out. A crashed car stays where it came to rest, and after <see cref="WreckWait"/> it is back in
-        /// its garage. Any other limps to its box on cut power and parks there.
+        /// Car i is out and can't drive on, whatever put it out. Nobody drives it: it stops where it is, stays in the
+        /// other cars' traffic so they drive round it, and after <see cref="WreckWait"/> it is back in its garage.
         /// </summary>
         private void Retire(int i)
         {
             CarController car = controllers[i];
-            AiDriver driver = Drivers[i];
-            if (Day.Cars[i].RetirementReason == FailureType.Crash)
-            {
-                driver.enabled = false;   // in the other cars' traffic till it is taken away, so they drive round it
-                car.Hold = true;
-                car.InputEnabled = false;
-                StartCoroutine(ToGarage(i));
-                return;
-            }
-            car.Supplies.PowerTrim *= LimpPower;
-            driver.Limping = true;
-            if (driver.Pilot != null) driver.Pilot.Limp = LimpSpeed;
+            Drivers[i].enabled = false;
+            car.Hold = true;
+            car.InputEnabled = false;
+            StartCoroutine(ToGarage(i));
         }
 
         private System.Collections.IEnumerator ToGarage(int i)

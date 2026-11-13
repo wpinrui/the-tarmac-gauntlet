@@ -39,8 +39,6 @@ namespace TarmacGauntlet.Raceday
         public int Garage = -1;
         /// <summary>The start this car takes part in, if any.</summary>
         public Starter Starter;
-        /// <summary>True once the car is out of the race and limps to its box: it keeps its physics, so it drives at its limping pace.</summary>
-        [System.NonSerialized] public bool Limping;
         /// <summary>A pilot built beforehand, on its tuned line: the car drives with it from the start, with no tuning.</summary>
         [System.NonSerialized] public AiPilot Given;
 

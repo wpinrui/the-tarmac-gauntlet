@@ -114,6 +114,24 @@ namespace TarmacGauntlet.Simulation.Tests
         }
 
         [Test]
+        public void CarsWithNoPhysicsTakeAFewHitsAnHourAndRarelyATotal()
+        {
+            var rng = new Random(3);
+            int hits = 0, totals = 0;
+            const int hours = 2000;
+            for (int s = 0; s < hours * 3600; s++)
+                if (CarDamage.RollHit(1, rng.NextDouble) is double impact)
+                {
+                    hits++;
+                    Assert.That(impact, Is.GreaterThanOrEqualTo(CarDamage.MinImpact));
+                    if (CarDamage.Totals(impact)) totals++;
+                }
+            Assert.That(hits / (double)hours, Is.EqualTo(CarDamage.HitsPerHour).Within(0.2));
+            Assert.That(totals / (double)hits, Is.LessThan(0.01));
+            Assert.That(CarDamage.RollHit(0, () => 0), Is.Null);
+        }
+
+        [Test]
         public void DamageSurvivesASave()
         {
             CarRaceLog log = PlayerLog();
