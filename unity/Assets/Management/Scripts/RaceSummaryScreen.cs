@@ -11,11 +11,12 @@ using static TarmacGauntlet.Management.MenuKit;
 namespace TarmacGauntlet.Management
 {
     /// <summary>
-    /// The race summary, shown over the circuit when the race is settled (<see cref="RaceWeekend.Finished"/>), with
+    /// The race summary, shown over the circuit once the race is settled and its podium is over (<see cref="RaceWeekend.SummaryDue"/>), with
     /// the player's car parked in its box. The results overall, by class and as class podiums sit on the left. The
     /// player's race sits on the right: the finish, a lap-by-lap position chart with each driver's stints shaded, and
-    /// the stints, stops and issues. The race's 3 skill points are spent here, and Continue stays locked until they
-    /// are. Continue goes back to the Team HQ, where the race's newspaper opens first.
+    /// the stints, stops and issues. While there are skill points to spend, Continue opens the Skill points step, where
+    /// each skill says what it does, and that step's Continue stays locked until they are spent. Continue then goes
+    /// back to the Team HQ, where the race's newspaper opens first.
     /// </summary>
     public sealed class RaceSummaryScreen : MonoBehaviour
     {
@@ -28,8 +29,8 @@ namespace TarmacGauntlet.Management
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Hook()
         {
-            RaceWeekend.Finished -= OnFinished;
-            RaceWeekend.Finished += OnFinished;
+            RaceWeekend.SummaryDue -= OnFinished;
+            RaceWeekend.SummaryDue += OnFinished;
         }
 
         private static void OnFinished()
@@ -40,8 +41,7 @@ namespace TarmacGauntlet.Management
 
         private RaceSummary summary;
         private MenuGlass glass;
-        private Tooltips tips;
-        private VisualElement root, skillsPanel, cont;
+        private VisualElement root, summaryStep, skillsStep, skillsBody, cont;
         private static readonly RaceView.Views views = new RaceView.Views();
 
         private readonly Dictionary<PlayerSkillType, int> pending = new Dictionary<PlayerSkillType, int>();
@@ -102,10 +102,12 @@ namespace TarmacGauntlet.Management
             FillTopBar(badge, name, year, money);
             root.Add(top);
 
+            summaryStep = Box("layer");
+            root.Add(summaryStep);
             var race = new RaceView(summary, true, views);
             VisualElement results = glass.Make("summary-results");
             race.Results(results);
-            root.Add(results);
+            summaryStep.Add(results);
 
             if (summary.Player != null)
             {
@@ -122,42 +124,53 @@ namespace TarmacGauntlet.Management
                     race.Log(log);
                     side.Add(log);
                 }
-                root.Add(side);
+                summaryStep.Add(side);
             }
 
-            if (toSpend > 0)
-            {
-                skillsPanel = glass.Make("summary-skills");
-                root.Add(skillsPanel);
-            }
-            cont = RedButton("Continue", "big-button", Continue);
-            cont.AddToClassList("corner");
-            root.Add(cont);
-            tips = new Tooltips(root);
-            RenderSkills();
+            VisualElement summaryContinue = RedButton("Continue", "big-button", toSpend > 0 ? ShowSkills : Leave);
+            summaryContinue.AddToClassList("corner");
+            summaryStep.Add(summaryContinue);
         }
 
-        // ------------------------------------------------------------------ skill points and Continue
+        // ------------------------------------------------------------------ the Skill points step
 
         private int Left => toSpend - pending.Values.Sum();
+
+        /// <summary>Swaps the summary for the Skill points step, built the first time it opens.</summary>
+        private void ShowSkills()
+        {
+            summaryStep.style.display = DisplayStyle.None;
+            if (skillsStep == null)
+            {
+                skillsStep = Box("layer", "centre");
+                VisualElement panel = glass.Make("skills-panel");
+                skillsBody = Box("skills-body");
+                panel.Add(skillsBody);
+                skillsStep.Add(panel);
+                cont = RedButton("Continue", "big-button", Leave);
+                cont.AddToClassList("corner");
+                skillsStep.Add(cont);
+                root.Add(skillsStep);
+            }
+            skillsStep.style.display = DisplayStyle.Flex;
+            RenderSkills();
+        }
 
         private void RenderSkills()
         {
             cont.EnableInClassList("disabled", Left > 0);
-            if (skillsPanel == null) return;
             PlayerSkills skills = Player?.Skills;
-            skillsPanel.Clear();
-            skillsPanel.Add(SkillPicker(tips, toSpend, Left, t => SkillLevel(skills, t) + pending[t], t => SkillLevel(skills, t), Spend));
+            skillsBody.Clear();
+            skillsBody.Add(SkillPicker(Left, t => SkillLevel(skills, t) + pending[t], t => SkillLevel(skills, t), Spend));
         }
 
         private void Spend(PlayerSkillType type, int points)
         {
-            tips.Hide();
             pending[type] = Math.Max(0, pending[type] + points);
             RenderSkills();
         }
 
-        private void Continue()
+        private void Leave()
         {
             if (Left > 0) return;
             if (GameSession.State != null && pending.Values.Sum() > 0)

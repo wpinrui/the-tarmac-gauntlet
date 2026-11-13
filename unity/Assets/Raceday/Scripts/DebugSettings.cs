@@ -15,7 +15,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>How the race starts, or null for the scene's own choice.</summary>
         public static CircuitScene.StartMode? Start
         {
-            get => Get(StartKey) is int i ? (CircuitScene.StartMode)i : (CircuitScene.StartMode?)null;
+            get => Get(StartKey) is int i && System.Enum.IsDefined(typeof(CircuitScene.StartMode), i) ? (CircuitScene.StartMode)i : (CircuitScene.StartMode?)null;
             set => Set(StartKey, (int?)value);
         }
 

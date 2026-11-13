@@ -7,7 +7,7 @@ shaders' functions are ported per pixel, with screen derivatives taken from neig
 
     python3 tools/rain-preview/preview.py out_dir [shot ...]
 
-Shots: tv, cut, onboard, longlens, spray-tv, spray-onboard (16 m behind), spray-follow (30 m behind). Each writes before and after images at Medium and Ultra, and a
+Shots: tv, cut, onboard, longlens, spray-tv, spray-onboard (16 m behind), spray-follow (30 m behind), spray-close (7 m behind, #423 against now). Each writes before and after images at Medium and Ultra, and a
 side-by-side sheet. Keep the constants below in step with the C# and the shaders.
 """
 import math
@@ -386,7 +386,7 @@ def draw_streaks(img, depth, cam, pos, vel, size, alpha, tint, length_scale, vel
         over(img, ys + y0, xs + x0, rgb, alpha[k] * s[inside], glow)
 
 
-def draw_puffs(img, depth, cam, pos, size, alpha, tint, max_size, glow=0.0, even=False):
+def draw_puffs(img, depth, cam, pos, size, alpha, tint, max_size, glow=0.0, even=False, soft=False):
     x, y, z = cam.view(pos)
     order = np.argsort(-z)
     for k in order:
@@ -409,6 +409,10 @@ def draw_puffs(img, depth, cam, pos, size, alpha, tint, max_size, glow=0.0, even
         inside = (s > 0) & (depth[y0:y1, x0:x1] > z[k])
         if not inside.any():
             continue
+        if soft:
+            # Drops.shader: fades over 1.2 m in front of the scene, and thins right at the lens.
+            f = np.clip((depth[y0:y1, x0:x1] - z[k]) / 1.2, 0, 1)
+            s = s * f * f * (3 - 2 * f) * min(max((z[k] - 0.4) / 1.6, 0), 1)
         ys, xs = np.nonzero(inside)
         over(img, ys + y0, xs + x0, fog_mix(tint, z[k]), alpha[k] * s[inside], glow)
 
@@ -508,8 +512,10 @@ def sky_capped(tint):
 
 
 class Spray:
-    def __init__(self, new):
+    def __init__(self, new, v2=True):
         self.new = new
+        # v2: no droplets, and the mist fades into the scene. Without it, as #423 merged it.
+        self.v2 = new and v2
         self.drops = Particles()
         self.mist = Particles()
 
@@ -522,7 +528,7 @@ class Spray:
             at = rear + np.array([0, 0.3, 0])
             pace = min(max((speed - 8) / 47, 0), 1)
             mult = (0.5 + 0.7 * pace) * (1 + 0.6 * standing)
-            rate = 250 * amount * pace * (1 + 0.5 * standing)
+            rate = 0 if self.v2 else 250 * amount * pace * (1 + 0.5 * standing)
             self.drops.acc += rate * dt
             n = int(self.drops.acc); self.drops.acc -= n
             if n:
@@ -580,7 +586,7 @@ class Spray:
             t = self.mist.age / self.mist.life
             a = np.interp(t, [0, 0.05, 0.15, 0.5, 1], [0, 1, 0.5, 0.25, 0])
             size = self.mist.size * np.interp(t, [0, 1], [0.7, 2.4])
-            draw_puffs(img, depth, cam, self.mist.pos, size, 0.4 * a, sky_capped(light), 0.5, even=True)
+            draw_puffs(img, depth, cam, self.mist.pos, size, 0.4 * a, sky_capped(light), 0.5, even=True, soft=self.v2)
             t = self.drops.age / self.drops.life
             a = np.interp(t, [0, 0.5, 1], [1, 0.7, 0])
             draw_streaks(img, depth, cam, self.drops.pos, self.drops.vel, self.drops.size, 0.3 * a,
@@ -614,10 +620,10 @@ def draw_rain(img, depth, cam, rays, rain, new, level, fall):
         draw_streaks(img, depth, cam, rain.p.pos, vel, rain.p.size, np.full(len(rain.p.age), 0.3), LIGHT, 1.0, 0.05)
 
 
-def run_rain(cams, new, level, frames_to_draw, cars_at, spray_cars=()):
+def run_rain(cams, new, level, frames_to_draw, cars_at, spray_cars=(), v2=True):
     """Steps the weather through a list of cameras, one a frame; draws the frames asked for."""
     rain = NewRain() if new else OldRain()
-    sprays = [Spray(new) for _ in spray_cars]
+    sprays = [Spray(new, v2) for _ in spray_cars]
     out = {}
     fall = 0.0
     prev = None
@@ -763,13 +769,31 @@ def shot_spray(out, view):
     sheet(tiles, 3, f"{out}/spray-{view}-sheet.png")
 
 
+def shot_spray_close(out):
+    """Ivan's frame: onboard 7 m behind a car at 200 km/h in heavy rain. Before is #423 as merged, at High."""
+    speed = 200 / 3.6
+    n = 120
+    start = -260.0
+    car_x = lambda k: start + speed * k * DT
+    cams = [Cam((car_x(k) - 7, 1.2, 6.0), yaw=90, pitch=-6, fov=60) for k in range(n)]
+    cars = lambda k: [(car_x(k), 6.0, CAR)]
+    tiles = []
+    for v2, level in ((False, "High"), (True, "Medium"), (True, "Ultra")):
+        img = run_rain(cams, True, level, {n - 1}, cars, spray_cars=[(start, 6.0, speed)], v2=v2)[n - 1]
+        name = "before-high" if not v2 else f"after-{level.lower()}"
+        save(img, f"{out}/spray-close-{name}.png")
+        tiles.append(label(img, "Before, High" if not v2 else f"After, {level}"))
+    sheet(tiles, 3, f"{out}/spray-close-sheet.png")
+
+
 def main():
     out = sys.argv[1]
     os.makedirs(out, exist_ok=True)
-    shots = sys.argv[2:] or ["tv", "cut", "onboard", "longlens", "spray-tv", "spray-onboard", "spray-follow"]
+    shots = sys.argv[2:] or ["tv", "cut", "onboard", "longlens", "spray-tv", "spray-onboard", "spray-follow", "spray-close"]
     for s in shots:
         {"tv": shot_ivan, "cut": shot_cut, "onboard": shot_onboard, "longlens": shot_longlens,
-         "spray-tv": lambda o: shot_spray(o, "tv"), "spray-onboard": lambda o: shot_spray(o, "onboard"), "spray-follow": lambda o: shot_spray(o, "follow")}[s](out)
+         "spray-tv": lambda o: shot_spray(o, "tv"), "spray-onboard": lambda o: shot_spray(o, "onboard"), "spray-follow": lambda o: shot_spray(o, "follow"),
+         "spray-close": shot_spray_close}[s](out)
         print("done", s, flush=True)
 
 

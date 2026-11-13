@@ -31,6 +31,7 @@ namespace TarmacGauntlet.Audio
         private static void Boot()
         {
             Mix.Settle();
+            Mix.FadeRace(1f, 0f);
             var go = new GameObject("Sound mixer");
             DontDestroyOnLoad(go);
             go.AddComponent<SoundMixer>();

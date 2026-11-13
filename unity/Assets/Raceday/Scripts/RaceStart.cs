@@ -76,11 +76,61 @@ namespace TarmacGauntlet.Raceday
                     hasAhead ? ahead.Distance : float.NaN, ahead.Speed, ahead.Braking, me.Braking);
             }
 
+            LimitPlayers();
+
             if (!Racing && start.PaceCarIn && Grid[0].Laps >= 1)
             {
                 start.Green();
                 RaceCar.StartRace();
                 Debug.Log("Green flag");
+            }
+        }
+
+        /// <summary>
+        /// A car someone drives, not the AI, keeps its place in the formation on a limiter until it
+        /// crosses the line after the green: no faster than its place allows, and never past the car
+        /// before it in grid order. Above the limit the power is cut, and a little further over the
+        /// brakes come on. The pit lane limiter still holds where it is lower.
+        /// </summary>
+        private void LimitPlayers()
+        {
+            for (int i = 0; i < Grid.Length; i++)
+            {
+                RaceCar r = Grid[i];
+                CarController car = r.GetComponent<CarController>();
+                if (car.AiDriving || !r.isActiveAndEnabled || !start.Holds(r.Laps)) continue;
+                TrafficCar me = r.Traffic;
+                float before = i > 0 ? Grid[i - 1].Traffic.Distance : float.NaN;
+                float beforeSpeed = i > 0 ? Grid[i - 1].Traffic.Speed : 0f;
+                float limit = RollingStart.Limiter(i, caps[i], me.Distance, before, beforeSpeed);
+                car.SpeedLimit = Mathf.Min(car.SpeedLimit, limit);
+                car.BrakeAbove = limit + RollingStart.LimiterGrace;
+            }
+        }
+
+        /// <summary>
+        /// Cuts to the last part of the formation lap: the pace car is gone into the pit lane and the
+        /// field runs two by two in grid order, the leader at race distance <c>leader</c> on the
+        /// formation lap, every car at the formation speed where it is.
+        /// </summary>
+        public void CutToFinal(float leader)
+        {
+            if (columns == null) Begin();
+            Circuit c = PaceCar.Circuit;
+            start.CutToFinal();
+            paceOnRoute = true;
+            PaceCar.gameObject.SetActive(false);
+            for (int i = 0; i < Grid.Length; i++)
+            {
+                float d = RollingStart.PlaceOf(leader, i);
+                int k = c.IndexOf(Mathf.Repeat(d, c.Lap));
+                Vector3 at = c.Surface(k, RollingStart.ColumnOf(i));
+                Quaternion facing = Quaternion.LookRotation(c.Forward[k], Vector3.up);
+                float speed = start.SpeedAt(d);
+                RaceCar r = Grid[i];
+                if (r.TryGetComponent(out AiDriver driver)) driver.Place(at, facing, speed, k);
+                else r.GetComponent<CarController>().Wake(at, facing, speed, 0f, 0f);
+                r.Moved(Mathf.FloorToInt(d / c.Lap), k);
             }
         }
 

@@ -55,7 +55,9 @@ namespace TarmacGauntlet.Raceday
         private void Update()
         {
             if (frame == null) return;
-            bool show = Car != null && !Car.AiDriving && Race.InPitLane && (Car.Supplies == null || !Car.Supplies.Retired);
+            // After the flag it shows the way home until the car is parked there for good; a retired car isn't yours to drive.
+            bool home = Car != null && Car.Supplies != null && Car.Supplies.RaceOver;
+            bool show = Car != null && !Car.AiDriving && Race.InPitLane && (!home || !Car.Supplies.Retired && !Car.Hold);
             if (frame.activeSelf != show) frame.SetActive(show);
         }
 

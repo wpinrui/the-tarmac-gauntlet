@@ -3,8 +3,11 @@ using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
 {
-    /// <summary>Where a box's stop has got to, as its crew sees it.</summary>
-    public enum CrewStage { Home, Ready, Stop, Release }
+    /// <summary>
+    /// Where a box's stop has got to, as its crew sees it. Welcome is a car home after the chequered flag, parked in its
+    /// box for good: the crew stand out round it and wave.
+    /// </summary>
+    public enum CrewStage { Home, Ready, Stop, Release, Welcome }
 
     /// <summary>
     /// A stop's clock as the crew follows it, read from <see cref="PitService"/> and never written back:
@@ -16,6 +19,8 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Seconds into the stop, and when the fuel and the tyres start and end.</summary>
         public float Elapsed, FuelFrom, FuelTo, TyresFrom, TyresTo, Duration;
         public bool NewTyres, NewDriver;
+        /// <summary>True when the car coming in has taken the chequered flag: no stop, so no kit is fetched, and the crew wave it in.</summary>
+        public bool Finish;
         /// <summary>The car's middle in the box's frame (<see cref="GarageCrew.Local"/>), its speed, m/s, and whether it is near the box at all.</summary>
         public Vector2 Car;
         public float CarSpeed;
@@ -63,6 +68,8 @@ namespace TarmacGauntlet.Raceday
         public bool Working { get; internal set; }
         /// <summary>The stage of the stop as this person last saw it.</summary>
         public CrewStage Stage { get; internal set; }
+        /// <summary>True while standing at their place waving a car home after the flag, an arm up over the clip.</summary>
+        public bool Waving { get; internal set; }
 
         /// <summary>
         /// Where in the garage, in the box's frame, this person picks up the kit they carry to the stop, or null with
@@ -529,6 +536,12 @@ namespace TarmacGauntlet.Raceday
                 Vector2 r = Ready(m.Tasks[0]);
                 return (r, (-r).normalized, false, false);
             }
+            if (c.Stage == CrewStage.Welcome)
+            {
+                // Beside the box where they wait for a stop, turned to the car.
+                Vector2 r = Ready(m.Tasks[0]);
+                return (r, Toward(r, car, -r), false, false);
+            }
             if (m.Next < m.Tasks.Count)
             {
                 CrewTask t = m.Tasks[m.Next];
@@ -545,7 +558,7 @@ namespace TarmacGauntlet.Raceday
         /// </summary>
         private bool Fetching(CrewMember m, Vector2 kit, in StopClock c)
         {
-            if (c.Stage != CrewStage.Ready || m.FetchLetGo || m.FetchTyre && !c.NewTyres) return false;
+            if (c.Stage != CrewStage.Ready || c.Finish || m.FetchLetGo || m.FetchTyre && !c.NewTyres) return false;
             // The way there round the front of the garage, and from there out to the spot.
             float line = Door - 0.5f;
             Vector2 a = m.At, ready = Ready(m.Tasks[0]);
@@ -644,7 +657,7 @@ namespace TarmacGauntlet.Raceday
             doorway = clock.Stage == CrewStage.Stop && clock.NewDriver && clock.Elapsed < DriverSwap.End(clock);
             car = clock.Car;
             bool standing = near && clock.CarSpeed < 1f && Mathf.Abs(car.x) < 3f && Mathf.Abs(car.y) < 1.5f;
-            if (clock.Stage == CrewStage.Stop && standing) stopped = car;
+            if ((clock.Stage == CrewStage.Stop || clock.Stage == CrewStage.Welcome) && standing) stopped = car;
             else if (clock.Stage == CrewStage.Home || clock.Stage == CrewStage.Ready) stopped = Vector2.zero;
             int steps = Mathf.Max(1, Mathf.CeilToInt(dt / MaxStep));
             float h = dt / steps;
@@ -661,6 +674,7 @@ namespace TarmacGauntlet.Raceday
         private void Move(CrewMember m, in StopClock c, float dt)
         {
             m.Advance(dt);
+            m.Waving = false;
             Progress(m, c);
             (Vector2 at, Vector2 face, bool low, bool fetch) want = Want(m, c);
             Vector2 to = want.at - m.At;
@@ -717,6 +731,7 @@ namespace TarmacGauntlet.Raceday
             }
             if (m.Crouched) m.Play("Crouch", 0f, 1f, true);
             else m.Play("Idle", m.IdleFrom, 1f, true);
+            m.Waving = !m.Crouched && (c.Stage == CrewStage.Welcome || c.Stage == CrewStage.Ready && c.Finish);
             // At the place, down if the job is done crouched, inside its time: the work is going on.
             if (c.Stage == CrewStage.Stop && m.Next < m.Tasks.Count)
             {

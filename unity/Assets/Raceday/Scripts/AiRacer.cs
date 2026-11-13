@@ -133,6 +133,17 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>
+        /// Takes the wheel from someone else in the pit lane, at track sample <paramref name="k"/>: the stop goes on
+        /// from where the car is (<see cref="PitPlan.TakeOver"/>), with the <paramref name="service"/> under way in the box if any.
+        /// </summary>
+        public void TakeOverInPits(int k, PitService service)
+        {
+            if (Pit == null || InFormation) return;
+            Pit.TakeOver(Pilot, Seed, k, service);
+            HandOver(Pit.Route);
+        }
+
+        /// <summary>
         /// One physics step: works out what the car should do and returns its pedals and steering.
         /// <c>cars</c> is every car's position, for the pit lane. Pit stops start only when <c>racing</c>.
         /// </summary>

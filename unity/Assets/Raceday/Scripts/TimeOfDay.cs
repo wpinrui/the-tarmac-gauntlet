@@ -81,6 +81,8 @@ namespace TarmacGauntlet.Raceday
         /// moves no faster than <see cref="LightsRate"/> a second so a sudden change of weather fades rather than flicks.
         /// </summary>
         public float Lights { get; private set; }
+        /// <summary>The sun's height over the horizon now, degrees: below zero after sunset.</summary>
+        public float SunElevation { get; private set; }
         private const float LightsRate = 0.25f;
         private bool lightsSet;
         /// <summary>
@@ -193,6 +195,7 @@ namespace TarmacGauntlet.Raceday
             float shadeNow = map.Shading(spot, s.LightDir) * Mathf.Clamp01(CloudMap.Strength(overcast) / 0.85f);
             shade = float.IsNaN(shade) ? shadeNow : Mathf.Lerp(shade, shadeNow, 1f - Mathf.Exp(-Time.unscaledDeltaTime / ShadeEase));
             // The first sky with its weather sets the lights outright; after that they ease towards it.
+            SunElevation = s.SunElevation;
             Lights = lightsSet ? Mathf.MoveTowards(Lights, s.Lights, LightsRate * Time.unscaledDeltaTime) : s.Lights;
             lightsSet |= Weather != null;
             PostEffects.Current?.Set(SkyGrade.For(s, overcast, rain, shade, SkyGrade.Patchy(share, overcast)));
@@ -210,17 +213,19 @@ namespace TarmacGauntlet.Raceday
             RenderSettings.ambientSkyColor = LinearLight.Ambient(s.AmbientSky * bounce);
             RenderSettings.ambientEquatorColor = LinearLight.Ambient(s.AmbientEquator * bounce);
             RenderSettings.ambientGroundColor = LinearLight.Ambient(s.AmbientGround * bounce);
-            RenderSettings.fogColor = s.Fog;
+            // The sky as it is seen, dimmer at night; the light on the ground keeps its level.
+            float seen = SkyClock.SkySeen(s, SkyClock.Look);
+            RenderSettings.fogColor = s.Fog * seen;
             RenderSettings.fogDensity = SkyClock.Density(haze);
 
-            sky.SetColor(ZenithId, s.Zenith);
-            sky.SetColor(HorizonId, s.Horizon);
+            sky.SetColor(ZenithId, s.Zenith * seen);
+            sky.SetColor(HorizonId, s.Horizon * seen);
             sky.SetColor(GlowId, s.Glow);
-            sky.SetColor(GroundId, s.AmbientGround);
-            sky.SetColor(HazeId, s.Fog);
+            sky.SetColor(GroundId, s.AmbientGround * seen);
+            sky.SetColor(HazeId, s.Fog * seen);
             sky.SetColor(SunColorId, s.SunElevation > -2f ? s.LightColour : Color.black);
-            sky.SetColor(CloudLitId, s.CloudLit);
-            sky.SetColor(CloudShadeId, s.CloudShade);
+            sky.SetColor(CloudLitId, s.CloudLit * seen);
+            sky.SetColor(CloudShadeId, s.CloudShade * seen);
             sky.SetVector(SunDirId, s.SunDir);
             sky.SetVector(MoonDirId, s.MoonDir);
             sky.SetVector(CloudOffsetId, clouds);
@@ -235,13 +240,13 @@ namespace TarmacGauntlet.Raceday
             SkyPalette.CloudAmbient(s, sunLight, out Color above, out Color below);
             Atmosphere.Publish(new Atmosphere.Sky
             {
-                SkyLight = above,
-                GroundLight = below,
+                SkyLight = above * seen,
+                GroundLight = below * seen,
                 SunDir = s.LightDir,
-                Sun = sunLight,
-                CloudLit = s.CloudLit,
-                CloudShade = s.CloudShade,
-                Haze = s.Fog,
+                Sun = sunLight * seen,
+                CloudLit = s.CloudLit * seen,
+                CloudShade = s.CloudShade * seen,
+                Haze = s.Fog * seen,
                 HazeDensity = RenderSettings.fogDensity,
                 CloudTex = cloudNoise,
                 CloudTiles = map.Tiles,

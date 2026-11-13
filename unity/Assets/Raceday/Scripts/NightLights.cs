@@ -162,7 +162,7 @@ namespace TarmacGauntlet.Raceday
             foreach (Slot s in floods) Follow(s, step, on * FloodIntensity, PlaceFlood, false);
             foreach (Slot s in heads) Follow(s, step, on * HeadIntensity, PlaceHead, true);
             Camera cam = Camera.main;
-            HeadlampGround.Publish(cam, on);
+            HeadlampGround.Publish(cam, on * NightLook.HeadlampDark(Sky.SunElevation), Layout);
             foreach (Light l in uplights)
             {
                 bool near = cam != null && (cam.transform.position - l.transform.position).sqrMagnitude < UplightReach * UplightReach;

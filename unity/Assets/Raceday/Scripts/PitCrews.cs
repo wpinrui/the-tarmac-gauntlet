@@ -16,6 +16,10 @@ namespace TarmacGauntlet.Raceday
     /// baked from the clips once) that moves about the box, all of them sharing a few instanced meshes and dropped
     /// when the garage is small on screen. The crews nearest the camera swap their still figures for live skinned
     /// rigs that play the clips, at most <see cref="MaxLive"/> people at a time, the crews at work first.
+    ///
+    /// A car on its way home after the chequered flag is waved in by its crew, out beside the box with no kit. Once it
+    /// is parked there for good they stand round it waving for <see cref="WelcomeTime"/> (<see cref="Received"/>), then
+    /// walk back in. The wave is an arm raised over the clip on the live rigs, swinging from the elbow.
     /// </summary>
     public sealed partial class PitCrews : MonoBehaviour
     {
@@ -24,7 +28,7 @@ namespace TarmacGauntlet.Raceday
 
         /// <summary>The kit look the crews wear.</summary>
         public const KitLook Kit = KitLook.TeamSuit;
-        private const string BodyId = "crew_suit";
+        internal const string BodyId = "crew_suit";
         /// <summary>Most people played as live rigs at once.</summary>
         private const int MaxLive = 48;
         /// <summary>A crew is played live while a person in it stands at least this share of the screen's height.</summary>
@@ -38,6 +42,12 @@ namespace TarmacGauntlet.Raceday
         private const float PersonHeight = 1.8f;
         /// <summary>The player's crew walk out once the player's car is in the pit lane this close to the box, m.</summary>
         private const float PlayerReady = 200f;
+        /// <summary>How long a crew wave their car home once it is parked in its box after the flag, s.</summary>
+        public const float WelcomeTime = 6f;
+        /// <summary>Waves a second, and how far the forearm swings each way, degrees.</summary>
+        private const float WaveRate = 1.6f, WaveSwing = 28f;
+        /// <summary>How quickly the arm goes up and comes down, share a second.</summary>
+        private const float WaveRaise = 4f;
         private static readonly Color Charcoal = new Color(0.17f, 0.18f, 0.2f, 1f);
         private static readonly int ClothId = Shader.PropertyToID("_Cloth"), PanelId = Shader.PropertyToID("_Panel");
 
@@ -47,7 +57,9 @@ namespace TarmacGauntlet.Raceday
         {
             public HqCrewRig Rig;
             public SkinnedMeshRenderer Skin;
-            public Transform LeftHand, RightHand;
+            public Transform LeftHand, RightHand, RightArm, RightForeArm;
+            /// <summary>How far the arm is up for a wave, 0 to 1.</summary>
+            public float Wave;
         }
 
         private RaceCar[] cars;
@@ -71,6 +83,8 @@ namespace TarmacGauntlet.Raceday
         private readonly Stack<Live> pool = new Stack<Live>();
         private int built;
         private float nextPick;
+        /// <summary>By car: when its crew started waving it home after the flag, or -1 before then.</summary>
+        private float[] welcomeFrom;
         private readonly List<(HqCrewBody.Clip, float, float)> layers = new List<(HqCrewBody.Clip, float, float)>();
         private readonly List<(int car, float share, bool busy)> candidates = new List<(int, float, bool)>();
         private readonly Plane[] frustum = new Plane[6];
@@ -93,6 +107,8 @@ namespace TarmacGauntlet.Raceday
             figures = new MeshFilter[n][];
             figureRenderers = new Renderer[n][];
             live = new Live[n][];
+            welcomeFrom = new float[n];
+            for (int i = 0; i < n; i++) welcomeFrom[i] = -1f;
             kits = new MaterialPropertyBlock[n];
             Materials();
             Stills();
@@ -145,6 +161,10 @@ namespace TarmacGauntlet.Raceday
         /// </summary>
         public GarageCrew Crew(int car) => crews != null && car >= 0 && car < crews.Length ? crews[car] : null;
 
+        /// <summary>True once car i's crew have welcomed it home after the flag: parked in its box and waved for <see cref="WelcomeTime"/>.</summary>
+        public bool Received(int car) => welcomeFrom != null && car >= 0 && car < welcomeFrom.Length && welcomeFrom[car] >= 0f
+                                         && Time.time - welcomeFrom[car] >= WelcomeTime;
+
         /// <summary>The stop's clock car i's crew follows this frame.</summary>
         public StopClock ClockOf(int car) => Crew(car) == null ? default : Clock(car);
 
@@ -163,12 +183,18 @@ namespace TarmacGauntlet.Raceday
         // ---------------------------------------------------------------- materials and still figures
 
         /// <summary>The body's own materials, but the suit's cloth parts drawn with the kit shader, all instanced.</summary>
-        private void Materials()
+        private void Materials() => materials = KitMaterials(body, out kitParts);
+
+        /// <summary>
+        /// A crew body's materials with the suit's cloth parts drawn with the kit shader, all instanced, and the submeshes
+        /// those parts are: paint them with <see cref="KitBlock"/> or <see cref="DriverKit"/>. The podium dresses its people the same way.
+        /// </summary>
+        internal static Material[] KitMaterials(HqCrewBody body, out int[] kitParts)
         {
             Material[] own = body.PartMaterials(body.Palette(0));
             Shader kit = Resources.Load<Shader>("PitCrew/CrewKit");
             var parts = new List<int>();
-            materials = new Material[own.Length];
+            var materials = new Material[own.Length];
             for (int s = 0; s < own.Length; s++)
             {
                 string name = body.MaterialName(s);
@@ -188,10 +214,11 @@ namespace TarmacGauntlet.Raceday
                 parts.Add(s);
             }
             kitParts = parts.ToArray();
+            return materials;
         }
 
         /// <summary>The team's colours for the kit parts, per the chosen look.</summary>
-        private static MaterialPropertyBlock KitBlock(Color team)
+        internal static MaterialPropertyBlock KitBlock(Color team)
         {
             var b = new MaterialPropertyBlock();
             team.a = 1f;
@@ -324,6 +351,8 @@ namespace TarmacGauntlet.Raceday
             c.CarSpeed = car.Speed;
             c.CarNear = Mathf.Abs(c.Car.x) < 40f && Mathf.Abs(c.Car.y) < 12f;
             PitService service = null;
+            bool flagged = car.Supplies != null && car.Supplies.RaceOver && !car.Supplies.Retired;
+            c.Finish = flagged;
             PitPlan plan = car.AiDriving && drivers[i] != null ? drivers[i].Racer?.Pit : null;
             if (plan != null)
             {
@@ -332,8 +361,11 @@ namespace TarmacGauntlet.Raceday
                     case PitPlan.Stage.ToBox: c.Stage = CrewStage.Ready; break;
                     case PitPlan.Stage.Stopped:
                         service = plan.Service;
-                        // A retired car parks in its box for good, with no service: the crew stay in.
-                        c.Stage = service == null || car.Supplies != null && car.Supplies.Retired ? CrewStage.Home : service.Done ? CrewStage.Release : CrewStage.Stop;
+                        // A car whose race is over parks in its box for good, with no service: the crew stay in,
+                        // or after the flag come out to welcome it.
+                        if (flagged) c.Stage = Welcome(i);
+                        else c.Stage = service == null || car.Supplies != null && car.Supplies.RaceOver ? CrewStage.Home : service.Done ? CrewStage.Release : CrewStage.Stop;
+                        if (flagged) service = null;
                         break;
                     case PitPlan.Stage.Leaving: c.Stage = CrewStage.Release; break;
                     default: c.Stage = CrewStage.Home; break;
@@ -343,8 +375,10 @@ namespace TarmacGauntlet.Raceday
             {
                 service = race.Service;
                 if (service != null) c.Stage = service.Done ? CrewStage.Release : CrewStage.Stop;
+                // Home after the flag: parked in the box for good (RaceCar holds it there).
+                else if (flagged && car.Hold && race.InPitLane && toBox.sqrMagnitude < 3f * 3f) c.Stage = Welcome(i);
                 else if (race.InPitLane && Vector3.Dot(toBox, crew.Forward) > -3f && toBox.sqrMagnitude < PlayerReady * PlayerReady
-                         && (car.Supplies == null || !car.Supplies.Retired))
+                         && (car.Supplies == null || !car.Supplies.RaceOver || flagged))
                     c.Stage = CrewStage.Ready;
             }
             if (service != null)
@@ -358,7 +392,7 @@ namespace TarmacGauntlet.Raceday
                 c.NewDriver = service.NewDriver;
                 c.Duration = service.Duration;
             }
-            else if (c.Stage == CrewStage.Ready)
+            else if (c.Stage == CrewStage.Ready && !flagged)
             {
                 CarRaceLog log = car.Supplies?.Log;
                 c.NewDriver = log != null && log.NextDriverIndex != log.DriverIndex;
@@ -368,13 +402,46 @@ namespace TarmacGauntlet.Raceday
             return c;
         }
 
-        /// <summary>Poses a live rig from the person's clip, with the last one fading out under it.</summary>
+        /// <summary>
+        /// The crew's stage for car i parked in its box after the flag: waving it home for <see cref="WelcomeTime"/>,
+        /// counted from the first time asked, then back in the garage.
+        /// </summary>
+        private CrewStage Welcome(int i)
+        {
+            if (welcomeFrom[i] < 0f) welcomeFrom[i] = Time.time;
+            return Time.time - welcomeFrom[i] < WelcomeTime ? CrewStage.Welcome : CrewStage.Home;
+        }
+
+        /// <summary>Poses a live rig from the person's clip, with the last one fading out under it, and the wave over it.</summary>
         private void Pose(Live l, CrewMember m)
         {
             layers.Clear();
             if (m.UnderWeight > 0f && m.Under != null) layers.Add((body.Clips[m.Under], ClipTime(m.Under, m.UnderTime, m.UnderLoop), m.UnderWeight));
             layers.Add((body.Clips[m.Clip], ClipTime(m.Clip, m.ClipTime, m.Loop), 1f - m.UnderWeight));
             l.Rig.Pose(layers);
+            l.Wave = Mathf.MoveTowards(l.Wave, m.Waving ? 1f : 0f, WaveRaise * Time.deltaTime);
+            if (l.Wave > 0f) Wave(l, m.IdleFrom);
+        }
+
+        /// <summary>
+        /// Raises the right arm over the clip's pose, up and a little out to the side, the forearm swinging over the
+        /// elbow. Worked in the world from where the joints are, so it holds whatever way the bones' own axes lie.
+        /// </summary>
+        private static void Wave(Live l, float phase)
+        {
+            Transform arm = l.RightArm, fore = l.RightForeArm, hand = l.RightHand;
+            if (arm == null || fore == null || hand == null) return;
+            Transform root = l.Rig.Root.transform;
+            Vector3 side = Vector3.ProjectOnPlane(arm.position - root.position, Vector3.up);
+            side = side.sqrMagnitude > 1e-4f ? side.normalized : root.right;
+            Vector3 upper = (Vector3.up * 0.8f + side * 0.45f).normalized;
+            Quaternion armWas = arm.rotation;
+            arm.rotation = Quaternion.Slerp(armWas, Quaternion.FromToRotation(fore.position - arm.position, upper) * armWas, l.Wave);
+            Vector3 across = Vector3.Cross(Vector3.up, side);
+            float swing = Mathf.Sin((Time.time * WaveRate + phase) * 2f * Mathf.PI) * WaveSwing;
+            Vector3 lower = Quaternion.AngleAxis(swing, across) * (Vector3.up * 0.95f + side * 0.15f).normalized;
+            Quaternion foreWas = fore.rotation;
+            fore.rotation = Quaternion.Slerp(foreWas, Quaternion.FromToRotation(hand.position - fore.position, lower) * foreWas, l.Wave);
         }
 
         private float ClipTime(string clip, float t, bool loop)
@@ -438,6 +505,7 @@ namespace TarmacGauntlet.Raceday
             for (int k = 0; k < crew.People.Length; k++)
             {
                 Live l = pool.Count > 0 ? pool.Pop() : NewRig();
+                l.Wave = 0f;
                 l.Rig.Root.SetActive(true);
                 Paint(l.Skin, kits[i]);
                 Place(l.Rig.Root.transform, crew, crew.People[k]);
@@ -469,7 +537,11 @@ namespace TarmacGauntlet.Raceday
             rig.Root.name = "Live crew " + ++built;
             var skin = rig.Root.GetComponentInChildren<SkinnedMeshRenderer>();
             skin.sharedMaterials = materials;
-            return new Live { Rig = rig, Skin = skin, LeftHand = rig.Find("LeftHand"), RightHand = rig.Find("RightHand") };
+            return new Live
+            {
+                Rig = rig, Skin = skin, LeftHand = rig.Find("LeftHand"), RightHand = rig.Find("RightHand"),
+                RightArm = rig.Find("RightArm"), RightForeArm = rig.Find("RightForeArm"),
+            };
         }
     }
 }

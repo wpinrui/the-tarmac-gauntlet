@@ -12,8 +12,10 @@ namespace TarmacGauntlet.Raceday
     /// it, one row per car: position, a slash in the team's colour, team name, class badge and fake laps
     /// completed (<see cref="Standings"/>). Class leaders have their position on a red block, and the
     /// player's row is white. It shows every class leader and the four cars either side of the player,
-    /// then fills the screen height with the fastest class. Sizes are in design units, a hundredth of
-    /// the width of a 16:9 screen.
+    /// then fills the screen down to the driver card with the fastest class. Once the leader takes the flag, after the
+    /// time runs out, the countdown gives way to a chequered flag, and each car that has taken the flag has one beside its laps. As the
+    /// watched car takes it, a chequered flag and its finishing position show at the top of the screen for
+    /// <see cref="BannerTime"/>. Sizes are in design units, a hundredth of the width of a 16:9 screen.
     /// </summary>
     public sealed class RaceTower : MonoBehaviour
     {
@@ -42,6 +44,10 @@ namespace TarmacGauntlet.Raceday
         public Func<bool> Racing;
         /// <summary>True to stop drawing the tower, while live timing is up. The clock keeps running.</summary>
         [NonSerialized] public bool Hidden;
+        /// <summary>True once car i has taken the chequered flag, or null when no race is kept.</summary>
+        public Func<int, bool> Flagged;
+        /// <summary>How long the finishing banner stays up, real seconds.</summary>
+        public const float BannerTime = 6f;
 
         // Layout, in design units.
         private const float Margin = 1.6f, Width = 24f;
@@ -78,8 +84,13 @@ namespace TarmacGauntlet.Raceday
         private Font bold, semiBold;
         private GUIStyle clockStyle, hourStyle, posStyle, teamStyle, badgeStyle, gapStyle, headerStyle;
         private int styledFor = -1;
-        private Texture2D slash, lead;
+        private Texture2D slash, lead, flag;
         private string[] positions;
+        private int finishers;
+        /// <summary>When the watched car took the flag, in unscaled seconds, and the place it took it in, or -1 before.</summary>
+        private float bannerAt = -1f;
+        private string bannerText;
+        private GUIStyle bannerStyle;
 
         private void Start()
         {
@@ -95,6 +106,7 @@ namespace TarmacGauntlet.Raceday
             slash = Shape(barSpan, BarHeight, (x, y) => x >= y / BarHeight * shift && x <= y / BarHeight * shift + BarWidth);
             float leadWidth = PosWidth + LeadReach;
             lead = Shape(leadWidth, RowHeight, (x, y) => x <= leadWidth - LeadSlant * (1f - y / RowHeight));
+            flag = ChequeredFlag();
         }
 
         private void Update()
@@ -106,19 +118,33 @@ namespace TarmacGauntlet.Raceday
             for (int i = 0; i < Cars.Length; i++)
             {
                 if (Cars[i] == null) continue;
-                entries[i].Distance = Cars[i].Traffic.Distance;
-                entries[i].Player = i == Player;
-                order.Add(entries[i]);
+                Standings.Car e = entries[i];
+                if (!e.Finished && Flagged != null && Flagged(i)) Standings.Finish(e, Cars[i].Laps, Lap, ++finishers);
+                if (!e.Finished) e.Distance = Cars[i].Traffic.Distance;
+                e.Player = i == Player;
+                order.Add(e);
             }
             Standings.Rank(order, Lap, racing);
             Standings.Rows(order, Fit(), rows);
+            if (bannerAt < 0f && Player >= 0 && Player < entries.Length && entries[Player].Finished)
+            {
+                bannerAt = Time.unscaledTime;
+                bannerText = "P" + entries[Player].Position;
+            }
         }
 
-        /// <summary>How many rows fit between the top of the screen and the bottom margin.</summary>
+        /// <summary>Car i as the tower ranks it, or null before the tower has started.</summary>
+        public Standings.Car Entry(int i) => entries != null && i >= 0 && i < entries.Length ? entries[i] : null;
+
+        /// <summary>True once the leader has taken the chequered flag, after the race time ran out.</summary>
+        public bool FlagOut => finishers > 0;
+
+        /// <summary>How many rows fit between the top of the screen and the driver card below the tower.</summary>
         private static int Fit()
         {
             float u = Unit();
-            float room = Screen.height / u - 2f * Margin - TabHeight - 2f * BodyPad - HeaderHeight - BreakHeight;
+            float card = DriverCard.Room / (19.2f * Scale);
+            float room = Screen.height / u - Margin - card - TabHeight - 2f * BodyPad - HeaderHeight - BreakHeight;
             return Mathf.Max(1, Mathf.FloorToInt(room / RowHeight));
         }
 
@@ -158,7 +184,12 @@ namespace TarmacGauntlet.Raceday
             float tabWidth = clockStyle.CalcSize(new GUIContent(time)).x + 2f * TabPad * u;
             var tab = new Rect(x, y, tabWidth, TabHeight * u);
             Fill(tab, TabColour, new Vector4(Radius * u, Radius * u, 0f, 0f));
-            GUI.Label(tab, time, clockStyle);
+            if (FlagOut)
+            {
+                float fh = TabHeight * 0.62f * u, fw = fh * FlagAspect;
+                GUI.DrawTexture(new Rect(tab.center.x - fw / 2f, tab.center.y - fh / 2f, fw, fh), flag, ScaleMode.StretchToFill, true);
+            }
+            else GUI.Label(tab, time, clockStyle);
             string hour = TimeOfDayText;
             var hourTab = new Rect(tab.xMax + BodyPad * u, y, hourStyle.CalcSize(new GUIContent(hour)).x + 2f * TabPad * u, TabHeight * u);
             Fill(hourTab, TabColour, new Vector4(Radius * u, Radius * u, 0f, 0f));
@@ -190,6 +221,26 @@ namespace TarmacGauntlet.Raceday
                 afterBreak = false;
                 y += RowHeight * u;
             }
+            Banner(u);
+        }
+
+        /// <summary>The chequered flag and the watched car's finishing position, at the top of the screen, fading out at the end.</summary>
+        private void Banner(float u)
+        {
+            if (bannerAt < 0f) return;
+            float age = Time.unscaledTime - bannerAt;
+            if (age > BannerTime) return;
+            float alpha = Mathf.Clamp01(BannerTime - age);
+            float h = 4.2f * u, pad = 1.2f * u;
+            float fh = h - 2f * pad * 0.6f, fw = fh * FlagAspect;
+            float textWidth = bannerStyle.CalcSize(new GUIContent(bannerText)).x;
+            float width = pad + fw + pad + textWidth + pad;
+            var r = new Rect((Screen.width - width) / 2f, Margin * u, width, h);
+            Color back = TabColour;
+            back.a *= alpha;
+            Fill(r, back, Vector4.one * Radius * u);
+            GUI.DrawTexture(new Rect(r.x + pad, r.center.y - fh / 2f, fw, fh), flag, ScaleMode.StretchToFill, true, 0f, new Color(1f, 1f, 1f, alpha), 0f, 0f);
+            Text(new Rect(r.x + pad + fw + pad, r.y, textWidth, h), bannerText, bannerStyle, new Color(1f, 1f, 1f, alpha));
         }
 
         private void DrawRow(Standings.Car c, float x, float y, float w, float u, float classX, float gapX, bool rule)
@@ -223,7 +274,15 @@ namespace TarmacGauntlet.Raceday
             Text(badge, letter, badgeStyle, colour);
 
             Text(new Rect(gapX, y, GapWidth * u, h), Laps(c), gapStyle, player ? PlayerText : Color.white);
+            if (c.Finished)
+            {
+                float fh = RowFlag * u, fw = fh * FlagAspect;
+                GUI.DrawTexture(new Rect(gapX + FlagPad * u, y + (h - fh) / 2f, fw, fh), flag, ScaleMode.StretchToFill, true);
+            }
         }
+
+        /// <summary>The height of the flag beside a finished car's laps, and its gap from the class badge, in design units.</summary>
+        private const float RowFlag = 0.75f, FlagPad = 0.2f;
 
         /// <summary>The fake laps the car has completed.</summary>
         private string Laps(Standings.Car c)
@@ -280,6 +339,7 @@ namespace TarmacGauntlet.Raceday
             badgeStyle = Make(bold, 0.9f * u, TextAnchor.MiddleCenter);
             gapStyle = Make(semiBold, 1.05f * u, TextAnchor.MiddleRight);
             headerStyle = Make(semiBold, 0.74f * u, TextAnchor.MiddleRight);
+            bannerStyle = Make(bold, 2.4f * u, TextAnchor.MiddleLeft);
         }
 
         private static GUIStyle Make(Font font, float size, TextAnchor anchor) => new GUIStyle(GUI.skin.label)
@@ -333,6 +393,54 @@ namespace TarmacGauntlet.Raceday
             return (handle || head) && !jaw;
         });
 
+        /// <summary>Width over height of the chequered flag.</summary>
+        internal const float FlagAspect = 1.4f;
+
+        /// <summary>
+        /// A chequered flag rippling in the wind: black and white squares, five across and four down, with a
+        /// thin dark edge so its white squares read on a white row. Drawn untinted, or tinted for its alpha.
+        /// </summary>
+        internal static Texture2D ChequeredFlag()
+        {
+            const int Rows = 96, Samples = 3, Across = 5, Down = 4;
+            int columns = Mathf.RoundToInt(Rows * FlagAspect);
+            var tex = new Texture2D(columns, Rows, TextureFormat.RGBA32, false)
+            {
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+                hideFlags = HideFlags.DontSave,
+            };
+            const float Wave = 0.06f, Edge = 0.035f;
+            var pixels = new Color32[columns * Rows];
+            for (int j = 0; j < Rows; j++)
+            for (int i = 0; i < columns; i++)
+            {
+                float r = 0f, g = 0f, b = 0f, a = 0f;
+                for (int sj = 0; sj < Samples; sj++)
+                for (int si = 0; si < Samples; si++)
+                {
+                    float u = (i + (si + 0.5f) / Samples) / columns;
+                    float v = (j + (sj + 0.5f) / Samples) / Rows;
+                    // The cloth ripples up and down along its length, more towards the fly end.
+                    float y = (v - 0.5f) * (1f + 2f * Wave) + 0.5f - Wave * u * Mathf.Sin(u * Mathf.PI * 2.2f);
+                    if (y < 0f || y > 1f) continue;
+                    bool edge = u < Edge || u > 1f - Edge || y < Edge * FlagAspect || y > 1f - Edge * FlagAspect;
+                    bool dark = edge || ((Mathf.FloorToInt(u * Across) + Mathf.FloorToInt(y * Down)) & 1) == 0;
+                    // A little shading in the folds.
+                    float shade = 0.88f + 0.12f * Mathf.Cos(u * Mathf.PI * 2.2f);
+                    float c = dark ? 0.08f : shade;
+                    r += c; g += c; b += c; a += 1f;
+                }
+                int n = Samples * Samples;
+                pixels[j * columns + i] = a > 0f
+                    ? new Color32((byte)(255 * r / a), (byte)(255 * g / a), (byte)(255 * b / a), (byte)(255 * a / n))
+                    : new Color32(0, 0, 0, 0);
+            }
+            tex.SetPixels32(pixels);
+            tex.Apply();
+            return tex;
+        }
+
         /// <summary>A fuel pump with its hose.</summary>
         internal static Texture2D FuelIcon() => Shape(1f, 1f, (x, y) =>
         {
@@ -378,6 +486,7 @@ namespace TarmacGauntlet.Raceday
         {
             if (slash != null) Destroy(slash);
             if (lead != null) Destroy(lead);
+            if (flag != null) Destroy(flag);
         }
 
         public static Color ClassColour(CarClass c) => c switch

@@ -1,15 +1,16 @@
-"""Renders Ivan's three night frames with the cars' headlamps as the race draws them, before and after the headlamp fix.
+"""Renders Ivan's night frames with the cars' headlamps as the race draws them, before and after the headlamp fix.
 
-The real headlamp lights (NightLights: spot lights that light only the cars) are rendered by Cycles with URP's inverse
-square falloff and the game's intensities: before, at the middle of the headlamps with the Gamma lamp matched at 15 m,
-which comes to about 960; after, just ahead of the bumper at 24, dimmed for a car close in front. The beam on the road
-before was drawn by the HeadlampBeam decal, its added light pinned at its cap (the scene's colour it read came back
-flat, which is what drew the hard slab in Ivan's frames); after, the ground's own shading takes the headlamps' light in
-its own colour (Headlamps.hlsl), from every car. The floodlights,
-their pools and their beams in the mist are as beams.py draws them, and the post stack follows.
+The real headlamp lights (NightLights: spot lights that light only the cars, just ahead of each bumper at 24, dimmed for
+a car close in front) are rendered by Cycles with URP's inverse square falloff. The headlamps' light on the ground is the
+ground's own shading (Headlamps.hlsl): it is added to the opaque pass in each surface's own colour, from every car, and
+the floodlights' pools then brighten it as they brighten the rest. Before is that light as it first went in, at full
+strength from every car with nothing to stop it adding up; after, the cars' light saturates at 1.3 times one car's and a
+car under the floodlights throws a share of it. The floodlights' beams in the mist are as beams.py draws them, and the
+post stack follows.
 
-Usage: [HOUR=22] python headlamps.py out_dir frame       frame is "alongside" (19:06, floodlights on, a car alongside),
-       "dark" (20:43, no circuit lights) or "pack" (20:42, no circuit lights, cars close ahead); REUSE=1 keeps renders
+Usage: [HOUR=22] python headlamps.py out_dir frame       frame is "field" (19:06, floodlights on, twenty cars down the
+       straight), "alongside" (19:06, floodlights on, a car alongside), "dark" (20:43, no circuit lights, one car) or
+       "pack" (20:42, no circuit lights, cars close ahead); REUSE=1 keeps renders
 """
 import math
 import os
@@ -19,7 +20,7 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 out_dir, frame_name = sys.argv[1], sys.argv[2]
-HOURS = {"alongside": 19.1, "dark": 20.72, "pack": 20.7}
+HOURS = {"field": 19.1, "alongside": 19.1, "dark": 20.72, "pack": 20.7}
 hour = float(os.environ.get("HOUR", HOURS[frame_name]))
 TAG = frame_name if "HOUR" not in os.environ else f"{frame_name}-{os.environ['HOUR']}"
 sys.argv = [sys.argv[0], out_dir, "straight", str(hour)]
@@ -32,19 +33,24 @@ HEAD = beams.HEAD
 
 # NightLights and LightFalloff.
 HEAD_RANGE, HEAD_CONE, HEAD_LIGHTS = 70.0, 55.0, 15.0
-HEAD_BEFORE = 959.0           # LightFalloff.UrpLinear(HeadTint, 3, 70, 15)
 HEAD_AFTER, HEAD_AHEAD, HEAD_NEAREST = 24.0, 0.15, 2.0
 CAR_HALF_LENGTH, CAR_HALF_WIDTH = 2.2, 0.9
 # CarLamps: the headlamps' middle and the bumper, from the car's middle, m.
 NOSE_Y, NOSE_Z, FRONT_Z = 0.65, 1.8, 2.3
-# The beam on the road.
-BEFORE_GAIN, BEFORE_CAP, BEFORE_LIFT, BEFORE_SCENE = 10.0, 0.4, 0.03, 0.5
 # Headlamps.hlsl and NightLook: the light the headlamps throw on the ground, and how far.
-GROUND_LIGHT, GROUND_REACH = float(os.environ.get("GROUND_LIGHT", "5.0")), 75.0
+GROUND_LIGHT, GROUND_REACH = 5.0, 75.0
+GROUND_UNDER_FLOODS, GROUND_SATURATE = 0.01, 1.466
 
 # Each frame: floodlights on, the camera (position, a point it looks at), the other cars (x, z of their middles, colour),
 # and which cars carry a real headlamp light (the nearest the camera: 0 is our own).
+FIELD_COLOURS = [(0.85, 0.72, 0.12), (0.2, 0.6, 0.2), (0.7, 0.1, 0.1), (0.85, 0.85, 0.85), (0.2, 0.35, 0.8),
+                 (0.85, 0.2, 0.75), (0.95, 0.5, 0.1), (0.1, 0.1, 0.12)]
+FIELD = [(x, z, FIELD_COLOURS[i % len(FIELD_COLOURS)]) for i, (x, z) in enumerate(
+    [(-2.2, 10.0), (2.6, -9.0), (1.8, 24.0), (-3.0, 33.0), (2.4, 47.0), (-1.0, 60.0), (3.2, 72.0), (-2.6, 86.0),
+     (0.8, 101.0), (-3.4, 118.0), (2.2, 137.0), (-1.4, 158.0), (-2.8, -22.0), (1.0, -34.0), (3.0, -48.0),
+     (-1.8, -61.0), (2.0, -77.0), (-3.0, -92.0), (0.6, -110.0)])]
 FRAMES = {
+    "field": (True, ((0.0, 1.15, -2.9), (0.0, 0.5, 7.1)), FIELD, [0, 1, 2]),
     "alongside": (True, ((0.0, 1.05, -2.7), (0.0, 0.45, 7.3)),
                   [(-2.9, 0.6, (0.85, 0.72, 0.12)), (2.0, 32.0, (0.2, 0.6, 0.2)), (-1.5, 60.0, (0.7, 0.1, 0.1))], [0, 1]),
     "dark": (False, ((0.0, 1.05, -2.7), (0.0, 0.45, 7.3)),
@@ -138,16 +144,12 @@ def build(s, which):
     forward = np.array([0, -math.sin(math.radians(4)), math.cos(math.radians(4))])
     for i in lit:
         x, z, _ = middles[i]
-        if which == "before":
-            at = np.array([x, NOSE_Y, z + NOSE_Z])
-            head_light(f"head{i}", at, HEAD_BEFORE, cars)
-        else:
-            at = np.array([x, NOSE_Y, z + FRONT_Z + HEAD_AHEAD])
-            near = nearest(i, at, forward, middles)
-            share = at_share(near, HEAD_RANGE)
-            scale = min(1.0, HEAD_NEAREST * at_share(HEAD_LIGHTS, HEAD_RANGE) / share) if share > 0 else 1.0
-            print(f"car {i}: nearest car in front {near:.1f} m, light at {scale:.2f} of {HEAD_AFTER}")
-            head_light(f"head{i}", at, HEAD_AFTER * scale, cars)
+        at = np.array([x, NOSE_Y, z + FRONT_Z + HEAD_AHEAD])
+        near = nearest(i, at, forward, middles)
+        share = at_share(near, HEAD_RANGE)
+        scale = min(1.0, HEAD_NEAREST * at_share(HEAD_LIGHTS, HEAD_RANGE) / share) if share > 0 else 1.0
+        print(f"car {i}: nearest car in front {near:.1f} m, light at {scale:.2f} of {HEAD_AFTER}")
+        head_light(f"head{i}", at, HEAD_AFTER * scale, cars)
 
 
 def camera():
@@ -188,11 +190,13 @@ def render(s, which):
     return cam, dirs, beams.read_layers(path)
 
 
-def ground_light(pos, nrm, sky, lamps):
-    """Headlamps.hlsl: the light each car's headlamps throw on the ground ahead, per unit of albedo."""
+def ground_light(pos, nrm, sky, lamps, new):
+    """Headlamps.hlsl: the light the cars' headlamps throw on the ground ahead, per unit of albedo. Each lamp is (where,
+    heading, height, share of its light); before, every share was 1, a slope could take half as much again and the sum
+    had no limit."""
     sm = beams.sm
     e = np.zeros(pos.shape[:-1])
-    for at, fwd, h in lamps:
+    for at, fwd, h, share in lamps:
         up = np.array([0.0, 1.0, 0.0]) - fwd * fwd[1]
         up /= np.linalg.norm(up)
         right = np.cross(up, fwd)
@@ -207,7 +211,9 @@ def ground_light(pos, nrm, sky, lamps):
         side = np.exp(-1.2 * u * u)
         cut = (1 - sm(0.0, 0.06, y / zc)) * sm(-h - 4.0, -h - 2.5, y)
         facing = np.clip(np.sum(nrm * -(v / d[..., None]), -1), 0, None) / np.maximum(h / d, 0.01)
-        e += along * side * cut * np.minimum(facing, 1.5)
+        e += along * side * cut * np.minimum(facing, 1.0 if new else 1.5) * (share if new else 1.0)
+    if new:
+        e = (1 - np.exp(-GROUND_SATURATE * e)) / (1 - math.exp(-GROUND_SATURATE))
     # Only the ground's shaders take it: the road, its lines and the grass, not the cars.
     return np.where(sky | (pos[..., 1] > 0.05), 0.0, e)
 
@@ -219,26 +225,26 @@ def main():
     g = skyclock.grade(s)
     on = skyclock.sm(0, 0.12, s["night"])
     rads = {}
+    cam, dirs, L = render(s, "scene")
+    opaque = L["Combined"][..., :3]
+    pos = L["Position"][..., [0, 2, 1]]
+    nrm = L["Normal"][..., [0, 2, 1]]
+    albedo = L["Diffuse Color"][..., :3]
+    sky = (np.linalg.norm(pos - cam, axis=-1) > 15000) | (np.linalg.norm(pos, axis=-1) < 1e-6)
+    dist = np.where(sky, 1e7, np.linalg.norm(pos - cam, axis=-1))
+    up = (nrm[..., 1] > 0.7) & ~sky & (pos[..., 1] < 0.2)
+    p = beams.pools(pos, up, beams.flat)[..., None] * (on if floods else 0.0)
+    # NightLook.HeadlampDark, and HeadlampGround's share for a car whose beam falls in the floodlights' pools: the
+    # straight's masts light all of it.
+    dark = skyclock.sm(4.0, 16.0, -s["e"])
+    share = GROUND_UNDER_FLOODS if floods else 1.0
+    fwd = np.array([0.0, 0.0, 1.0])
     for which in ("before", "after"):
-        cam, dirs, L = render(s, which)
-        opaque = L["Combined"][..., :3]
-        pos = L["Position"][..., [0, 2, 1]]
-        nrm = L["Normal"][..., [0, 2, 1]]
-        sky = (np.linalg.norm(pos - cam, axis=-1) > 15000) | (np.linalg.norm(pos, axis=-1) < 1e-6)
-        dist = np.where(sky, 1e7, np.linalg.norm(pos - cam, axis=-1))
-        up = (nrm[..., 1] > 0.7) & ~sky & (pos[..., 1] < 0.2)
-        p = beams.pools(pos, up, beams.flat)[..., None] * (on if floods else 0.0)
-        rad = opaque * (1 + ft * beams.POOL_BRIGHTENING * p) + ft * beams.POOL_LIFT * p
-        if which == "before":
-            w = beams.beam_decal(pos, sky, cam, beams.car_frame(0.0))[..., None]
-            add = BEFORE_SCENE * ht * BEFORE_GAIN * on * w
-            lum = (add @ LUMA)[..., None]
-            rad = rad + add / (1 + lum / (BEFORE_CAP * on)) + ht * BEFORE_LIFT * on * w
-        else:
-            fwd = np.array([0.0, 0.0, 1.0])
-            lamps = [(np.array([x, NOSE_Y, z + FRONT_Z]), fwd, NOSE_Y) for x, z, _ in MIDDLES]
-            e = ground_light(pos, nrm, sky, lamps)[..., None]
-            rad = rad + L["Diffuse Color"][..., :3] * ht * (GROUND_LIGHT * on) * e
+        new = which == "after"
+        lamps = [(np.array([x, NOSE_Y, z + FRONT_Z]), fwd, NOSE_Y, share) for x, z, _ in MIDDLES]
+        e = ground_light(pos, nrm, sky, lamps, new)[..., None]
+        lit_ground = opaque + albedo * ht * (GROUND_LIGHT * on * (dark if new else 1.0)) * e
+        rad = lit_ground * (1 + ft * beams.POOL_BRIGHTENING * p) + ft * beams.POOL_LIFT * p
         rads[which] = (rad, dirs, dist, cam)
     beam_list = beams.mast_beams(rads["before"][3], beams.flat) if floods else []
     for level, (scale, has_bloom, div, steps) in beams.LEVELS.items():
@@ -250,8 +256,7 @@ def main():
                 d = dirs[div // 2::div, div // 2::div][:h, :w_]
                 reach = np.minimum(dist[div // 2::div, div // 2::div][:h, :w_], beams.FOG_REACH)
                 jit = beams.ign(h, w_, 7)
-                lit_ = beams.mist_old(cam, d, reach, jit, beam_list, steps) if which == "before" else \
-                    beams.mist_new(cam, d, reach, jit, beam_list)
+                lit_ = beams.mist_new(cam, d, reach, jit, beam_list)
                 m = np.repeat(np.repeat(lit_, div, 0), div, 1)[:H, :W, None] * (ft * on * beams.BEAM_STRENGTH / (4 * math.pi))
                 r = r + np.pad(m, ((0, H - m.shape[0]), (0, W - m.shape[1]), (0, 0)))
             bl = bloom(r, g["exposure"]) if has_bloom else None

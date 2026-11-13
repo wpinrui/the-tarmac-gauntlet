@@ -6,7 +6,8 @@ namespace TarmacGauntlet.Raceday
     /// <summary>
     /// Speed and gear in the bottom right corner while driving, in the race font. Above them a rev bar
     /// lights from the left as the engine climbs to the redline, and flashes blue at the shift point.
-    /// Above that are the fuel and tyre bars, each behind its icon. The gear is blue in automatic and
+    /// Above that are the fuel and tyre bars, each behind its icon, with the laps it has left at its
+    /// right end, as learned over the stint (<see cref="Consumables.Stint"/>). The gear is blue in automatic and
     /// white in manual. The speed turns amber while the pit lane limiter is on. The fuel bar is green in
     /// Conserve, white in Normal and orange in Push. Above the fuel bar the engine maps sit on their keys, 1, 2
     /// and 3, the one in use lit in its colour. The tyre bar turns red once the tyres are nearly
@@ -18,7 +19,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>True while the TV view shows the broadcast.</summary>
         [System.NonSerialized] public bool Hidden;
 
-        private GUIStyle gear, speed, key;
+        private GUIStyle gear, speed, key, laps;
         /// <summary>The engine maps in the order of their keys.</summary>
         private static readonly EngineMap[] Maps = { EngineMap.Conserve, EngineMap.Normal, EngineMap.Push };
         private static readonly Color Ink = new Color(0.07f, 0.07f, 0.07f);
@@ -96,8 +97,10 @@ namespace TarmacGauntlet.Raceday
             Color fuelColour = s.Map == EngineMap.Push ? Push : s.Map == EngineMap.Conserve ? Conserve : Color.white;
             float tyreRow = revTop - 14f * scale - icon;
             float fuelRow = tyreRow - rowGap - icon;
-            Supply(new Rect(left, tyreRow, width, icon), tyreIcon, tyres, tyres < 0.15f ? Worn : Color.white, barHeight);
-            Supply(new Rect(left, fuelRow, width, icon), fuelIcon, s.Fuel / s.Capacity, fuelColour, barHeight);
+            if (laps == null) laps = new GUIStyle(speed);
+            laps.fontSize = Mathf.RoundToInt(22 * scale);
+            Supply(new Rect(left, tyreRow, width, icon), tyreIcon, tyres, tyres < 0.15f ? Worn : Color.white, barHeight, s.TyreLaps(PitPlan.WearLimit), laps, scale);
+            Supply(new Rect(left, fuelRow, width, icon), fuelIcon, s.Fuel / s.Capacity, fuelColour, barHeight, s.FuelLaps, laps, scale);
 
             // The engine maps, on their keys, above the fuel bar.
             if (key == null) key = new GUIStyle(speed) { alignment = TextAnchor.MiddleCenter };
@@ -120,12 +123,15 @@ namespace TarmacGauntlet.Raceday
         private static Rect Line(float left, float width, float baseline, int size) =>
             new Rect(left, baseline + Descent * size - LineHeight * size, width, LineHeight * size);
 
-        /// <summary>An icon on the left of a row, then a thin bar filled from the left in the rest of it.</summary>
-        private static void Supply(Rect row, Texture2D icon, float fill, Color colour, float barHeight)
+        /// <summary>An icon on the left of a row, a thin bar filled from the left, and the whole laps left on the right.</summary>
+        private static void Supply(Rect row, Texture2D icon, float fill, Color colour, float barHeight, float lapsLeft, GUIStyle style, float scale)
         {
             GUI.DrawTexture(new Rect(row.x, row.y, row.height, row.height), icon, ScaleMode.StretchToFill, true, 0f, colour, 0f, 0f);
+            float number = 40f * scale;
+            style.normal.textColor = colour;
+            Shadowed(Line(row.xMax - number, number, row.center.y + CapHeight * style.fontSize / 2f, style.fontSize), Mathf.FloorToInt(Mathf.Min(lapsLeft, 999f)).ToString(), style, scale);
             float x = row.x + row.height * 1.5f;
-            var bar = new Rect(x, row.center.y - barHeight / 2f, row.xMax - x, barHeight);
+            var bar = new Rect(x, row.center.y - barHeight / 2f, row.xMax - number - 8f * scale - x, barHeight);
             Fill(bar, Track);
             Fill(new Rect(bar.x, bar.y, bar.width * Mathf.Clamp01(fill), bar.height), colour);
         }

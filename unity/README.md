@@ -93,14 +93,55 @@ target speed for every 2 m sample (`SpeedProfile.cs`, from the car's grip, downf
 brakes). After a hard crash, or when stuck or spun, it puts the car back on track itself. The console
 shows its predicted lap time and each lap it drives.
 
-The camera starts on the broadcast when the race comes from the career, and on the chase camera when the scene runs on
-its own. `C` cycles the car cameras: TV, chase, bonnet and bumper. The TV camera is coverage locked to the car: a second
+The stages before the green and after the chequered flag run in turn (`Stages/StageSequence.cs`): `intro` plays once the
+scene is built and `outro` once the race's time is up. A stage derives from `SkippableStage` and is added in
+`CircuitScene` with `intro.Add` or `outro.Add`. While one runs, the hint at the bottom of the screen reads "Press and
+hold [Enter] to skip [stage]". Holding Enter for a second fills the circle beside it, and the full circle skips that
+one stage. The next stage fills only after Enter is let go (`SkipHold.cs`).
+
+The race preview (`Stages/BroadcastIntro.cs`) comes first. It opens over the start line with the event and the year
+(year 1 is 2026), flies a lap beside a diagram of the circuit with each turn called out (`Stages/PreviewPath.cs`), then
+shows each class's expected lap time, last year's class podiums, past winners and each class's favourite
+(`Stages/IntroFacts.cs`). A stage that places the camera sets `RaceCameras.Held` and runs after it in the frame. After
+changing the preview, run `bash tools/intro-check/run.sh`: it flies the camera over the real circuit, checking it keeps
+clear of the ground, sees the road and turns smoothly, and checks the figures from a career.
+
+The grid presentation (`Stages/GridPresentation.cs`) shows pole and second, each class's pole and your car, each in a slow
+shot from in front of it with a strip naming its place, driver, team, model and class. Then the whole grid shows on the
+board, two by two and staggered, twenty places a page, over a crane shot across the field (`Stages/GridRunsheet.cs`).
+
+The last stage before the green is the end of the formation lap (`Stages/FinalFormation.cs`). It cuts to the leader
+200 m short of the last corner, the pace car gone into the pit lane and the field behind two by two in grid order, and
+ends at the green. It is the start of the race, so it can't be skipped. From the cut you drive your own car, on a limiter until
+you cross the line: past the speed that holds your place the power is cut, and a little over it the brakes come on, so
+you can't pass the car before you in grid order. `bash tools/ai-check/run.sh final` runs it with 100 cars, with and
+without a player driving flat out against the limiter.
+
+After the flag come the cool-down lap (`Stages/CooldownStage.cs`), then two podium ceremonies (`Podium/PodiumStage.cs`):
+the overall top three, then your class's, skipped when it is the same three cars or you have no car in the race. The
+podium stands all race on the race offices' front, a balcony over the pit lane with three steps under a canopy
+(`Podium/PodiumPlan.cs`, `Podium/PodiumBuilder.cs`). A ceremony (`Podium/PodiumShow.cs`) is a timeline: the drivers
+walk out of the doorway and up onto their steps, each lead driver is handed the trophy and lifts it, then takes the
+champagne from the ice bucket, shakes it and sprays it over the others and the podium teams' crews in the fast lane
+below, and confetti falls. Every car still on its cool-down lap is put in its box first. The people are Team HQ's crew
+body as live rigs, posed from its clips with their arms reaching for the trophy and the bottle (`Podium/Podium.cs`).
+Each person has their own pace, timing, lean and mark, so nobody moves in step. The crowd below swells with how many
+are cheering and roars at each moment; the corks pop, the champagne fizzes and the confetti cannon booms
+(`Podium/PodiumSound.cs`). The corks, fizz and confetti are synthesised by `python3 tools/podium/sounds.py`.
+The race summary opens once the last ceremony ends or is skipped (`RaceDirector.ShowSummary`). After changing the
+podium, run `bash tools/podium/run.sh [folder]`: it builds the podium on the real pit building and plays a ceremony
+for every line-up of one to three drivers in each place, checking it sits on the offices, nobody walks into anybody,
+every hand reaches what it holds, the crowd stands clear of the parked cars and every shot's camera is clear. With a
+folder it writes a preview there that plays the ceremony through its own camera.
+
+The camera starts on the chase camera. The broadcast has no way in for now, while the mode is rethought: its `V` toggle
+is off. Do not remove the broadcast mode or its director, which stay in the game to come back. `C` cycles the car cameras: TV, chase, bonnet and bumper. The TV camera is coverage locked to the car: a second
 director with `Lock` set shows mostly trackside shots and pans, a helicopter shot now and then, and an onboard about one
-shot in ten (roll hoop, driver's seat or wing mirror, in turn, never down at the bumpers). `V` puts the broadcast on, and `V` or `C` takes it off. Holding `B` looks back on every
+shot in ten (roll hoop, driver's seat or wing mirror, in turn, never down at the bumpers). Holding `B` looks back on every
 camera. While you are not driving your own car, the car camera is yours to move and still rides along with the car. Hold
 the right mouse button and drag to look, `W` `A` `S` `D` move, `Q` and `E` go down and up, `Shift` is 5x faster and the
 wheel changes speed. On the TV camera the drag orbits the car and the wheel zooms, within each shot. Switching camera or
-car, or taking the wheel, puts the view back. Camera in the race's pause menu sets the chase, bonnet and bumper cameras'
+car, or taking the wheel, puts the view back. `Backspace` comes back to your own car. Camera in the race's pause menu sets the chase, bonnet and bumper cameras'
 field of view, position and tilt (`Visuals/CameraPresets.cs`). The bonnet camera's position is moved from each car's own
 bonnet spot, just ahead of the windscreen's base and over the bonnet, measured from its model (`CarCameraSpots.cs`), with the race seen through the camera being tuned beside the
 panel, changing as each slider moves. On the broadcast the director (`BroadcastDirector.cs`) picks
@@ -111,6 +152,11 @@ helicopter, onboard and pit lane shots.
 The director's shots carry the broadcast graphics (`BroadcastGraphics.cs`): a battle strip with the gap in a
 fight, a driver strip the first time a car is on air in a stint, a pit timer with fuel, tyres and driver
 change lit as each is done, and the track map during helicopter shots, or always with Track map on in the settings.
+
+Off the broadcast, the driver card (`DriverCard.cs`) sits bottom left under the timing tower, which stops short for it: the driver now in the car
+the cameras ride with, their flag, name and overall (the average of their five stats, as in the menus), over their
+five stats. While that car rolls through the pit lane to a stop that changes the driver, a strip above it, tabbed NEXT, shows who
+gets in (`NextDriverWatch` in `DriverFacts.cs`). `bash tools/driver-card-check/run.sh` checks both outside Unity.
 
 `T` opens live timing while the AI drives your car (`LiveTiming.cs`), with the race at 16x behind it: every
 car in race order by class, your car's onboard and the track map, its driver, fuel, tyres and condition with

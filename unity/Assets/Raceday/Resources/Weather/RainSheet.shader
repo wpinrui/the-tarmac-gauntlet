@@ -61,7 +61,7 @@ Shader "Hidden/TarmacGauntlet/RainSheet"
                 return o;
             }
 
-            uint Hash(uint x)
+            uint RainHash(uint x)
             {
                 x ^= x >> 16; x *= 0x7feb352du;
                 x ^= x >> 15; x *= 0x846ca68bu;
@@ -69,7 +69,7 @@ Shader "Hidden/TarmacGauntlet/RainSheet"
                 return x;
             }
 
-            float Random(uint x) { return (Hash(x) & 0xffffffu) / 16777216.0; }
+            float RainRandom(uint x) { return (RainHash(x) & 0xffffffu) / 16777216.0; }
 
             // The streaks on one side of the sheet: u runs across it in the world, y up it.
             float Streaks(float u, float y, float slant, uint seed)
@@ -82,12 +82,12 @@ Shader "Hidden/TarmacGauntlet/RainSheet"
                 float column = floor(a / cw);
                 uint col = (uint)(int)column + seed * 0x9e3779b9u;
                 // Each column's rows start at their own height, so the streaks don't line up.
-                float bv = b / ch + Random(col);
+                float bv = b / ch + RainRandom(col);
                 float row = floor(bv);
-                uint cell = Hash(col ^ Hash(((uint)(int)row & 4095u) + 0x51ed27u));
-                float here = Random(cell) < _Share ? 1.0 : 0.0;
-                float centre = 0.15 + 0.7 * Random(cell + 1u);
-                float start = Random(cell + 2u) * (ch - len);
+                uint cell = RainHash(col ^ RainHash(((uint)(int)row & 4095u) + 0x51ed27u));
+                float here = RainRandom(cell) < _Share ? 1.0 : 0.0;
+                float centre = 0.15 + 0.7 * RainRandom(cell + 1u);
+                float start = RainRandom(cell + 2u) * (ch - len);
                 float across = (frac(a / cw) - centre) * cw;
                 float along = (frac(bv) * ch - start) / len;
                 // A pixel wide at least, and as much fainter.

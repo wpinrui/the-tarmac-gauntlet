@@ -6,14 +6,14 @@ using UnityEngine;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// The full screen live timing page, on T while the AI drives your car. The race runs at 16x behind
-    /// it. Left: every car in race order, filtered by class, your row in white. Right: your car's
-    /// onboard and the track map, then your car's driver, fuel, tyres, condition and the driver's fatigue,
+    /// The full screen live timing page, on T while a teammate drives your car and it is out of the pit lane: it closes
+    /// as the car enters the pit lane. The race runs at the speed picked on the buttons left of the way back, 1x to 16x,
+    /// and back at 1x once the page closes. The scene behind the page is not drawn. Left: every car in race order, filtered by class, your row in white, a chequered flag by each car that has finished. Right: your car's
+    /// onboard and the track map, or above 2x the map alone across both, as a second view of the scene costs too much there, then your car's driver, fuel, tyres, condition and the driver's fatigue,
     /// fuel and tyres with the laps they last on the engine map in use (the one that runs out first in amber), the engine map, and
     /// the next stop: laps of fuel, tyres, repairs, next driver and Pit now (<see cref="PitOrders"/>), the same plan
     /// as the pit panel's (<see cref="PitPanel"/>). Left alone the car still pits and the crew choose (<see cref="StopPlanner"/>).
-    /// The red button top right, or T, returns to the race, and the button beside it, or N, skips to your next stint,
-    /// while a teammate drives. Over the race, the same corner has the way in, and the skip, each with its key.
+    /// The red button top right, or T, returns to the race. Over the race, the same corner has the way in, with its key.
     /// Laid out on a 1920 by 1080 screen and scaled to the screen's height.
     /// </summary>
     public sealed class LiveTiming : MonoBehaviour
@@ -35,17 +35,21 @@ namespace TarmacGauntlet.Raceday
         public KeyboardState Keys;
         /// <summary>The career, for the drivers' names.</summary>
         public GameState Game;
-        /// <summary>True when skipping to your next stint can be offered: the button left of the way back to the race.</summary>
-        public System.Func<bool> CanSkip;
-        /// <summary>Skips to your next stint.</summary>
-        public System.Action Skip;
-
         public bool Open { get; private set; }
+
+        /// <summary>How fast the race runs behind the page, times normal.</summary>
+        public float Speed => Speeds[speed];
+
+        private static readonly float[] Speeds = { 1f, 2f, 4f, 16f };
+        private static readonly string[] SpeedNames = { "1x", "2x", "4x", "16x" };
+        private int speed;
 
         private static readonly RepairMode[] RepairChoices = { RepairMode.Crew, RepairMode.All, RepairMode.None };
         /// <summary>Where the timing columns start along a row, px on the 1920 layout.</summary>
         private const float ClassX = 560f, LapX = 676f, PitX = 740f;
-        private const int PipWidth = 880, PipHeight = 496, MapWidth = 1040, MapHeight = 496;
+        private const int PipWidth = 880, PipHeight = 496, MapWidth = 1040, WideMapWidth = 1960, MapHeight = 496;
+        /// <summary>Above this speed the onboard is off and the track map takes its place.</summary>
+        private const float FeedTopSpeed = 2f;
 
         private static readonly Color Ground = new Color32(0x0b, 0x0b, 0x0d, 0xff);
         private static readonly Color Panel = new Color32(0x1a, 0x1a, 0x1c, 0xe6);
@@ -71,10 +75,16 @@ namespace TarmacGauntlet.Raceday
 
         private Font bold, semiBold;
         private GUIStyle big, text, small, right;
-        private Texture2D slash, disc, arrow;
-        private TrackMap map;
+        private Texture2D slash, disc, flag;
+        private TrackMap map, wideMap;
         private RenderTexture pip;
         private Camera onboard;
+        /// <summary>The race camera while the page covers it, drawing nothing, and what it drew before.</summary>
+        private Camera behind;
+        private int behindMask;
+        private CameraClearFlags behindClear;
+
+        private static bool Feed => Time.timeScale <= FeedTopSpeed;
 
         private CarController Car => Driver.Car;
         private Consumables Supplies => Car.Supplies;
@@ -90,9 +100,10 @@ namespace TarmacGauntlet.Raceday
             // The tower's slash: a bar leaning at 24 degrees.
             float lean = Mathf.Tan(24f * Mathf.Deg2Rad);
             slash = RaceTower.Shape(0.42f + 1.25f * lean, 1.25f, (x, y) => x >= y * lean && x <= y * lean + 0.42f);
-            arrow = RaceTower.Shape(0.72f, 1f, (x, y) => x <= 0.72f * (1f - 2f * Mathf.Abs(y - 0.5f)));
+            flag = RaceTower.ChequeredFlag();
             disc = RaceTower.Shape(1f, 1f, (x, y) => (x - 0.5f) * (x - 0.5f) + (y - 0.5f) * (y - 0.5f) < 0.25f);
             map = new TrackMap(Circuit, MapWidth, MapHeight);
+            wideMap = new TrackMap(Circuit, WideMapWidth, MapHeight);
             pip = new RenderTexture(PipWidth, PipHeight, 24) { hideFlags = HideFlags.DontSave };
             onboard = new GameObject("Onboard camera").AddComponent<Camera>();
             onboard.transform.SetParent(transform, false);
@@ -106,7 +117,7 @@ namespace TarmacGauntlet.Raceday
         private void Update()
         {
             if (entries == null || Driver == null) return;
-            bool can = Driver.enabled && Supplies != null && Log != null;
+            bool can = CanOpen;
             if (Open && !can) Show(false);
             else if (Keys != null && Keys.Pressed(KeyCode.T) && (Open || can)) Show(!Open);
             if (!Open) return;
@@ -114,7 +125,15 @@ namespace TarmacGauntlet.Raceday
             for (int i = 0; i < Cars.Length; i++)
             {
                 if (Cars[i] == null) continue;
-                entries[i].Distance = Cars[i].Traffic.Distance;
+                // A car past the flag ranks where it finished, as on the tower.
+                Standings.Car t = Tower != null ? Tower.Entry(i) : null;
+                if (t != null && t.Finished)
+                {
+                    entries[i].Finished = true;
+                    entries[i].FinishOrder = t.FinishOrder;
+                    entries[i].Distance = t.Distance;
+                }
+                else entries[i].Distance = Cars[i].Traffic.Distance;
                 order.Add(entries[i]);
             }
             Standings.Rank(order, Lap, Tower == null || Tower.Racing == null || Tower.Racing());
@@ -122,17 +141,44 @@ namespace TarmacGauntlet.Raceday
             foreach (Standings.Car c in order) if (filter == null || c.Class == filter) shown.Add(c);
         }
 
+        /// <summary>True while a teammate drives your car and it is out of the pit lane: you are never locked out of your own wheel.</summary>
+        private bool CanOpen => Driver.enabled && Supplies != null && Log != null
+            && Log.Driver.Id != RaceEntry.PlayerCharacterDriverId && Cars[Player] != null && !Cars[Player].InPitLane;
+
         private void Show(bool on)
         {
             Open = on;
+            speed = 0;   // opened at, and closed back to, normal speed
             if (Tower != null) Tower.Hidden = on;
             if (Hud != null) Hud.enabled = !on;
-            if (onboard != null) onboard.enabled = on;
             centre = on;
+            // The page covers the screen: the race camera draws nothing behind it.
+            if (on)
+            {
+                behind = Camera.main;
+                if (behind != null)
+                {
+                    behindMask = behind.cullingMask;
+                    behindClear = behind.clearFlags;
+                    behind.cullingMask = 0;
+                    behind.clearFlags = CameraClearFlags.SolidColor;
+                }
+            }
+            else Uncover();
+        }
+
+        /// <summary>The race camera draws the scene again.</summary>
+        private void Uncover()
+        {
+            if (behind == null) return;
+            behind.cullingMask = behindMask;
+            behind.clearFlags = behindClear;
+            behind = null;
         }
 
         private void LateUpdate()
         {
+            if (onboard != null) onboard.enabled = Open && Car != null && Feed;
             if (!Open || Car == null) return;
             Transform t = Car.transform;
             onboard.transform.SetPositionAndRotation(t.TransformPoint(new Vector3(0f, 1.2f, 0.3f)), t.rotation);
@@ -152,7 +198,7 @@ namespace TarmacGauntlet.Raceday
             offset = (Screen.width / k - 1920f) / 2f;
             if (!Open)
             {
-                if (Driver.enabled) RaceButtons(paint);
+                if (CanOpen) RaceButtons(paint);
                 return;
             }
             if (paint) Fill(new Rect(0f, 0f, Screen.width, Screen.height), Ground, 0f);
@@ -173,16 +219,13 @@ namespace TarmacGauntlet.Raceday
                 Label(day, hour, big, new Color(1f, 1f, 1f, 0.6f), TextAnchor.MiddleCenter);
             }
             if (KeyButton(R(LiveX, 40f, KeyWidth, 44f), Red, ScreenIcon, "T", paint)) Show(false);
-            if (CanSkip != null && CanSkip() && KeyButton(R(SkipX, 40f, KeyWidth, 44f), new Color(1f, 1f, 1f, 0.1f), SkipIcon, "N", paint))
-            {
-                Show(false);
-                Skip?.Invoke();
-            }
+            SpeedButtons(paint);
 
             Timing(R(40f, 104f, 820f, 936f), paint);
 
             Rect pipRect = R(900f, 104f, 440f, 248f);
-            if (paint)
+            bool feed = Feed;
+            if (paint && feed)
             {
                 GUI.DrawTexture(pipRect, pip, ScaleMode.ScaleAndCrop, false, 0f, Color.white, 0f, 9f * k);
                 Standings.Car me = entries[Player];
@@ -192,8 +235,11 @@ namespace TarmacGauntlet.Raceday
                 GUI.DrawTexture(new Rect(tag.x + 8f * k, tag.y + 5f * k, 10f * k, 16f * k), slash, ScaleMode.StretchToFill, true, 0f, White, 0f, 0f);
                 Label(new Rect(tag.x + 22f * k, tag.y, tag.width - 22f * k, tag.height), me.Position.ToString(), text, Color.white, TextAnchor.MiddleLeft);
             }
-            Rect mapRect = R(1360f, 104f, 520f, 248f);
-            if (paint) Map(mapRect);
+            if (paint)
+            {
+                if (feed) Map(R(1360f, 104f, 520f, 248f), map);
+                else Map(R(900f, 104f, 980f, 248f), wideMap);
+            }
 
             Status(R(900f, 372f, 480f, 668f), paint);
             Stop(R(1400f, 372f, 480f, 668f), paint);
@@ -275,6 +321,11 @@ namespace TarmacGauntlet.Raceday
             Label(badge, RaceTower.ClassLetter(c.Class), small, colour, TextAnchor.MiddleCenter);
             Label(Col(r, ClassX + 64f, 44f), c.ClassPosition.ToString(), right, mine ? Ink : Dim, TextAnchor.MiddleRight);
             Label(Col(r, LapX, 64f), c.FakeLaps.ToString(), right, ink, TextAnchor.MiddleRight);
+            if (c.Finished)
+            {
+                float fh = 12f * k, fw = fh * RaceTower.FlagAspect;
+                GUI.DrawTexture(new Rect(r.x + (LapX + 2f) * k, r.center.y - fh / 2f, fw, fh), flag, ScaleMode.StretchToFill, true);
+            }
             AiDriver d = Drivers[c.Id];
             int stops = d != null && d.Racer?.Pit != null ? d.Racer.Pit.Stops : 0;
             Label(Col(r, PitX, 48f), stops.ToString(), right, mine ? Ink : Dim, TextAnchor.MiddleRight);
@@ -283,7 +334,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>A column of a row, from <paramref name="x"/> px along the 1920 layout's row.</summary>
         private Rect Col(Rect r, float x, float w) => new Rect(r.x + x * k, r.y, w * k, r.height);
 
-        private void Map(Rect r)
+        private void Map(Rect r, TrackMap map)
         {
             Fill(r, Panel, 9f);
             Rect inner = map.Fit(r);
@@ -291,16 +342,16 @@ namespace TarmacGauntlet.Raceday
             for (int i = 0; i < Cars.Length; i++)
             {
                 if (Cars[i] == null || i == Player) continue;
-                Dot(inner, TrackMap.OnTrack(Circuit, Cars[i]), 9f, RaceTower.ClassColour(Classes[i]));
+                Dot(map, inner, TrackMap.OnTrack(Circuit, Cars[i]), 9f, RaceTower.ClassColour(Classes[i]));
             }
             if (Cars[Player] != null)
             {
-                Dot(inner, TrackMap.OnTrack(Circuit, Cars[Player]), 18f, Ground);
-                Dot(inner, TrackMap.OnTrack(Circuit, Cars[Player]), 13f, Color.white);
+                Dot(map, inner, TrackMap.OnTrack(Circuit, Cars[Player]), 18f, Ground);
+                Dot(map, inner, TrackMap.OnTrack(Circuit, Cars[Player]), 13f, Color.white);
             }
         }
 
-        private void Dot(Rect inner, Vector3 p, float size, Color colour)
+        private void Dot(TrackMap map, Rect inner, Vector3 p, float size, Color colour)
         {
             Vector2 at = map.At(inner, p);
             float s = size * k;
@@ -417,7 +468,7 @@ namespace TarmacGauntlet.Raceday
                 else Fill(box, Red, 9f);
                 Label(box, orders.Requested ? "BOXING THIS LAP" : "PIT NOW", big, Color.white, TextAnchor.MiddleCenter);
             }
-            if (!s.Retired && Click(box)) orders.Requested = !orders.Requested;
+            if (!s.RaceOver && Click(box)) orders.Requested = !orders.Requested;
         }
 
         private void Step(Rect r, string sign)
@@ -446,18 +497,14 @@ namespace TarmacGauntlet.Raceday
         // ---------------------------------------------------------------- the key buttons
 
         /// <summary>Where the top right buttons sit on the layout, and how wide each is with its key.</summary>
-        private const float LiveX = 1800f, SkipX = 1708f, KeyWidth = 80f;
+        private const float LiveX = 1800f, KeyWidth = 80f, SpeedWidth = 64f, Gap = 8f;
         private static readonly Color Glass = new Color(18f / 255f, 18f / 255f, 20f / 255f, 0.85f);
 
-        /// <summary>
-        /// Over the race while the AI drives your car: the way into live timing, and the skip to your stint while a
-        /// teammate drives, where the timing page has its own two buttons, each with its key.
-        /// </summary>
+        /// <summary>Over the race while live timing can open: the way in, with its key.</summary>
         private void RaceButtons(bool paint)
         {
             if (RaceWeekend.Paused || RaceWeekend.Summary != null) return;   // under the pause menu, or the race is settled
             if (KeyButton(R(LiveX, 40f, KeyWidth, 44f), Glass, TimingIcon, "T", paint)) Show(true);
-            if (CanSkip != null && CanSkip() && KeyButton(R(SkipX, 40f, KeyWidth, 44f), Glass, SkipIcon, "N", paint)) Skip?.Invoke();
         }
 
         /// <summary>A rounded button with its icon on the left and its key on the right. True when clicked.</summary>
@@ -489,12 +536,16 @@ namespace TarmacGauntlet.Raceday
                 Fill(new Rect(at.center.x - w / 2f, at.center.y - 1.5f * h - gap + i * (h + gap), w, h), Color.white, 1.5f);
         }
 
-        /// <summary>Two arrows: skip to your stint.</summary>
-        private void SkipIcon(Rect at)
+        /// <summary>The race's speed, 1x to 16x, in a row left of the way back to the race, the one in use filled.</summary>
+        private void SpeedButtons(bool paint)
         {
-            float h = 18f * k, w = 13f * k;
-            GUI.DrawTexture(new Rect(at.center.x - w, at.center.y - h / 2f, w, h), arrow, ScaleMode.StretchToFill, true, 0f, Color.white, 0f, 0f);
-            GUI.DrawTexture(new Rect(at.center.x, at.center.y - h / 2f, w, h), arrow, ScaleMode.StretchToFill, true, 0f, Color.white, 0f, 0f);
+            for (int i = 0; i < Speeds.Length; i++)
+            {
+                float x = LiveX - Gap - (Speeds.Length - i) * (SpeedWidth + Gap) + Gap;
+                Rect b = R(x, 40f, SpeedWidth, 44f);
+                if (paint) Chip(b, SpeedNames[i], speed == i, true);
+                if (Click(b)) speed = i;
+            }
         }
 
         private void Style()
@@ -538,10 +589,12 @@ namespace TarmacGauntlet.Raceday
         private void OnDestroy()
         {
             if (slash != null) Destroy(slash);
+            if (flag != null) Destroy(flag);
             if (disc != null) Destroy(disc);
-            if (arrow != null) Destroy(arrow);
             if (map != null) Destroy(map.Texture);
+            if (wideMap != null) Destroy(wideMap.Texture);
             if (pip != null) pip.Release();
+            Uncover();
         }
     }
 }

@@ -35,6 +35,8 @@ Shader "Hidden/TarmacGauntlet/ScreenReflections"
         float _SsrReach;
         float _SsrSteps;
         float _SsrThickness;
+        // The frame, 0 to 63, that turns the trace's jitter while STP runs.
+        float _SsrFrame;
 
         struct Varyings
         {
@@ -135,7 +137,7 @@ Shader "Hidden/TarmacGauntlet/ScreenReflections"
                 float tStart = 1.5 / length(dir * _SsrSize.xy);
                 float dt = (tEnd - tStart) / count;
                 if (dt <= 0) return 0;
-                float jitter = InterleavedGradientNoise(i.uv * _SsrSize.xy, 0);
+                float jitter = InterleavedGradientNoise(i.uv * _SsrSize.xy, (int)_SsrFrame);
 
                 float tPrev = tStart, zPrev = RayDepth(k0, k1, tStart);
                 float tHit = -1;

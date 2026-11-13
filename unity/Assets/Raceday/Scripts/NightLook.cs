@@ -24,6 +24,16 @@ namespace TarmacGauntlet.Raceday
         /// stay short of white. It fades to nothing at the reach, m, lighting the road out to about 60 m.
         /// </summary>
         public const float HeadlampGround = 5f, HeadlampReach = 75f;
+        /// <summary>
+        /// The share of that light the ground takes from a car under the floodlights (<see cref="HeadlampGround"/>): there the
+        /// headlamps are a subtle extra on the road just ahead, and the floodlights' pools brighten it again.
+        /// </summary>
+        public const float HeadlampUnderFloods = 0.01f;
+        /// <summary>
+        /// How far the headlamps light the ground for the sun's height, degrees: from none at the first dusk to all of it
+        /// once the sky is dark, so they do not stand out against the twilight.
+        /// </summary>
+        public static float HeadlampDark(float sunElevation) => SkyClock.Smooth(4f, 16f, -sunElevation);
         /// <summary>A floodlight lens's glow, and a headlamp's.</summary>
         public const float LensGlow = 2f, HeadlampGlow = 2.2f;
         /// <summary>Tail lamps at night, and brake lamps whenever the brakes are on.</summary>
