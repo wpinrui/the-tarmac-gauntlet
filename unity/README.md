@@ -93,6 +93,12 @@ target speed for every 2 m sample (`SpeedProfile.cs`, from the car's grip, downf
 brakes). After a hard crash, or when stuck or spun, it puts the car back on track itself. The console
 shows its predicted lap time and each lap it drives.
 
+The stages before the green and after the chequered flag run in turn (`Stages/StageSequence.cs`): `intro` plays once the
+scene is built and `outro` once the race's time is up. A stage derives from `SkippableStage` and is added in
+`CircuitScene` with `intro.Add` or `outro.Add`. While one runs, the hint at the bottom of the screen reads "Press and
+hold [Enter] to skip [stage]". Holding Enter for a second fills the circle beside it, and the full circle skips that
+one stage. The next stage fills only after Enter is let go (`SkipHold.cs`).
+
 The camera starts on the broadcast when the race comes from the career, and on the chase camera when the scene runs on
 its own. `C` cycles the car cameras: TV, chase, bonnet and bumper. The TV camera is coverage locked to the car: a second
 director with `Lock` set shows mostly trackside shots and pans, a helicopter shot now and then, and an onboard about one
