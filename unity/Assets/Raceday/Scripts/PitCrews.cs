@@ -51,7 +51,7 @@ namespace TarmacGauntlet.Raceday
         private static readonly Color Charcoal = new Color(0.17f, 0.18f, 0.2f, 1f);
         private static readonly int ClothId = Shader.PropertyToID("_Cloth"), PanelId = Shader.PropertyToID("_Panel");
 
-        private enum Figure { Standing, Walking, Low }
+        private enum Figure { Standing, Walking, Low, Seated }
 
         private sealed class Live
         {
@@ -70,9 +70,9 @@ namespace TarmacGauntlet.Raceday
         private HqCrewBody body;
         private Material[] materials;
         private int[] kitParts;
-        private readonly Mesh[] stills = new Mesh[3];
+        private readonly Mesh[] stills = new Mesh[4];
         /// <summary>Each still figure's hands, left and right, in its own frame.</summary>
-        private readonly Vector3[,] stillHands = new Vector3[3, 2];
+        private readonly Vector3[,] stillHands = new Vector3[4, 2];
 
         // By car: its garage's crew, still figures and live rigs (null where none).
         private GarageCrew[] crews;
@@ -233,12 +233,12 @@ namespace TarmacGauntlet.Raceday
             foreach (int s in kitParts) r.SetPropertyBlock(kit, s);
         }
 
-        /// <summary>Bakes the still figures: standing, mid stride and crouched at a wheel.</summary>
+        /// <summary>Bakes the still figures: standing, mid stride, crouched at a wheel and sitting on a stool.</summary>
         private void Stills()
         {
             HqCrewRig rig = body.Build(transform, 0, true);
             var skin = rig.Root.GetComponentInChildren<SkinnedMeshRenderer>();
-            (string clip, float time)[] poses = { ("Idle", 0.8f), ("Walk", 0.24f), ("Crouch", 1.0f) };
+            (string clip, float time)[] poses = { ("Idle", 0.8f), ("Walk", 0.24f), ("Crouch", 1.0f), ("Sit", DriverSwap.SitClip) };
             for (int p = 0; p < poses.Length; p++)
             {
                 layers.Clear();
@@ -270,13 +270,13 @@ namespace TarmacGauntlet.Raceday
                 var go = new GameObject("Crew " + (k + 1));
                 go.transform.SetParent(group.transform, false);
                 figures[i][k] = go.AddComponent<MeshFilter>();
-                figures[i][k].sharedMesh = stills[0];
+                figures[i][k].sharedMesh = stills[(int)FigureFor(crew.People[k])];
                 var r = go.AddComponent<MeshRenderer>();
                 r.sharedMaterials = materials;
                 r.shadowCastingMode = ShadowCastingMode.On;
                 Paint(r, kits[i]);
                 figureRenderers[i][k] = r;
-                Place(go.transform, crew, crew.People[k]);
+                Place(go.transform, crew, crew.People[k], false);
             }
             LODGroup lod = group.AddComponent<LODGroup>();
             lod.localReferencePoint = crew.World(new Vector2(0f, crew.Door));
@@ -284,14 +284,21 @@ namespace TarmacGauntlet.Raceday
             lod.SetLODs(new[] { new LOD(Cull, figureRenderers[i]) });
         }
 
-        /// <summary>Sets a person's root where they stand, facing their way: the bodies face -Z, as packed.</summary>
-        private static void Place(Transform t, GarageCrew crew, CrewMember m)
+        /// <summary>
+        /// Sets a person's root where they stand, facing their way: the bodies face -Z, as packed. A live rig writing at
+        /// the desk stands its root back by the clip's lean, so the hips stay on the stool; the still figure sits as baked.
+        /// </summary>
+        private static void Place(Transform t, GarageCrew crew, CrewMember m, bool live)
         {
             Vector3 face = crew.WorldDirection(m.Facing);
-            t.SetPositionAndRotation(crew.World(m.At), Quaternion.LookRotation(-face, Vector3.up));
+            Vector3 at = crew.World(m.At);
+            if (live) at -= face.normalized * m.Lean;
+            t.SetPositionAndRotation(at, Quaternion.LookRotation(-face, Vector3.up));
         }
 
-        private static Figure FigureFor(CrewMember m) => m.Low ? Figure.Low : m.Clip == "Walk" ? Figure.Walking : Figure.Standing;
+        private static Figure FigureFor(CrewMember m) =>
+            m.Low ? Figure.Low : m.Clip == "Walk" ? Figure.Walking
+            : m.Clip == "Write" || m.Clip == "Sit" && m.ClipTime > DriverSwap.SitClip * 0.5f ? Figure.Seated : Figure.Standing;
 
         // ---------------------------------------------------------------- each frame
 
@@ -315,11 +322,11 @@ namespace TarmacGauntlet.Raceday
                     Live l = live[i][k];
                     if (l != null)
                     {
-                        Place(l.Rig.Root.transform, crew, m);
+                        Place(l.Rig.Root.transform, crew, m, true);
                         Pose(l, m);
                         continue;
                     }
-                    Place(figures[i][k].transform, crew, m);
+                    Place(figures[i][k].transform, crew, m, false);
                     figures[i][k].sharedMesh = stills[(int)FigureFor(m)];
                 }
             }
@@ -508,7 +515,7 @@ namespace TarmacGauntlet.Raceday
                 l.Wave = 0f;
                 l.Rig.Root.SetActive(true);
                 Paint(l.Skin, kits[i]);
-                Place(l.Rig.Root.transform, crew, crew.People[k]);
+                Place(l.Rig.Root.transform, crew, crew.People[k], true);
                 Pose(l, crew.People[k]);
                 live[i][k] = l;
                 figureRenderers[i][k].enabled = false;
@@ -526,7 +533,7 @@ namespace TarmacGauntlet.Raceday
                 l.Rig.Root.SetActive(false);
                 pool.Push(l);
                 figureRenderers[i][k].enabled = true;
-                Place(figures[i][k].transform, crew, crew.People[k]);
+                Place(figures[i][k].transform, crew, crew.People[k], false);
                 figures[i][k].sharedMesh = stills[(int)FigureFor(crew.People[k])];
             }
         }
