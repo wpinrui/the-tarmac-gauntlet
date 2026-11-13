@@ -69,6 +69,16 @@ namespace TarmacGauntlet.Raceday
         /// them down, and its upgrades lift them. The physics car is the model's, so the tuned lines are shared.
         /// </summary>
         public float PowerTrim = 1f, GripTrim = 1f;
+
+        /// <summary>
+        /// Sets <see cref="PowerTrim"/> and <see cref="GripTrim"/> from the car's stats now, worn by age and condition,
+        /// against its model's own: set at the green, and again each lap as the condition wears.
+        /// </summary>
+        public void Trim(CarStats stats, CarStats model)
+        {
+            PowerTrim = model.Power > 0 ? (float)(stats.Power / model.Power) : 1f;
+            GripTrim = (float)((1.0 + 0.006 * stats.Handling) / (1.0 + 0.006 * model.Handling));
+        }
         /// <summary>True once the car is out of the race: it limps to its box and parks there.</summary>
         public bool Retired => Log != null && Log.Retired;
         /// <summary>True once the car's race is over, out of it or past the chequered flag: it goes to its box and parks there, with no service.</summary>
