@@ -16,11 +16,15 @@ namespace TarmacGauntlet.Management
             public VisualElement Glass, Blur, Shadow;
             /// <summary>The blurred scene this pane last showed: each pane catches up on its own, so one hidden while the screen changed size doesn't keep the old one.</summary>
             public RenderTexture Shown;
+            /// <summary>The corner radii the shadow was made for, px: top left, top right, bottom right, bottom left.</summary>
+            public (int, int, int, int) Corners = (-1, -1, -1, -1);
         }
 
         private readonly VisualElement root;
         private readonly List<Pane> panes = new List<Pane>();
-        private readonly Texture2D sheen = Sheen(), shadow = ShadowTexture();
+        private readonly Texture2D sheen = Sheen();
+        /// <summary>Shadows by corner radii, so every pane casts one the shape of its own corners.</summary>
+        private readonly Dictionary<(int, int, int, int), Texture2D> shadows = new Dictionary<(int, int, int, int), Texture2D>();
 
         public MenuGlass(VisualElement root)
         {
@@ -61,7 +65,8 @@ namespace TarmacGauntlet.Management
                 {
                     p.Shadow.style.display = shown ? DisplayStyle.Flex : DisplayStyle.None;
                     Rect r = g.layout;
-                    // box-shadow: 0 24px 60px; the texture's soft edge is 32px of a 64px tile.
+                    FitShadow(p, r);
+                    // box-shadow: 0 24px 60px: the shadow reaches 40px past the pane, offset 24px down.
                     p.Shadow.style.left = r.x - 40;
                     p.Shadow.style.top = r.y - 16;
                     p.Shadow.style.width = r.width + 80;
@@ -86,7 +91,6 @@ namespace TarmacGauntlet.Management
         {
             var s = new VisualElement { pickingMode = PickingMode.Ignore };
             s.AddToClassList("glass-shadow");
-            s.style.backgroundImage = shadow;
             p.Glass.parent.Insert(p.Glass.parent.IndexOf(p.Glass), s);
             p.Shadow = s;
         }
@@ -113,17 +117,50 @@ namespace TarmacGauntlet.Management
             return t;
         }
 
-        /// <summary>A 64px tile: black at 35% in the middle, fading out over 32px on every side, for 9-slicing.</summary>
-        private static Texture2D ShadowTexture()
+        /// <summary>How far the shadow reaches past the pane, and over how much of that it fades in, px.</summary>
+        private const int ShadowReach = 40, ShadowSoft = 32;
+
+        /// <summary>Gives the pane's shadow the corners the pane has: a round button casts a round shadow.</summary>
+        private void FitShadow(Pane p, Rect r)
         {
-            const int n = 64;
+            IResolvedStyle st = p.Glass.resolvedStyle;
+            float most = Mathf.Max(0, Mathf.Min(r.width, r.height) / 2);
+            int Corner(float radius) => Mathf.RoundToInt(Mathf.Clamp(radius, 0, most));
+            (int, int, int, int) corners = (Corner(st.borderTopLeftRadius), Corner(st.borderTopRightRadius),
+                Corner(st.borderBottomRightRadius), Corner(st.borderBottomLeftRadius));
+            if (corners == p.Corners) return;
+            p.Corners = corners;
+            if (!shadows.TryGetValue(corners, out Texture2D texture)) shadows[corners] = texture = ShadowTexture(corners);
+            int slice = texture.width / 2 - 1;
+            p.Shadow.style.backgroundImage = texture;
+            p.Shadow.style.unitySliceLeft = slice;
+            p.Shadow.style.unitySliceRight = slice;
+            p.Shadow.style.unitySliceTop = slice;
+            p.Shadow.style.unitySliceBottom = slice;
+        }
+
+        /// <summary>
+        /// Black at 35% under a rounded box with these corner radii, fading out over <see cref="ShadowSoft"/>px to
+        /// nothing <see cref="ShadowReach"/>px outside it, for 9-slicing: each corner tile holds its own rounded corner
+        /// and the middle two pixels stretch.
+        /// </summary>
+        private static Texture2D ShadowTexture((int TopLeft, int TopRight, int BottomRight, int BottomLeft) c)
+        {
+            int most = Mathf.Max(Mathf.Max(c.TopLeft, c.TopRight), Mathf.Max(c.BottomRight, c.BottomLeft));
+            int n = 2 * (ShadowReach + most + 1);
+            float centre = n / 2f, half = most + 1;
             var t = new Texture2D(n, n, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, hideFlags = HideFlags.HideAndDontSave };
             var px = new Color32[n * n];
             for (int y = 0; y < n; y++)
             for (int x = 0; x < n; x++)
             {
-                float dx = Mathf.Min(x + 0.5f, n - x - 0.5f) / 32f, dy = Mathf.Min(y + 0.5f, n - y - 0.5f) / 32f;
-                float k = Mathf.SmoothStep(0, 1, Mathf.Clamp01(dx)) * Mathf.SmoothStep(0, 1, Mathf.Clamp01(dy));
+                // Texture rows run bottom to top, so the top row is the screen's top edge.
+                float dx = x + 0.5f - centre, dy = (n - y - 0.5f) - centre;
+                int radius = dy < 0 ? (dx < 0 ? c.TopLeft : c.TopRight) : (dx < 0 ? c.BottomLeft : c.BottomRight);
+                // Distance outside the rounded box, negative inside.
+                float qx = Mathf.Abs(dx) - (half - radius), qy = Mathf.Abs(dy) - (half - radius);
+                float outside = new Vector2(Mathf.Max(qx, 0), Mathf.Max(qy, 0)).magnitude + Mathf.Min(Mathf.Max(qx, qy), 0) - radius;
+                float k = Mathf.SmoothStep(0, 1, Mathf.Clamp01((ShadowReach - outside) / ShadowSoft));
                 px[y * n + x] = UiBlend.Alpha(new Color(0, 0, 0, 0.35f * k));
             }
             t.SetPixels32(px);

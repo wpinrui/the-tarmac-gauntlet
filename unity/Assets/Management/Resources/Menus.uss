@@ -25,7 +25,7 @@ Label, TextElement { white-space: nowrap; flex-shrink: 0; }
 .glass-blur, .glass-sheen { position: absolute; -unity-background-scale-mode: stretch-to-fill; }
 /* Dark glass, because all menu text is white: #0c0e0e under the sheen, as dark as 66% blended in sRGB. */
 .glass-sheen { left: 0; top: 0; right: 0; bottom: 0; background-color: rgba(12, 14, 14, 0.848); }
-.glass-shadow { position: absolute; -unity-background-scale-mode: stretch-to-fill; -unity-slice-left: 32; -unity-slice-right: 32; -unity-slice-top: 32; -unity-slice-bottom: 32; }
+.glass-shadow { position: absolute; -unity-background-scale-mode: stretch-to-fill; }
 
 /* Top bar */
 .top { position: absolute; left: 32px; right: 32px; top: 24px; flex-direction: row; justify-content: space-between; align-items: center; }
