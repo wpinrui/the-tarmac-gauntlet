@@ -91,7 +91,7 @@ namespace TarmacGauntlet.Raceday
             {
                 IReadOnlyList<RaceDriver> lineup = Log.Car.Lineup;
                 rows.Add((helmet, Name(lineup[Log.NextDriverIndex].Id), lineup.Count > 1, new[] { "7" }));
-                rows.Add((spanner, Supplies.Orders.Repairs.ToString().ToUpperInvariant(), Log.ActiveIssues.Count > 0, new[] { "8" }));
+                rows.Add((spanner, Supplies.Orders.Repairs.ToString().ToUpperInvariant(), Log.ActiveIssues.Count > 0 || Log.Damage > 0, new[] { "8" }));
             }
 
             bool callIn = Teammate;

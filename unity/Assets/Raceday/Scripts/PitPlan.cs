@@ -45,7 +45,7 @@ namespace TarmacGauntlet.Raceday
             StopPlan plan = supplies.Planner != null ? supplies.Planner.Plan() : StopPlan.Default(supplies);
             litres = Mathf.Clamp(plan.Litres, 0f, Mathf.Max(supplies.Capacity - supplies.Fuel, 0f));
             scale = Scale(spec);
-            PitWork work = supplies.Log?.Pit(plan.Tyres, plan.Fix);
+            PitWork work = supplies.Log?.Pit(plan.Tyres, plan.Fix, plan.DamageTo);
             tyres = work == null ? plan.Tyres : work.ChangeTyres;
             NewTyres = tyres;
             NewDriver = work?.NewDriver != null;
@@ -117,6 +117,8 @@ namespace TarmacGauntlet.Raceday
         private const float Reaction = 0.4f;        // s a car leaving keeps in hand behind the car ahead
         /// <summary>The car comes in before its tyres are this worn.</summary>
         public const float WearLimit = 0.9f;
+        /// <summary>A car this damaged or worse comes in for repairs (<see cref="CarDamage"/>).</summary>
+        public const double DamageLimit = 40;
 
         public readonly PitLane Lane;
         public readonly int Garage;
@@ -172,7 +174,9 @@ namespace TarmacGauntlet.Raceday
             if (s.RaceOver || s.Orders.Requested) return true;
             // Another lap must leave a fifth of a lap's fuel spare, and the tyres short of worn out.
             // With no tyre sets left a stop can't change them, so only the fuel brings the car in.
-            return s.Fuel < FuelPerLap * 1.2f + 0.5f || (s.TyresLeft && s.Wear + WearPerLap > WearLimit);
+            // A badly damaged car comes in for repairs while there are spares to make them with.
+            return s.Fuel < FuelPerLap * 1.2f + 0.5f || (s.TyresLeft && s.Wear + WearPerLap > WearLimit)
+                || (s.Log != null && s.Log.Damage >= DamageLimit && s.Log.SpareParts > 0);
         }
 
         /// <summary>Takes the pit route this lap: a pilot that drives it, built from the car's racing line.</summary>

@@ -210,8 +210,7 @@ namespace TarmacGauntlet.Raceday
                 predicted[i] = profile.LapTime;
                 car.Supplies = Consumables.For(car.Spec, profile, (float)starter0.Smoothness);
                 car.Supplies.Log = day.Cars[i];
-                car.Supplies.PowerTrim = model.Power > 0 ? (float)(stats.Power / model.Power) : 1f;
-                car.Supplies.GripTrim = (float)((1.0 + 0.006 * stats.Handling) / (1.0 + 0.006 * model.Handling));
+                car.Supplies.Trim(stats, model);
                 // Every car starts on a full tank and new tyres.
                 car.Supplies.Fuel = Mathf.Min(car.Supplies.Capacity, (float)grid[i].StartingFuel);
 
@@ -554,21 +553,13 @@ namespace TarmacGauntlet.Raceday
                 supplies.Orders.Tyres = s.PitTyres;
                 supplies.Orders.Repairs = s.PitRepairs;
                 supplies.Effects = log.Effects;
+                supplies.Trim(log.Stats, log.Car.Model.BaseStats);
                 racing[i].Resume(s.Laps);
 
                 if (log.Retired)
                 {
-                    if (log.RetirementReason == FailureType.Crash && s.Position is { Length: 3 } p && s.Forward is { Length: 3 } f)
-                        car.PlaceAt(new Vector3(p[0], p[1], p[2]), new Vector3(f[0], f[1], f[2]));
-                    else
-                    {
-                        Vector3 toGarage = pits.LaneLeft(pits.BoxLane[racing[i].Garage]);
-                        car.PlaceAt(pits.BoxPoint(racing[i].Garage), new Vector3(toGarage.z, 0f, -toGarage.x));
-                    }
+                    RaceDirector.ParkInGarage(racing[i]);
                     drivers[i].enabled = false;
-                    racing[i].enabled = false;   // out of every other car's traffic
-                    car.Hold = true;
-                    car.InputEnabled = false;
                     continue;
                 }
 
@@ -709,7 +700,14 @@ namespace TarmacGauntlet.Raceday
         private void Stints()
         {
             if (playerIndex < 0) return;
-            string now = day.Cars[playerIndex].Driver.Id;
+            CarRaceLog mine = day.Cars[playerIndex];
+            if (mine.Retired)
+            {
+                // Out of the race, nobody drives: a car that can still move limps back to its box on the AI.
+                if (!ai.enabled && mine.RetirementReason != FailureType.Crash && !ai.Car.Hold) GiveToAi();
+                return;
+            }
+            string now = mine.Driver.Id;
             bool changed = now != lastDriver;
             lastDriver = now;
             if (!ai.enabled && (changed || !YourStint)) GiveToAi();

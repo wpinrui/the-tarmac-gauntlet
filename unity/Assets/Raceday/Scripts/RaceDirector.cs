@@ -31,8 +31,8 @@ namespace TarmacGauntlet.Raceday
         public const float LimpPower = 0.6f;
         /// <summary>Share of its racing speed a car limping back to the pits drives at.</summary>
         public const float LimpSpeed = 0.45f;
-        /// <summary>How far beyond the track edge a car that crashed out comes to rest, m.</summary>
-        public const float OffTrack = 4f;
+        /// <summary>Seconds a totalled car stays where it came to rest before it is taken back to its garage.</summary>
+        public const float WreckWait = 5f;
         /// <summary>How far across the pit lane the summary's camera stands from the player's box, m.</summary>
         public const float SummaryDistance = 11f;
 
@@ -127,7 +127,23 @@ namespace TarmacGauntlet.Raceday
             driverShown = new int[Cars.Length];
             crossed = new float[Cars.Length];
             pitLap = new bool[Cars.Length];
-            for (int i = 0; i < Cars.Length; i++) controllers[i] = Cars[i].GetComponent<CarController>();
+            for (int i = 0; i < Cars.Length; i++)
+            {
+                controllers[i] = Cars[i].GetComponent<CarController>();
+                int car = i;
+                controllers[i].Hit += impact => OnHit(car, impact);
+            }
+        }
+
+        /// <summary>A car hit a barrier or another car: the damage goes on its log, and a hit hard enough totals it.</summary>
+        private void OnHit(int i, float impact)
+        {
+            if (!started || Finished || Day == null) return;
+            CarRaceLog log = Day.Cars[i];
+            if (log.Retired || log.Flagged) return;
+            bool totalled = log.Hit(Tower.RaceTime, impact);
+            controllers[i].Supplies.Effects = log.Effects;
+            if (totalled) Retire(i);
         }
 
         private void Update()
@@ -169,6 +185,7 @@ namespace TarmacGauntlet.Raceday
                     pitLap[i] = Cars[i].InPitLane;
                     Day.CompleteLap(i, Time.time - startTime, lap, supplies.Mode, timeUp);
                     supplies.Effects = log.Effects;
+                    supplies.Trim(log.Stats, log.Car.Model.BaseStats);   // the condition the lap wore off slows the car
                     if (log.Retired)
                     {
                         Retire(i);
@@ -247,27 +264,46 @@ namespace TarmacGauntlet.Raceday
             if (!Finished && Day != null) Finish();
         }
 
+        /// <summary>
+        /// Car i is out. A crashed car stays where it came to rest, and after <see cref="WreckWait"/> it is back in
+        /// its garage. Any other limps to its box on cut power and parks there.
+        /// </summary>
         private void Retire(int i)
         {
             CarController car = controllers[i];
             AiDriver driver = Drivers[i];
             if (Day.Cars[i].RetirementReason == FailureType.Crash)
             {
-                Circuit c = car.Circuit;
-                int k = c.IndexOf(Mathf.Repeat(Cars[i].Traffic.Distance, c.Lap));
-                float side = Cars[i].Traffic.Lateral >= 0f ? 1f : -1f;
-                Vector3 ground = c.Surface(k, side * (c.HalfWidth(k) + OffTrack));
-                ground.y = c.TerrainHeight(ground.x, ground.z);
-                driver.enabled = false;
-                Cars[i].enabled = false;   // out of every other car's traffic
-                car.PlaceAt(ground, Quaternion.AngleAxis(side * 25f, Vector3.up) * c.Forward[k]);
+                driver.enabled = false;   // in the other cars' traffic till it is taken away, so they drive round it
                 car.Hold = true;
                 car.InputEnabled = false;
+                StartCoroutine(ToGarage(i));
                 return;
             }
             car.Supplies.PowerTrim *= LimpPower;
             driver.Limping = true;
             if (driver.Pilot != null) driver.Pilot.Limp = LimpSpeed;
+        }
+
+        private System.Collections.IEnumerator ToGarage(int i)
+        {
+            yield return new WaitForSeconds(WreckWait);
+            ParkInGarage(Cars[i]);
+        }
+
+        /// <summary>Puts a car that is out of the race in its garage, at rest, out of every other car's traffic.</summary>
+        public static void ParkInGarage(RaceCar race)
+        {
+            CarController car = race.GetComponent<CarController>();
+            PitLane pits = race.Pits;
+            if (pits != null && race.Garage >= 0)
+            {
+                Vector3 toGarage = pits.LaneLeft(pits.BoxLane[race.Garage]);
+                car.PlaceAt(pits.BoxPoint(race.Garage), new Vector3(toGarage.z, 0f, -toGarage.x));
+            }
+            race.enabled = false;
+            car.Hold = true;
+            car.InputEnabled = false;
         }
 
         private void Finish()

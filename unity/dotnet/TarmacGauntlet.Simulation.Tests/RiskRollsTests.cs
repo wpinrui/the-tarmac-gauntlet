@@ -38,18 +38,6 @@ namespace TarmacGauntlet.Simulation.Tests
             WorkUnits = 30,
         };
 
-        private static readonly IssueTemplate FrontWingDamage = new IssueTemplate
-        {
-            Id = "front-wing-damage",
-            Description = "Front wing damage",
-            Severity = IssueSeverity.Major,
-            Category = IssueCategory.Crash,
-            StatDebuffs = new Dictionary<CarStatKey, double> { [CarStatKey.Handling] = 0.25, [CarStatKey.FuelEfficiency] = 0.15 },
-            Weight = 3,
-            SparePartsCost = 4,
-            WorkUnits = 50,
-        };
-
         /// <summary>Baseline "healthy car, safe driver, Normal mode" context.</summary>
         private static readonly LapRiskContext Ctx = new LapRiskContext
         {
@@ -61,7 +49,6 @@ namespace TarmacGauntlet.Simulation.Tests
             InstructionMode = Normal,
             ActiveIssues = new ActiveIssue[0],
             IssueTemplates = new[] { LooseWheel, BrakeFade },
-            CrashTemplates = new[] { FrontWingDamage },
             Random = () => 0.5, // mid-range default; overridden per test
         };
 
@@ -161,22 +148,6 @@ namespace TarmacGauntlet.Simulation.Tests
                 Assert.That(push, Is.GreaterThan(normal));
                 Assert.That(normal, Is.GreaterThan(conserve));
                 Assert.That(push, Is.GreaterThan(normal * 1.5));
-            }
-        }
-
-        public class CrashSurvivalProbabilityTests
-        {
-            [Test]
-            public void HigherSafetyMeansHigherSurvivalChance()
-            {
-                Assert.That(CrashSurvivalProbability(100), Is.GreaterThan(CrashSurvivalProbability(0)));
-            }
-
-            [Test]
-            public void SurvivalProbabilityIsBetween0And1()
-            {
-                Assert.That(CrashSurvivalProbability(0), Is.GreaterThan(0));
-                Assert.That(CrashSurvivalProbability(100), Is.LessThan(1));
             }
         }
 
@@ -299,40 +270,39 @@ namespace TarmacGauntlet.Simulation.Tests
         public class RollLapRisksFailures
         {
             [Test]
-            public void FailureIsReturnedWhenFirstRollFires()
+            public void FailureIsMechanicalWhenFirstRollFires()
             {
                 var result = RollLapRisks(Ctx with { Random = AlwaysFire });
-                // AlwaysFire: failure fires, crash roll fires (< 0.25), survival fires → non-terminal
-                // OR terminal depending on crash templates. Either way, something happens.
-                Assert.That(result.Failure != null || result.NewIssues.Count > 0, Is.True);
-            }
-
-            [Test]
-            public void TerminalMechanicalFailureWhenCrashRollDoesNotFire()
-            {
-                // Calls: failure (fire), crash type (>0.25 = mechanical)
-                var result = RollLapRisks(Ctx with { Random = Sequence(0.5, 0, 0.5) });
                 Assert.That(result.Failure, Is.EqualTo(FailureType.Mechanical));
                 Assert.That(result.NewIssues, Has.Count.EqualTo(0));
             }
 
             [Test]
-            public void NonTerminalCrashProducesACrashIssueWhenDriverSurvives()
+            public void NoRollEverCrashesTheCar()
             {
-                // Calls: failure (fire), crash type (<0.25), survival (fire), weighted pick
-                var result = RollLapRisks(Ctx with { Random = Sequence(0, 0, 0, 0) });
-                Assert.That(result.Failure, Is.Null);
-                Assert.That(result.NewIssues, Has.Count.EqualTo(1));
-                Assert.That(result.NewIssues[0].TemplateId, Is.EqualTo("front-wing-damage"));
+                var rng = new Random(7);
+                for (int i = 0; i < 20000; i++)
+                {
+                    var result = RollLapRisks(Ctx with { Condition = 0, CarAge = 30, InstructionMode = Push, Random = rng.NextDouble });
+                    Assert.That(result.Failure, Is.Not.EqualTo(FailureType.Crash));
+                    Assert.That(result.NewIssues.All(n => n.TemplateId != "front-wing-damage"), Is.True);
+                }
             }
 
             [Test]
-            public void TerminalCrashWhenDriverDoesNotSurvive()
+            public void NoTimeOnTrackMeansNoRisk()
             {
-                // Calls: failure (fire), crash type (<0.25), survival (fail)
-                var result = RollLapRisks(Ctx with { Random = Sequence(0.5, 0, 0, 1) });
-                Assert.That(result.Failure, Is.EqualTo(FailureType.Crash));
+                var result = RollLapRisks(Ctx with { Random = AlwaysFire, Exposure = 0 });
+                Assert.That(result.Failure, Is.Null);
                 Assert.That(result.NewIssues, Has.Count.EqualTo(0));
+            }
+
+            [Test]
+            public void TwoLapsOfTimeCompoundTheChance()
+            {
+                Assert.That(Over(0.1, 1), Is.EqualTo(0.1).Within(1e-12));
+                Assert.That(Over(0.1, 2), Is.EqualTo(0.19).Within(1e-12));
+                Assert.That(Over(0.1, 0.5), Is.LessThan(0.1).And.GreaterThan(0.05));
             }
 
             [Test]

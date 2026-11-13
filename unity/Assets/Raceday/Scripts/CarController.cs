@@ -553,13 +553,22 @@ namespace TarmacGauntlet.Raceday
 
         // ---------------------------------------------------------------- crashes and resets
 
+        /// <summary>
+        /// The car hit a barrier or another car, with the speed into it, m/s: the part of the two bodies' closing
+        /// speed along the contact's normal. A scrape along a barrier is slow into it, however fast the car.
+        /// </summary>
+        public event System.Action<float> Hit;
+
         private void OnCollisionEnter(Collision collision)
         {
-            if (Crashed || SurfaceOf(collision.collider) != SurfaceKind.Barrier) return;
+            bool barrier = SurfaceOf(collision.collider) == SurfaceKind.Barrier;
+            bool car = collision.rigidbody != null && collision.rigidbody != body && collision.rigidbody.GetComponent<CarController>() != null;
+            if (!barrier && !car) return;
             float into = 0f;
             for (int i = 0; i < collision.contactCount; i++)
                 into = Mathf.Max(into, Mathf.Abs(Vector3.Dot(collision.relativeVelocity, collision.GetContact(i).normal)));
-            if (into < HardHit) return;
+            Hit?.Invoke(into);
+            if (Crashed || !barrier || into < HardHit) return;
             Crashed = true;
             Stop();
         }

@@ -5,21 +5,26 @@ using UnityEngine;
 
 namespace TarmacGauntlet.Raceday
 {
-    /// <summary>What a stop does: the litres that go in, new tyres or not, and the issues fixed (null for every one).</summary>
+    /// <summary>
+    /// What a stop does: the litres that go in, new tyres or not, the issues fixed (null for every one), and the
+    /// damage left once the crew have repaired what they will (null to repair all of it).
+    /// </summary>
     public readonly struct StopPlan
     {
         public readonly float Litres;
         public readonly bool Tyres;
         public readonly IReadOnlyList<string> Fix;
+        public readonly double? DamageTo;
 
-        public StopPlan(float litres, bool tyres, IReadOnlyList<string> fix)
+        public StopPlan(float litres, bool tyres, IReadOnlyList<string> fix, double? damageTo = null)
         {
             Litres = litres;
             Tyres = tyres;
             Fix = fix;
+            DamageTo = damageTo;
         }
 
-        /// <summary>A stop as the AI teams make it: a full tank, new tyres while a set is left, and every issue the spares allow.</summary>
+        /// <summary>A stop as the AI teams make it: a full tank, new tyres while a set is left, and every issue and all the damage the spares allow.</summary>
         public static StopPlan Default(Consumables s) => new StopPlan(Mathf.Max(s.Capacity - s.Fuel, 0f), s.TyresLeft, null);
     }
 
@@ -82,26 +87,41 @@ namespace TarmacGauntlet.Raceday
             {
                 CarRaceLog log = s.Log;
                 if (log == null) return Array.Empty<string>();
-                double crew = PitStop.CrewMultiplier(log.Car.CrewSize, log.Car.EngineerSkill);
-                var stint = new StintOutlook
-                {
-                    Laps = Laps,
-                    LapSeconds = lapSeconds(),
-                    LitresPerLap = s.LitresPerLap,
-                    SecondsPerLitre = PitService.SecondsPerLitre(spec) * crew,
-                    CrewMultiplier = crew,
-                };
-                return PitRepairs.Choose(Orders.Repairs, log.ActiveIssues, log.Stats, stint);
+                return PitRepairs.Choose(Orders.Repairs, log.ActiveIssues, log.Stats, Stint(log));
             }
         }
 
-        public StopPlan Plan() => new StopPlan(Litres, Tyres, Fix);
+        /// <summary>The damage the stop leaves: none, all of it, or what the crew judge not worth the time (<see cref="CarDamage.Target"/>).</summary>
+        public double DamageTo
+        {
+            get
+            {
+                CarRaceLog log = s.Log;
+                if (log == null) return 0;
+                return CarDamage.Target(Orders.Repairs, log.Damage, Stint(log));
+            }
+        }
+
+        private StintOutlook Stint(CarRaceLog log)
+        {
+            double crew = PitStop.CrewMultiplier(log.Car.CrewSize, log.Car.EngineerSkill);
+            return new StintOutlook
+            {
+                Laps = Laps,
+                LapSeconds = lapSeconds(),
+                LitresPerLap = s.LitresPerLap,
+                SecondsPerLitre = PitService.SecondsPerLitre(spec) * crew,
+                CrewMultiplier = crew,
+            };
+        }
+
+        public StopPlan Plan() => new StopPlan(Litres, Tyres, Fix, DamageTo);
 
         /// <summary>Seconds the car would stand in its box for the plan as it stands.</summary>
         public float Seconds()
         {
             IReadOnlyList<string> fix = Fix;
-            double extra = s.Log != null ? s.Log.WorkSeconds(fix) : 0.0;
+            double extra = s.Log != null ? s.Log.WorkSeconds(fix, DamageTo) : 0.0;
             return PitService.Seconds(spec, Litres, Tyres, s.Log, extra);
         }
     }
