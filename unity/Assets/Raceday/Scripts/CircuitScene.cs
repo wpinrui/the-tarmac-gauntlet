@@ -26,7 +26,8 @@ namespace TarmacGauntlet.Raceday
     /// chequered flag the AI takes your car round its cooldown lap and into its box, and Delete still takes it back.
     /// A race saved part way (<see cref="RaceWeekend.Resuming"/>) carries on from the save: every car where it was, on its
     /// lap, fuel and tyres, the clocks and the weather as they were. A car that was in the pit lane goes back on track
-    /// beside where it was, at the edge on the pit side. Saved before the green, the race starts again.
+    /// beside where it was, at the edge on the pit side. Saved before the green, the race starts again. The stages before the
+    /// green and after the flag run in turn (<see cref="StageSequence"/>), and holding Enter skips the one on screen.
     /// </summary>
     public sealed class CircuitScene : MonoBehaviour
     {
@@ -52,6 +53,10 @@ namespace TarmacGauntlet.Raceday
         private DebugMenu debug;
         private RaceDay day;
         private RaceDirector director;
+        /// <summary>The stages before the green (<see cref="StageSequence"/>), played once the scene is built.</summary>
+        private StageSequence intro;
+        /// <summary>The stages after the chequered flag, played once the race's time is up.</summary>
+        private StageSequence outro;
         private LiveTiming timing;
         /// <summary>The player's car in the race, or -1 for none.</summary>
         private int playerIndex = -1;
@@ -421,9 +426,16 @@ namespace TarmacGauntlet.Raceday
                 rolling.PaceCar = paceCar;
                 rolling.Pits = pits;
             }
+            // The stages before the green and after the flag, each skipped by holding Enter. Stages are added here in order.
+            intro = new GameObject("Intro").AddComponent<StageSequence>();
+            intro.Keys = keys;
+            outro = new GameObject("Outro").AddComponent<StageSequence>();
+            outro.Keys = keys;
             Lap("race");
             built = true;
             SceneLoader.Release();
+            if (resumed) intro.MarkPlayed();   // a race saved after the green has had its intro
+            else intro.Play();
             var report = new System.Text.StringBuilder("Raceday built in ");
             long total = 0;
             foreach ((string Stage, long Ms) t in buildTimes) total += t.Ms;
@@ -610,6 +622,7 @@ namespace TarmacGauntlet.Raceday
         private void Update()
         {
             if (!built || keys == null || ai == null) return;
+            if (director.SinceTimeUp.HasValue) outro.Play();
             if (RaceWeekend.Paused) return;   // the pause menu holds the clock
             if (director.Finished) return;   // the race summary is up, at normal speed
             if (keys.Pressed(KeyCode.Delete))
