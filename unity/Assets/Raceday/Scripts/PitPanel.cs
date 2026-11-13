@@ -56,6 +56,7 @@ namespace TarmacGauntlet.Raceday
                 Open = false;
                 return;
             }
+            if (Hud != null && Hud.Hidden) return;   // nothing to see over the broadcast, so its keys do nothing there
             if (Keys.Pressed(KeyCode.P)) Open = !Open;
             if (!Open) return;
             PitOrders orders = Supplies.Orders;
