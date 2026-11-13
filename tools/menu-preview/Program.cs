@@ -47,7 +47,14 @@ namespace MenuPreview
             var summary = new GameObject("summary").AddComponent<RaceSummaryScreen>();
             summary.RunStart();
             Scheduler.Flush();
-            Snap("race-summary", "track", UIDocument.All.Last().rootVisualElement);
+            VisualElement summaryRoot = UIDocument.All.Last().rootVisualElement;
+            Snap("race-summary", "track", summaryRoot);
+
+            // Continue opens the Skill points step; two points go on Driver.
+            Click(summaryRoot.Q(className: "corner"));
+            Snap("skill-points", "track", summaryRoot);
+            for (int i = 0; i < 2; i++) Click(summaryRoot.Query<VisualElement>(className: "skill-step").ToList()[1]);
+            Snap("skill-points-spent", "track", summaryRoot);
 
             // Then the paper is read, the year ends, and the Team HQ opens on the hub.
             GameSession.Apply(g => Season.AdvanceYear(g, rng.NextDouble));

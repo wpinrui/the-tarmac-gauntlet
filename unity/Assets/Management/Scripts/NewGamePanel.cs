@@ -114,7 +114,7 @@ namespace TarmacGauntlet.Management
             Body.Add(playerBox);
             team.RegisterValueChangedCallback(_ => RenderStart());
 
-            // Skills: the points left as pips, then each skill's level.
+            // Skills: the points left, then each skill, what it does and its level.
             skills = Group("ng-skills");
             Body.Add(skills);
 
@@ -244,9 +244,8 @@ namespace TarmacGauntlet.Management
 
         private void RenderSkills()
         {
-            Tips.Hide();
             skills.Clear();
-            skills.Add(SkillPicker(Tips, GameInit.StartingSkillPoints, Left, t => levels[t], _ => 0, Spend));
+            skills.Add(SkillPicker(Left, t => levels[t], _ => 0, Spend, true));
             RenderStart();
         }
 
