@@ -33,6 +33,11 @@ namespace TarmacGauntlet.Raceday
         public const float Most = 1f;
         /// <summary>The share of the lamps' targets that may be lit less than <see cref="Most"/> before the light eases.</summary>
         public const float Dim = 0.1f;
+        /// <summary>
+        /// Past the edge of the road or the pit lane the light fades out over these distances, m: the verges and the
+        /// pit building's front stay lit, and the grass beyond darkens as it would at night.
+        /// </summary>
+        public const float EdgeFrom = 3f, EdgeTo = 15f;
         /// <summary>Nearer than its target, a lamp lights the ground at most this many times as brightly as at its target.</summary>
         private const float NearMost = 2f;
 
@@ -76,6 +81,7 @@ namespace TarmacGauntlet.Raceday
                     for (int i = i0 / step; i <= i1 / step + 1; i++) needed[j * cw + i] = true;
             }
             var coarse = new float[cw * ch];
+            var edge = new float[cw * ch];
             int hint = -1;
             for (int j = 0; j < ch; j++)
             {
@@ -84,11 +90,14 @@ namespace TarmacGauntlet.Raceday
                 {
                     if (!needed[j * cw + i]) { chained = false; continue; }
                     var p = new Vector3(X0 + i * step * Texel, 0f, Z0 + j * step * Texel);
-                    coarse[j * cw + i] = floods.Ground(p, chained ? hint : -1, out hint);
+                    coarse[j * cw + i] = floods.Ground(p, chained ? hint : -1, out hint, out float beyond);
+                    float t = Mathf.Clamp01((beyond - EdgeFrom) / (EdgeTo - EdgeFrom));
+                    edge[j * cw + i] = 1f - t * t * (3f - 2f * t);
                     chained = true;
                 }
             }
             var raw = new float[n];
+            var near = new float[n];
             for (int j = 0; j < Height; j++)
                 for (int i = 0; i < Width; i++)
                 {
@@ -96,6 +105,8 @@ namespace TarmacGauntlet.Raceday
                     float fi = (float)(i - ci * step) / step, fj = (float)(j - cj * step) / step;
                     Ground[j * Width + i] = Mathf.Lerp(Mathf.Lerp(coarse[cj * cw + ci], coarse[cj * cw + ci + 1], fi),
                         Mathf.Lerp(coarse[(cj + 1) * cw + ci], coarse[(cj + 1) * cw + ci + 1], fi), fj);
+                    near[j * Width + i] = Mathf.Lerp(Mathf.Lerp(edge[cj * cw + ci], edge[cj * cw + ci + 1], fi),
+                        Mathf.Lerp(edge[(cj + 1) * cw + ci], edge[(cj + 1) * cw + ci + 1], fi), fj);
                 }
             // Each lamp over the cells its beam can reach.
             foreach (Floodlight f in floods.Lights)
@@ -119,7 +130,7 @@ namespace TarmacGauntlet.Raceday
             foreach (Floodlight f in floods.Lights) aimed.Add(Sample(raw, f.Target.x, f.Target.z));
             aimed.Sort();
             float scale = aimed.Count > 0 && aimed[(int)(aimed.Count * Dim)] > 1e-6f ? Most / aimed[(int)(aimed.Count * Dim)] : 0f;
-            for (int k = 0; k < n; k++) Light[k] = Knee(raw[k] * scale, Most);
+            for (int k = 0; k < n; k++) Light[k] = Knee(raw[k] * scale, Most) * near[k];
         }
 
         /// <summary>The cells a lamp's beam can reach.</summary>

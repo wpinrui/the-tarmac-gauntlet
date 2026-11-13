@@ -246,15 +246,19 @@ namespace TarmacGauntlet.Raceday
         /// Height of whatever is underfoot at a point: the road where it is on the road or its kerbs, the pit lane where
         /// it is on the lane, otherwise the ground.
         /// </summary>
-        public float Ground(Vector3 p, int hint) => Ground(p, hint, out _);
+        public float Ground(Vector3 p, int hint) => Ground(p, hint, out _, out _);
 
-        /// <summary>As <see cref="Ground(Vector3, int)"/>, giving the track sample nearest the point, a hint for the next one near it.</summary>
-        public float Ground(Vector3 p, int hint, out int nearestTrack)
+        /// <summary>
+        /// As <see cref="Ground(Vector3, int)"/>, giving the track sample nearest the point, a hint for the next one near
+        /// it, and how far the point lies beyond the edge of the road or the pit lane, whichever is nearer, m: 0 on them.
+        /// </summary>
+        public float Ground(Vector3 p, int hint, out int nearestTrack, out float beyond)
         {
             float y = c.TerrainHeight(p.x, p.z);
             int k = NearestTrack(p, hint);
             nearestTrack = k;
             float lat = Vector3.Dot(p - c.Centre[k], c.Left[k]);
+            beyond = Mathf.Max(Mathf.Abs(lat) - c.HalfWidth(k), 0f);
             if (Mathf.Abs(lat) < c.HalfWidth(k) + 1.5f) y = Mathf.Max(y, c.Surface(k, lat).y);
             if (c.Lane != null && c.Lane.Length > 0 && NearLane(p))
             {
@@ -266,6 +270,7 @@ namespace TarmacGauntlet.Raceday
                     if (d < nearest) { nearest = d; best = i; }
                 }
                 if (Mathf.Sqrt(nearest) < c.Data.pit.laneWidth * 0.5f + 1.2f) y = Mathf.Max(y, c.Lane[best].y + 0.01f);
+                beyond = Mathf.Min(beyond, Mathf.Max(Mathf.Sqrt(nearest) - c.Data.pit.laneWidth * 0.5f, 0f));
             }
             return y;
         }
@@ -277,7 +282,7 @@ namespace TarmacGauntlet.Raceday
         {
             if (float.IsNaN(laneX0))
             {
-                float pad = c.Data.pit.laneWidth + 5f;
+                float pad = c.Data.pit.laneWidth + 30f;
                 laneX0 = laneZ0 = float.MaxValue;
                 laneX1 = laneZ1 = float.MinValue;
                 foreach (Vector3 q in c.Lane)
