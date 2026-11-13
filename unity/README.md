@@ -112,7 +112,7 @@ board, two by two and staggered, twenty places a page, over a crane shot across 
 
 The last stage before the green is the end of the formation lap (`Stages/FinalFormation.cs`). It cuts to the leader
 200 m short of the last corner, the pace car gone into the pit lane and the field behind two by two in grid order, and
-ends at the green. Skipped, it cuts to the leader at the line. From the cut you drive your own car, on a limiter until
+ends at the green. It is the start of the race, so it can't be skipped. From the cut you drive your own car, on a limiter until
 you cross the line: past the speed that holds your place the power is cut, and a little over it the brakes come on, so
 you can't pass the car before you in grid order. `bash tools/ai-check/run.sh final` runs it with 100 cars, with and
 without a player driving flat out against the limiter.
