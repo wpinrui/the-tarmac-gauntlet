@@ -69,14 +69,15 @@ compiles in Unity.
 ## Raceday scene
 
 `Assets/Raceday/Raceday.unity` opens when the editor starts. Press Play and the AI drives the Seorak
-Cheonma CX-24Si. `I` hands the car to you, and pressing it again hands it back.
+Cheonma CX-24Si. Delete hands the car to you, and pressing it again hands it back.
 
-Start on the scene's `CircuitScene` picks how the race starts. Rolling (the default) starts behind the pace car. Pit Lane: the 100 cars
-queue in the pit lane's fast lane, quickest first with the Cheonma last, and leave three seconds apart
-from the pit exit line (the end of the limiter zone), the queue moving up behind each car that goes
-(`PitLaneStart.cs`). The scene fast forwards at 32x until just before the car ahead of the Cheonma
-leaves; `F` or `I` ends the fast forward early. Pit stops open once every car is out of the pit lane, and
-every car starts on a full tank. Grid races from the grid at once.
+Start on the scene's `CircuitScene` picks how the race starts. Rolling (the default) starts behind the pace car,
+from the garages: after the grid show, the pit exit stage sends the whole field out at once on a timetable
+(`GarageStart.cs`). Each car has a slot in a line that moves down the pit lane at a steady headway, the pace car
+two slots ahead, and leaves its garage just in time to meet its slot, so the garage order does not matter.
+A car that would cut into a car already on its way waits for it. A player who drives out slowly holds up
+everyone behind, who queue. Hold Enter to skip the stage; the formation lap then puts the field in place.
+Every car starts on a full tank. Grid races from the grid at once.
 
 The field is the season's 99 AI teams, by the class of their roster entry, and the player's. The timing
 tower in the top left (`RaceTower.cs`, order in `Standings.cs`) counts down the 24 hour race clock, which runs
@@ -186,8 +187,9 @@ leaving the track and within 5% of its predicted time, that Pace, Consistency an
 say, and that overcooked corners cost time. `run.sh glide` checks gliding: every model's gliding lap
 is within 1.5% of its driven one, a gliding mistake costs about what a driven one does, cars switch
 between gliding and physics without leaving the track or touching, 100 gliding cars at 16x keep their
-pace, gliding cars still pit and start rolling with the pack, and the pit lane start sends all 100
-cars out cleanly (`run.sh pitstart` for the same with a line per car). `StandInCar.cs` copies `CarController`'s formulas, so keep
+pace, and gliding cars still pit and start rolling with the pack. `run.sh garagestart` sends 100 cars out
+of their garages into formation behind the pace car (`GARAGE_GLIDE=1` with the far cars gliding), and
+`run.sh garageslow` does it with a slow player in slot 40, checking the cars behind queue without touching. `StandInCar.cs` copies `CarController`'s formulas, so keep
 it in step when those change.
 
 Driving: left and right arrows steer, up accelerates, down brakes (hold it at a standstill to

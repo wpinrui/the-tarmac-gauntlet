@@ -197,8 +197,13 @@ namespace TarmacGauntlet.Raceday
                 string id = field[i];
                 Color paint = PaintFor(id);
                 CarController car = CarBuilder.Spawn(id, circuit, mine ? keys : null, paint, grid[i].TeamName, grid[i].RaceNumber);
-                GridPlace(circuit, i, out float d, out float lateral);
-                car.PlaceAt(circuit.IndexOf(d - 2.6f), lateral);   // front wheels just behind the line
+                int garage = GarageStart.GarageFor(i, pits.Garages);
+                if (start == StartMode.Rolling) car.PlaceAt(GarageStart.Parked(Complex, garage, out Vector3 forward), forward);   // parked in its garage
+                else
+                {
+                    GridPlace(circuit, i, out float d, out float lateral);
+                    car.PlaceAt(circuit.IndexOf(d - 2.6f), lateral);   // front wheels just behind the line
+                }
 
                 // The career car's stats, worn by age and condition and lifted by upgrades, set its fuel, tyres and stops.
                 CarStats stats = EffectiveStats.CalculateEffectiveStats(grid[i].Car, grid[i].Model);
@@ -214,7 +219,6 @@ namespace TarmacGauntlet.Raceday
                 // Every car starts on a full tank and new tyres.
                 car.Supplies.Fuel = Mathf.Min(car.Supplies.Capacity, (float)grid[i].StartingFuel);
 
-                int garage = i % pits.Garages;
                 RaceCar race = car.gameObject.AddComponent<RaceCar>();
                 race.Pits = pits;
                 race.Garage = garage;
@@ -280,7 +284,9 @@ namespace TarmacGauntlet.Raceday
             if (resumed) tower.SetRaceTime(resume.RaceTime);
             views.Tower = tower;
             if (player >= 0 && TeamColour(setup.Game, grid[player].TeamId) is Color own) tower.Colours[player] = own;
-            view.Fit(Complex, tower.Colours, pits.Garages);
+            var carGarages = new int[racing.Length];
+            for (int i = 0; i < racing.Length; i++) carGarages[i] = racing[i].Garage;
+            view.Fit(Complex, tower.Colours, carGarages, pits.Garages);
             // Each team's hired crew wait in its garage and work its stops.
             var crewSizes = new int[grid.Count];
             for (int i = 0; i < grid.Count; i++) crewSizes[i] = grid[i].CrewSize;
@@ -405,6 +411,11 @@ namespace TarmacGauntlet.Raceday
                 rolling.Grid = racing;
                 rolling.PaceCar = paceCar;
                 rolling.Pits = pits;
+                // The field starts parked in its garages, and holds there until the drive out of the pit lane.
+                rolling.Complex = Complex;
+                rolling.Garages = new int[racing.Length];
+                for (int i = 0; i < racing.Length; i++) rolling.Garages[i] = racing[i].Garage;
+                rolling.Holding = true;
             }
             // The stages before the green and after the flag, each skipped by holding Enter. Stages are added here in order.
             intro = new GameObject("Intro").AddComponent<StageSequence>();
@@ -430,6 +441,12 @@ namespace TarmacGauntlet.Raceday
             gridShow.Camera = views.GetComponent<Camera>();
             gridShow.Cameras = views;
             intro.Add(gridShow);
+            if (starter is RaceStart fromGarages && fromGarages.Complex != null)
+            {
+                PitExitStage pitExit = intro.gameObject.AddComponent<PitExitStage>();
+                pitExit.Race = fromGarages;
+                intro.Add(pitExit);
+            }
             if (starter is RaceStart rollingStart)
             {
                 FinalFormation finalFormation = intro.gameObject.AddComponent<FinalFormation>();

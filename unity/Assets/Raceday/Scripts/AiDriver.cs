@@ -206,6 +206,13 @@ namespace TarmacGauntlet.Raceday
             }
             crashTimer = 0f;
 
+            if (Starter != null && Starter.Steers(this, out AiPilot.Controls own, out bool held))
+            {
+                car.SetControls(own.Throttle, own.Brake, own.Steer);
+                car.Hold = held;
+                stuckTimer = 0f;
+                return;
+            }
             if (Starter != null) Starter.Brief(this);
             Racer.Active.Towed = car.DragScale < 0.97f;
             TrafficCar me = race != null ? race.Traffic : new TrafficCar { Id = -1 - Seed };
@@ -240,7 +247,7 @@ namespace TarmacGauntlet.Raceday
         /// Whether the car can leave physics now: driven by the AI, racing or in the formation, and
         /// not making a pit stop or waiting to be put back after a crash.
         /// </summary>
-        public bool CanGlide => enabled && Racer != null && Racer.CanGlide && !Gliding && !car.Crashed && !car.Asleep;
+        public bool CanGlide => enabled && Racer != null && Racer.CanGlide && !Gliding && !car.Crashed && !car.Asleep && (Starter == null || !Starter.Pinned(this));
 
         /// <summary>Takes the car off physics. It glides on from where it is, at its speed along the track.</summary>
         public void Glide()
