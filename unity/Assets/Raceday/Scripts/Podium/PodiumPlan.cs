@@ -151,9 +151,10 @@ namespace TarmacGauntlet.Raceday
             for (int row = 0; row < 2; row++)
                 for (int c = 0; c < 12; c++)
                 {
-                    float x = -6.6f + c * 1.2f + (row == 1 ? 0.6f : 0f) + (float)(rng.NextDouble() - 0.5) * 0.35f;
+                    // A loose huddle rather than two neat rows: each stands well off a grid spot.
+                    float x = -6.6f + c * 1.2f + (row == 1 ? 0.6f : 0f) + (float)(rng.NextDouble() - 0.5) * 0.6f;
                     // Across the fast lane: lane offsets from the wall side, the first row nearer the boxes.
-                    float lateral = (row == 0 ? -2.95f : -4.15f) + (float)(rng.NextDouble() - 0.5) * 0.3f;
+                    float lateral = (row == 0 ? -2.95f : -4.15f) + (float)(rng.NextDouble() - 0.5) * 0.8f;
                     Vector3 world = OnLane(lane, frame, g, x, lateral);
                     int place = x < -2.2f ? 1 : x > 2.2f ? 2 : 0;
                     spots.Add((frame.Local(world), place));

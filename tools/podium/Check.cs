@@ -489,7 +489,7 @@ static class Check
         {
             PodiumActor a = show.Actors[k];
             if (k > 0) actors.Append(',');
-            actors.Append("{role:").Append((int)a.Role).Append(",place:").Append(a.Place).Append(",start:").Append(F(a.Role == PodiumRole.Driver ? show.StartOf(a) : -1f)).Append(",f:[");
+            actors.Append("{role:").Append((int)a.Role).Append(",place:").Append(a.Place).Append(",start:").Append(F(a.Role == PodiumRole.Driver ? show.StartOf(a) : -1f)).Append(",size:").Append(F(a.Size)).Append(",f:[");
             bool first = true;
             for (float t = 0f; t <= PodiumShow.Length; t += Dt)
             {
