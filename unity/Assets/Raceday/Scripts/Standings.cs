@@ -8,7 +8,8 @@ namespace TarmacGauntlet.Raceday
     /// The running order for the timing tower, with no Unity objects so it can be tested outside Unity.
     /// Laps are counted in fake laps: a tenth of the real lap, because the race runs at 10:1. Every
     /// car shows the fake laps it has completed, from 0. The tower shows every class leader, the cars
-    /// round the player and, in the rows left, the fastest class in race order.
+    /// round the player and, in the rows left, the fastest class in race order. A car that has taken the
+    /// chequered flag keeps the place it finished in (<see cref="Finish"/>) while it drives its cooldown lap.
     /// </summary>
     public static class Standings
     {
@@ -29,7 +30,27 @@ namespace TarmacGauntlet.Raceday
             public int Position;
             public int ClassPosition;
             public int FakeLaps;
+            /// <summary>True once the car has taken the chequered flag.</summary>
+            public bool Finished;
+            /// <summary>The order the car took the flag in, from 1, while <see cref="Finished"/>.</summary>
+            public int FinishOrder;
         }
+
+        /// <summary>
+        /// The car takes the chequered flag with <paramref name="laps"/> laps done, the
+        /// <paramref name="order"/>th across the line. From here it ranks on the line it crossed, so its
+        /// cooldown lap moves it nowhere, and among cars that crossed the same line in the order they crossed it.
+        /// </summary>
+        public static void Finish(Car c, int laps, float lap, int order)
+        {
+            if (c.Finished) return;
+            c.Finished = true;
+            c.FinishOrder = order;
+            c.Distance = laps * lap + LineMargin;
+        }
+
+        /// <summary>How far past the line a finished car is ranked, m: enough that its fake laps don't round down.</summary>
+        private const float LineMargin = 1f;
 
         public struct Row
         {
@@ -49,7 +70,7 @@ namespace TarmacGauntlet.Raceday
         /// </summary>
         public static void Rank(List<Car> cars, float lap, bool racing = true)
         {
-            if (racing) cars.Sort((a, b) => a.Distance != b.Distance ? b.Distance.CompareTo(a.Distance) : a.Id.CompareTo(b.Id));
+            if (racing) cars.Sort(Compare);
             else cars.Sort((a, b) => a.Id.CompareTo(b.Id));
             var inClass = new Dictionary<CarClass, int>();
             for (int i = 0; i < cars.Count; i++)
@@ -60,6 +81,14 @@ namespace TarmacGauntlet.Raceday
                 c.ClassPosition = inClass[c.Class] = n + 1;
                 c.FakeLaps = racing ? FakeLaps(c.Distance, lap) : 0;
             }
+        }
+
+        private static int Compare(Car a, Car b)
+        {
+            if (a.Distance != b.Distance) return b.Distance.CompareTo(a.Distance);
+            if (a.Finished != b.Finished) return a.Finished ? -1 : 1;
+            if (a.Finished && a.FinishOrder != b.FinishOrder) return a.FinishOrder.CompareTo(b.FinishOrder);
+            return a.Id.CompareTo(b.Id);
         }
 
         /// <summary>

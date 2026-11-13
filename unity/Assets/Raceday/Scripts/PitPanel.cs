@@ -40,7 +40,7 @@ namespace TarmacGauntlet.Raceday
         private CarRaceLog Log => Supplies?.Log;
 
         /// <summary>True while you drive a car with a stop to plan.</summary>
-        private bool Usable => Car != null && !Car.AiDriving && Car.InputEnabled && Planner != null && Supplies != null && !Supplies.Retired;
+        private bool Usable => Car != null && !Car.AiDriving && Car.InputEnabled && Planner != null && Supplies != null && !Supplies.RaceOver;
 
         private void Update()
         {

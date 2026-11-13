@@ -51,6 +51,31 @@ static partial class Check
         if (rows.Count(r => r.Car.Class == CarClass.A) != 12 || rows.Count != 12 + 1 + 1 + 9)
             problems.Add($"with room to spare, every A car and no more should show, not {rows.Count} rows");
 
+        // Past the flag: cars keep the places they finished in while they drive their cooldown laps.
+        var end = new List<Standings.Car>
+        {
+            new Standings.Car { Id = 0, Team = "L", Class = CarClass.A, Distance = lap * 50f + 30f },
+            new Standings.Car { Id = 1, Team = "S", Class = CarClass.A, Distance = lap * 50f + 10f },
+            new Standings.Car { Id = 2, Team = "T", Class = CarClass.A, Distance = lap * 50f - 40f },
+            new Standings.Car { Id = 3, Team = "D", Class = CarClass.F, Distance = lap * 49f + 300f },
+        };
+        // L crossed first, then S: both on 50 laps. S crossed a little further past the line in its frame.
+        Standings.Finish(end[0], 50, lap, 1);
+        Standings.Finish(end[1], 50, lap, 2);
+        Standings.Rank(end, lap);
+        if (end[0].Team != "L" || end[1].Team != "S") problems.Add("cars on the same lap should finish in the order they crossed the line");
+        if (end[0].FakeLaps != 500 || end[1].FakeLaps != 500) problems.Add($"a car flagged on 50 laps should show 500 fake laps, not {end[0].FakeLaps}");
+        // T, still racing to the line, gains distance; L drives its cooldown lap but keeps P1.
+        end.First(c => c.Team == "T").Distance = lap * 50f - 1f;
+        Standings.Rank(end, lap);
+        if (end[0].Team != "L" || end[1].Team != "S" || end[2].Team != "T") problems.Add("a car still racing to the line should stay behind those that crossed it");
+        Standings.Car t = end.First(c => c.Team == "T");
+        Standings.Finish(t, 50, lap, 3);
+        Standings.Finish(t, 51, lap, 9);   // a second flag changes nothing
+        Standings.Rank(end, lap);
+        if (end[2].Team != "T" || t.FinishOrder != 3 || t.FakeLaps != 500) problems.Add("a car should take the flag only once");
+        if (!end[3].Team.Equals("D") || end[3].Finished) problems.Add("a lapped car still racing should rank on its distance, unflagged");
+
         Report("timing tower", problems);
     }
 }

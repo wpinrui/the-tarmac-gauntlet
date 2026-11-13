@@ -183,8 +183,8 @@ namespace TarmacGauntlet.Raceday
                 Vector3 box = Pits.BoxPoint(Garage) - transform.position;
                 box.y = 0f;
                 bool stopped = box.sqrMagnitude < 2.5f * 2.5f && car.Speed < 0.5f;
-                // Out of the race: once in the box, the car stays there.
-                if (car.Supplies.Retired)
+                // Race over: once in the box, the car stays there.
+                if (car.Supplies.RaceOver)
                 {
                     if (stopped) car.Hold = true;
                     return;
