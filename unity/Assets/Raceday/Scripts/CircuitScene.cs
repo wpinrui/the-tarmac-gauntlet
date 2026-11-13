@@ -451,6 +451,7 @@ namespace TarmacGauntlet.Raceday
             gridShow.Tower = tower;
             gridShow.Hud = views.Hud;
             gridShow.Camera = views.GetComponent<Camera>();
+            gridShow.Cameras = views;
             intro.Add(gridShow);
             outro = new GameObject("Outro").AddComponent<StageSequence>();
             outro.Keys = keys;
