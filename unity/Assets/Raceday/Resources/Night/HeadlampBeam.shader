@@ -3,7 +3,8 @@
 // it lies inside the beam, near the car's own ground and faces up. So the sky, walls, other cars and anything over a
 // crest stay as they were. The light added is the scene's own colour there, from before the transparent pass, times
 // _Color: so the road, the lines and the grass keep their colours, and a floodlit pool is not brightened again by
-// its own floodlight. A soft cap (_Cap, linear luminance) keeps a brightly lit floor, such as the pit garage's, from
+// its own floodlight. Where the moon's shadow darkened that colour, the shadow is divided back out (LampFill.hlsl), so a
+// car's shadow is lit inside the beam like the road beside it. A soft cap (_Cap, linear luminance) keeps a brightly lit floor, such as the pit garage's, from
 // running into bloom. _Lift adds a little so black ground still shows the light. It fades out at the beam's edge and
 // into the fog with distance.
 // The beam's shape matches CarLamps: _Shape is its length and its width at the nose and at the far end, m; _Band how
@@ -38,6 +39,7 @@ Shader "Hidden/TarmacGauntlet/HeadlampBeam"
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Fog.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareOpaqueTexture.hlsl"
+            #include_with_pragmas "Assets/Rendering/Shaders/LampFill.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _Color;
@@ -128,7 +130,7 @@ Shader "Hidden/TarmacGauntlet/HeadlampBeam"
 
                 // The headlamps' light on this point: the scene's colour here times the brightening, eased off towards
                 // the cap so a brightly lit floor gains no more than _Cap.
-                float3 add = SampleSceneColor(uv) * _Color.rgb * w;
+                float3 add = SampleSceneColor(uv) * LampFill(p, n, uv) * _Color.rgb * w;
                 float lum = dot(add, float3(0.2126, 0.7152, 0.0722));
                 add *= 1.0 / (1.0 + lum / max(_Cap, 1e-4));
                 add += _Lift.rgb * w;

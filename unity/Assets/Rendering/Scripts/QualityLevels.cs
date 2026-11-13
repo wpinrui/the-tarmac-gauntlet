@@ -73,6 +73,8 @@ namespace TarmacGauntlet.Rendering
             new ShadowQuality(0.008f, 32, 24, 24f, 0.5f, 20, 120f, 0.9f, 0.15f),
         };
 
+        /// <summary>1 while the screen-space shadows are on, for the night lamps that read them (LampFill.hlsl).</summary>
+        private static readonly int ScreenShadowsId = Shader.PropertyToID("_TgScreenShadows");
         private static readonly int SoftId = Shader.PropertyToID("_TarmacShadowSoft"),
             ContactId = Shader.PropertyToID("_TarmacShadowContact"), BlendId = Shader.PropertyToID("_TarmacShadowBlend");
 
@@ -140,6 +142,7 @@ namespace TarmacGauntlet.Rendering
             GraphicsOptions.SoftShadows.Changed -= ShowScreenShadows;
             QualitySettings.renderPipeline = pipelineBefore;
             foreach (KeyValuePair<ScriptableRendererFeature, bool> f in activeBefore) f.Key.SetActive(f.Value);
+            Shader.SetGlobalFloat(ScreenShadowsId, 0f);
             level = -1;
             started = false;
         }
@@ -169,6 +172,7 @@ namespace TarmacGauntlet.Rendering
         private static void ShowScreenShadows(GraphicsOption option)
         {
             foreach (ScriptableRendererFeature f in screenShadows) f.SetActive(option.On);
+            Shader.SetGlobalFloat(ScreenShadowsId, option.On && screenShadows.Count > 0 ? 1f : 0f);
         }
 
         private static void Configure(ScriptableRenderContext context, Camera camera)

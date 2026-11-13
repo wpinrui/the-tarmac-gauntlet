@@ -1,7 +1,9 @@
 // A pool of light lying on the ground: the floodlights' pools and the cars' headlamp beams. It brightens what is
 // already drawn under it, so the road, the lines and the grass keep their own colours: the first pass multiplies
 // the colour behind by 1 + _Color, the second adds a little _Lift so black ground still shows the light. Both
-// fade to nothing at the pool's edge, where its UVs reach 1, and into the fog with distance.
+// fade to nothing at the pool's edge, where its UVs reach 1, and into the fog with distance. Where the moon's shadow
+// darkened the ground, the brightening is raised to divide it back out (LampFill.hlsl), so a car's shadow in a pool is lit
+// like the ground beside it.
 // URP draws an object's SRPDefaultUnlit pass before its UniversalForward one, which keeps the two in order.
 Shader "Hidden/TarmacGauntlet/LightPool"
 {
@@ -36,13 +38,15 @@ Shader "Hidden/TarmacGauntlet/LightPool"
             float4 positionCS : SV_POSITION;
             float2 uv : TEXCOORD0;
             float fog : TEXCOORD1;
+            float3 positionWS : TEXCOORD2;
         };
 
         Varyings vert(Attributes v)
         {
             UNITY_SETUP_INSTANCE_ID(v);
             Varyings o;
-            o.positionCS = TransformObjectToHClip(v.positionOS.xyz);
+            o.positionWS = TransformObjectToWorld(v.positionOS.xyz);
+            o.positionCS = TransformWorldToHClip(o.positionWS);
             o.uv = v.uv;
             o.fog = ComputeFogFactor(o.positionCS.z);
             return o;
@@ -71,11 +75,13 @@ Shader "Hidden/TarmacGauntlet/LightPool"
             #pragma vertex vert
             #pragma fragment frag
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Fog.hlsl"
+            #include_with_pragmas "Assets/Rendering/Shaders/LampFill.hlsl"
             #pragma multi_compile_instancing
 
             float4 frag(Varyings i) : SV_Target
             {
-                return Fogged(_Color.rgb * Falloff(i.uv), i.fog);
+                half3 fill = LampFill(i.positionWS, half3(0, 1, 0), GetNormalizedScreenSpaceUV(i.positionCS));
+                return Fogged(_Color.rgb * fill * Falloff(i.uv), i.fog);
             }
             ENDHLSL
         }

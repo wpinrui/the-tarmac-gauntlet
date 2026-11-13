@@ -2,6 +2,10 @@
 // round a little and shines through when the camera looks towards it; the sky fills the shade; the sun's shadow and the
 // race's lights reach it too. Soft: where the depth is drawn, a puff fades where it meets the track or a car. No texture
 // is read. The particle system sends each puff's centre (CarEffects sets the streams), so the lighting turns with nothing.
+// At night the lamps light it as they light the ground: the headlamp beams of the cars nearest the camera and the
+// floodlights' beams, each as bright on a puff as on the road under it. And at night smoke mostly scatters light rather
+// than blocking it: a puff hides what is behind it only as far as it is lit itself, so it shows as a pale haze where a
+// lamp catches it and never as a dark blot over a lit road.
 Shader "Hidden/TarmacGauntlet/Smoke"
 {
     Properties
@@ -11,7 +15,8 @@ Shader "Hidden/TarmacGauntlet/Smoke"
     SubShader
     {
         Tags { "Queue" = "Transparent" "RenderType" = "Transparent" "IgnoreProjector" = "True" "RenderPipeline" = "UniversalPipeline" }
-        Blend SrcAlpha OneMinusSrcAlpha
+        // Premultiplied: the colour carries its own alpha, and the alpha says how much of what is behind is hidden.
+        Blend One OneMinusSrcAlpha
         ZWrite Off
         Cull Off
 
@@ -34,9 +39,77 @@ Shader "Hidden/TarmacGauntlet/Smoke"
                 float4 _Tint;
             CBUFFER_END
             // Set by CarEffects: 1 when the scene's depth is drawn, so the puffs can fade into it; the night's glow over the
-            // circuit, for the lights not drawn as real lights.
+            // circuit, for the lights not drawn as real lights; how far the lamps are on, 0 by day to 1 at night.
             float _EffectsSoft;
             float3 _EffectsNight;
+            float _EffectsDark;
+            // The headlamp beams of the cars nearest the camera (CarEffects): x how many, yzw their brightening, as
+            // HeadlampBeam's _Color; each one's origin on the car's ground under its nose, its forward and up; the beam's
+            // length and its width at the nose and the far end, m, as CarLamps shapes it.
+            #define TG_MOST_HEADS 8
+            float4 _TgHeads;
+            float4 _TgHeadPos[TG_MOST_HEADS];
+            float4 _TgHeadFwd[TG_MOST_HEADS];
+            float4 _TgHeadUp[TG_MOST_HEADS];
+            float4 _TgHeadShape;
+            // The floodlights' beams (Atmosphere.Beams) and the pools' brightening, as LightPool's _Color.
+            #define TG_MOST_BEAMS 16
+            float4 _TgBeams;
+            float4 _TgBeamPos[TG_MOST_BEAMS];
+            float4 _TgBeamAim[TG_MOST_BEAMS];
+            float3 _EffectsFlood;
+
+            // A puff at night is lit by no more than this, linear luminance, eased towards, as the beam's _Cap eases the
+            // road: a puff right in front of a lamp glows but doesn't blow out.
+            #define SMOKE_LAMP_CAP 0.15
+            // At night a puff hides what is behind it as far as its own light reaches this, linear luminance: about the
+            // brightest a lit road gets, so over any lit road it adds at least as much light as it hides.
+            #define SMOKE_DARK_SHOWS 0.6
+
+            // How far a headlamp beam reaches a point in the air: its footprint on the road, carried up to the height
+            // the lamps light.
+            float HeadAt(int k, float3 p)
+            {
+                float3 v = p - _TgHeadPos[k].xyz;
+                float3 fwd = _TgHeadFwd[k].xyz, up = _TgHeadUp[k].xyz;
+                float t = dot(v, fwd) / _TgHeadShape.x;
+                if (t <= 0.0 || t >= 1.0) return 0.0;
+                float across = lerp(_TgHeadShape.y, _TgHeadShape.z, t) * 0.5;
+                float u = dot(v, cross(up, fwd)) / across, w = pow(t, 0.7) * 2.0 - 1.0;
+                float shape = saturate(1.0 - u * u - w * w);
+                float y = dot(v, up);
+                return shape * shape * smoothstep(-0.6, 0.0, y) * (1.0 - smoothstep(1.4, 2.6, y));
+            }
+
+            // How far a floodlight's beam reaches a point: 1 where it lights the middle of its pool.
+            float FloodAt(int k, float3 p)
+            {
+                float3 v = p - _TgBeamPos[k].xyz;
+                float dd = dot(v, v);
+                float reach = _TgBeamPos[k].w;
+                if (dd >= reach * reach) return 0.0;
+                float c = dot(v * rsqrt(dd + 1e-4), _TgBeamAim[k].xyz);
+                float edge = _TgBeamAim[k].w;
+                float cone = smoothstep(edge, lerp(edge, 1.0, 0.4), c);
+                // The pool's middle is where the beam was aimed, at its reach over 1.6 (NightLights.BeamCarry).
+                float target = reach * reach / 2.56;
+                float atTarget = (1.0 - 1.0 / 2.56) / (target + 9.0);
+                return min(cone * saturate(1.0 - dd / (reach * reach)) / (dd + 9.0) / atTarget, 1.5);
+            }
+
+            // The lamps' light on a puff: what the night gives the open ground, brightened as the beams and pools
+            // brighten it.
+            float3 Lamps(float3 p, float3 night)
+            {
+                float3 lamps = 0;
+                int heads = (int)_TgHeads.x;
+                UNITY_LOOP
+                for (int k = 0; k < heads; k++) lamps += _TgHeads.yzw * HeadAt(k, p);
+                int floods = (int)_TgBeams.x;
+                UNITY_LOOP
+                for (int j = 0; j < floods; j++) lamps += _EffectsFlood * FloodAt(j, p);
+                return night * lamps;
+            }
 
             struct Attributes
             {
@@ -87,7 +160,10 @@ Shader "Hidden/TarmacGauntlet/Smoke"
                     sky += l.color * (l.distanceAttenuation * 0.6);
                 }
                 #endif
-                o.sky = sky + _EffectsNight;
+                float3 open = max(SampleSH(float3(0, 1, 0)), 0) + sun.color * saturate(sun.direction.y);
+                float3 lamps = _EffectsDark > 0.0 ? Lamps(centre, open) : 0;
+                float lum = dot(lamps * _Tint.rgb, float3(0.2126, 0.7152, 0.0722));
+                o.sky = sky + _EffectsNight + lamps / (1.0 + lum / SMOKE_LAMP_CAP);
                 o.fog = ComputeFogFactor(o.positionCS.z);
                 return o;
             }
@@ -122,7 +198,9 @@ Shader "Hidden/TarmacGauntlet/Smoke"
                 // Puffs right at the lens thin out instead of filling the screen.
                 col.a *= saturate((i.eye - 0.4) / 1.6);
                 col.rgb = MixFog(col.rgb, i.fog);
-                return col;
+                // By day a puff hides what is behind it; at night only as far as it is lit.
+                float shows = saturate(dot(col.rgb, float3(0.2126, 0.7152, 0.0722)) / SMOKE_DARK_SHOWS);
+                return half4(col.rgb * col.a, col.a * lerp(1.0, shows, _EffectsDark));
             }
             ENDHLSL
         }

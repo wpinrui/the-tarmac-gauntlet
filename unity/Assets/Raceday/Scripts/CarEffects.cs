@@ -39,6 +39,9 @@ namespace TarmacGauntlet.Raceday
         private const float SparkSpeed = 12f, SparkRate = 260f;
         /// <summary>Haze puffs a second from one car at full throttle.</summary>
         private const float HazeRate = 22f;
+        /// <summary>The headlamp beams the smoke catches: from this many of the cars nearest the camera, within this far, m.</summary>
+        private const int MostHeads = 8;
+        private const float HeadsRange = 80f;
         /// <summary>Discs glow from inside the rim at this share of the wheel's radius, and sit this far in from its centre, m.</summary>
         private const float DiscRadius = 0.62f, DiscInset = 0.05f;
 
@@ -49,6 +52,10 @@ namespace TarmacGauntlet.Raceday
         private float picked = -1f, levelRead = -1f;
         private readonly List<int> nearSmoke = new List<int>(), nearHaze = new List<int>();
         private readonly List<(float, int)> byDistance = new List<(float, int)>();
+        /// <summary>The cars nearest the camera whose headlamp beams the smoke catches.</summary>
+        private readonly List<CarLamps> nearHeads = new List<CarLamps>();
+        private readonly List<(float, CarLamps)> lampsByDistance = new List<(float, CarLamps)>();
+        private readonly Vector4[] headPos = new Vector4[MostHeads], headFwd = new Vector4[MostHeads], headUp = new Vector4[MostHeads];
         /// <summary>Puffs and sparks owed to each car's corners, carried over between frames so slow rates still emit.</summary>
         private float[] smokeOwed, sparkOwed, hazeOwed;
         /// <summary>Seconds each car's tyres have kept sliding (<see cref="TyreSmoke.Step"/>).</summary>
@@ -59,7 +66,10 @@ namespace TarmacGauntlet.Raceday
         private MaterialPropertyBlock block;
 
         private static readonly int GlowId = Shader.PropertyToID("_Glow"), SoftId = Shader.PropertyToID("_EffectsSoft"),
-            NightId = Shader.PropertyToID("_EffectsNight");
+            NightId = Shader.PropertyToID("_EffectsNight"), DarkId = Shader.PropertyToID("_EffectsDark"),
+            FloodId = Shader.PropertyToID("_EffectsFlood"), HeadsId = Shader.PropertyToID("_TgHeads"),
+            HeadPosId = Shader.PropertyToID("_TgHeadPos"), HeadFwdId = Shader.PropertyToID("_TgHeadFwd"),
+            HeadUpId = Shader.PropertyToID("_TgHeadUp"), HeadShapeId = Shader.PropertyToID("_TgHeadShape");
 
         private sealed class Discs
         {
@@ -93,6 +103,8 @@ namespace TarmacGauntlet.Raceday
             HeatHazeFeature.ExhaustHaze = false;
             HeatHazeFeature.SoftParticles = false;
             Shader.SetGlobalFloat(SoftId, 0f);
+            Shader.SetGlobalFloat(DarkId, 0f);
+            Shader.SetGlobalVector(HeadsId, Vector4.zero);
             Destroy(smokeMaterial);
             Destroy(sparkMaterial);
             Destroy(hazeMaterial);
@@ -159,10 +171,15 @@ namespace TarmacGauntlet.Raceday
                 Pick(cam.transform.position);
             }
 
-            float night = Night != null ? NightLook.On(Night()) : 0f;
+            float lights = Night != null ? Night() : 0f;
+            float night = NightLook.On(lights);
             Color flood = NightLook.Flood * (0.3f * night);
             // Set as a colour so Unity converts it to linear light.
             Shader.SetGlobalColor(NightId, flood);
+            Shader.SetGlobalFloat(DarkId, night);
+            // The smoke is lit by the beams and pools as brightly as the road under them.
+            Shader.SetGlobalVector(FloodId, FloodMaterials.Brightening(NightLook.Flood, NightLook.PoolBrightening * lights));
+            Heads(lights);
 
             Glow(dt);
             if (dt <= 1e-5f) return;
@@ -172,7 +189,8 @@ namespace TarmacGauntlet.Raceday
             bool sparking = GraphicsOptions.Sparks.On && sparks.main.maxParticles > 0;
             if (smoking || sparking)
                 foreach (int c in nearSmoke) Friction(c, dt, smoking, sparking, dryness);
-            if (HeatHazeFeature.ExhaustHaze)
+            // The haze fades out as the lamps come on (Haze.shader): none is thrown at full night.
+            if (HeatHazeFeature.ExhaustHaze && night < 0.999f)
                 foreach (int c in nearHaze) Exhaust(c, dt);
         }
 
@@ -188,9 +206,44 @@ namespace TarmacGauntlet.Raceday
             return Mathf.Clamp01(high * clear * dry * Mathf.Clamp01(sun.intensity));
         }
 
+        /// <summary>Hands the smoke the headlamp beams of the cars nearest the camera, where they are now.</summary>
+        private void Heads(float lights)
+        {
+            int n = 0;
+            if (LampMaterials.Shared.BeamsOn)
+                foreach (CarLamps lamps in nearHeads)
+                {
+                    if (lamps == null || !lamps.isActiveAndEnabled || n >= MostHeads) continue;
+                    Transform t = lamps.transform;
+                    Vector3 at = t.TransformPoint(new Vector3(0f, 0f, lamps.Nose.z));
+                    headPos[n] = new Vector4(at.x, at.y, at.z, 0f);
+                    headFwd[n] = t.forward;
+                    headUp[n] = t.up;
+                    n++;
+                }
+            Vector4 bright = FloodMaterials.Brightening(LampMaterials.Shared.HeadTint, NightLook.BeamBrightening * lights);
+            Shader.SetGlobalVector(HeadsId, new Vector4(n, bright.x, bright.y, bright.z));
+            if (n == 0) return;
+            Shader.SetGlobalVectorArray(HeadPosId, headPos);
+            Shader.SetGlobalVectorArray(HeadFwdId, headFwd);
+            Shader.SetGlobalVectorArray(HeadUpId, headUp);
+            Shader.SetGlobalVector(HeadShapeId, new Vector4(LampMaterials.BeamLength, LampMaterials.BeamNear, LampMaterials.BeamFar, 0f));
+        }
+
         /// <summary>The cars nearest the camera that smoke and spark, and the fewer nearer still that show their haze.</summary>
         private void Pick(Vector3 camera)
         {
+            lampsByDistance.Clear();
+            foreach (CarLamps lamps in CarLamps.All)
+            {
+                if (lamps == null || !lamps.HasHeadlamps) continue;
+                float d = (lamps.transform.position - camera).sqrMagnitude;
+                if (d < HeadsRange * HeadsRange) lampsByDistance.Add((d, lamps));
+            }
+            lampsByDistance.Sort((a, b) => a.Item1.CompareTo(b.Item1));
+            nearHeads.Clear();
+            for (int i = 0; i < lampsByDistance.Count && i < MostHeads; i++) nearHeads.Add(lampsByDistance[i].Item2);
+
             byDistance.Clear();
             for (int c = 0; c < Cars.Length; c++)
             {

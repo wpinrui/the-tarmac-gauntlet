@@ -219,7 +219,7 @@ namespace TarmacGauntlet.Raceday
             BandId = Shader.PropertyToID("_Band");
 
         /// <summary>The beam reaches from the nose to this far ahead, widening from the first width to the second, m.</summary>
-        private const float BeamLength = 24f, BeamNear = 1.8f, BeamFar = 9f;
+        public const float BeamLength = 24f, BeamNear = 1.8f, BeamFar = 9f;
         /// <summary>
         /// The beam lights ground from this far below the car's own ground to this far above it, m: down a crest and up a
         /// dip ahead, but not the bonnets and roofs of the cars in front.
