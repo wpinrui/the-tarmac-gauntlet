@@ -80,7 +80,8 @@ Shader "Hidden/TarmacGauntlet/LightPool"
 
             float4 frag(Varyings i) : SV_Target
             {
-                half3 fill = LampFill(i.positionWS, half3(0, 1, 0), GetNormalizedScreenSpaceUV(i.positionCS));
+                float2 uv = GetNormalizedScreenSpaceUV(i.positionCS);
+                half3 fill = LampFill(SampleSceneColor(uv), i.positionWS, half3(0, 1, 0), uv);
                 return Fogged(_Color.rgb * fill * Falloff(i.uv), i.fog);
             }
             ENDHLSL

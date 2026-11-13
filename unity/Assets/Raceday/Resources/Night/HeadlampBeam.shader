@@ -130,7 +130,8 @@ Shader "Hidden/TarmacGauntlet/HeadlampBeam"
 
                 // The headlamps' light on this point: the scene's colour here times the brightening, eased off towards
                 // the cap so a brightly lit floor gains no more than _Cap.
-                float3 add = SampleSceneColor(uv) * LampFill(p, n, uv) * _Color.rgb * w;
+                float3 scene = SampleSceneColor(uv);
+                float3 add = scene * LampFill(scene, p, n, uv) * _Color.rgb * w;
                 float lum = dot(add, float3(0.2126, 0.7152, 0.0722));
                 add *= 1.0 / (1.0 + lum / max(_Cap, 1e-4));
                 add += _Lift.rgb * w;

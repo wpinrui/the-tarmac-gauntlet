@@ -91,11 +91,14 @@ def material(name, colour, rough, emit=None, strength=1.0):
     return m
 
 
-def box(centre, size, mat):
+def box(centre, size, mat, lamp=False):
+    """A box; a lamp is seen glowing but lights nothing, as the game's emissive lamps light nothing."""
     bpy.ops.mesh.primitive_cube_add(size=1, location=b(centre))
     ob = bpy.context.object
     ob.scale = b(size)
     ob.data.materials.append(mat)
+    if lamp:
+        ob.visible_diffuse = ob.visible_glossy = ob.visible_transmission = ob.visible_shadow = False
 
 
 def plane(name, x0, x1, z0, z1, y, mat):
@@ -131,9 +134,10 @@ def scene(s):
     sc.cycles.device = "CPU"
     sc.cycles.samples = int(os.environ.get("SAMPLES", "24"))
     sc.cycles.use_denoising = True
-    sc.cycles.max_bounces = 2
+    # No bounces: the game's opaque pass has none either, only the sky's ambient and the lights it draws.
+    sc.cycles.max_bounces = 0
     sc.render.resolution_x, sc.render.resolution_y = W, H
-    asphalt = material("asphalt", (0.17, 0.17, 0.18), 0.75)
+    asphalt = material("asphalt", (0.17, 0.17, 0.18), 0.55)
     grass = material("grass", (0.25, 0.34, 0.18), 0.95)
     line = material("line", (0.93, 0.93, 0.91), 0.6)
     plane("track", -6, 6, -30, 1500, 0.0, asphalt)
@@ -146,7 +150,7 @@ def scene(s):
         paint = material(f"paint{i}", colour, 0.3)
         box((x, (0.12 + BODY_TOP) / 2, z), (HALF_WIDTH * 2, BODY_TOP - 0.12, HALF_LENGTH * 2), paint)
         box((x, (BODY_TOP + CABIN_TOP) / 2, z - 0.35), (1.5, CABIN_TOP - BODY_TOP, 1.9), paint)
-        for sx in (-0.6, 0.6): box((x + sx, 0.62, z - HALF_LENGTH - 0.01), (0.4, 0.12, 0.02), tail)
+        for sx in (-0.6, 0.6): box((x + sx, 0.62, z - HALF_LENGTH - 0.01), (0.4, 0.12, 0.02), tail, lamp=True)
         tyre = material(f"tyre{i}", (0.05, 0.05, 0.05), 0.9)
         for sx in (-0.82, 0.82):
             for sz in (-1.35, 1.35): box((x + sx, 0.31, z + sz), (0.24, 0.62, 0.62), tyre)
@@ -155,7 +159,7 @@ def scene(s):
         lens = material("lens", FLOOD, 0.3, emit=FLOOD, strength=2.0 * s["on"])
         for pos, _ in masts():
             box((pos[0] - 0.6, 9, pos[2]), (0.4, 18, 0.4), steel)
-            box(pos, (0.9, 0.9, 0.9), lens)
+            box(pos, (0.9, 0.9, 0.9), lens, lamp=True)
     w = bpy.data.worlds.new("sky")
     w.use_nodes = True
     nt = w.node_tree
@@ -163,7 +167,8 @@ def scene(s):
     mix = nt.nodes.new("ShaderNodeMix")
     mix.data_type = "RGBA"
     nt.links.new(lp.outputs["Is Camera Ray"], mix.inputs[0])
-    mix.inputs[6].default_value = (*(skyclock.ambient(s["amb_sky"] * 0.5 + s["amb_eq"] * 0.5) * s["gain"]), 1)
+    # The ground's ambient light as the game's SH gives it facing up: the sky colour of the trilight.
+    mix.inputs[6].default_value = (*(skyclock.ambient(s["amb_sky"]) * s["gain"]), 1)
     seen = lin(s["horizon"] * 0.6 + s["zenith"] * 0.4) if s["night"] < 0.5 else radiance_for(SKY_SEEN, s)
     mix.inputs[7].default_value = (*seen, 1)
     nt.links.new(mix.outputs[2], nt.nodes["Background"].inputs["Color"])
@@ -417,6 +422,23 @@ def mist(cam, d, far, jitter, beams, samples=8):
     return lit
 
 
+def lamp_fill(scene, sh, n, pos, cam, to_light, main_col, sky_up, sky_eq, smooth=0.45):
+    """LampFill.hlsl: how much brighter to take the scene's colour, the shadow divided out of all but the sky's sheen."""
+    sh_n = sky_eq + (sky_up - sky_eq) * np.clip(n[..., 1:2], 0, 1)
+    direct = main_col * np.clip(n @ to_light, 0, 1)[..., None]
+    open_, shaded = sh_n + direct, sh_n + direct * sh[..., None]
+    fill = np.minimum(open_ / np.maximum(shaded, open_ / LAMP_FILL_MOST + 1e-5), LAMP_FILL_MOST)
+    view = cam - pos
+    view /= np.maximum(np.linalg.norm(view, axis=-1, keepdims=True), 1e-6)
+    nov = np.clip((n * view).sum(-1, keepdims=True), 0, 1)
+    refl = 2 * nov * n - view
+    sh_r = sky_eq + (sky_up - sky_eq) * np.clip(refl[..., 1:2], 0, 1)
+    rough = (1 - smooth) ** 2
+    sheen = np.minimum(sh_r * (0.04 + (min(smooth + 0.04, 1) - 0.04) * (1 - nov) ** 4) / (rough * rough + 1), scene)
+    lit = (scene - sheen) * fill + sheen
+    return np.where(sh[..., None] >= 0.999, 1.0, np.where(scene > 1e-5, lit / np.maximum(scene, 1e-5), fill))
+
+
 def resample(img, scale):
     from scipy.ndimage import zoom
     if scale >= 0.999: return img
@@ -625,11 +647,8 @@ def main():
         sh = shadow(pos, sky, to_light, level, boxes)
         opaque = ambient_scene + albedo * main_col * (nl * sh)[..., None]
         # LampFill: the open ground's light over the shadowed ground's, on the depth's normal (beams) or up (pools).
-        sh_amb = np.where(n_depth[..., 1:2] > 0, sky_up, sky_eq)
-        dn = main_col * np.clip(n_depth @ to_light, 0, 1)[..., None]
-        fill_beam = np.minimum((sh_amb + dn) / np.maximum(sh_amb + dn * sh[..., None], (sh_amb + dn) / LAMP_FILL_MOST + 1e-5), LAMP_FILL_MOST)
-        dup = main_col * max(to_light[1], 0)
-        fill_up = np.minimum((sky_up + dup) / np.maximum(sky_up + dup * sh[..., None], (sky_up + dup) / LAMP_FILL_MOST + 1e-5), LAMP_FILL_MOST)
+        fill_beam = lamp_fill(opaque, sh, n_depth, pos, cam, to_light, main_col, sky_up, sky_eq)
+        fill_up = lamp_fill(opaque, sh, np.broadcast_to([0, 1.0, 0], pos.shape), pos, cam, to_light, main_col, sky_up, sky_eq)
         m = np.zeros_like(opaque)
         if cfg["mist"] and beams and on > 0.001:
             div = cfg["mist"]
