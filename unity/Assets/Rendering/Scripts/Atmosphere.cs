@@ -84,7 +84,7 @@ namespace TarmacGauntlet.Rendering
         public static void Clear()
         {
             Present = false;
-            Beams(null, null, 0, Color.black);
+            Beams(null, null, 0, Color.black, 0f);
         }
 
         /// <summary>
