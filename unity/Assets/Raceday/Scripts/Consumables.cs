@@ -60,6 +60,8 @@ namespace TarmacGauntlet.Raceday
         public IssueEffects Effects = IssueEffects.None;
         /// <summary>What the team asks for at the next stop.</summary>
         public readonly PitOrders Orders = new PitOrders();
+        /// <summary>Fuel and tyre wear a lap uses, learned over the driver's stint (<see cref="RaceDirector"/>, <see cref="PitService"/>).</summary>
+        public readonly StintEstimate Stint = new StintEstimate();
         /// <summary>Plans the player's stops from <see cref="Orders"/>, or null for a car that fills up and changes everything.</summary>
         public StopPlanner Planner;
         /// <summary>
@@ -126,11 +128,16 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Tyre wear a lap at the limit adds on the engine map in use.</summary>
         public float WearPerLapNow => WearPerLap * WearScale;
 
-        /// <summary>Laps the fuel lasts at the limit on the engine map in use.</summary>
-        public float FuelLaps => Fuel / Mathf.Max(LitresPerLap, 0.01f);
+        /// <summary>Litres a lap uses, as learned this stint, or the crew's estimate before its first clean lap.</summary>
+        public float StintLitresPerLap => Stint.FuelPerLap is double f ? (float)f : LitresPerLap;
+        /// <summary>Tyre wear a lap adds, as learned this stint, or the crew's estimate before its first clean lap.</summary>
+        public float StintWearPerLap => Stint.WearPerLap is double w ? (float)w : WearPerLapNow;
 
-        /// <summary>Laps at the limit on the engine map in use before the tyres reach <paramref name="limit"/> worn.</summary>
-        public float TyreLaps(float limit) => Mathf.Max(limit - Wear, 0f) / Mathf.Max(WearPerLapNow, 1e-5f);
+        /// <summary>Laps the fuel lasts, at the stint's learned rate.</summary>
+        public float FuelLaps => Fuel / Mathf.Max(StintLitresPerLap, 0.01f);
+
+        /// <summary>Laps before the tyres reach <paramref name="limit"/> worn, at the stint's learned rate.</summary>
+        public float TyreLaps(float limit) => Mathf.Max(limit - Wear, 0f) / Mathf.Max(StintWearPerLap, 1e-5f);
 
         /// <summary>The race maths' mode for the engine map.</summary>
         public InstructionMode Mode => Map == EngineMap.Push ? InstructionMode.Push : Map == EngineMap.Conserve ? InstructionMode.Conserve : InstructionMode.Normal;
