@@ -129,17 +129,17 @@ namespace TarmacGauntlet.Raceday
             {
                 controllers[i] = Cars[i].GetComponent<CarController>();
                 int car = i;
-                controllers[i].Hit += impact => OnHit(car, impact);
+                controllers[i].Hit += (impact, front) => OnHit(car, impact, front);
             }
         }
 
         /// <summary>A car hit a barrier or another car: the damage goes on its log, and a hit hard enough totals it.</summary>
-        private void OnHit(int i, float impact)
+        private void OnHit(int i, float impact, float front)
         {
             if (!started || Finished || Day == null) return;
             CarRaceLog log = Day.Cars[i];
             if (log.Retired || log.Flagged) return;
-            bool totalled = log.Hit(Tower.RaceTime, impact);
+            bool totalled = log.Hit(Tower.RaceTime, impact, front);
             controllers[i].Supplies.Effects = log.Effects;
             if (totalled) Retire(i);
         }
@@ -198,7 +198,7 @@ namespace TarmacGauntlet.Raceday
                 // A car far from the camera runs with no physics, so it can't hit anything: it takes its hits by chance.
                 if (controllers[i].Asleep && !Cars[i].InPitLane && CarDamage.RollHit(Time.deltaTime, hitRoll.NextDouble) is double impact)
                 {
-                    OnHit(i, (float)impact);
+                    OnHit(i, (float)impact, (float)hitRoll.NextDouble());
                     if (log.Retired) continue;
                 }
                 if (log.DriverIndex != driverShown[i])

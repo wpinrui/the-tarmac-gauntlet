@@ -40,12 +40,36 @@ namespace TarmacGauntlet.Simulation.Tests
         }
 
         [Test]
-        public void MoreDamageCostsMoreGripAndFasterThanInProportion()
+        public void DamageCostsGripAndAddsDrag()
         {
             Assert.That(CarDamage.Grip(0), Is.EqualTo(1));
             Assert.That(CarDamage.Grip(100), Is.EqualTo(1 - CarDamage.MaxGripLoss).Within(1e-12));
-            double light = 1 - CarDamage.Grip(25), heavy = 1 - CarDamage.Grip(50);
-            Assert.That(heavy, Is.GreaterThan(2 * light));
+            Assert.That(CarDamage.Drag(0), Is.EqualTo(1));
+            Assert.That(CarDamage.Drag(100), Is.EqualTo(1 + CarDamage.MaxDrag).Within(1e-12));
+            // A medium hit (18 m/s) costs a lap several per cent; a light one (8 m/s) a little.
+            Assert.That(CarDamage.LapSlowdown(CarDamage.FromImpact(18)), Is.InRange(0.07, 0.11));
+            Assert.That(CarDamage.LapSlowdown(CarDamage.FromImpact(8)), Is.InRange(0.02, 0.04));
+        }
+
+        [Test]
+        public void TheEndThatWasHitLosesMostGrip()
+        {
+            Assert.That(CarDamage.AxleGrip(40, 1, true), Is.LessThan(CarDamage.AxleGrip(40, 1, false)));
+            Assert.That(CarDamage.AxleGrip(40, 0, true), Is.GreaterThan(CarDamage.AxleGrip(40, 0, false)));
+            Assert.That(CarDamage.AxleGrip(40, 0.5, true), Is.EqualTo(CarDamage.Grip(40)).Within(1e-12));
+            Assert.That(CarDamage.FrontShare(2, 2), Is.EqualTo(1));
+            Assert.That(CarDamage.FrontShare(-2, 2), Is.EqualTo(0));
+            Assert.That(CarDamage.FrontShare(0, 2), Is.EqualTo(0.5));
+        }
+
+        [Test]
+        public void HitsKeepTrackOfWhichEndWasHit()
+        {
+            CarRaceLog log = PlayerLog();
+            log.Hit(10, 13, front: 1);
+            log.Hit(20, 13, front: 0.5);
+            Assert.That(log.DamageFront, Is.EqualTo(0.75).Within(1e-9));
+            Assert.That(log.AxleGrip(true), Is.LessThan(log.AxleGrip(false)));
         }
 
         [Test]
@@ -65,7 +89,8 @@ namespace TarmacGauntlet.Simulation.Tests
             Assert.That(log.Hit(10, 10), Is.False);
             Assert.That(log.Hit(20, 10), Is.False);
             Assert.That(log.Damage, Is.EqualTo(2 * CarDamage.FromImpact(10)).Within(1e-9));
-            Assert.That(log.Effects.Handling, Is.LessThan(1));
+            Assert.That(log.AxleGrip(true), Is.LessThan(1));
+            Assert.That(log.Effects.Handling, Is.EqualTo(1));
             Assert.That(log.Retired, Is.False);
         }
 
@@ -80,11 +105,11 @@ namespace TarmacGauntlet.Simulation.Tests
         }
 
         [Test]
-        public void DamageLeftAtTheFlagComesOffTheCondition()
+        public void AFifthOfTheDamageLeftAtTheFlagComesOffTheCondition()
         {
             CarRaceLog log = PlayerLog();
             log.SetDamage(30);
-            Assert.That(log.ConditionAfterRace, Is.EqualTo(log.Condition - 30).Within(1e-9));
+            Assert.That(log.ConditionAfterRace, Is.EqualTo(log.Condition - 6).Within(1e-9));
         }
 
         [Test]

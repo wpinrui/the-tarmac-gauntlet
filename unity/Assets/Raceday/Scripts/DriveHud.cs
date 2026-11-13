@@ -11,10 +11,10 @@ namespace TarmacGauntlet.Raceday
     /// lane limiter is on.
     ///
     /// In the bottom right corner, three cards. The top one is the car's condition, as a number and a bar. Once the
-    /// car is damaged, its bar is striped as far as the spare parts on hand would repair it at a stop and grey on to
-    /// what a full repair gives back, and a line under it gives the parts on hand, the parts a full repair takes and
-    /// the condition a stop would repair it to. The condition is amber once damaged, red once the damage would bring an
-    /// AI car in (<see cref="PitPlan.DamageLimit"/>). The middle card is the fuel and tyres, each a bar with the laps
+    /// car is damaged, the damage sits under it on the same card, apart from the condition: a number and a bar, amber,
+    /// red once the damage would bring an AI car in (<see cref="PitPlan.DamageLimit"/>). The bar's end is striped as far
+    /// as the spare parts on hand would repair at a stop, and a line under it gives the parts on hand, the parts a full
+    /// repair takes and how much of the damage a stop would fix. The middle card is the fuel and tyres, each a bar with the laps
     /// it has left, to a tenth, as learned over the stint (<see cref="Consumables.Stint"/>); the tyres turn red once
     /// nearly worn out. The bottom card is the engine maps, each named beside its key, the one in use filled in its
     /// colour. Laid out on a 1920 by 1080 screen and scaled to the screen's height.
@@ -37,7 +37,6 @@ namespace TarmacGauntlet.Raceday
         private static readonly Color Dim = new Color(1f, 1f, 1f, 0.5f);
         private static readonly Color Track = new Color(1f, 1f, 1f, 0.13f);
         private static readonly Color Seg = new Color(1f, 1f, 1f, 0.08f);
-        private static readonly Color Missing = new Color(1f, 1f, 1f, 0.24f);
         private static readonly Color Auto = new Color(0.55f, 0.75f, 1f);
         private static readonly Color Amber = new Color(1f, 0.75f, 0.2f);
         private static readonly Color Conserve = new Color(0.45f, 0.9f, 0.5f);
@@ -150,39 +149,49 @@ namespace TarmacGauntlet.Raceday
             Supply(new Rect(card.x + pad, card.y + pad, width - 2f * pad, row), fuelIcon, s.Fuel / s.Capacity, Color.white, s.FuelLaps);
             Supply(new Rect(card.x + pad, card.y + pad + row + rowGap, width - 2f * pad, row), tyreIcon, tyres, tyreColour, s.TyreLaps(PitPlan.WearLimit));
 
-            // Condition, and once damaged what a stop would repair.
+            // Condition, and once damaged, the damage and what a stop would repair.
             CarRaceLog log = s.Log;
             if (log == null) return;
             bool damaged = log.Damage > 0;
-            float head = 22f * k, bar = 8f * k, line = 16f * k, gapY = 6f * k;
-            float height = 2f * pad + head + gapY + bar + (damaged ? gapY + line : 0f);
+            float head = 22f * k, bar = 8f * k, line = 16f * k, gapY = 6f * k, section = 12f * k;
+            float height = 2f * pad + head + gapY + bar + (damaged ? section + head + gapY + bar + gapY + line : 0f);
             card = new Rect(left, card.y - CardGap * k - height, width, height);
             Fill(card, Panel, Corner * k);
-            float condition = (float)log.ConditionAfterRace;
-            Color hurt = !damaged ? Color.white : log.Damage >= PitPlan.DamageLimit ? Red : Amber;
             float inner = width - 2f * pad, x0 = card.x + pad, y = card.y + pad;
-            float headBase = y + head / 2f + CapHeight * 22f * k / 2f;
-            Text("Condition", semi, 14, Dim, x0, headBase, TextAnchor.LowerLeft);
-            Text(Mathf.RoundToInt(condition) + "%", semi, 22, hurt, x0 + inner, headBase, TextAnchor.LowerRight);
-            y += head + gapY;
 
-            var track = new Rect(x0, y, inner, bar);
-            Fill(track, Track, bar / 2f);
-            Fill(new Rect(x0, y, inner * condition / 100f, bar), hurt, bar / 2f);
+            float condition = (float)log.Condition;
+            Heading("Condition", condition, Color.white, x0, inner, y, head);
+            y += head + gapY;
+            Fill(new Rect(x0, y, inner, bar), Track, bar / 2f);
+            Fill(new Rect(x0, y, inner * condition / 100f, bar), Color.white, bar / 2f);
             if (!damaged) return;
-            float restore = Mathf.Min((float)log.Damage, (float)CarDamage.PointsFrom(log.SpareParts));
-            float full = (float)log.Condition;
-            float hatchX = x0 + inner * condition / 100f, hatchW = inner * restore / 100f;
-            var striped = new Rect(hatchX, y, hatchW, bar);
+            y += bar + section;
+
+            float damage = (float)log.Damage;
+            Color hurt = log.Damage >= PitPlan.DamageLimit ? Red : Amber;
+            Heading("Damage", damage, hurt, x0, inner, y, head);
+            y += head + gapY;
+            // The striped end of the bar is what the spare parts on hand would repair at a stop.
+            float fixes = Mathf.Min(damage, (float)CarDamage.PointsFrom(log.SpareParts));
+            Fill(new Rect(x0, y, inner, bar), Track, bar / 2f);
+            Fill(new Rect(x0, y, inner * (damage - fixes) / 100f, bar), hurt, bar / 2f);
+            var striped = new Rect(x0 + inner * (damage - fixes) / 100f, y, inner * fixes / 100f, bar);
             GUI.DrawTextureWithTexCoords(striped, hatch, new Rect(0f, 0f, striped.width / (8f * k), 1f));
-            Fill(new Rect(hatchX + hatchW, y, inner * (full - condition - restore) / 100f, bar), Missing);
             y += bar + gapY;
 
             float lineBase = y + line / 2f + CapHeight * 14f * k / 2f;
             int need = CarDamage.PartsFor(log.Damage);
             string parts = log.SpareParts + (log.SpareParts == 1 ? " part, " : " parts, ") + need + " needed";
             Text(parts, semi, 14, log.SpareParts >= need ? Color.white : hurt, x0, lineBase, TextAnchor.LowerLeft);
-            if (restore > 0f) Text("Repairs to " + Mathf.RoundToInt(condition + restore) + "%", semi, 14, new Color(1f, 1f, 1f, 0.75f), x0 + inner, lineBase, TextAnchor.LowerRight);
+            if (fixes > 0f) Text(fixes >= damage ? "Fixes all" : "Fixes " + Mathf.RoundToInt(fixes) + "%", semi, 14, new Color(1f, 1f, 1f, 0.75f), x0 + inner, lineBase, TextAnchor.LowerRight);
+        }
+
+        /// <summary>A card's heading: its name on the left, its value as a percentage on the right.</summary>
+        private void Heading(string name, float value, Color colour, float x0, float inner, float y, float head)
+        {
+            float headBase = y + head / 2f + CapHeight * 22f * k / 2f;
+            Text(name, semi, 14, Dim, x0, headBase, TextAnchor.LowerLeft);
+            Text(Mathf.RoundToInt(value) + "%", semi, 22, colour, x0 + inner, headBase, TextAnchor.LowerRight);
         }
 
         /// <summary>An icon, a thin bar filled from the left, and the laps left with its unit on the right.</summary>

@@ -5,11 +5,11 @@ namespace TarmacGauntlet.Simulation
 {
     /// <summary>
     /// Damage from real hits in the driven race: a barrier, or another car. It builds from 0 (untouched) to 100
-    /// (wrecked) with the speed of each hit, and the more of it there is, the less grip the car has, and more than
-    /// in proportion, so light damage costs little and heavy damage a lot. The crew can repair it at a stop, all
-    /// of it or some, at a cost in time and spare parts for each point. One hit hard enough totals the car: it is
-    /// out of the race and goes back to the garage at 0% condition. Damage still on the car at the flag comes off
-    /// its condition, point for point.
+    /// (wrecked) with the speed of each hit. It is not condition: it costs grip, more at the end of the car that was
+    /// hit (a nose hit understeers, a tail hit oversteers), and adds drag from the broken bodywork. The crew can
+    /// repair it at a stop, all of it or some, at a cost in time and spare parts for each point. One hit hard enough
+    /// totals the car: it is out of the race and goes back to the garage at 0% condition. A share of the damage still
+    /// on the car at the flag comes off its condition (<see cref="ConditionPerPoint"/>).
     /// </summary>
     public static class CarDamage
     {
@@ -19,16 +19,20 @@ namespace TarmacGauntlet.Simulation
         public const double DamagePerImpact = 2.5;
         /// <summary>A hit at least this hard, m/s into what was hit (about 145 km/h), totals the car.</summary>
         public const double TotalImpact = 40;
-        /// <summary>Share of its grip a car loses at 100 damage.</summary>
-        public const double MaxGripLoss = 0.4;
-        /// <summary>How the grip lost grows with damage: above 1, faster than in proportion.</summary>
-        private const double GripCurve = 1.5;
+        /// <summary>Share of its grip a car loses at 100 damage spread evenly, in proportion to the damage.</summary>
+        public const double MaxGripLoss = 0.45;
+        /// <summary>Drag added at 100 damage, as a share of the car's own: 0.6 is 60% more.</summary>
+        public const double MaxDrag = 0.6;
+        /// <summary>Condition a point of damage still on the car at the flag takes off: a fifth of it.</summary>
+        public const double ConditionPerPoint = 0.2;
         /// <summary>Crew seconds to repair one point of damage, before the crew's size and the Engineer skill scale it.</summary>
         public const double RepairSecondsPerPoint = 1.2;
         /// <summary>Points of damage one spare part repairs.</summary>
         public const double PointsPerPart = 10;
         /// <summary>Share of a lap's time spent where grip sets the speed, for weighing a repair against the laps to come.</summary>
         private const double GripShare = 0.6;
+        /// <summary>Share of a lap's time spent where drag sets the speed.</summary>
+        private const double DragShare = 0.4;
 
         /// <summary>
         /// Damaging hits a car takes per hour of driving, for a car far from the camera, which runs without physics and
@@ -56,12 +60,32 @@ namespace TarmacGauntlet.Simulation
         /// <summary>True for a hit hard enough to total the car.</summary>
         public static bool Totals(double impact) => impact >= TotalImpact;
 
-        /// <summary>How damage scales the car's grip: 1 untouched, 1 − <see cref="MaxGripLoss"/> at 100.</summary>
-        public static double Grip(double damage) =>
-            1 - MaxGripLoss * Math.Pow(Math.Max(0, Math.Min(100, damage)) / 100, GripCurve);
+        private static double Share(double damage) => Math.Max(0, Math.Min(100, damage)) / 100;
+
+        /// <summary>
+        /// How damage scales one axle's grip. <paramref name="front"/> is the share of the damage at the front, 0 all at
+        /// the rear, 0.5 even: the damaged end loses up to one and a half times the even share, the other end half.
+        /// </summary>
+        public static double AxleGrip(double damage, double front, bool frontAxle)
+        {
+            double f = Math.Max(0, Math.Min(1, front));
+            double weight = frontAxle ? 0.5 + f : 1.5 - f;
+            return Math.Max(0.1, 1 - MaxGripLoss * Share(damage) * weight);
+        }
+
+        /// <summary>How damage scales the grip of the car as a whole, spread evenly.</summary>
+        public static double Grip(double damage) => 1 - MaxGripLoss * Share(damage);
+
+        /// <summary>How damage scales the car's drag: 1 untouched, 1 + <see cref="MaxDrag"/> at 100.</summary>
+        public static double Drag(double damage) => 1 + MaxDrag * Share(damage);
 
         /// <summary>Share by which damage slows a lap: 0 untouched.</summary>
-        public static double LapSlowdown(double damage) => GripShare * (1 / Math.Sqrt(Grip(damage)) - 1);
+        public static double LapSlowdown(double damage) =>
+            GripShare * (1 / Math.Sqrt(Grip(damage)) - 1) + DragShare * (Math.Pow(Drag(damage), 1.0 / 3) - 1);
+
+        /// <summary>Share of a hit's damage at the front: 1 on the nose, 0 on the tail, 0.5 on the side.</summary>
+        public static double FrontShare(double along, double halfLength) =>
+            halfLength <= 0 ? 0.5 : Math.Max(0, Math.Min(1, 0.5 + 0.5 * along / halfLength));
 
         /// <summary>Spare parts it takes to repair <paramref name="points"/> of damage.</summary>
         public static int PartsFor(double points) => points <= 0 ? 0 : (int)Math.Ceiling(points / PointsPerPart - 1e-9);

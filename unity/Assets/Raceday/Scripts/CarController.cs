@@ -266,7 +266,7 @@ namespace TarmacGauntlet.Raceday
 
             // Aerodynamics: drag at the centre of mass, downforce split 40/60 front to rear for stability.
             float q = 0.5f * CarSpec.AirDensity * speed * speed;
-            if (speed > 0.1f) body.AddForce(-v / speed * (q * Spec.DragArea * DragScale));
+            if (speed > 0.1f) body.AddForce(-v / speed * (q * Spec.DragArea * DragScale * (Supplies != null ? Supplies.DamageDrag : 1f)));
             Vector3 down = -transform.up * (q * Spec.LiftArea);
             body.AddForceAtPosition(down * 0.4f, transform.TransformPoint(new Vector3(0, 0, Spec.HalfWheelbase)));
             body.AddForceAtPosition(down * 0.6f, transform.TransformPoint(new Vector3(0, 0, -Spec.HalfWheelbase)));
@@ -365,7 +365,7 @@ namespace TarmacGauntlet.Raceday
                 float corner = Spec.Mass / 4f;
                 // Rear tyres grip a little more than the fronts, so the car leans towards understeer.
                 float cap = Spec.Grip * TrackSurface.Grip(kind) * load * (w.Front ? 0.97f : 1.06f);
-                if (Supplies != null) cap *= Supplies.GripScale;
+                if (Supplies != null) cap *= Supplies.WheelGrip(w.Front);
 
                 // Static grip: when nearly stopped the tyre holds against the slope it stands on,
                 // up to its grip limit, instead of creeping down it.
@@ -555,9 +555,10 @@ namespace TarmacGauntlet.Raceday
 
         /// <summary>
         /// The car hit a barrier or another car, with the speed into it, m/s: the part of the two bodies' closing
-        /// speed along the contact's normal. A scrape along a barrier is slow into it, however fast the car.
+        /// speed along the contact's normal. A scrape along a barrier is slow into it, however fast the car. Then how far
+        /// along the car it was hit, from 1 on the nose through 0.5 on the side to 0 on the tail.
         /// </summary>
-        public event System.Action<float> Hit;
+        public event System.Action<float, float> Hit;
 
         private void OnCollisionEnter(Collision collision)
         {
@@ -565,9 +566,17 @@ namespace TarmacGauntlet.Raceday
             bool car = collision.rigidbody != null && collision.rigidbody != body && collision.rigidbody.GetComponent<CarController>() != null;
             if (!barrier && !car) return;
             float into = 0f;
+            Vector3 where = transform.position;
             for (int i = 0; i < collision.contactCount; i++)
-                into = Mathf.Max(into, Mathf.Abs(Vector3.Dot(collision.relativeVelocity, collision.GetContact(i).normal)));
-            Hit?.Invoke(into);
+            {
+                ContactPoint contact = collision.GetContact(i);
+                float speed = Mathf.Abs(Vector3.Dot(collision.relativeVelocity, contact.normal));
+                if (speed < into) continue;
+                into = speed;
+                where = contact.point;
+            }
+            float along = transform.InverseTransformPoint(where).z;
+            Hit?.Invoke(into, (float)TarmacGauntlet.Simulation.CarDamage.FrontShare(along, Spec != null ? Spec.HalfWheelbase * 1.5f : 2.25f));
             if (Crashed || !barrier || into < HardHit) return;
             Crashed = true;
             Stop();
