@@ -272,7 +272,7 @@ def rear_parts(ref, cutters, out):
     band = half_shape(R["band_r"], 0.006)
     _ends("band_r", band, 0, 0, "grille", ref, cutters, out, fr, 0.03, sides=False)
     u, z0, z1 = R["rain"]
-    out += blend.lay(ref, "lamp_rain", soft(box(-u, z0, u, z1), 0.004), fr, -0.026, -0.022, "lamp_rain", 0.004,
+    out += blend.lay(ref, "lamp_rain", soft(box(-u, z0, u, z1), 0.004), fr, -0.0245, -0.0205, "lamp_rain", 0.004,
                      along_ray=True)
     out += exhaust(ref)
 
@@ -637,7 +637,7 @@ def vents(ref, out):
     for sgn, side in ((1, "l"), (-1, "r")):
         g = sh if sgn > 0 else sscale(sh, 1, -1, origin=(0, 0))
         out += blend.lay(ref, f"vent_{side}", g, top_fr(), -0.001, 0.003, "grille", 0.008)
-        out += blend.lay(ref, f"vent_slat_{side}", slats(g, 3, 0.006), top_fr(), 0.0028, 0.0045, "trim", 0.006)
+        out += blend.lay(ref, f"vent_slat_{side}", slats(g, 3, 0.006), top_fr(), 0.0015, 0.0045, "trim", 0.006)
 
 
 # ---------------------------------------------------------------- interior
@@ -703,11 +703,11 @@ def interior():
             body.inside(x, 0.035 + 0.008)).difference(body.inside(x, 0.035 + 0.026))
         obs.append(_loft(f"door_card_{side}", bc + 0.04, R["front_door"][2][0] - 0.05, clip, n=10))
         yc = 0.36 * sgn
-        obs.append(_rbox(f"seat_base_{side}", -0.36, 0.12, yc - 0.22, yc + 0.22, FLOOR + 0.006, FLOOR + 0.16))
+        obs.append(_rbox(f"seat_base_{side}", -0.36, 0.12, yc - 0.22, yc + 0.22, FLOOR - 0.012, FLOOR + 0.16))
         obs.append(_rbox(f"seat_back_{side}", -0.50, -0.38, yc - 0.21, yc + 0.21, FLOOR + 0.161, FLOOR + 0.70, lean=0.22))
         obs.append(_rbox(f"headrest_{side}", -0.63, -0.53, yc - 0.12, yc + 0.12, FLOOR + 0.701, FLOOR + 0.80, r=0.035, lean=0.1))
-    obs.append(_rbox("rear_base", -1.02, -0.72, -0.52, 0.52, FLOOR + 0.04, FLOOR + 0.20))
-    obs.append(_rbox("rear_back", -1.14, -1.03, -0.52, 0.52, FLOOR + 0.201, FLOOR + 0.58, lean=0.3))
+    obs.append(_rbox("rear_base", -1.02, -0.72, -0.52, 0.52, FLOOR - 0.012, FLOOR + 0.20))
+    obs.append(_rbox("rear_back", -1.13, -1.00, -0.52, 0.52, FLOOR + 0.19, FLOOR + 0.58, lean=0.3))
     obs.append(steering())
     xm = R["screen"]["x_top_mid"] - 0.03
     roof_in = body.inside(xm, 0.035).bounds[3]
@@ -754,7 +754,7 @@ def wheels():
             if sgn < 0:
                 f = [tuple(q[::-1]) for q in f]
             obs.append(blend.make(f"wheel_spokes_{fb}{lr}", place(v), f, "rim"))
-            v, f = geom.disc((0, hw - 0.024, 0), (0, 1, 0), 0.03, 0.008, n=32)
+            v, f = geom.disc((0, hw - 0.021, 0), (0, 1, 0), 0.03, 0.008, n=32)
             obs.append(blend.make(f"wheel_cap_{fb}{lr}", place(v), f, "dark_metal"))
             v, f = geom.disc((0, hw - 0.10, 0), (0, 1, 0), rr - 0.022, 0.008, n=64)
             obs.append(blend.make(f"wheel_disc_{fb}{lr}", place(v), f, "dark_metal"))
@@ -854,6 +854,7 @@ def _flat(ref, g, size, fr, a, b, up, name, d0, d1, mat, step=0.004):
 
 
 BADGE_T = 0.006       # badges stand proud of the panel by this much
+NAME_PAD = 0.035      # the name on the tailgate stops this far in from its shut line
 NAME_T = 0.003
 
 
@@ -881,15 +882,20 @@ def options(ref):
     bonnet_x = NOSE - 0.30
     gate_z, gate_low = R["gate_z"], R["gate_low"]
     for k, style in ((0, "chrome"), (1, "colour")):
-        # front: on the nose under the upper grille's middle (the reference's spot), or on the bonnet's nose
-        add("frontbadge", 1 + k, badge(ref, style, 0.07, front_fr(), 0, min(gz) - 0.03, up, "fb"))
+        # front: centred on the upper grille, or on the bonnet's nose
+        add("frontbadge", 1 + k, badge(ref, style, 0.07, front_fr(), 0, (min(gz) + max(gz)) / 2, up, "fb"))
         add("frontbadge", 3 + k, badge(ref, style, 0.065, top_fr(), bonnet_x, 0, fwd, "fb"))
-        # rear: on the tailgate just under the glass (the reference's spot), or low on the tailgate
-        add("rearbadge", 1 + k, badge(ref, style, 0.07, rear_fr(), 0, gate_z, up, "rb"))
-        add("rearbadge", 3 + k, badge(ref, style, 0.06, rear_fr(), 0, gate_low, up, "rb"))
+        # rear: on the tailgate's middle level with the tail lamps' middle, or just under the glass
+        # (the reference's spot)
+        add("rearbadge", 1 + k, badge(ref, style, 0.091, rear_fr(), 0, R["tail_mid_z"], up, "rb"))
+        add("rearbadge", 3 + k, badge(ref, style, 0.07, rear_fr(), 0, gate_z, up, "rb"))
     cap = 0.03
-    # name: on the tailgate's lower right, or low on both doors behind their front edge
-    add("name", 1, _flat(ref, nm, cap, rear_fr(), -0.30, gate_low, up, "nm", 0.0012, NAME_T, "chrome"))
+    # name: on the tailgate's lower right, its right end a little in from the tailgate's shut line,
+    # or low on both doors behind their front edge
+    nb = nm.bounds
+    edge = np.interp(gate_low, [p[1] for p in R["hatch"]][:5], [p[0] for p in R["hatch"]][:5])
+    xn = -(edge - NAME_PAD - (nb[2] - nb[0]) * cap / 2)
+    add("name", 1, _flat(ref, nm, cap, rear_fr(), xn, gate_low, up, "nm", 0.0012, NAME_T, "chrome"))
     q = []
     xd = R["front_door"][2][0] - 0.25
     for sgn in (1, -1):

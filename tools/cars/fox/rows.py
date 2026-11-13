@@ -133,7 +133,7 @@ GLASS_FOOT = [(-0.87, 0.70), (-0.70, 0.735), (-0.40, 0.748), (0.90, 0.755), (1.3
               (1.87, 0.735)]
 ROOF_Z = [(-0.87, 0.474), (-0.70, 0.560), (-0.50, 0.665), (-0.30, 0.770), (-0.15, 0.840), (-0.05, 0.872),
           (0.10, 0.886), (0.50, 0.894), (0.90, 0.892), (1.20, 0.878), (1.40, 0.852), (1.55, 0.805),
-          (1.65, 0.735), (1.75, 0.660), (1.87, 0.585)]
+          (1.65, 0.730), (1.75, 0.645), (1.87, 0.552)]   # the C-pillar runs down into the shoulder
 ROOF_W = [(-0.87, 0.70), (-0.60, 0.665), (-0.30, 0.625), (-0.05, 0.592), (0.30, 0.585), (1.00, 0.585),
           (1.30, 0.595), (1.55, 0.620), (1.75, 0.660), (1.87, 0.690)]
 
@@ -297,6 +297,7 @@ data = {
     "hatch_top": plan(HATCH_TOP),
     "gate_z": Z(GATE_Z),
     "gate_low": Z(GATE_LOW),
+    "tail_mid_z": Z(0.400),                       # the tail lamps' middle height on the tail
     "exhaust": [H(EXHAUST[0]), Z(EXHAUST[1]), L(EXHAUST[2])],
     "exhaust_x": X(EXHAUST_END),
     "mirror": {"x_back": X(MIRROR["y1"]), "x_front": X(MIRROR["y0"]), "y_in": H(MIRROR["w0"]),
@@ -305,7 +306,7 @@ data = {
     "wing_span": H(WING_SPAN),
     "scoop": [X(SCOOP[0]), X(SCOOP[1]), H(SCOOP[2]), L(SCOOP[3])],
     "vent": plan(VENT),
-    "picks": {"frontbadge": 1, "rearbadge": 1, "name": 1, "wing": 1, "scoop": 1},
+    "picks": {"frontbadge": 2, "rearbadge": 2, "name": 1, "wing": 1, "scoop": 1},   # Ivan's picks, 2026-11-13
 }
 # belt line z(x) in build space, sampled for parts to interpolate
 _ys = np.linspace(-0.70, 1.65, 48)

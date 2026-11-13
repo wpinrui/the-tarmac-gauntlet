@@ -98,7 +98,7 @@ def _round(g):
 
 
 FLARE_R = 0.035    # the flare's edges round off this much
-FLARE_EDGE = 0.10  # over this far at its front and back the flare eases out to the side
+FLARE_EDGE = 0.18  # over this far at its front and back the flare eases out to the side
 
 
 def flare(x, v):
