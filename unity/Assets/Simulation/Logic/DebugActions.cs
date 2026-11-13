@@ -151,16 +151,23 @@ namespace TarmacGauntlet.Simulation
             for (int r = 0; r < n; r++) laps[order[r].Index] = RaceLaps - r * LapSpread / n;
             if (me != null && retire) laps[me.Index] = RaceLaps / 2;
 
+            // Every lap but each car's last, then the last laps in finishing order: the leader takes the flag first.
             for (int lap = 1; lap <= RaceLaps; lap++)
                 for (int r = 0; r < n; r++)
                 {
                     CarRaceLog c = order[r];
-                    if (lap > laps[c.Index]) continue;
-                    double time = lap * LapSeconds + r * 0.01;
-                    bool last = lap == laps[c.Index];
-                    day.CompleteLap(c.Index, time, LapSeconds + r * 0.001, InstructionMode.Normal, last && !(retire && c == me));
-                    if (last && retire && c == me) c.Retire(time, FailureType.Mechanical);
+                    if (lap >= laps[c.Index]) continue;
+                    day.CompleteLap(c.Index, lap * LapSeconds + r * 0.01, LapSeconds + r * 0.001, InstructionMode.Normal, false);
                 }
+            for (int r = 0; r < n; r++)
+            {
+                CarRaceLog c = order[r];
+                int lap = laps[c.Index];
+                double time = lap * LapSeconds + r * 0.01;
+                bool retiring = retire && c == me;
+                day.CompleteLap(c.Index, time, LapSeconds + r * 0.001, InstructionMode.Normal, !retiring);
+                if (retiring) c.Retire(time, FailureType.Mechanical);
+            }
             return day;
         }
     }

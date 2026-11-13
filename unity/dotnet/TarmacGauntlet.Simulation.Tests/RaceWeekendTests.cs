@@ -493,5 +493,35 @@ namespace TarmacGauntlet.Simulation.Tests
                 RaceWeekend.SkippingToEnd -= count;
             }
         }
+
+        [Test]
+        public void TheFlagWaitsForTheLeader()
+        {
+            var race = new RaceDay(RaceWeekend.BuildSetup(Career()), Never);
+            CarRaceLog leader = race.Cars[0], lapped = race.Cars[1];
+            for (int lap = 1; lap <= 10; lap++) race.CompleteLap(leader.Index, lap * 100, 100, InstructionMode.Normal, false);
+            for (int lap = 1; lap <= 8; lap++) race.CompleteLap(lapped.Index, lap * 110, 110, InstructionMode.Normal, false);
+            // Time is up, and the lapped car crosses the line first: no flag until the leader has taken it.
+            race.CompleteLap(lapped.Index, 990, 110, InstructionMode.Normal, true);
+            Assert.That(lapped.Flagged, Is.False);
+            Assert.That(race.FlagOut, Is.False);
+            race.CompleteLap(leader.Index, 1100, 100, InstructionMode.Normal, true);
+            Assert.That(leader.Flagged, Is.True);
+            race.CompleteLap(lapped.Index, 1100.5, 110, InstructionMode.Normal, true);
+            Assert.That(lapped.Flagged, Is.True);
+            Assert.That(lapped.Laps, Is.EqualTo(10));
+        }
+
+        [Test]
+        public void ARetiredCarKeepsWhenItCompletedItsLaps()
+        {
+            var race = new RaceDay(RaceWeekend.BuildSetup(Career()), Never);
+            CarRaceLog early = race.Cars[0], late = race.Cars[1];
+            for (int lap = 1; lap <= 9; lap++) race.CompleteLap(early.Index, lap * 100, 100, InstructionMode.Normal, false);
+            early.Retire(950, FailureType.Mechanical);   // out part way round lap 10
+            for (int lap = 1; lap <= 9; lap++) race.CompleteLap(late.Index, lap * 105, 105, InstructionMode.Normal, lap == 9);
+            IReadOnlyList<CarRaceLog> order = race.Classify();
+            Assert.That(order.ToList().IndexOf(early), Is.LessThan(order.ToList().IndexOf(late)));
+        }
     }
 }
