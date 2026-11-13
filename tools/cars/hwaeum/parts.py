@@ -654,7 +654,8 @@ def interior():
     """Firewall, a dash meeting it, two front seats, a rear bench, door cards, wheel and mirror."""
     x0 = R["screen"]["x_base_mid"] - 0.05
     belt_z = belt(0.0)
-    obs = [_loft("firewall", x0 - 0.010, x0 - 0.004, lambda x: box(-0.9, FLOOR + 0.002, 0.9, 3), n=2),
+    tub = W["outer_y"] - W["width_f"] - 0.04       # the firewall stops short of the front wheels' inner faces
+    obs = [_loft("firewall", x0 - 0.010, x0 - 0.004, lambda x: box(-tub, FLOOR + 0.002, tub, 3), n=2),
            _loft("dash", x0 - 0.0125, 0.36, lambda x: box(-0.9, belt_z - 0.30, 0.9, belt_z - 0.10 + 0.12 * (1 - (x0 - x) / 0.6) + 0.04),
                  n=10, gap=0.045)]
     bc = R["rear_door"][0][0]
