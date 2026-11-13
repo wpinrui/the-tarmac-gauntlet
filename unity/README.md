@@ -99,6 +99,10 @@ scene is built and `outro` once the race's time is up. A stage derives from `Ski
 hold [Enter] to skip [stage]". Holding Enter for a second fills the circle beside it, and the full circle skips that
 one stage. The next stage fills only after Enter is let go (`SkipHold.cs`).
 
+The grid presentation (`Stages/GridPresentation.cs`) shows pole and second, each class's pole and your car, each in a slow
+shot from in front of it with a strip naming its place, driver, team, model and class. Then the whole grid shows on the
+board, two by two and staggered, twenty places a page, over a crane shot across the field (`Stages/GridRunsheet.cs`).
+
 The last stage before the green is the end of the formation lap (`Stages/FinalFormation.cs`). It cuts to the leader
 200 m short of the last corner, the pace car gone into the pit lane and the field behind two by two in grid order, and
 ends at the green. Skipped, it cuts to the leader at the line. From the cut you drive your own car, on a limiter until

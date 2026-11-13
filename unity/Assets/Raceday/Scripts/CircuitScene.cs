@@ -289,7 +289,12 @@ namespace TarmacGauntlet.Raceday
             if (!career) views.StartInChase();
             RaceTower tower = Tower(circuit, racing, field, teams, watched, starter);
             raceTower = tower;
-            if (day != null) tower.Flagged = i => day.Cars[i].Flagged;
+            if (day != null)
+            {
+                tower.Flagged = i => day.Cars[i].Flagged;
+                tv.Flagged = tower.Flagged;
+                locked.Flagged = tower.Flagged;
+            }
             if (resumed) tower.SetRaceTime(resume.RaceTime);
             views.Tower = tower;
             if (player >= 0 && TeamColour(setup.Game, grid[player].TeamId) is Color own) tower.Colours[player] = own;
@@ -426,6 +431,19 @@ namespace TarmacGauntlet.Raceday
             // The stages before the green and after the flag, each skipped by holding Enter. Stages are added here in order.
             intro = new GameObject("Intro").AddComponent<StageSequence>();
             intro.Keys = keys;
+            GridPresentation gridShow = new GameObject("Grid presentation").AddComponent<GridPresentation>();
+            gridShow.Cars = racing;
+            gridShow.Teams = teams;
+            gridShow.Classes = tower.Classes;
+            gridShow.Colours = tower.Colours;
+            gridShow.Models = graphics.Models;
+            gridShow.Day = day;
+            gridShow.Game = setup.Game;
+            gridShow.Player = player;
+            gridShow.Tower = tower;
+            gridShow.Hud = views.Hud;
+            gridShow.Camera = views.GetComponent<Camera>();
+            intro.Add(gridShow);
             if (starter is RaceStart rollingStart)
             {
                 finalFormation = intro.gameObject.AddComponent<FinalFormation>();
@@ -435,6 +453,9 @@ namespace TarmacGauntlet.Raceday
             }
             outro = new GameObject("Outro").AddComponent<StageSequence>();
             outro.Keys = keys;
+            CooldownStage cooldown = outro.gameObject.AddComponent<CooldownStage>();
+            cooldown.Director = director;
+            outro.Add(cooldown);
             Lap("race");
             built = true;
             SceneLoader.Release();
