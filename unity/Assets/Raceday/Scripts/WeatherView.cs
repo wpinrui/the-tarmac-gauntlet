@@ -473,9 +473,11 @@ namespace TarmacGauntlet.Raceday
             grow.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 0.7f, 1f, 2.4f));
             ParticleSystem.ColorOverLifetimeModule fade = ps.colorOverLifetime;
             fade.enabled = true;
+            // Densest in its first few metres behind the tyres, then thinning out down the tail.
             var gradient = new Gradient();
             gradient.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
-                new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.08f), new GradientAlphaKey(0.5f, 0.5f), new GradientAlphaKey(0f, 1f) });
+                new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.05f), new GradientAlphaKey(0.5f, 0.15f),
+                    new GradientAlphaKey(0.25f, 0.5f), new GradientAlphaKey(0f, 1f) });
             fade.color = gradient;
             var renderer = go.GetComponent<ParticleSystemRenderer>();
             renderer.material = material;
@@ -499,10 +501,10 @@ namespace TarmacGauntlet.Raceday
             tint.a = 0.3f;
             sprayMaterial.SetColor(TintId, tint);
             // Fine mist is lit by the overcast sky and can be no brighter than it.
-            Color sky = RenderSettings.fogColor * 0.95f;
+            Color sky = RenderSettings.fogColor;
             float over = tint.maxColorComponent / Mathf.Max(sky.maxColorComponent, 1e-4f);
             if (over > 1f) tint /= over;
-            tint.a = 0.2f;
+            tint.a = 0.4f;
             mistMaterial.SetColor(TintId, tint);
             float amount = SkyClock.Smooth(0.15f, 0.9f, Now.Water);
             float standing = Mathf.Clamp01((Now.Water - 0.8f) / 1.5f);

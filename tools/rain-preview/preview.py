@@ -503,7 +503,7 @@ def car_frame(v):
 
 
 def sky_capped(tint):
-    cap = FOG.max() * 0.95
+    cap = FOG.max()
     return tint / max(tint.max() / cap, 1.0)
 
 
@@ -578,9 +578,9 @@ class Spray:
         light = LIGHT
         if self.new:
             t = self.mist.age / self.mist.life
-            a = np.interp(t, [0, 0.08, 0.5, 1], [0, 1, 0.5, 0])
+            a = np.interp(t, [0, 0.05, 0.15, 0.5, 1], [0, 1, 0.5, 0.25, 0])
             size = self.mist.size * np.interp(t, [0, 1], [0.7, 2.4])
-            draw_puffs(img, depth, cam, self.mist.pos, size, 0.2 * a, sky_capped(light), 0.5, even=True)
+            draw_puffs(img, depth, cam, self.mist.pos, size, 0.4 * a, sky_capped(light), 0.5, even=True)
             t = self.drops.age / self.drops.life
             a = np.interp(t, [0, 0.5, 1], [1, 0.7, 0])
             draw_streaks(img, depth, cam, self.drops.pos, self.drops.vel, self.drops.size, 0.3 * a,
