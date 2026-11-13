@@ -6,7 +6,7 @@ namespace TarmacGauntlet.Raceday
     /// <summary>
     /// While the AI drives your car in your own stint, a hint at the bottom of the screen: the Delete key, then
     /// "Toggle AI autopilot on/off", drawn as the hold-Enter hint is (<see cref="StageSequence"/>). It sits a row
-    /// above that hint while both show. Laid out on a 1920 by 1080 screen and scaled to its height.
+    /// above that hint while both show, and above the HUD's dial while that shows (<see cref="DriveHud.Clearance"/>). Laid out on a 1920 by 1080 screen and scaled to its height.
     /// </summary>
     public sealed class AutopilotHint : MonoBehaviour
     {
@@ -59,6 +59,8 @@ namespace TarmacGauntlet.Raceday
             if (Stages != null)
                 foreach (StageSequence s in Stages)
                     if (s != null && s.HintShown) raise = 52f * k;
+            // Above the HUD's dial while it shows.
+            if (DriveHud.Clearance > 0f) raise = Mathf.Max(raise, (DriveHud.Clearance + 10f - 64f) * k + row / 2f);
             float x = (Screen.width - width) / 2f, top = Screen.height - 64f * k - row / 2f - raise, mid = top + row / 2f;
 
             var keyRect = new Rect(x, mid - keyHeight / 2f, keyWidth, keyHeight);

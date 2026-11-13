@@ -5,17 +5,19 @@ using UnityEngine;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// Speed and gear in the bottom right corner while driving, in the race font. Above them a rev bar
-    /// lights from the left as the engine climbs to the redline, and flashes blue at the shift point.
-    /// Above that are the fuel and tyre bars, each behind its icon, with the laps it has left at its
-    /// right end, as learned over the stint (<see cref="Consumables.Stint"/>). The gear is blue in automatic and
-    /// white in manual. The speed turns amber while the pit lane limiter is on. The fuel bar is green in
-    /// Conserve, white in Normal and orange in Push. Above the fuel bar the engine maps sit on their keys, 1, 2
-    /// and 3, the one in use lit in its colour. The tyre bar turns red once the tyres are nearly
-    /// worn out. Once the car is damaged, two rows sit above the fuel bar. Behind a spanner, the car's condition as a bar
-    /// and a number, amber, red once the damage is bad enough to bring an AI car in (<see cref="PitPlan.DamageLimit"/>); the
-    /// faint part of the bar is what the spare parts on hand would restore at a stop. Behind a nut, the spare parts on hand
-    /// over the parts a full repair takes, and on the right the condition those parts restore. Green and red bars to the left of the speed show the throttle and brake. Laid out on a 1920 by 1080 screen and scaled to the screen's height.
+    /// The HUD while driving, kept small. At the bottom centre a round dial: rev ticks round the gear, which light
+    /// from the left as the engine climbs to the redline and flash blue at the shift point, and the speed in km/h
+    /// under the gear. The gear is blue in automatic and white in manual, and the speed turns amber while the pit
+    /// lane limiter is on.
+    ///
+    /// In the bottom right corner, three cards. The top one is the car's condition, as a number and a bar. Once the
+    /// car is damaged, its bar is striped as far as the spare parts on hand would repair it at a stop and grey on to
+    /// what a full repair gives back, and a line under it gives the parts on hand, the parts a full repair takes and
+    /// the condition a stop would repair it to. The condition is amber once damaged, red once the damage would bring an
+    /// AI car in (<see cref="PitPlan.DamageLimit"/>). The middle card is the fuel and tyres, each a bar with the laps
+    /// it has left, to a tenth, as learned over the stint (<see cref="Consumables.Stint"/>); the tyres turn red once
+    /// nearly worn out. The bottom card is the engine maps, each named beside its key, the one in use filled in its
+    /// colour. Laid out on a 1920 by 1080 screen and scaled to the screen's height.
     /// </summary>
     public sealed class DriveHud : MonoBehaviour
     {
@@ -23,179 +25,228 @@ namespace TarmacGauntlet.Raceday
         /// <summary>True while the TV view shows the broadcast.</summary>
         [System.NonSerialized] public bool Hidden;
 
-        private GUIStyle gear, speed, key, laps;
-        /// <summary>The engine maps in the order of their keys.</summary>
-        private static readonly EngineMap[] Maps = { EngineMap.Conserve, EngineMap.Normal, EngineMap.Push };
-        private static readonly Color Ink = new Color(0.07f, 0.07f, 0.07f);
-        private Texture2D fuelIcon, tyreIcon, spannerIcon, nutIcon;
-        private static readonly Color Auto = new Color(0.55f, 0.75f, 1f);
-        private static readonly Color Limiter = new Color(1f, 0.75f, 0.2f);
-        private static readonly Color Conserve = new Color(0.45f, 0.9f, 0.5f);
-        private static readonly Color Push = new Color(1f, 0.5f, 0.15f);
-        private static readonly Color Worn = new Color(0.95f, 0.25f, 0.2f);
-        /// <summary>The condition the spare parts on hand would restore.</summary>
-        private static readonly Color Restore = new Color(1f, 1f, 1f, 0.45f);
-        private static readonly Color ThrottleColour = new Color(0.35f, 0.85f, 0.4f);
-        private static readonly Color BrakeColour = new Color(0.95f, 0.25f, 0.2f);
-        private static readonly Color Track = new Color(0f, 0f, 0f, 0.45f);
-        private static readonly Color Rev = new Color(0.92f, 0.92f, 0.92f);
-        private static readonly Color RevHigh = new Color(1f, 0.75f, 0.2f);
-        private static readonly Color RevRed = new Color(0.95f, 0.25f, 0.2f);
+        /// <summary>Height the dial takes up from the bottom of the screen, px on the layout, while it shows; else 0.</summary>
+        public static float Clearance { get; private set; }
 
-        /// <summary>Lights in the rev bar, and the engine fraction where it flashes to shift up.</summary>
-        private const int RevLights = 10;
-        private const float ShiftPoint = 0.95f;
+        /// <summary>The engine maps in the order of their keys, with their names.</summary>
+        private static readonly EngineMap[] Maps = { EngineMap.Conserve, EngineMap.Normal, EngineMap.Push };
+        private static readonly string[] MapNames = { "Conserve", "Normal", "Push" };
+
+        private static readonly Color Ink = new Color(0.07f, 0.07f, 0.07f);
+        private static readonly Color Panel = new Color(0.08f, 0.08f, 0.09f, 0.86f);
+        private static readonly Color Dim = new Color(1f, 1f, 1f, 0.5f);
+        private static readonly Color Track = new Color(1f, 1f, 1f, 0.13f);
+        private static readonly Color Seg = new Color(1f, 1f, 1f, 0.08f);
+        private static readonly Color Missing = new Color(1f, 1f, 1f, 0.24f);
+        private static readonly Color Auto = new Color(0.55f, 0.75f, 1f);
+        private static readonly Color Amber = new Color(1f, 0.75f, 0.2f);
+        private static readonly Color Conserve = new Color(0.45f, 0.9f, 0.5f);
+        private static readonly Color Push = new Color(1f, 0.55f, 0.17f);
+        private static readonly Color Red = new Color(0.95f, 0.27f, 0.24f);
+        private static readonly Color Rev = new Color(0.93f, 0.93f, 0.93f);
+
+        /// <summary>Ticks round the dial, the degrees they sweep, and the engine fraction where they flash to shift up.</summary>
+        private const int RevTicks = 21;
+        private const float Sweep = 240f, ShiftPoint = 0.95f;
+        /// <summary>Sizes on the layout, px.</summary>
+        private const float Margin = 32f, DialRadius = 80f, CardWidth = 270f, CardGap = 8f, CardPad = 14f, Corner = 10f;
+        /// <summary>Width the cards take from the right edge of the screen, px on the layout, for the pit panel to sit beside.</summary>
+        public const float CardsWidth = Margin + CardWidth;
         /// <summary>Titillium's digit height, and the space below the baseline in its line, as fractions of the font size.</summary>
         private const float CapHeight = 0.68f, Descent = 0.388f, LineHeight = 1.521f;
+
+        private GUIStyle bold, semi;
+        private Texture2D fuelIcon, tyreIcon, hatch;
+        private float k;
 
         private void OnGUI()
         {
             using (GammaGui.Begin()) DrawGui();
         }
 
+        private void OnDisable() => Clearance = 0f;
+
         private void DrawGui()
         {
-            if (Car == null || Hidden || DebugMenu.Bare || !Car.InputEnabled || Event.current.type != EventType.Repaint) return;
-            float scale = Screen.height / 1080f;
-            if (gear == null)
+            if (Event.current.type != EventType.Repaint) return;
+            if (Car == null || Hidden || DebugMenu.Bare || !Car.InputEnabled) { Clearance = 0f; return; }
+            k = Screen.height / 1080f;
+            if (bold == null)
             {
-                gear = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.LowerRight, padding = new RectOffset(), font = Resources.Load<Font>("Fonts/TitilliumWeb-Bold") };
-                speed = new GUIStyle(gear) { font = Resources.Load<Font>("Fonts/TitilliumWeb-SemiBold") };
+                bold = new GUIStyle(GUI.skin.label) { padding = new RectOffset(), wordWrap = false, clipping = TextClipping.Overflow, font = Resources.Load<Font>("Fonts/TitilliumWeb-Bold") };
+                semi = new GUIStyle(bold) { font = Resources.Load<Font>("Fonts/TitilliumWeb-SemiBold") };
                 fuelIcon = RaceTower.FuelIcon();
                 tyreIcon = RaceTower.TyreIcon();
-                spannerIcon = RaceTower.SpannerIcon();
-                nutIcon = RaceTower.NutIcon();
+                hatch = Hatch();
             }
-            gear.fontSize = Mathf.RoundToInt(110 * scale);
-            speed.fontSize = Mathf.RoundToInt(48 * scale);
-            gear.normal.textColor = Car.Automatic ? Auto : Color.white;
-            speed.normal.textColor = Car.Limiting ? Limiter : Color.white;
+            Clearance = Margin + 2f * DialRadius;
+            Dial();
+            Cards();
+        }
 
-            // Stacked up from the gear's baseline, 40 above the bottom of the screen.
-            float margin = 40f * scale, width = 160f * scale;
-            float right = Screen.width - margin, left = right - width;
-            float gearBase = Screen.height - margin, gearTop = gearBase - CapHeight * gear.fontSize;
-            float speedBase = gearTop - 16f * scale, speedTop = speedBase - CapHeight * speed.fontSize;
-            Shadowed(Line(left, width, speedBase, speed.fontSize), Mathf.RoundToInt(Car.Speed * 3.6f).ToString(), speed, scale);
-            Shadowed(Line(left, width, gearBase, gear.fontSize), Car.Gear == 0 ? "R" : Car.Gear.ToString(), gear, scale);
+        /// <summary>Rev ticks round the gear, the speed under it.</summary>
+        private void Dial()
+        {
+            var c = new Vector2(Screen.width / 2f, Screen.height - (Margin + DialRadius) * k);
+            float r = DialRadius * k;
+            Fill(new Rect(c.x - r, c.y - r, 2f * r, 2f * r), Panel, r);
 
-            // Throttle and brake, as tall bars on the left under the rev bar.
-            float pedalWidth = 10f * scale, pedalGap = 6f * scale;
-            float px = left + 2f * pedalWidth + pedalGap;
-            Pedal(new Rect(px - pedalWidth, speedTop, pedalWidth, gearBase - speedTop), Car.Brake, BrakeColour);
-            Pedal(new Rect(px - 2f * pedalWidth - pedalGap, speedTop, pedalWidth, gearBase - speedTop), Car.Throttle, ThrottleColour);
-
-            // The rev bar, across the full width above the speed.
-            float revHeight = 12f * scale, revGap = 4f * scale;
-            float revTop = speedTop - 12f * scale - revHeight;
-            float light = (width - (RevLights - 1) * revGap) / RevLights;
             float rev = Car.EngineFraction;
             bool shift = rev >= ShiftPoint && Car.Gear > 0 && Mathf.Repeat(Time.unscaledTime * 8f, 1f) < 0.5f;
-            for (int i = 0; i < RevLights; i++)
+            float tickWidth = 4f * k, tickLength = 9f * k, outer = 70f * k;
+            Matrix4x4 was = GUI.matrix;
+            for (int i = 0; i < RevTicks; i++)
             {
-                bool lit = rev * RevLights >= i + 0.5f;
-                Color c = !lit ? Track : shift ? Auto : i >= RevLights - 2 ? RevRed : i >= RevLights - 5 ? RevHigh : Rev;
-                Fill(new Rect(left + i * (light + revGap), revTop, light, revHeight), c);
+                bool lit = rev * RevTicks >= i + 0.5f;
+                Color col = !lit ? Track : shift ? Auto : i >= RevTicks - 3 ? Red : i >= RevTicks - 8 ? Amber : Rev;
+                GUIUtility.RotateAroundPivot(-Sweep / 2f + i * Sweep / (RevTicks - 1), c);
+                Fill(new Rect(c.x - tickWidth / 2f, c.y - outer, tickWidth, tickLength), col, tickWidth / 2f);
+                GUI.matrix = was;
             }
 
+            Text(Car.Gear == 0 ? "R" : Car.Gear.ToString(), bold, 72, Car.Automatic ? Auto : Color.white, c.x, c.y + 22f * k, TextAnchor.LowerCenter);
+            // The speed and its unit, centred together.
+            string kmh = Mathf.RoundToInt(Car.Speed * 3.6f).ToString();
+            float speedWidth = Width(kmh, semi, 22), unitWidth = Width("km/h", semi, 12), gap = 4f * k;
+            float x = c.x - (speedWidth + gap + unitWidth) / 2f, baseline = c.y + 54f * k;
+            Text(kmh, semi, 22, Car.Limiting ? Amber : Color.white, x, baseline, TextAnchor.LowerLeft);
+            Text("km/h", semi, 12, Dim, x + speedWidth + gap, baseline, TextAnchor.LowerLeft);
+        }
+
+        /// <summary>The condition, supplies and engine map cards, stacked up from the bottom right corner.</summary>
+        private void Cards()
+        {
             Consumables s = Car.Supplies;
             if (s == null) return;
-            float icon = 22f * scale, barHeight = 7f * scale, rowGap = 8f * scale;
-            float tyres = 1f - s.Wear;
-            Color fuelColour = s.Map == EngineMap.Push ? Push : s.Map == EngineMap.Conserve ? Conserve : Color.white;
-            float tyreRow = revTop - 14f * scale - icon;
-            float fuelRow = tyreRow - rowGap - icon;
-            if (laps == null) laps = new GUIStyle(speed);
-            laps.fontSize = Mathf.RoundToInt(22 * scale);
-            Supply(new Rect(left, tyreRow, width, icon), tyreIcon, tyres, tyres < 0.15f ? Worn : Color.white, barHeight, s.TyreLaps(PitPlan.WearLimit), laps, scale);
-            Supply(new Rect(left, fuelRow, width, icon), fuelIcon, s.Fuel / s.Capacity, fuelColour, barHeight, s.FuelLaps, laps, scale);
-            float topRow = fuelRow;
-            CarRaceLog log = s.Log;
-            if (log != null && log.Damage > 0)
-            {
-                // What a stop would put back with the parts on hand, and what all of it takes.
-                double restore = Mathf.Min((float)log.Damage, (float)CarDamage.PointsFrom(log.SpareParts));
-                int need = CarDamage.PartsFor(log.Damage);
-                float condition = (float)log.ConditionAfterRace;
-                Color hurt = log.Damage >= PitPlan.DamageLimit ? Worn : Limiter;
-                float partsRow = fuelRow - rowGap - icon;
-                topRow = partsRow - rowGap - icon;
-                var row = new Rect(left, topRow, width, icon);
-                Supply(row, spannerIcon, condition / 100f, hurt, barHeight, condition, laps, scale);
-                float number = 40f * scale, barX = row.x + row.height * 1.5f, barWidth = row.xMax - number - 8f * scale - barX;
-                Fill(new Rect(barX + barWidth * condition / 100f, row.center.y - barHeight / 2f, barWidth * (float)restore / 100f, barHeight), Restore);
+            float left = Screen.width - (Margin + CardWidth) * k, width = CardWidth * k, pad = CardPad * k;
+            float bottom = Screen.height - Margin * k;
 
-                var parts = new Rect(left, partsRow, width, icon);
-                GUI.DrawTexture(new Rect(parts.x, parts.y, parts.height, parts.height), nutIcon, ScaleMode.StretchToFill, true, 0f, Color.white, 0f, 0f);
-                float baseline = parts.center.y + CapHeight * laps.fontSize / 2f;
-                laps.normal.textColor = log.SpareParts >= need ? Color.white : hurt;
-                laps.alignment = TextAnchor.LowerLeft;
-                Shadowed(Line(barX, barWidth, baseline, laps.fontSize), log.SpareParts + "/" + need, laps, scale);
-                laps.alignment = TextAnchor.LowerRight;
-                laps.normal.textColor = Restore;
-                if (restore > 0) Shadowed(Line(parts.xMax - number - 8f * scale - 60f * scale, 60f * scale + 8f * scale + number, baseline, laps.fontSize), "+" + Mathf.RoundToInt((float)restore), laps, scale);
-            }
-
-            // The engine maps, on their keys, above the fuel bar.
-            if (key == null) key = new GUIStyle(speed) { alignment = TextAnchor.MiddleCenter };
-            key.fontSize = Mathf.RoundToInt(18 * scale);
-            float keyHeight = 26f * scale, keyGap = 6f * scale;
-            float keyWidth = (width - 2f * keyGap) / 3f;
-            float mapRow = topRow - 12f * scale - keyHeight;
+            // Engine maps.
+            float segHeight = 26f * k, mapPad = 8f * k;
+            var card = new Rect(left, bottom - segHeight - 2f * mapPad, width, segHeight + 2f * mapPad);
+            Fill(card, Panel, Corner * k);
+            float segGap = 4f * k, segWidth = (width - 2f * mapPad - 2f * segGap) / 3f;
             for (int i = 0; i < Maps.Length; i++)
             {
-                bool lit = s.Map == Maps[i];
-                var r = new Rect(left + i * (keyWidth + keyGap), mapRow, keyWidth, keyHeight);
-                Color c = Maps[i] == EngineMap.Push ? Push : Maps[i] == EngineMap.Conserve ? Conserve : Color.white;
-                GUI.DrawTexture(r, Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, lit ? c : Track, 0f, 5f * scale);
-                key.normal.textColor = lit ? Ink : new Color(1f, 1f, 1f, 0.6f);
-                GUI.Label(r, (i + 1).ToString(), key);
+                bool on = s.Map == Maps[i];
+                var seg = new Rect(card.x + mapPad + i * (segWidth + segGap), card.y + mapPad, segWidth, segHeight);
+                Color colour = Maps[i] == EngineMap.Push ? Push : Maps[i] == EngineMap.Conserve ? Conserve : Color.white;
+                Fill(seg, on ? colour : Seg, 6f * k);
+                Color ink = on ? Ink : new Color(1f, 1f, 1f, 0.6f);
+                float key = 14f * k, gap = 5f * k, name = Width(MapNames[i], semi, 13);
+                float x = seg.center.x - (key + gap + name) / 2f;
+                var cap = new Rect(x, seg.center.y - key / 2f, key, key);
+                GUI.DrawTexture(cap, Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, ink, 1.5f * k, 3f * k);
+                Text((i + 1).ToString(), bold, 10, ink, cap.center.x, cap.center.y + CapHeight * 10f * k / 2f, TextAnchor.LowerCenter);
+                Text(MapNames[i], semi, 13, ink, x + key + gap, seg.center.y + CapHeight * 13f * k / 2f, TextAnchor.LowerLeft);
             }
+
+            // Fuel and tyres.
+            float row = 20f * k, rowGap = 6f * k;
+            card = new Rect(left, card.y - CardGap * k - (2f * row + rowGap + 2f * pad), width, 2f * row + rowGap + 2f * pad);
+            Fill(card, Panel, Corner * k);
+            float tyres = 1f - s.Wear;
+            Color tyreColour = tyres < 0.15f ? Red : Color.white;
+            Supply(new Rect(card.x + pad, card.y + pad, width - 2f * pad, row), fuelIcon, s.Fuel / s.Capacity, Color.white, s.FuelLaps);
+            Supply(new Rect(card.x + pad, card.y + pad + row + rowGap, width - 2f * pad, row), tyreIcon, tyres, tyreColour, s.TyreLaps(PitPlan.WearLimit));
+
+            // Condition, and once damaged what a stop would repair.
+            CarRaceLog log = s.Log;
+            if (log == null) return;
+            bool damaged = log.Damage > 0;
+            float head = 22f * k, bar = 8f * k, line = 16f * k, gapY = 6f * k;
+            float height = 2f * pad + head + gapY + bar + (damaged ? gapY + line : 0f);
+            card = new Rect(left, card.y - CardGap * k - height, width, height);
+            Fill(card, Panel, Corner * k);
+            float condition = (float)log.ConditionAfterRace;
+            Color hurt = !damaged ? Color.white : log.Damage >= PitPlan.DamageLimit ? Red : Amber;
+            float inner = width - 2f * pad, x0 = card.x + pad, y = card.y + pad;
+            float headBase = y + head / 2f + CapHeight * 22f * k / 2f;
+            Text("Condition", semi, 14, Dim, x0, headBase, TextAnchor.LowerLeft);
+            Text(Mathf.RoundToInt(condition) + "%", semi, 22, hurt, x0 + inner, headBase, TextAnchor.LowerRight);
+            y += head + gapY;
+
+            var track = new Rect(x0, y, inner, bar);
+            Fill(track, Track, bar / 2f);
+            Fill(new Rect(x0, y, inner * condition / 100f, bar), hurt, bar / 2f);
+            if (!damaged) return;
+            float restore = Mathf.Min((float)log.Damage, (float)CarDamage.PointsFrom(log.SpareParts));
+            float full = (float)log.Condition;
+            float hatchX = x0 + inner * condition / 100f, hatchW = inner * restore / 100f;
+            var striped = new Rect(hatchX, y, hatchW, bar);
+            GUI.DrawTextureWithTexCoords(striped, hatch, new Rect(0f, 0f, striped.width / (8f * k), 1f));
+            Fill(new Rect(hatchX + hatchW, y, inner * (full - condition - restore) / 100f, bar), Missing);
+            y += bar + gapY;
+
+            float lineBase = y + line / 2f + CapHeight * 14f * k / 2f;
+            int need = CarDamage.PartsFor(log.Damage);
+            string parts = log.SpareParts + (log.SpareParts == 1 ? " part, " : " parts, ") + need + " needed";
+            Text(parts, semi, 14, log.SpareParts >= need ? Color.white : hurt, x0, lineBase, TextAnchor.LowerLeft);
+            if (restore > 0f) Text("Repairs to " + Mathf.RoundToInt(condition + restore) + "%", semi, 14, new Color(1f, 1f, 1f, 0.75f), x0 + inner, lineBase, TextAnchor.LowerRight);
         }
 
-        /// <summary>The rect of a line of text with its baseline at baseline.</summary>
-        private static Rect Line(float left, float width, float baseline, int size) =>
-            new Rect(left, baseline + Descent * size - LineHeight * size, width, LineHeight * size);
-
-        /// <summary>An icon on the left of a row, a thin bar filled from the left, and a whole number on the right.</summary>
-        private static void Supply(Rect row, Texture2D icon, float fill, Color colour, float barHeight, float lapsLeft, GUIStyle style, float scale)
+        /// <summary>An icon, a thin bar filled from the left, and the laps left with its unit on the right.</summary>
+        private void Supply(Rect row, Texture2D icon, float fill, Color colour, float lapsLeft)
         {
-            GUI.DrawTexture(new Rect(row.x, row.y, row.height, row.height), icon, ScaleMode.StretchToFill, true, 0f, colour, 0f, 0f);
-            float number = 40f * scale;
+            float icon16 = 16f * k;
+            GUI.DrawTexture(new Rect(row.x, row.center.y - icon16 / 2f, icon16, icon16), icon, ScaleMode.StretchToFill, true, 0f, colour, 0f, 0f);
+            float baseline = row.center.y + CapHeight * 18f * k / 2f;
+            float unitWidth = Width("laps", semi, 12), gap = 4f * k;
+            Text("laps", semi, 12, Dim, row.xMax, baseline, TextAnchor.LowerRight);
+            Text(Mathf.Min(lapsLeft, 999.9f).ToString("0.0"), semi, 18, colour, row.xMax - unitWidth - gap, baseline, TextAnchor.LowerRight);
+            float x = row.x + icon16 + 12f * k, barHeight = 5f * k;
+            var bar = new Rect(x, row.center.y - barHeight / 2f, row.xMax - 74f * k - x, barHeight);
+            Fill(bar, Track, barHeight / 2f);
+            Fill(new Rect(bar.x, bar.y, bar.width * Mathf.Clamp01(fill), bar.height), colour, barHeight / 2f);
+        }
+
+        /// <summary>Width of text at a layout font size, px on screen.</summary>
+        private float Width(string text, GUIStyle style, float size)
+        {
+            style.fontSize = Mathf.RoundToInt(size * k);
+            return style.CalcSize(new GUIContent(text)).x;
+        }
+
+        /// <summary>Text at a layout font size with its baseline at baseline, anchored at x by its left, centre or right, over a soft shadow.</summary>
+        private void Text(string text, GUIStyle style, float size, Color colour, float x, float baseline, TextAnchor anchor)
+        {
+            style.fontSize = Mathf.RoundToInt(size * k);
+            style.alignment = anchor;
+            float w = style.CalcSize(new GUIContent(text)).x + 2f;
+            float left = anchor == TextAnchor.LowerLeft ? x : anchor == TextAnchor.LowerRight ? x - w : x - w / 2f;
+            float fs = style.fontSize;
+            var r = new Rect(left, baseline + Descent * fs - LineHeight * fs, w, LineHeight * fs);
+            style.normal.textColor = new Color(0f, 0f, 0f, 0.5f * colour.a);
+            GUI.Label(new Rect(r.x + 1f * k, r.y + 1f * k, r.width, r.height), text, style);
             style.normal.textColor = colour;
-            Shadowed(Line(row.xMax - number, number, row.center.y + CapHeight * style.fontSize / 2f, style.fontSize), Mathf.FloorToInt(Mathf.Min(lapsLeft, 999f)).ToString(), style, scale);
-            float x = row.x + row.height * 1.5f;
-            var bar = new Rect(x, row.center.y - barHeight / 2f, row.xMax - number - 8f * scale - x, barHeight);
-            Fill(bar, Track);
-            Fill(new Rect(bar.x, bar.y, bar.width * Mathf.Clamp01(fill), bar.height), colour);
-        }
-
-        /// <summary>A tall bar filled from the bottom, on a dark track.</summary>
-        private static void Pedal(Rect r, float fill, Color colour)
-        {
-            Fill(r, Track);
-            float h = r.height * Mathf.Clamp01(fill);
-            Fill(new Rect(r.x, r.yMax - h, r.width, h), colour);
-        }
-
-        private static void Fill(Rect r, Color colour) =>
-            GUI.DrawTexture(r, Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, colour, 0f, 0f);
-
-        private static void Shadowed(Rect r, string text, GUIStyle style, float scale)
-        {
-            Color c = style.normal.textColor;
-            style.normal.textColor = new Color(0f, 0f, 0f, 0.6f);
-            GUI.Label(new Rect(r.x + 2f * scale, r.y + 2f * scale, r.width, r.height), text, style);
-            style.normal.textColor = c;
             GUI.Label(r, text, style);
+        }
+
+        private static void Fill(Rect r, Color colour, float radius = 0f)
+        {
+            if (r.width <= 0f || r.height <= 0f) return;
+            GUI.DrawTexture(r, Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, colour, 0f, Mathf.Min(radius, r.width / 2f, r.height / 2f));
+        }
+
+        /// <summary>Diagonal white stripes, bright and faint, that tile across.</summary>
+        private static Texture2D Hatch()
+        {
+            const int n = 8;
+            var t = new Texture2D(n, n, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Bilinear };
+            var px = new Color[n * n];
+            for (int y = 0; y < n; y++)
+                for (int x = 0; x < n; x++)
+                    px[y * n + x] = new Color(1f, 1f, 1f, (x + y) % n < n / 2 ? 0.8f : 0.3f);
+            t.SetPixels(px);
+            t.Apply();
+            return t;
         }
 
         private void OnDestroy()
         {
             if (fuelIcon != null) Destroy(fuelIcon);
             if (tyreIcon != null) Destroy(tyreIcon);
-            if (spannerIcon != null) Destroy(spannerIcon);
-            if (nutIcon != null) Destroy(nutIcon);
+            if (hatch != null) Destroy(hatch);
         }
     }
 }

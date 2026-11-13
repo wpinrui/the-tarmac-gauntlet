@@ -32,8 +32,8 @@ namespace TarmacGauntlet.Raceday
         private static readonly Color Dim = new Color(1f, 1f, 1f, 0.35f);
         private static readonly RepairMode[] RepairSteps = { RepairMode.Crew, RepairMode.All, RepairMode.None };
 
-        /// <summary>Panel size and place, px on the layout: its right edge clears the HUD by 40.</summary>
-        private const float Width = 380f, Header = 56f, Row = 38f, Right = 240f, Bottom = 40f;
+        /// <summary>Panel size and place, px on the layout: its right edge clears the HUD's cards by 16.</summary>
+        private const float Width = 380f, Header = 56f, Row = 38f, Right = DriveHud.CardsWidth + 16f, Bottom = 32f;
         /// <summary>Space above the Pit now row, px on the layout.</summary>
         private const float CallGap = 10f;
 
