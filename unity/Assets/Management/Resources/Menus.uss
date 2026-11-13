@@ -296,6 +296,7 @@
 .main-item { height: auto; padding: 12px 18px; margin-left: -18px; border-radius: 14px; font-size: 24px; letter-spacing: 0; }
 .main-item:hover { background-color: rgba(255, 255, 255, 0.059); }
 .main-item .label { font-size: 24px; }
+.build-stamp { position: absolute; left: 56px; bottom: 40px; font-size: 14px; color: rgba(255, 255, 255, 0.392); }
 .main-item .sub { font-size: 14px; color: rgba(255, 255, 255, 0.392); margin-top: 2px; }
 
 /* Settings */

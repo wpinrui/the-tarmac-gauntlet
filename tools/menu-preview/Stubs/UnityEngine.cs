@@ -99,6 +99,11 @@ namespace UnityEngine
 
     public class Font : Object { }
 
+    public class TextAsset : Object
+    {
+        public string text = "";
+    }
+
     public class Shader : Object { }
 
     public class Material : Object
@@ -202,6 +207,7 @@ namespace UnityEngine
     public static class Application
     {
         public static string persistentDataPath => System.IO.Path.GetTempPath();
+        public static bool isEditor => true;
         public static event Action quitting { add { } remove { } }
         public static void Quit() { }
     }
