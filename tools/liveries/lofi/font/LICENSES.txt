@@ -1,0 +1,11 @@
+Fonts from Google Fonts, used to draw Lo-fi Racing's livery and digits.
+
+PermanentMarker-Regular.ttf   Permanent Marker, Font Diner. Apache License 2.0.
+ArchivoBlack-Regular.ttf      Archivo Black, Omnibus-Type. SIL Open Font License 1.1.
+SpaceMono-Bold.ttf            Space Mono, Colophon Foundry. SIL Open Font License 1.1.
+BarlowCondensed-Bold.ttf      Barlow Condensed, Jeremy Tribby. SIL Open Font License 1.1.
+NotoSansTC-subset.ttf         Noto Sans TC Black, Google, cut to the characters 低傳真賽車台中製造錄音帶.
+                              SIL Open Font License 1.1.
+
+Apache 2.0: https://www.apache.org/licenses/LICENSE-2.0
+OFL 1.1: https://openfontlicense.org
