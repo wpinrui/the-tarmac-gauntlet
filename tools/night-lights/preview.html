@@ -214,7 +214,8 @@
     for (const s of [-1, 1]) { const q = new THREE.Mesh(new THREE.PlaneGeometry(w, h), null); q.position.set(s * x, y, z); if (z < 0) q.rotation.y = Math.PI; g.add(q); }
     return g;
   };
-  // The beam on the road, as LampMaterials builds it: 24 m ahead of the nose, widening from 1.8 to 9 m.
+  // The headlamps' light on the road, roughly: the game lights the ground in its own shading (Headlamps.hlsl), out to
+  // about 70 m. Here a card 24 m long adds it as the asphalt would take it.
   function beamGeometry() {
     const along = 8, across = 4, pos = [], uv = [], idx = [];
     for (let r = 0; r <= along; r++) {
@@ -312,8 +313,8 @@
     floodPools.multiply.uniforms.uColor.value = linMul(floodTint, L.PoolBrightening * n);
     floodPools.lift.uniforms.uColor.value = linMul(floodTint, L.PoolLift * n);
     for (const b of beamMats) {
-      b.multiply.uniforms.uColor.value = linMul(headTint, L.BeamBrightening * n);
-      b.lift.uniforms.uColor.value = linMul(headTint, L.BeamLift * n);
+      b.multiply.uniforms.uColor.value = linMul(headTint, 0);
+      b.lift.uniforms.uColor.value = linMul(headTint, L.HeadlampGround * lin(COLOURS["Road"]).r * n);
     }
     lampMats.head.color = lin(headTint, L.HeadlampGlow * lit);
     lampMats.tail.color = lin(D.red, L.TailGlow * lit);

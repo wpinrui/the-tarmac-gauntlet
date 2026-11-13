@@ -59,6 +59,8 @@ Shader "Hidden/TarmacGauntlet/Ground"
             #pragma fragment frag
             #pragma multi_compile_local_fragment _ _GROUND_STRIPES
             #include_with_pragmas "Assets/Rendering/Shaders/LitKeywords.hlsl"
+            // The cars' headlamps light it at night (Headlamps.hlsl).
+            #define TARMAC_HEADLAMPS
             #include "Assets/Rendering/Shaders/TarmacLit.hlsl"
 
             struct Attributes

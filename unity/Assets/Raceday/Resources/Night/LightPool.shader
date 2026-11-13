@@ -1,4 +1,4 @@
-// A pool of light lying on the ground: the floodlights' pools and the cars' headlamp beams. It brightens what is
+// A pool of light lying on the ground: the floodlights' pools. It brightens what is
 // already drawn under it, so the road, the lines and the grass keep their own colours: the first pass multiplies
 // the colour behind by 1 + _Color, the second adds a little _Lift so black ground still shows the light. Both
 // fade to nothing at the pool's edge, where its UVs reach 1, and into the fog with distance.

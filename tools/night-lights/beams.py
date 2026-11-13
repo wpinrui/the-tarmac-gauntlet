@@ -549,4 +549,5 @@ def main():
     print("rendered", tag, "night", round(s["night"], 3), "lights on", round(on, 3))
 
 
-main()
+if __name__ == "__main__":
+    main()
