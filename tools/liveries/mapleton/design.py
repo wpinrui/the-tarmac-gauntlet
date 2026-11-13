@@ -90,7 +90,8 @@ def flannel(pid, ground, dark, cell):
 
 def roundel(lv, view, u, v, h, rotate=0, ink=MAPLE, cloth=False):
     """Logo 1: a maple leaf in a ring, the name round the top, 192 units across. ink: ring and leaf,
-    maple red by default. cloth: ring and leaf cut from a green flannel and stitched on instead."""
+    maple red by default. cloth: ring and leaf cut from a green flannel and stitched on instead.
+    The name sits on a radius that centres its capitals between the ring's stitches (67 and 91)."""
     k = next(_ids)
     s = h / 192
     fill = f"url(#cloth{k})" if cloth else ink
@@ -98,7 +99,7 @@ def roundel(lv, view, u, v, h, rotate=0, ink=MAPLE, cloth=False):
               f'<circle r="91"/><circle r="67"/><path transform="translate(0 2) scale(0.93)" d="{LEAF_D}" stroke-linejoin="round"/></g>'
               if cloth else "")
     lv.raw(view, f'<g transform="translate({f(u)} {f(v)}) rotate({rotate}) scale({s:.6f})">'
-                 f'<defs><path id="ring{k}" d="M-80,0 A80,80 0 0 1 80,0"/>{flannel(f"cloth{k}", PINE, CHAR, round(0.03 / s, 2)) if cloth else ""}</defs>'
+                 f'<defs><path id="ring{k}" d="M-73.7,0 A73.7,73.7 0 0 1 73.7,0"/>{flannel(f"cloth{k}", PINE, CHAR, round(0.03 / s, 2)) if cloth else ""}</defs>'
                  f'<circle r="96" fill="{fill}"/><circle r="62" fill="{IVORY}"/>'
                  f'<path transform="translate(0 2) scale(1.02)" d="{LEAF_D}" fill="{fill}"/>{stitch}'
                  f'<text font-family="Fraunces" font-size="15" letter-spacing="2.2" fill="{IVORY}">'
