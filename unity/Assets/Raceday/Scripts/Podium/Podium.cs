@@ -51,6 +51,19 @@ namespace TarmacGauntlet.Raceday
             public SkinnedMeshRenderer Skin;
             public PodiumActor Actor;
             public Transform LeftArm, LeftForeArm, LeftHand, RightArm, RightForeArm, RightHand;
+            /// <summary>Each hand's finger joints, knuckle to tip, finger by finger, then the thumb's.</summary>
+            public Transform[] LeftFingers, RightFingers;
+        }
+
+        private static readonly string[] Fingers = { "Index", "Middle", "Ring", "Pinky" };
+
+        private static Transform[] FingersOf(HqCrewRig rig, string side)
+        {
+            var joints = new List<Transform>();
+            foreach (string f in Fingers)
+                for (int j = 1; j <= 3; j++) joints.Add(rig.Find(side + "Hand" + f + j));
+            for (int j = 2; j <= 3; j++) joints.Add(rig.Find(side + "Hand" + "Thumb" + j));
+            return joints.ToArray();
         }
 
         // ---------------------------------------------------------------- building
@@ -376,6 +389,7 @@ namespace TarmacGauntlet.Raceday
                 Body = rig, Skin = skin,
                 LeftArm = rig.Find("LeftArm"), LeftForeArm = rig.Find("LeftForeArm"), LeftHand = rig.Find("LeftHand"),
                 RightArm = rig.Find("RightArm"), RightForeArm = rig.Find("RightForeArm"), RightHand = rig.Find("RightHand"),
+                LeftFingers = FingersOf(rig, "Left"), RightFingers = FingersOf(rig, "Right"),
             };
         }
 
@@ -418,8 +432,10 @@ namespace TarmacGauntlet.Raceday
                 layers.Add((body.Clips[pose.Clip], ClipTime(pose.Clip, pose.ClipTime, pose.Loop), 1f - pose.UnderWeight));
                 r.Body.Pose(layers);
                 Vector3 right = Vector3.Cross(Vector3.up, face).normalized;
-                if (pose.LeftWeight > 0f) Reach(r.LeftArm, r.LeftForeArm, r.LeftHand, f.At(pose.LeftHand), Pole(face, -right, f.At(pose.LeftHand), r.LeftArm.position), pose.LeftWeight);
-                if (pose.RightWeight > 0f) Reach(r.RightArm, r.RightForeArm, r.RightHand, f.At(pose.RightHand), Pole(face, right, f.At(pose.RightHand), r.RightArm.position), pose.RightWeight);
+                if (pose.LeftWeight > 0f)
+                    Hold(r.LeftArm, r.LeftForeArm, r.LeftHand, r.LeftFingers, false, f.At(pose.LeftHand), f.Dir(pose.LeftGrip), pose.LeftBar, face, -right, pose.LeftWeight);
+                if (pose.RightWeight > 0f)
+                    Hold(r.RightArm, r.RightForeArm, r.RightHand, r.RightFingers, true, f.At(pose.RightHand), f.Dir(pose.RightGrip), pose.RightBar, face, right, pose.RightWeight);
             }
 
             for (int p = 0; p < 3; p++)
@@ -465,6 +481,49 @@ namespace TarmacGauntlet.Raceday
         {
             float d = body.Clips[clip].Duration;
             return loop ? Mathf.Repeat(t, d) : Mathf.Clamp(t, 0f, d);
+        }
+
+        /// <summary>The fingers' local axis that runs knuckle to tip, and the one that runs out of the palm (the bones' own).</summary>
+        private static readonly Vector3 Along = Vector3.up, PalmOut = new Vector3(0f, 0f, PalmSign);
+        /// <summary>Which way the palm faces along the hand's local z: the sign that turns a positive curl about x towards it.</summary>
+        public const float PalmSign = -1f;
+        /// <summary>Where the middle of the palm is from the wrist, along the fingers, m.</summary>
+        private const float PalmLength = 0.075f;
+        /// <summary>How far each joint of a finger bends closing round a bar, knuckle to tip, degrees, round a thin bar and a bottle.</summary>
+        private static readonly float[] CurlThin = { 70f, 85f, 60f }, CurlThick = { 45f, 60f, 45f };
+
+        /// <summary>
+        /// A hand taking hold of a bar at a point: the hand turned so the bar runs across its palm, out past the thumb,
+        /// the arm reaching to put the palm on the bar, and the fingers closed round it. With no bar, the arm just
+        /// reaches the wrist to the point.
+        /// </summary>
+        private static void Hold(Transform upper, Transform lower, Transform hand, Transform[] fingers, bool rightHand, Vector3 at, Vector3 bar, float radius,
+            Vector3 face, Vector3 outward, float weight)
+        {
+            if (hand == null) return;
+            if (bar.sqrMagnitude < 1e-6f)
+            {
+                Reach(upper, lower, hand, at, Pole(face, outward, at, upper.position), weight);
+                return;
+            }
+            bar.Normalize();
+            // The thumb's side of the hand: the index finger's, along the hand's local x (+x on the right hand).
+            Vector3 thumbSide = hand.rotation * (rightHand ? Vector3.right : Vector3.left);
+            Quaternion held = Quaternion.FromToRotation(thumbSide, bar) * hand.rotation;
+            // The wrist sits back from the bar by the palm's length and the bar's radius off the palm.
+            Vector3 palm = held * (Along * PalmLength + PalmOut * (radius + 0.012f));
+            Vector3 wrist = at - palm;
+            Reach(upper, lower, hand, wrist, Pole(face, outward, wrist, upper.position), weight);
+            hand.rotation = Quaternion.Slerp(hand.rotation, held, weight);
+            float[] curl = radius > 0.025f ? CurlThick : CurlThin;
+            for (int i = 0; i < fingers.Length; i++)
+            {
+                Transform j = fingers[i];
+                if (j == null) continue;
+                bool thumb = i >= 12;
+                float angle = thumb ? 30f : curl[i % 3];
+                j.localRotation *= Quaternion.AngleAxis(angle * PalmSign * weight, Vector3.right);
+            }
         }
 
         /// <summary>The way an elbow points: down and out to its side, and out to the side more as the hand goes up.</summary>
