@@ -40,6 +40,12 @@ namespace TarmacGauntlet.Rendering
         /// <summary>Raised as a load starts, before the loading screen is drawn, so sound can fade out with the old scene.</summary>
         public static event System.Action Leaving;
 
+        /// <summary>Raised once the new scene is built and drawn, as the loading screen starts to fade off it.</summary>
+        public static event System.Action Arrived;
+
+        /// <summary>The scene the current or last load went to.</summary>
+        public static string Target { get; private set; }
+
         /// <summary>True while a load is under way, from the call to the end of the fade.</summary>
         public static bool Loading => current != null;
 
@@ -54,6 +60,7 @@ namespace TarmacGauntlet.Rendering
         public static void Load(string scene)
         {
             if (current != null) return;
+            Target = scene;
             Leaving?.Invoke();
             var go = new GameObject("Loading screen");
             DontDestroyOnLoad(go);
@@ -79,6 +86,7 @@ namespace TarmacGauntlet.Rendering
             // The new scene's first frame is drawn underneath before the screen goes.
             yield return null;
             yield return new WaitForEndOfFrame();
+            Arrived?.Invoke();
             for (float t = 0f; t < FadeSeconds; t += Mathf.Min(Time.unscaledDeltaTime, MaxStep))
             {
                 root.style.opacity = 1f - t / FadeSeconds;
