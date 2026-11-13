@@ -332,8 +332,8 @@ namespace TarmacGauntlet.Raceday
                     case PitPlan.Stage.ToBox: c.Stage = CrewStage.Ready; break;
                     case PitPlan.Stage.Stopped:
                         service = plan.Service;
-                        // A retired car parks in its box for good, with no service: the crew stay in.
-                        c.Stage = service == null || car.Supplies != null && car.Supplies.Retired ? CrewStage.Home : service.Done ? CrewStage.Release : CrewStage.Stop;
+                        // A car whose race is over parks in its box for good, with no service: the crew stay in.
+                        c.Stage = service == null || car.Supplies != null && car.Supplies.RaceOver ? CrewStage.Home : service.Done ? CrewStage.Release : CrewStage.Stop;
                         break;
                     case PitPlan.Stage.Leaving: c.Stage = CrewStage.Release; break;
                     default: c.Stage = CrewStage.Home; break;
@@ -344,7 +344,7 @@ namespace TarmacGauntlet.Raceday
                 service = race.Service;
                 if (service != null) c.Stage = service.Done ? CrewStage.Release : CrewStage.Stop;
                 else if (race.InPitLane && Vector3.Dot(toBox, crew.Forward) > -3f && toBox.sqrMagnitude < PlayerReady * PlayerReady
-                         && (car.Supplies == null || !car.Supplies.Retired))
+                         && (car.Supplies == null || !car.Supplies.RaceOver))
                     c.Stage = CrewStage.Ready;
             }
             if (service != null)

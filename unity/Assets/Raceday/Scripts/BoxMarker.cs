@@ -55,7 +55,7 @@ namespace TarmacGauntlet.Raceday
         private void Update()
         {
             if (frame == null) return;
-            bool show = Car != null && !Car.AiDriving && Race.InPitLane && (Car.Supplies == null || !Car.Supplies.Retired);
+            bool show = Car != null && !Car.AiDriving && Race.InPitLane && (Car.Supplies == null || !Car.Supplies.RaceOver);
             if (frame.activeSelf != show) frame.SetActive(show);
         }
 

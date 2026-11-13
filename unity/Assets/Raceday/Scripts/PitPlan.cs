@@ -163,8 +163,8 @@ namespace TarmacGauntlet.Raceday
             }
             lapFuel = s.Fuel;
             lapWear = s.Wear;
-            // A retired car limps in at the first chance and stays, and a car the team calls in comes in.
-            if (s.Retired || s.Orders.Requested) return true;
+            // A car whose race is over comes in at the first chance and stays, and a car the team calls in comes in.
+            if (s.RaceOver || s.Orders.Requested) return true;
             // Another lap must leave a fifth of a lap's fuel spare, and the tyres short of worn out.
             // With no tyre sets left a stop can't change them, so only the fuel brings the car in.
             return s.Fuel < FuelPerLap * 1.2f + 0.5f || (s.TyresLeft && s.Wear + WearPerLap > WearLimit);
@@ -208,7 +208,7 @@ namespace TarmacGauntlet.Raceday
                     if (toBox < 0.5f || (toBox < 1.5f && speed < 0.5f))
                     {
                         State = Stage.Stopped;
-                        if (s.Retired) return true;   // parked for good: no service
+                        if (s.RaceOver) return true;   // parked for good: no service
                         Service = new PitService(s, spec);
                         Stops++;
                         lapFuel = -1f;
@@ -217,7 +217,7 @@ namespace TarmacGauntlet.Raceday
                     return false;
                 }
                 case Stage.Stopped:
-                    if (s.Retired || Service == null) return true;
+                    if (s.RaceOver || Service == null) return true;
                     Service.Step(dt);
                     if (Service.Done && FastLaneClear(id, cars)) State = Stage.Leaving;
                     return State == Stage.Stopped;

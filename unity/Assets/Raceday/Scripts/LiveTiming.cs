@@ -7,7 +7,7 @@ namespace TarmacGauntlet.Raceday
 {
     /// <summary>
     /// The full screen live timing page, on T while the AI drives your car. The race runs at 16x behind
-    /// it. Left: every car in race order, filtered by class, your row in white. Right: your car's
+    /// it. Left: every car in race order, filtered by class, your row in white, a chequered flag by each car that has finished. Right: your car's
     /// onboard and the track map, then your car's driver, fuel, tyres, condition and the driver's fatigue,
     /// fuel and tyres with the laps they last on the engine map in use (the one that runs out first in amber), the engine map, and
     /// the next stop: laps of fuel, tyres, repairs, next driver and Pit now (<see cref="PitOrders"/>), the same plan
@@ -71,7 +71,7 @@ namespace TarmacGauntlet.Raceday
 
         private Font bold, semiBold;
         private GUIStyle big, text, small, right;
-        private Texture2D slash, disc, arrow;
+        private Texture2D slash, disc, arrow, flag;
         private TrackMap map;
         private RenderTexture pip;
         private Camera onboard;
@@ -90,6 +90,7 @@ namespace TarmacGauntlet.Raceday
             // The tower's slash: a bar leaning at 24 degrees.
             float lean = Mathf.Tan(24f * Mathf.Deg2Rad);
             slash = RaceTower.Shape(0.42f + 1.25f * lean, 1.25f, (x, y) => x >= y * lean && x <= y * lean + 0.42f);
+            flag = RaceTower.ChequeredFlag();
             arrow = RaceTower.Shape(0.72f, 1f, (x, y) => x <= 0.72f * (1f - 2f * Mathf.Abs(y - 0.5f)));
             disc = RaceTower.Shape(1f, 1f, (x, y) => (x - 0.5f) * (x - 0.5f) + (y - 0.5f) * (y - 0.5f) < 0.25f);
             map = new TrackMap(Circuit, MapWidth, MapHeight);
@@ -114,7 +115,15 @@ namespace TarmacGauntlet.Raceday
             for (int i = 0; i < Cars.Length; i++)
             {
                 if (Cars[i] == null) continue;
-                entries[i].Distance = Cars[i].Traffic.Distance;
+                // A car past the flag ranks where it finished, as on the tower.
+                Standings.Car t = Tower != null ? Tower.Entry(i) : null;
+                if (t != null && t.Finished)
+                {
+                    entries[i].Finished = true;
+                    entries[i].FinishOrder = t.FinishOrder;
+                    entries[i].Distance = t.Distance;
+                }
+                else entries[i].Distance = Cars[i].Traffic.Distance;
                 order.Add(entries[i]);
             }
             Standings.Rank(order, Lap, Tower == null || Tower.Racing == null || Tower.Racing());
@@ -275,6 +284,11 @@ namespace TarmacGauntlet.Raceday
             Label(badge, RaceTower.ClassLetter(c.Class), small, colour, TextAnchor.MiddleCenter);
             Label(Col(r, ClassX + 64f, 44f), c.ClassPosition.ToString(), right, mine ? Ink : Dim, TextAnchor.MiddleRight);
             Label(Col(r, LapX, 64f), c.FakeLaps.ToString(), right, ink, TextAnchor.MiddleRight);
+            if (c.Finished)
+            {
+                float fh = 12f * k, fw = fh * RaceTower.FlagAspect;
+                GUI.DrawTexture(new Rect(r.x + (LapX + 2f) * k, r.center.y - fh / 2f, fw, fh), flag, ScaleMode.StretchToFill, true);
+            }
             AiDriver d = Drivers[c.Id];
             int stops = d != null && d.Racer?.Pit != null ? d.Racer.Pit.Stops : 0;
             Label(Col(r, PitX, 48f), stops.ToString(), right, mine ? Ink : Dim, TextAnchor.MiddleRight);
@@ -417,7 +431,7 @@ namespace TarmacGauntlet.Raceday
                 else Fill(box, Red, 9f);
                 Label(box, orders.Requested ? "BOXING THIS LAP" : "PIT NOW", big, Color.white, TextAnchor.MiddleCenter);
             }
-            if (!s.Retired && Click(box)) orders.Requested = !orders.Requested;
+            if (!s.RaceOver && Click(box)) orders.Requested = !orders.Requested;
         }
 
         private void Step(Rect r, string sign)
@@ -538,6 +552,7 @@ namespace TarmacGauntlet.Raceday
         private void OnDestroy()
         {
             if (slash != null) Destroy(slash);
+            if (flag != null) Destroy(flag);
             if (disc != null) Destroy(disc);
             if (arrow != null) Destroy(arrow);
             if (map != null) Destroy(map.Texture);

@@ -69,6 +69,8 @@ namespace TarmacGauntlet.Raceday
         public float PowerTrim = 1f, GripTrim = 1f;
         /// <summary>True once the car is out of the race: it limps to its box and parks there.</summary>
         public bool Retired => Log != null && Log.Retired;
+        /// <summary>True once the car's race is over, out of it or past the chequered flag: it goes to its box and parks there, with no service.</summary>
+        public bool RaceOver => Log != null && (Log.Retired || Log.Flagged);
         /// <summary>False once the team has no tyre sets left, so a stop can't change them.</summary>
         public bool TyresLeft => Log == null || Log.TyreSets > 0;
 

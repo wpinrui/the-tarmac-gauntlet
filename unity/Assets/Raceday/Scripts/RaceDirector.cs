@@ -10,14 +10,21 @@ namespace TarmacGauntlet.Raceday
     /// power, grip, fuel efficiency and tyre life until a stop fixes them, and a retired car limps to
     /// its box, or stops beside the track after a fatal crash (<see cref="Retire"/>). After a stop's driver change, the new driver drives at their own pace.
     /// The driver at the wheel tires lap by lap (<see cref="CarRaceLog.Fatigue"/>), which slows the car until a stop puts in someone fresh. When the
-    /// race clock runs out each car takes the flag the next time it crosses the line, and once all
-    /// have, or <see cref="FlagWait"/> after the time ran out, the race is settled into the career
-    /// (<see cref="RaceWeekend.Finish"/>) and the player's car is parked in its box for the race summary.
+    /// race clock runs out each car takes the chequered flag the next time it crosses the line, then drives a
+    /// cooldown lap at <see cref="CooldownSpeed"/>, off the racing line, and parks in its box. Once every car
+    /// is parked or out of the race, or <see cref="FlagWait"/> and <see cref="CooldownWait"/> after the time ran out,
+    /// the race is settled into the career (<see cref="RaceWeekend.Finish"/>) and the player's car is parked in its
+    /// box for the race summary. Once the player's race is over the cooldown can be skipped
+    /// (<see cref="RaceWeekend.SkipToEnd"/>): the race is settled there and then.
     /// </summary>
     public sealed class RaceDirector : MonoBehaviour
     {
         /// <summary>The race is called this long after the time runs out, s, for cars that never come round.</summary>
         public const float FlagWait = 400f;
+        /// <summary>How long the cooldown laps may take once <see cref="FlagWait"/> is up, s, for cars that never park.</summary>
+        public const float CooldownWait = 700f;
+        /// <summary>Share of its racing speed a car drives its cooldown lap at.</summary>
+        public const float CooldownSpeed = 0.6f;
         /// <summary>Share of its power a car limping back to the pits has.</summary>
         public const float LimpPower = 0.6f;
         /// <summary>Share of its racing speed a car limping back to the pits drives at.</summary>
@@ -55,17 +62,59 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Carries on a saved race: its clocks pick up where the save left them.</summary>
         public void Resume(RaceSave save) => resume = save;
 
-        private void OnEnable() => RaceWeekend.Withdrawing += Withdraw;
-        private void OnDisable() => RaceWeekend.Withdrawing -= Withdraw;
+        private void OnEnable()
+        {
+            RaceWeekend.Withdrawing += Withdraw;
+            RaceWeekend.SkippingToEnd += SkipToEnd;
+        }
+
+        private void OnDisable()
+        {
+            RaceWeekend.Withdrawing -= Withdraw;
+            RaceWeekend.SkippingToEnd -= SkipToEnd;
+            RaceWeekend.CanSkipToEnd = false;
+        }
 
         /// <summary>The player's car out of the race now, and the race settled from where every car is.</summary>
         private void Withdraw()
         {
             if (Finished || Day == null) return;
             for (int i = 0; i < Day.Cars.Count; i++)
-                if (Day.Cars[i].Car.Player) RetireNow(i, FailureType.Withdrawn);
+                if (Day.Cars[i].Car.Player && !Day.Cars[i].Flagged) RetireNow(i, FailureType.Withdrawn);
             Finish();
         }
+
+        /// <summary>The cooldown skipped: the race settled from where every car is.</summary>
+        private void SkipToEnd()
+        {
+            if (RaceWeekend.CanSkipToEnd) FinishNow();
+        }
+
+        /// <summary>
+        /// True once the time is up and the player's race is over: their car has taken the flag or is out.
+        /// With no car of the player's in the race, once the first car has taken the flag.
+        /// </summary>
+        private bool PlayerDone()
+        {
+            if (timeUpAt < 0f) return false;
+            bool any = false;
+            foreach (CarRaceLog log in Day.Cars)
+            {
+                if (log.Car.Player) return log.Flagged || log.Retired;
+                any |= log.Flagged;
+            }
+            return any;
+        }
+
+        /// <summary>A car past the flag: its cooldown lap, slow and off the line, then into its box (<see cref="Consumables.RaceOver"/>).</summary>
+        private void TakeFlag(int i)
+        {
+            AiPilot pilot = Drivers[i] != null ? Drivers[i].Pilot : null;
+            if (pilot != null && pilot.Limp <= 0f) pilot.Limp = CooldownSpeed;
+        }
+
+        /// <summary>True once car i is parked for good: held in the pit lane, or taken off the track.</summary>
+        private bool Parked(int i) => Cars[i] == null || !Cars[i].enabled || (Cars[i].InPitLane && controllers[i].Hold);
 
         private void Start()
         {
@@ -89,6 +138,7 @@ namespace TarmacGauntlet.Raceday
                 {
                     counted[i] = Cars[i].Laps;
                     crossed[i] = Time.time - (resume != null && i < resume.Cars.Count ? resume.Cars[i].SinceLine : 0f);
+                    if (Day.Cars[i].Flagged) TakeFlag(i);
                 }
                 resume = null;
             }
@@ -116,6 +166,11 @@ namespace TarmacGauntlet.Raceday
                         Retire(i);
                         continue;
                     }
+                    if (log.Flagged)
+                    {
+                        TakeFlag(i);
+                        continue;
+                    }
                 }
                 if (log.DriverIndex != driverShown[i])
                 {
@@ -126,7 +181,27 @@ namespace TarmacGauntlet.Raceday
                 if (Drivers[i].Fatigue != (float)log.Fatigue) Drivers[i].Fatigue = (float)log.Fatigue;
             }
 
-            if (Day.AllFlagged || (timeUpAt >= 0f && Time.time - timeUpAt > FlagWait)) Finish();
+            RaceWeekend.CanSkipToEnd = PlayerDone();
+            if (AllParked() || (timeUpAt >= 0f && Time.time - timeUpAt > FlagWait + CooldownWait)) Finish();
+        }
+
+        /// <summary>True once every car still in the race has taken the flag and parked in its box.</summary>
+        private bool AllParked()
+        {
+            if (timeUpAt < 0f) return false;
+            for (int i = 0; i < Cars.Length; i++)
+            {
+                CarRaceLog log = Day.Cars[i];
+                if (log.Retired) continue;
+                // A car that hasn't come round in FlagWait isn't waited on.
+                if (!log.Flagged)
+                {
+                    if (Time.time - timeUpAt > FlagWait) continue;
+                    return false;
+                }
+                if (!Parked(i)) return false;
+            }
+            return true;
         }
 
         /// <summary>
@@ -174,6 +249,7 @@ namespace TarmacGauntlet.Raceday
         private void Finish()
         {
             Finished = true;
+            RaceWeekend.CanSkipToEnd = false;
             try
             {
                 RaceWeekend.Finish(Day);
