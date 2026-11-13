@@ -131,10 +131,10 @@ for every line-up of one to three drivers in each place, checking it sits on the
 every hand reaches what it holds, the crowd stands clear of the parked cars and every shot's camera is clear. With a
 folder it writes a preview there that plays the ceremony through its own camera.
 
-The camera starts on the broadcast when the race comes from the career, and on the chase camera when the scene runs on
-its own. `C` cycles the car cameras: TV, chase, bonnet and bumper. The TV camera is coverage locked to the car: a second
+The camera starts on the chase camera. The broadcast has no way in for now, while the mode is rethought: its `V` toggle
+is off. Do not remove the broadcast mode or its director, which stay in the game to come back. `C` cycles the car cameras: TV, chase, bonnet and bumper. The TV camera is coverage locked to the car: a second
 director with `Lock` set shows mostly trackside shots and pans, a helicopter shot now and then, and an onboard about one
-shot in ten (roll hoop, driver's seat or wing mirror, in turn, never down at the bumpers). `V` puts the broadcast on, and `V` or `C` takes it off. Holding `B` looks back on every
+shot in ten (roll hoop, driver's seat or wing mirror, in turn, never down at the bumpers). Holding `B` looks back on every
 camera. While you are not driving your own car, the car camera is yours to move and still rides along with the car. Hold
 the right mouse button and drag to look, `W` `A` `S` `D` move, `Q` and `E` go down and up, `Shift` is 5x faster and the
 wheel changes speed. On the TV camera the drag orbits the car and the wheel zooms, within each shot. Switching camera or

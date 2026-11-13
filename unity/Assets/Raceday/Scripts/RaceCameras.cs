@@ -8,7 +8,8 @@ namespace TarmacGauntlet.Raceday
     /// C cycles the car cameras: TV coverage locked to the car (a second <see cref="BroadcastDirector"/> with its
     /// Lock set, cutting between trackside shots and onboards), then the chase, bonnet and bumper views, whose
     /// places come from <see cref="CameraPresets"/> in the settings.
-    /// V puts the broadcast on (<see cref="BroadcastDirector"/>) and V or C takes it off again. Holding B
+    /// The broadcast (<see cref="BroadcastDirector"/>) has no way in for now: its V toggle is off while Ivan rethinks
+    /// the mode. Do not remove the broadcast mode or its director. It stays in the game, to come back. Holding B
     /// looks back on every camera, the broadcast showing the chase view turned round. = rides
     /// with the car behind in race order and - with the car ahead, leaving the broadcast for the chase view.
     /// Backspace comes back to your own car, in the chase view.
@@ -43,7 +44,11 @@ namespace TarmacGauntlet.Raceday
         [System.NonSerialized] public bool Held;
 
         private View view = View.Chase;
-        private bool broadcast = true;
+        /// <summary>
+        /// True while the broadcast has the camera. Off from the start and with no key to turn it on while the mode is
+        /// rethought. Keep the mode: it comes back.
+        /// </summary>
+        private bool broadcast;
 
         /// <summary>Starts in the chase view instead of the broadcast, as the scene does run on its own for AI testing.</summary>
         public void StartInChase() => broadcast = false;
@@ -87,11 +92,6 @@ namespace TarmacGauntlet.Raceday
         private void Update()
         {
             if (Keys == null) return;
-            if (Keys.Pressed(KeyCode.V))
-            {
-                broadcast = !broadcast;
-                Apply();
-            }
             if (Keys.Pressed(KeyCode.C))
             {
                 if (broadcast) broadcast = false;
