@@ -457,7 +457,7 @@ namespace TarmacGauntlet.Raceday
             if (starter is RaceStart rollingStart)
             {
                 finalFormation = intro.gameObject.AddComponent<FinalFormation>();
-                finalFormation.Start = rollingStart;
+                finalFormation.Formation = rollingStart;
                 finalFormation.Cameras = views;
                 intro.Add(finalFormation);
             }
