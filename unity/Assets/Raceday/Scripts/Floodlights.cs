@@ -64,9 +64,9 @@ namespace TarmacGauntlet.Raceday
     /// The floodlights round the pits, the stands and the start line, laid out from the circuit with no Unity objects
     /// so they can be checked outside Unity. Lamps hang under each covered stand's roof edge (<see cref="Grandstands.RoofLamps"/>),
     /// off the pit building's roof edge over the pit lane, on masts along the pit wall, and under the start gantry's
-    /// beam, three aimed down the grid and one over the line. Uplights at the gantry's feet light the gantry itself. Each lamp has a glowing lens and throws a pool of light on the ground below its aim:
-    /// a mesh drawn over the ground that brightens what is already there, so the whole lit area costs a few draw
-    /// calls and no lights. <see cref="NightLights"/> adds real lights, for the cars only, near the camera.
+    /// beam, three aimed down the grid and one over the line. Uplights at the gantry's feet light the gantry itself. Each lamp has a glowing lens and lights the ground round where it aims:
+    /// <see cref="FloodField"/> sums them into one map that the lit shaders add, so the whole lit area costs no lights.
+    /// <see cref="NightLights"/> adds real lights, for the cars only, near the camera.
     /// </summary>
     public sealed class Floodlights
     {
@@ -75,20 +75,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Distance between masts along the pit wall, m.</summary>
         public const float MastSpacing = 48f;
         /// <summary>Pit building lamps are hung at every this many stations along the garage row.</summary>
-        public const int PitRoofEvery = 2;
-        /// <summary>Pools sit this far above the ground they lie on, m.</summary>
-        public const float PoolLift = 0.07f;
-        /// <summary>Squares across a pool's grid, each way.</summary>
-        public const int PoolCells = 6;
-
-        /// <summary>The circuit's parts a pool can lie on.</summary>
-        public static readonly HashSet<string> GroundParts = new HashSet<string>
-        {
-            "Road", "Road edges", "Kerbs", "Verges", "Grass runoff", "Gravel traps", "Ground", "Pit lane", "Pit lane shoulders",
-            "Paddock", "Edge lines", "Start line and safety car lines", "Grid slots", "Grid yellow lines", "Pit lane lines",
-            "Pit box lines", "Pit exit line", "Pit entry hatching",
-        };
-
+        public const int PitRoofEvery = 1;
         /// <summary>The pit building's roof: its top, and how far out from the garages' middle line its front edge is, m.</summary>
         private const float RoofTop = 14.9f, RoofFront = 9.4f;
         /// <summary>The race offices' roof, the same way.</summary>
@@ -110,14 +97,13 @@ namespace TarmacGauntlet.Raceday
 
         private readonly Circuit c;
         private readonly PitComplex pc;
-        private readonly MeshKit steel = new MeshKit(), lenses = new MeshKit(), pools = new MeshKit();
+        private readonly MeshKit steel = new MeshKit(), lenses = new MeshKit();
 
         /// <param name="standLamps">Under the stands' roofs, from <see cref="Grandstands.RoofLamps"/>.</param>
         /// <param name="pitWall">The pit wall's runs, from <see cref="CircuitBuilder.PitWallRuns"/>.</param>
-        /// <param name="built">The circuit's parts as built: the pools lie on those in <see cref="GroundParts"/>.</param>
         /// <param name="gantry">The start gantry, from <see cref="TrackFurniture"/>.</param>
         public Floodlights(Circuit circuit, PitComplex complex, IReadOnlyList<LampMount> standLamps, IReadOnlyList<Vector3[]> pitWall,
-            IEnumerable<CircuitPart> built, GantrySpan gantry)
+            GantrySpan gantry)
         {
             c = circuit;
             pc = complex;
@@ -125,20 +111,14 @@ namespace TarmacGauntlet.Raceday
             PitRoof();
             Gantry(gantry);
             foreach (Vector3[] run in pitWall) Masts(run, gantry);
-            var under = new GroundGrid();
-            foreach (Floodlight f in Lights) under.Cover(f.Target, Mathf.Sqrt(f.Long * f.Long + f.Wide * f.Wide) + 1f);
-            foreach (CircuitPart part in built)
-                if (GroundParts.Contains(part.Name)) under.Add(part.Kit);
-            foreach (Floodlight f in Lights) Pool(f, under);
         }
 
-        /// <summary>The masts and brackets, the glowing lenses and the pools of light on the ground.</summary>
-        public List<CircuitPart> Build(Material steelMaterial, Material lensMaterial, Material poolMaterial)
+        /// <summary>The masts and brackets, and the glowing lenses.</summary>
+        public List<CircuitPart> Build(Material steelMaterial, Material lensMaterial)
         {
             var parts = new List<CircuitPart>();
             foreach (MeshKit chunk in steel.Chunks(150f)) parts.Add(new CircuitPart("Floodlight steel", chunk, steelMaterial, false, true));
             foreach (MeshKit chunk in lenses.Chunks(150f)) parts.Add(new CircuitPart("Floodlight lenses", chunk, lensMaterial, false, false));
-            foreach (MeshKit chunk in pools.Chunks(150f)) parts.Add(new CircuitPart("Floodlight pools", chunk, poolMaterial, false, false));
             return parts;
         }
 
@@ -157,7 +137,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Lamps off the pit building's roof edge, and the race offices' higher roof, aimed down into the lane.</summary>
         private void PitRoof()
         {
-            for (int j = 1; j < pc.Stations - 1; j += PitRoofEvery)
+            for (int j = 0; j < pc.Stations; j += PitRoofEvery)
             {
                 bool office = j > pc.OfficeFrom && j < pc.OfficeTo;
                 float top = office ? OfficeTop : RoofTop, front = office ? OfficeFront : RoofFront;
@@ -255,36 +235,6 @@ namespace TarmacGauntlet.Raceday
             lenses.Face(p - hx - hy, p + hx - hy, p - hx + hy, p + hx + hy, p - z);
         }
 
-        // ---------------------------------------------------------------- pools of light
-
-        /// <summary>
-        /// The pool under a lamp's aim: a grid lying on the ground, its UVs running -1 to 1 across each radius, so the
-        /// shader can fade it to nothing at the edge.
-        /// </summary>
-        private void Pool(Floodlight f, GroundGrid under)
-        {
-            Vector3 a = f.PoolAxis, b = new Vector3(-a.z, 0f, a.x);
-            int hint = NearestTrack(f.Target, -1);
-            var rows = new List<Vector3[]>();
-            for (int r = 0; r <= PoolCells; r++)
-            {
-                float u = -1f + 2f * r / PoolCells;
-                var row = new Vector3[PoolCells + 1];
-                for (int q = 0; q <= PoolCells; q++)
-                {
-                    float v = -1f + 2f * q / PoolCells;
-                    Vector3 p = f.Target + a * (u * f.Long) + b * (v * f.Wide);
-                    float guess = Ground(p, hint);
-                    p.y = (under.Height(p.x, p.z, guess + 1.5f) ?? guess) + PoolLift;
-                    row[q] = p;
-                }
-                rows.Add(row);
-            }
-            Vector3 centre = f.Target;
-            float lr = f.Long, wr = f.Wide;
-            pools.Strip(rows, 1f, 1f, false, null, p => new Vector2(Vector3.Dot(Flat3(p - centre), a) / lr, Vector3.Dot(Flat3(p - centre), b) / wr));
-        }
-
         /// <summary>A point dropped onto the ground under it.</summary>
         private Vector3 OnGround(Vector3 p)
         {
@@ -296,13 +246,21 @@ namespace TarmacGauntlet.Raceday
         /// Height of whatever is underfoot at a point: the road where it is on the road or its kerbs, the pit lane where
         /// it is on the lane, otherwise the ground.
         /// </summary>
-        public float Ground(Vector3 p, int hint)
+        public float Ground(Vector3 p, int hint) => Ground(p, hint, out _, out _);
+
+        /// <summary>
+        /// As <see cref="Ground(Vector3, int)"/>, giving the track sample nearest the point, a hint for the next one near
+        /// it, and how far the point lies beyond the edge of the road or the pit lane, whichever is nearer, m: 0 on them.
+        /// </summary>
+        public float Ground(Vector3 p, int hint, out int nearestTrack, out float beyond)
         {
             float y = c.TerrainHeight(p.x, p.z);
             int k = NearestTrack(p, hint);
+            nearestTrack = k;
             float lat = Vector3.Dot(p - c.Centre[k], c.Left[k]);
+            beyond = Mathf.Max(Mathf.Abs(lat) - c.HalfWidth(k), 0f);
             if (Mathf.Abs(lat) < c.HalfWidth(k) + 1.5f) y = Mathf.Max(y, c.Surface(k, lat).y);
-            if (c.Lane != null && c.Lane.Length > 0)
+            if (c.Lane != null && c.Lane.Length > 0 && NearLane(p))
             {
                 int best = 0;
                 float nearest = float.MaxValue;
@@ -312,8 +270,28 @@ namespace TarmacGauntlet.Raceday
                     if (d < nearest) { nearest = d; best = i; }
                 }
                 if (Mathf.Sqrt(nearest) < c.Data.pit.laneWidth * 0.5f + 1.2f) y = Mathf.Max(y, c.Lane[best].y + 0.01f);
+                beyond = Mathf.Min(beyond, Mathf.Max(Mathf.Sqrt(nearest) - c.Data.pit.laneWidth * 0.5f, 0f));
             }
             return y;
+        }
+
+        private float laneX0 = float.NaN, laneX1, laneZ0, laneZ1;
+
+        /// <summary>Whether a point lies within the pit lane's bounds in plan, with room for its width.</summary>
+        private bool NearLane(Vector3 p)
+        {
+            if (float.IsNaN(laneX0))
+            {
+                float pad = c.Data.pit.laneWidth + 30f;
+                laneX0 = laneZ0 = float.MaxValue;
+                laneX1 = laneZ1 = float.MinValue;
+                foreach (Vector3 q in c.Lane)
+                {
+                    laneX0 = Mathf.Min(laneX0, q.x - pad); laneX1 = Mathf.Max(laneX1, q.x + pad);
+                    laneZ0 = Mathf.Min(laneZ0, q.z - pad); laneZ1 = Mathf.Max(laneZ1, q.z + pad);
+                }
+            }
+            return p.x >= laneX0 && p.x <= laneX1 && p.z >= laneZ0 && p.z <= laneZ1;
         }
 
         /// <summary>The track sample nearest a point in plan, searching near the hint when one is given.</summary>
@@ -329,67 +307,6 @@ namespace TarmacGauntlet.Raceday
                 if (d < nearest) { nearest = d; best = k; }
             }
             return best;
-        }
-
-        /// <summary>
-        /// The built ground's triangles in a grid of cells, kept only where a pool lies, to find the height of what is
-        /// built under a point.
-        /// </summary>
-        public sealed class GroundGrid
-        {
-            private const float Cell = 4f;
-            private readonly HashSet<(int, int)> covered = new HashSet<(int, int)>();
-            private readonly Dictionary<(int, int), List<Vector3>> cells = new Dictionary<(int, int), List<Vector3>>();
-
-            /// <summary>Keeps the triangles within this distance of a point in plan.</summary>
-            public void Cover(Vector3 centre, float radius)
-            {
-                int x0 = Mathf.FloorToInt((centre.x - radius) / Cell), x1 = Mathf.FloorToInt((centre.x + radius) / Cell);
-                int z0 = Mathf.FloorToInt((centre.z - radius) / Cell), z1 = Mathf.FloorToInt((centre.z + radius) / Cell);
-                for (int x = x0; x <= x1; x++)
-                    for (int z = z0; z <= z1; z++) covered.Add((x, z));
-            }
-
-            public void Add(MeshKit kit)
-            {
-                IReadOnlyList<Vector3> v = kit.Vertices;
-                IReadOnlyList<int> t = kit.Triangles;
-                for (int i = 0; i < t.Count; i += 3)
-                {
-                    Vector3 a = v[t[i]], b = v[t[i + 1]], d = v[t[i + 2]];
-                    int x0 = Mathf.FloorToInt(Mathf.Min(a.x, Mathf.Min(b.x, d.x)) / Cell), x1 = Mathf.FloorToInt(Mathf.Max(a.x, Mathf.Max(b.x, d.x)) / Cell);
-                    int z0 = Mathf.FloorToInt(Mathf.Min(a.z, Mathf.Min(b.z, d.z)) / Cell), z1 = Mathf.FloorToInt(Mathf.Max(a.z, Mathf.Max(b.z, d.z)) / Cell);
-                    for (int x = x0; x <= x1; x++)
-                        for (int z = z0; z <= z1; z++)
-                        {
-                            if (!covered.Contains((x, z))) continue;
-                            if (!cells.TryGetValue((x, z), out List<Vector3> list)) cells[(x, z)] = list = new List<Vector3>();
-                            list.Add(a);
-                            list.Add(b);
-                            list.Add(d);
-                        }
-                }
-            }
-
-            /// <summary>The highest built surface under a point that is below the ceiling, or null where there is none.</summary>
-            public float? Height(float x, float z, float ceiling)
-            {
-                if (!cells.TryGetValue((Mathf.FloorToInt(x / Cell), Mathf.FloorToInt(z / Cell)), out List<Vector3> list)) return null;
-                float? best = null;
-                for (int i = 0; i < list.Count; i += 3)
-                {
-                    Vector3 a = list[i], b = list[i + 1], c = list[i + 2];
-                    float det = (b.z - c.z) * (a.x - c.x) + (c.x - b.x) * (a.z - c.z);
-                    if (Mathf.Abs(det) < 1e-9f) continue;
-                    float l1 = ((b.z - c.z) * (x - c.x) + (c.x - b.x) * (z - c.z)) / det;
-                    float l2 = ((c.z - a.z) * (x - c.x) + (a.x - c.x) * (z - c.z)) / det;
-                    float l3 = 1f - l1 - l2;
-                    if (l1 < -1e-4f || l2 < -1e-4f || l3 < -1e-4f) continue;
-                    float y = l1 * a.y + l2 * b.y + l3 * c.y;
-                    if (y < ceiling && (best == null || y > best)) best = y;
-                }
-                return best;
-            }
         }
 
         // ---------------------------------------------------------------- shapes

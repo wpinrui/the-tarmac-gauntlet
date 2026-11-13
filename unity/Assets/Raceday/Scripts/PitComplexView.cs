@@ -45,20 +45,21 @@ namespace TarmacGauntlet.Raceday
             {
                 if (g < 0 || fitted[g]) continue;
                 fitted[g] = true;
-                Props(complex.Frame(g), g);
+                Props(complex, g);
             }
             Kit = new GameObject("Pit box kit").AddComponent<PitBoxKitView>();
             Kit.transform.SetParent(transform, false);
             Kit.Build(complex, used, cars);
         }
 
-        private void Props(GarageFrame f, int g)
+        private void Props(PitComplex complex, int g)
         {
+            GarageFrame f = complex.Frame(g);
             var kit = new GameObject("Garage " + (g + 1) + " kit");
             kit.transform.SetParent(transform, false);
             kit.transform.SetPositionAndRotation(f.Floor, Quaternion.LookRotation(f.Out, Vector3.up));
             foreach (GarageProp p in PitComplexBuilder.Props)
-                HqProps.Place(kit.transform, new HqProp { Id = p.Id, Position = new Vector3(p.X, p.Y, p.Z), Yaw = p.Yaw, Scale = 1f });
+                HqProps.Place(kit.transform, new HqProp { Id = p.Id, Position = new Vector3(p.XIn(complex, g), p.Y, p.Z), Yaw = p.Yaw, Scale = 1f });
             Renderer[] renderers = kit.GetComponentsInChildren<Renderer>();
             foreach (Renderer r in renderers)
                 foreach (Material m in r.sharedMaterials) m.enableInstancing = true;

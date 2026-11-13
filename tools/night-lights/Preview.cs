@@ -16,7 +16,7 @@ static class Preview
     static float[] Rgb(Color c) => new[] { c.r, c.g, c.b };
     static float[] Xyz(Vector3 v) => new[] { v.x, v.y, v.z };
 
-    static readonly HashSet<string> WithUv = new HashSet<string> { "Pit building glass", "Crowd", "Floodlight pools" };
+    static readonly HashSet<string> WithUv = new HashSet<string> { "Pit building glass", "Crowd" };
 
     public static void Write(string dir, Circuit c, PitComplex pc, Floodlights floods, List<CircuitPart> track, List<CircuitPart> stands,
         List<CircuitPart> pit, List<CircuitPart> lit)
@@ -103,7 +103,7 @@ static class Preview
             red = Rgb(NightLook.Red),
             look = new
             {
-                NightLook.PoolBrightening, NightLook.PoolLift, NightLook.HeadlampGround, NightLook.LensGlow,
+                NightLook.FloodGround, NightLook.NightMost, NightLook.HeadlampGround, NightLook.LensGlow,
                 NightLook.HeadlampGlow, NightLook.TailGlow, NightLook.BrakeGlow, NightLook.StandGlow,
             },
             crowd = new[] { CrowdPalette.Shirts, CrowdPalette.Skins, CrowdPalette.Trousers }.Select(row => row.Select(Rgb).ToArray()).ToArray(),

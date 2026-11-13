@@ -5,9 +5,9 @@ using UnityEngine.Rendering;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// The cars' headlamps on the ground ahead at night: where each car's lamps are and where they aim, for the ground's
-    /// own shading to light it (Rendering/Shaders/Headlamps.hlsl, in the track, the ground and the grass). The surface
-    /// takes the light in its own colour, so the lines and kerbs catch it further out than the asphalt. The cars nearest
+    /// The cars' headlamps at night: where each car's lamps are and where they aim, for every lit shader to light what is
+    /// ahead of them (Rendering/Shaders/Headlamps.hlsl, through NightLit.hlsl). Each surface takes the light in its own
+    /// colour, so the lines and kerbs catch it further out than the asphalt. The cars nearest
     /// the camera are lit, up to <see cref="Most"/>. A car whose beam falls in the floodlights' pools throws only
     /// <see cref="NightLook.HeadlampUnderFloods"/> of its light. A reflection probe or any camera but the game's sees none of it.
     /// </summary>
