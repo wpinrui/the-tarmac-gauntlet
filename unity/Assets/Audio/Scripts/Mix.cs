@@ -159,6 +159,7 @@ namespace TarmacGauntlet.Audio
             float rate = target > duck ? 1f / DuckAttack : 1f / DuckRelease;
             duck = MoveTowards(duck, target, rate * Math.Max(0f, dt));
             Muffle = MoveTowards(Muffle, Paused ? 1f : 0f, Math.Max(0f, realDt) / (Paused ? PauseIn : PauseOut));
+            race = MoveTowards(race, raceTarget, raceRate * Math.Max(0f, realDt));
         }
 
         /// <summary>Back to no ducking and no muffle, as a new scene opens.</summary>
@@ -170,16 +171,42 @@ namespace TarmacGauntlet.Audio
             closest = 0f;
         }
 
+        // ---------------------------------------------------------------- scene changes
+
+        /// <summary>How long the HQ's music and the race's sound take to cross over each other, real seconds.</summary>
+        public const float Crossfade = 2.5f;
+
+        private static float race = 1f, raceTarget = 1f, raceRate;
+
+        /// <summary>How far the race's groups are faded in, 0 to 1, for the crossfade with the HQ's music.</summary>
+        public static float RaceLevel => race;
+
+        /// <summary>Fades the race's groups to a level over some real seconds; 0 seconds sets it at once.</summary>
+        public static void FadeRace(float target, float seconds)
+        {
+            raceTarget = Clamp01(target);
+            if (seconds <= 0f) race = raceTarget;
+            raceRate = seconds <= 0f ? 0f : 1f / seconds;
+        }
+
+        /// <summary>One side of the crossfade: a fade's share, 0 to 1, as a gain that sums with the other side to a steady
+        /// loudness (equal power), so the change never dips in the middle.</summary>
+        public static float CrossGain(float share)
+        {
+            float p = Clamp01(share);
+            return (float)Math.Sin(p * Math.PI / 2);
+        }
+
         // ---------------------------------------------------------------- the gain
 
         /// <summary>
         /// A group's volume now, 0 to 1, under the master volume: its slider, its loudness-pass level, and for the race's
-        /// groups the pause. The crowd and PA take <see cref="CrowdDuck"/> on top.
+        /// groups the pause and the crossfade with the HQ's music (<see cref="RaceLevel"/>). The crowd and PA take <see cref="CrowdDuck"/> on top.
         /// </summary>
         public static float Gain(SoundGroup group)
         {
             float g = Taper(Position(SliderOf(group))) * Trim(group);
-            if (InRace(group)) g *= 1f - (1f - PausedGain) * Smooth(Muffle);
+            if (InRace(group)) g *= (1f - (1f - PausedGain) * Smooth(Muffle)) * CrossGain(race);
             return g;
         }
 
