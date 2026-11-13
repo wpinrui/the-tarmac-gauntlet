@@ -17,6 +17,8 @@ namespace TarmacGauntlet.Raceday
     /// focuses on its car, so the background blurs (<see cref="PostEffects.Focus"/>).
     /// With <see cref="Lock"/> set it stays on that one car: mostly trackside shots and pans, a helicopter shot now and
     /// then, and an onboard about one shot in ten, from the roll hoop, the driver's seat or the wing mirror in turn.
+    /// Past the chequered flag (<see cref="Flagged"/>) a car is on its cooldown lap and fights no one, and your car's
+    /// cooldown lap tops every story until it stops in its box, with the pit lane camera once it is in the lane.
     /// </summary>
     public sealed class BroadcastDirector : MonoBehaviour
     {
@@ -28,6 +30,8 @@ namespace TarmacGauntlet.Raceday
         public int Player = -1;
         /// <summary>The car to stay on, or -1 to direct the whole race.</summary>
         public int Lock = -1;
+        /// <summary>True once car i has taken the chequered flag, or null for a race with no flag.</summary>
+        public System.Func<int, bool> Flagged;
 
         private enum Story { None, Leader, Rejoin, Stop, Mine, Battle, LeadBattle, Crash }
         private enum Shot { Trackside, Pan, Helicopter, Onboard, PitLane, RollHoop, Nose, Mirror, Rear }
@@ -49,6 +53,8 @@ namespace TarmacGauntlet.Raceday
         private const float StoppedSpeed = 3f;
         /// <summary>The story on air scores this much more, so the director doesn't flick between two.</summary>
         private const float Stick = 15f;
+        /// <summary>Your car's cooldown lap scores this, above every other story.</summary>
+        private const float CooldownScore = 120f;
 
         private Story story;
         private int subject = -1, other = -1;
@@ -100,7 +106,9 @@ namespace TarmacGauntlet.Raceday
                 Think();
             }
             if (subject < 0 || !Live(subject)) return;
-            if (ShotDone()) Cut(story, subject, other, false);
+            // Your car turning into the pit lane on its cooldown lap goes to the pit lane camera, and back out of it.
+            bool lane = story == Story.Mine && PastFlag(subject) && Cars[subject].InPitLane != (shot == Shot.PitLane);
+            if (lane || ShotDone()) Cut(story, subject, other, false);
             Place(cam);
         }
 
@@ -141,19 +149,19 @@ namespace TarmacGauntlet.Raceday
                 if (racer?.Pit != null && racer.Pit.State == PitPlan.Stage.Stopped && (i == Player || ClassLeader(i)))
                     Offer(Story.Stop, i, -1, 55f);
             }
-            if (Player >= 0 && Live(Player)) Offer(Story.Mine, Player, -1, 60f);
+            if (Player >= 0 && Live(Player)) Offer(Story.Mine, Player, -1, CoolingDown(Player) ? CooldownScore : 60f);
             if (leader >= 0) Offer(Story.Leader, leader, -1, 20f);
 
             // Fights: each car and the nearest car of its class ahead of it on the track.
             for (int j = 0; j < Cars.Length; j++)
             {
-                if (!Live(j) || Cars[j].InPitLane) continue;
+                if (!Live(j) || Cars[j].InPitLane || PastFlag(j)) continue;
                 TrafficCar b = Cars[j].Traffic;
                 int ahead = -1;
                 float gap = float.MaxValue;
                 for (int i = 0; i < Cars.Length; i++)
                 {
-                    if (i == j || !Live(i) || Cars[i].InPitLane || Classes[i] != Classes[j]) continue;
+                    if (i == j || !Live(i) || Cars[i].InPitLane || PastFlag(i) || Classes[i] != Classes[j]) continue;
                     float d = Cars[i].Traffic.Distance - b.Distance;
                     if (d > 0f && d < gap) (gap, ahead) = (d, i);
                 }
@@ -176,6 +184,11 @@ namespace TarmacGauntlet.Raceday
         }
 
         private bool ClassLeader(int i) => ClassPlace(i) == 1;
+
+        private bool PastFlag(int i) => Flagged != null && Flagged(i);
+
+        /// <summary>True while car i is past the flag and still on the move: on its cooldown lap or rolling into its box.</summary>
+        private bool CoolingDown(int i) => PastFlag(i) && (!Cars[i].InPitLane || Mathf.Abs(Cars[i].Traffic.Speed) >= StoppedSpeed);
 
         /// <summary>Car i's place in its class on the road, from 1.</summary>
         private int ClassPlace(int i)
@@ -225,7 +238,8 @@ namespace TarmacGauntlet.Raceday
             shotCount = newStory ? 0 : shotCount + 1;
             if (newStory) Stories++;
             Shots++;
-            shot = Lock >= 0 ? Cars[car].InPitLane ? Shot.PitLane : LockedShots[shotCount % LockedShots.Length] : Pick(s, shotCount);
+            bool laneShot = Cars[car].InPitLane && (Lock >= 0 || (s == Story.Mine && PastFlag(car)));
+            shot = laneShot ? Shot.PitLane : Lock >= 0 ? LockedShots[shotCount % LockedShots.Length] : Pick(s, shotCount);
             if (Lock >= 0 && shot == Shot.Onboard) shot = LockedOnboards[lockedOnboard++ % LockedOnboards.Length];
             // A stop is shown until it's over: once the car leaves its box the story moves on.
             if (s == Story.Stop && shotCount > 0) shot = Shot.Trackside;
