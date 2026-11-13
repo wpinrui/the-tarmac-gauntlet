@@ -165,7 +165,7 @@ half4 TarmacFragmentPBR(InputData inputData, SurfaceData surfaceData, bool fresn
         {
             float e = 0;
             if (budget) light.color *= LampShare(light, inputData.normalWS, e);
-            half3 lit = LightingPhysicallyBased(budget ? lampBrdf : brdfData, brdfDataClearCoat, light, inputData.normalWS,
+            half3 lit = LightingPhysicallyBased(lampBrdf, brdfDataClearCoat, light, inputData.normalWS,
                                                 inputData.viewDirectionWS, surfaceData.clearCoatMask, specularHighlightsOff);
             if (budget) { lamps += lit; lampLight += e; }
             else lightingData.additionalLightsColor += lit;
