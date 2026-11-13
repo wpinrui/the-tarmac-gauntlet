@@ -192,7 +192,7 @@ namespace TarmacGauntlet.Raceday
                     }
                 GUILayout.EndHorizontal();
                 GUILayout.BeginHorizontal();
-                foreach ((CircuitScene.StartMode mode, string name) in new[] { (CircuitScene.StartMode.Grid, "Grid"), (CircuitScene.StartMode.Rolling, "Rolling"), (CircuitScene.StartMode.PitLane, "Pit lane") })
+                foreach ((CircuitScene.StartMode mode, string name) in new[] { (CircuitScene.StartMode.Grid, "Grid"), (CircuitScene.StartMode.Rolling, "Rolling") })
                     if (Button(name, DebugSettings.Start == mode))
                     {
                         DebugSettings.Start = mode;

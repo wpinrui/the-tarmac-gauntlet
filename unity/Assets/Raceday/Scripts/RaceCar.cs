@@ -177,6 +177,15 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>
+        /// You take the wheel from the AI in the pit lane: the stop it has under way in the box goes on, and a stop it
+        /// has finished is not started again while the car is still in the box.
+        /// </summary>
+        public void TakeOverStop(PitService service)
+        {
+            if (service != null) Service = service;
+        }
+
+        /// <summary>
         /// A player who stops in their own box is served: held on the brakes while the crew refuels
         /// and changes the tyres, then let go. AI cars are served by their own driver.
         /// </summary>
