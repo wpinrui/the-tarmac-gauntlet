@@ -138,7 +138,7 @@ shot in ten (roll hoop, driver's seat or wing mirror, in turn, never down at the
 camera. While you are not driving your own car, the car camera is yours to move and still rides along with the car. Hold
 the right mouse button and drag to look, `W` `A` `S` `D` move, `Q` and `E` go down and up, `Shift` is 5x faster and the
 wheel changes speed. On the TV camera the drag orbits the car and the wheel zooms, within each shot. Switching camera or
-car, or taking the wheel, puts the view back. Camera in the race's pause menu sets the chase, bonnet and bumper cameras'
+car, or taking the wheel, puts the view back. `Backspace` comes back to your own car. Camera in the race's pause menu sets the chase, bonnet and bumper cameras'
 field of view, position and tilt (`Visuals/CameraPresets.cs`). The bonnet camera's position is moved from each car's own
 bonnet spot, just ahead of the windscreen's base and over the bonnet, measured from its model (`CarCameraSpots.cs`), with the race seen through the camera being tuned beside the
 panel, changing as each slider moves. On the broadcast the director (`BroadcastDirector.cs`) picks
@@ -149,6 +149,11 @@ helicopter, onboard and pit lane shots.
 The director's shots carry the broadcast graphics (`BroadcastGraphics.cs`): a battle strip with the gap in a
 fight, a driver strip the first time a car is on air in a stint, a pit timer with fuel, tyres and driver
 change lit as each is done, and the track map during helicopter shots, or always with Track map on in the settings.
+
+Off the broadcast, the driver card (`DriverCard.cs`) sits bottom left beside the timing tower: the driver now in the car
+the cameras ride with, their flag, name and overall (the average of their five stats, as in the menus), over their
+five stats. While that car rolls through the pit lane to a stop that changes the driver, a strip above it shows who
+gets in (`NextDriverWatch` in `DriverFacts.cs`). `bash tools/driver-card-check/run.sh` checks both outside Unity.
 
 `T` opens live timing while the AI drives your car (`LiveTiming.cs`), with the race at 16x behind it: every
 car in race order by class, your car's onboard and the track map, its driver, fuel, tyres and condition with
