@@ -101,7 +101,7 @@ namespace TarmacGauntlet.Raceday
             if (Mathf.Abs(Glow - shownGlow) > 0.002f)
             {
                 shownGlow = Glow;
-                Lens.SetColor(EmissionId, NightBudget.Flood * (NightBudget.FloodLens * Glow));
+                Lens.SetColor(EmissionId, NightBudget.Glow(NightBudget.Flood, NightBudget.FloodLens * Glow).gamma);
             }
         }
 

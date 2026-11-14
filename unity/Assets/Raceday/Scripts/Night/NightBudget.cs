@@ -26,7 +26,12 @@ namespace TarmacGauntlet.Raceday
     {
         /// <summary>The colour grade's exposure at full night, stops (SkyGrade).</summary>
         public const float Exposure = 1f;
-        /// <summary>The floodlights' light on the track where they aim.</summary>
+        /// <summary>
+        /// How much more bloom the night has than the day's 0.5: nothing lamp-lit reaches its threshold (the caps below), so
+        /// it only gives the lamps themselves their halo.
+        /// </summary>
+        public const float Bloom = 0.5f;
+                /// <summary>The floodlights' light on the track where they aim.</summary>
         public const float Floodlit = 1f;
         /// <summary>The most one lamp gives any surface, the most all of them together give, and the most a lamp-lit pixel gives back.</summary>
         public const float LampMost = 0.8f, AllMost = 1.4f, PixelMost = 1.6f;
@@ -44,8 +49,23 @@ namespace TarmacGauntlet.Raceday
         /// <summary>The floodlights' colour, a neutral white a touch warm, and the headlamps', a cool white, as Ivan picked.</summary>
         public static readonly Color Flood = new Color(1f, 0.95f, 0.86f), Headlamp = new Color(0.9f, 0.95f, 1f);
         public static readonly Color Red = new Color(1f, 0.06f, 0.03f);
-        /// <summary>The floodlights' lenses and the headlamps glow this bright, linear; tail lamps at night, brake lamps whenever the brakes are on.</summary>
-        public const float FloodLens = 3f, HeadlampGlow = 2.2f, TailGlow = 0.9f, BrakeGlow = 3f;
+        /// <summary>
+        /// How bright the lamps themselves glow, linear light in their brightest channel (<see cref="Glow"/>): the floodlights'
+        /// lenses, the headlamps and the tail lamps at night, the brake lamps whenever the brakes are on, and the pit
+        /// building's brightest windows at night. All but the windows sit well over the bloom's threshold (1.2), so each
+        /// lamp shows a halo; the windows just reach it, so they bloom slightly.
+        /// </summary>
+        public const float FloodLens = 10f, HeadlampGlow = 8f, TailGlow = 3f, BrakeGlow = 8f, WindowGlow = 2f;
+        /// <summary>
+        /// A glow of this colour, linear, its brightest channel at <paramref name="level"/>. Material.SetColor takes sRGB,
+        /// so a material is given its <c>.gamma</c>.
+        /// </summary>
+        public static Color Glow(Color tint, float level)
+        {
+            var c = new Color(LinearLight.Linear(tint.r), LinearLight.Linear(tint.g), LinearLight.Linear(tint.b), 1f);
+            float most = Mathf.Max(c.r, Mathf.Max(c.g, c.b));
+            return new Color(c.r * level / most, c.g * level / most, c.b * level / most, 1f);
+        }
         /// <summary>The stands' seats and crowd glow this much at night, lit by the lamps under their roofs.</summary>
         public const float StandGlow = 0.22f;
 

@@ -24,6 +24,8 @@ namespace TarmacGauntlet.Rendering
             public float Contrast, Saturation;
             /// <summary>-100 (blue) to 100 (yellow), and -100 (green) to 100 (magenta).</summary>
             public float Temperature, Tint;
+            /// <summary>How much more bloom than the day's, added to its intensity.</summary>
+            public float Bloom;
         }
 
         /// <summary>The scene's post-processing; null in a scene without it.</summary>
@@ -117,6 +119,7 @@ namespace TarmacGauntlet.Rendering
             adjustments.saturation.Override(Mathf.Clamp(g.Saturation, -100f, 100f));
             balance.temperature.Override(Mathf.Clamp(g.Temperature, -100f, 100f));
             balance.tint.Override(Mathf.Clamp(g.Tint, -100f, 100f));
+            bloom.intensity.Override(BloomIntensity + Mathf.Max(g.Bloom, 0f));
         }
 
         private void Show(GraphicsOption _)

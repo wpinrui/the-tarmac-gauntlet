@@ -36,18 +36,23 @@ function compile(vs, fs) {
 const GBUF_VS = `
 layout(location = 0) in vec3 aPos;
 layout(location = 1) in vec3 aNrm;
+layout(location = 2) in vec2 aUv;
 uniform mat4 uModel, uViewProj;
-out vec3 vPos; out vec3 vNrm;
+out vec3 vPos; out vec3 vNrm; out vec2 vTex;
 void main() {
+  vTex = aUv;
   vec4 w = uModel * vec4(aPos, 1.0);
   vPos = w.xyz;
   vNrm = mat3(uModel) * aNrm;
   gl_Position = uViewProj * w;
 }`;
 const GBUF_FS = `
-in vec3 vPos; in vec3 vNrm;
+in vec3 vPos; in vec3 vNrm; in vec2 vTex;
 uniform vec3 uAlbedo, uEmission, uEye;
 uniform float uSmooth, uMetal, uFresnel, uGrass;
+// The pit building's lit windows (PitMaterials): each window's light, linear, a texel a window; 0 for anything else.
+uniform int uWindows;
+uniform sampler2D uRooms;
 layout(location = 0) out vec4 oPos;
 layout(location = 1) out vec4 oNrm;
 layout(location = 2) out vec4 oAlb;
@@ -59,7 +64,16 @@ void main() {
   oPos = vec4(vPos, 1.0);
   oNrm = vec4(n, uSmooth);
   oAlb = vec4(uAlbedo, uMetal + 2.0 * uGrass);
-  oEmi = vec4(uEmission, 1.0 + uFresnel);
+  vec3 emission = uEmission;
+  if (uWindows == 1) {
+    ivec2 cells = textureSize(uRooms, 0);
+    vec2 at = mod(vTex, vec2(cells));
+    vec2 inCell = fract(at);
+    // PitComplexBuilder.WindowFrame: the mullions and the floor band between the panes.
+    bool frame = inCell.x < 1.0 / 16.0 || inCell.x >= 15.0 / 16.0 || inCell.y < 3.0 / 16.0 || inCell.y >= 14.0 / 16.0;
+    emission = frame ? vec3(0.0) : uEmission * texelFetch(uRooms, ivec2(floor(at)), 0).rgb;
+  }
+  oEmi = vec4(emission, 1.0 + uFresnel);
 }`;
 
 // ------------------------------------------------------------------ the lights
@@ -369,10 +383,12 @@ function invert(m) {
 }
 // Unity's Color to linear (Material.SetColor and Light.color in a Linear project): the sRGB curve, carried past 1.
 const lin = c => c.map(x => x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4));
+// NightBudget.Glow: a glow of this colour, linear, its brightest channel at level.
+const glow = (tint, level) => { const c = lin(tint), most = Math.max(...c); return c.map(x => x * level / most); };
 const IDENTITY = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 
 // ------------------------------------------------------------------ the scene
-let scene, cars, meshes = [], carModels = [];
+let scene, cars, meshes = [], carModels = [], rooms;
 
 function upload(bin, m) {
   const vao = gl.createVertexArray();
@@ -390,6 +406,13 @@ function upload(bin, m) {
   const idx = gl.createBuffer();
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idx);
   gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(bin, m.idx, m.indices), gl.STATIC_DRAW);
+  if (m.uv >= 0) {
+    const uv = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, uv);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(bin, m.uv, m.vertices * 2), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribPointer(2, 2, gl.FLOAT, false, 0, 0);
+  }
   gl.bindVertexArray(null);
   return { vao, count: m.indices };
 }
@@ -399,6 +422,7 @@ const CAR_LOOKS = {
   glass: { albedo: [0.02, 0.022, 0.025], smooth: 0.95, metal: 0 },
   head: { albedo: [0.6, 0.62, 0.64], smooth: 0.92, metal: 0, glow: 'head' },
   tail: { albedo: [0.1, 0.01, 0.01], smooth: 0.85, metal: 0, glow: 'tail' },
+  brake: { albedo: [0.15, 0.012, 0.01], smooth: 0.85, metal: 0, glow: 'brake' },
   chrome: { albedo: [0.55, 0.56, 0.58], smooth: 0.85, metal: 0.9 },
   dark: { albedo: [0.025, 0.025, 0.027], smooth: 0.35, metal: 0 },
   tyre: { albedo: [0.02, 0.02, 0.021], smooth: 0.2, metal: 0 },
@@ -411,17 +435,25 @@ async function load(base) {
   scene = await (await fetch(base + 'scene.json')).json();
   const bin = await (await fetch(base + 'scene.bin')).arrayBuffer();
   const b = scene.budget;
+  // The windows' light, linear, a texel a window and a row a storey, as PitMaterials' texture holds it.
+  const [cw, ch] = scene.windows.cells;
+  rooms = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, rooms);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, cw, ch, 0, gl.RGBA, gl.FLOAT, new Float32Array(scene.windows.rooms.flatMap(r => [...lin(r), 1])));
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
   for (const m of scene.meshes) {
     const g = upload(bin, m);
     let emission = [0, 0, 0];
-    if (m.lens) emission = lin(V.mul(b.flood, b.FloodLens * b.on));
+    if (m.lens) emission = glow(b.flood, b.FloodLens * b.on);
+    if (m.uv >= 0) emission = glow([1, 1, 1], b.WindowGlow * b.on);
     if (m.name === 'Stand seats' || m.name === 'Crowd') emission = lin(V.mul(b.flood, b.StandGlow * b.on));
-    meshes.push({ ...g, albedo: lin(m.colour), smooth: m.smooth, metal: m.metal, emission, fresnel: m.fresnel, grass: m.grass, lens: m.lens });
+    meshes.push({ ...g, albedo: lin(m.colour), smooth: m.smooth, metal: m.metal, emission, fresnel: m.fresnel, grass: m.grass, lens: m.lens, windows: m.uv >= 0 });
   }
   cars = await (await fetch(base + 'cars/cars.json')).json();
   for (const c of cars) {
     const cbin = await (await fetch(base + 'cars/' + c.name + '.bin')).arrayBuffer();
-    carModels.push({ ...c, parts: c.parts.filter(p => p.kind !== 'tailglass').map(p => ({ kind: p.kind, ...upload(cbin, p) })) });
+    carModels.push({ ...c, parts: c.parts.filter(p => p.kind !== 'tailglass' && p.kind !== 'headglass').map(p => ({ kind: p.kind, ...upload(cbin, p) })) });
   }
 }
 
@@ -451,8 +483,10 @@ async function render(view) {
   gl.useProgram(P.p);
   gl.uniformMatrix4fv(P.u.uViewProj, false, vp);
   gl.uniform3fv(P.u.uEye, view.eye);
-  const draw = (g, model, albedo, smooth, metal, emission, fresnel = false, grass = false) => {
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, rooms); gl.uniform1i(P.u.uRooms, 0);
+  const draw = (g, model, albedo, smooth, metal, emission, fresnel = false, grass = false, windows = false) => {
     gl.uniformMatrix4fv(P.u.uModel, false, model);
+    gl.uniform1i(P.u.uWindows, windows ? 1 : 0);
     gl.uniform1f(P.u.uGrass, grass ? 1 : 0);
     gl.uniform1f(P.u.uFresnel, fresnel ? 1 : 0);
     gl.uniform3fv(P.u.uAlbedo, albedo);
@@ -462,16 +496,19 @@ async function render(view) {
     gl.bindVertexArray(g.vao);
     gl.drawElements(gl.TRIANGLES, g.count, gl.UNSIGNED_INT, 0);
   };
-  for (const m of meshes) draw(m, IDENTITY, m.albedo, m.smooth, m.metal, m.lens && view.floods === false ? [0, 0, 0] : m.emission, m.fresnel, m.grass);
-  const headGlow = lin(V.mul(b.headlamp, b.HeadlampGlow * b.on)), tailGlow = lin(V.mul(b.red, b.TailGlow * b.on));
-  const placed = scene.grid.slice(0, view.cars).map((g, i) => ({ ...g, model: carModels[(i * 3) % carModels.length], paint: PAINTS[i % PAINTS.length] }));
+  for (const m of meshes) draw(m, IDENTITY, m.albedo, m.smooth, m.metal, m.lens && view.floods === false ? [0, 0, 0] : m.emission, m.fresnel, m.grass, m.windows);
+  const headGlow = glow(b.headlamp, b.HeadlampGlow * b.on), tailGlow = glow(b.red, b.TailGlow * b.on), brakeGlow = glow(b.red, b.BrakeGlow);
+  // A braking car's brake lamps light (CarLights); every other car's stay as the model paints them.
+  const braking = i => (view.braking || []).includes(i);
+  const placed = scene.grid.slice(0, view.cars).map((g, i) => ({ ...g, model: carModels[(i * 3) % carModels.length], paint: PAINTS[i % PAINTS.length], brake: braking(i) }));
   for (const car of placed) {
     const M = carMatrix(car.at, car.forward);
     for (const part of car.model.parts) {
       if (part.kind === 'paint') draw(part, M, lin(car.paint), 0.9, 0, [0, 0, 0]);
       else {
         const L = CAR_LOOKS[part.kind];
-        draw(part, M, L.albedo, L.smooth, L.metal, L.glow === 'head' ? headGlow : L.glow === 'tail' ? tailGlow : [0, 0, 0]);
+        const e = L.glow === 'head' ? headGlow : L.glow === 'tail' ? tailGlow : L.glow === 'brake' && car.brake ? brakeGlow : [0, 0, 0];
+        draw(part, M, L.albedo, L.smooth, L.metal, e);
       }
     }
   }
@@ -566,7 +603,8 @@ async function render(view) {
   gl.useProgram(F.p);
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, sceneTex); gl.uniform1i(F.u.uScene, 0);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, low.t); gl.uniform1i(F.u.uBloom, 1);
-  gl.uniform1f(F.u.uBloomIntensity, 0.5);
+  // The day's 0.5 and the night's more (NightBudget.Bloom).
+  gl.uniform1f(F.u.uBloomIntensity, 0.5 + b.Bloom);
   gl.uniform1f(F.u.uExposure, Math.pow(2, 0.45 + b.Exposure));
   // The night's grade (SkyGrade): contrast 8 + 6, saturation 6 - 22, as URP's percentages.
   gl.uniform1f(F.u.uContrast, 1 + 14 / 100);
