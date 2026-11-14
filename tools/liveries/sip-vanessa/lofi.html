@@ -1,0 +1,325 @@
+<title>Sip Vanessa Options</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Monoton&family=Bebas+Neue&family=Caveat:wght@700&family=Lobster&family=Abril+Fatface&display=swap" rel="stylesheet">
+<style>
+:root { --bg: #ecebee; --fg: #1d1b20; --chip: #ffffff; --line: #cfccd4; --on: #1d1b20; --on-fg: #ffffff; --muted: #5d5964; --card: #ffffff; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #151418; --fg: #ecebef; --chip: #24222a; --line: #3b3842; --on: #ecebef; --on-fg: #151418; --muted: #a5a0ad; --card: #1f1d24; color-scheme: dark; } }
+:root[data-theme="dark"] { --bg: #151418; --fg: #ecebef; --chip: #24222a; --line: #3b3842; --on: #ecebef; --on-fg: #151418; --muted: #a5a0ad; --card: #1f1d24; color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--fg); font: 500 15px/1.45 system-ui, sans-serif; }
+#stage { height: 62vh; min-height: 320px; }
+canvas.gl { display: block; width: 100%; height: 100%; touch-action: none; }
+.bar { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; padding: 10px 16px 6px; }
+button { font: inherit; color: var(--fg); background: var(--chip); border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; cursor: pointer; }
+button[aria-pressed="true"] { background: var(--on); color: var(--on-fg); border-color: var(--on); }
+button:focus-visible { outline: 2px solid var(--on); outline-offset: 2px; }
+#note { max-width: 640px; margin: 4px auto 0; padding: 0 16px; color: var(--muted); text-align: center; min-height: 3em; }
+.logos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; max-width: 960px; margin: 22px auto 40px; padding: 0 16px; }
+.logo { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px; position: relative; }
+.logo b { position: absolute; top: 8px; left: 11px; font-size: 13px; color: var(--muted); }
+.logo svg { display: block; width: 100%; height: auto; }
+</style>
+<div id="stage"></div>
+<div class="bar" id="opts"></div>
+<p id="note"></p>
+<div class="logos" id="logos"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+// Archer Tachyon, game OBJ metres: x half width 1.044, y 0 to 1.183, z tail -2.119 to nose 2.388.
+const HW = 1.044, H = 1.183, ZN = 2.388, ZT = -2.119, L = ZN - ZT, W = 2 * HW;
+const WF = 1.335, WR = -1.335;            // axles
+const DOOR = [1.086, -0.339];             // door front, back (z)
+const PPM = 256;
+
+const PINK = '#ff4fa3', HOT = '#e8247f', BLUSH = '#f8bcd4', CREAM = '#fff3e2', PLUM = '#3d0d2e', LIP = '#c4124f', NIGHT = '#1c0a19', CHALK = '#2a2a2c', CYAN = '#7cf3ff', CHERRY = '#d0103a', LEAF = '#2f8a3c', BUBBLE = '#ff8fc8', BLACK = '#17121a';
+
+// ---------- shared marks, drawn in metres -----------------------------------------------
+function kiss(g, x, y, s, col = LIP, rot = 0) {
+  g.save(); g.translate(x, y); g.rotate(rot); g.scale(s, s); g.fillStyle = col;
+  g.beginPath(); // upper lip
+  g.moveTo(-1, 0); g.bezierCurveTo(-0.7, -0.35, -0.35, -0.55, -0.12, -0.42); g.quadraticCurveTo(0, -0.3, 0.12, -0.42);
+  g.bezierCurveTo(0.35, -0.55, 0.7, -0.35, 1, 0); g.bezierCurveTo(0.5, -0.06, -0.5, -0.06, -1, 0); g.fill();
+  g.beginPath(); // lower lip
+  g.moveTo(-1, 0.04); g.bezierCurveTo(-0.5, 0.1, 0.5, 0.1, 1, 0.04); g.bezierCurveTo(0.7, 0.55, -0.7, 0.55, -1, 0.04); g.fill();
+  g.restore();
+}
+function pint(g, x, y, s, glass = CREAM, beer = '#f3a93b', withKiss = true) {
+  g.save(); g.translate(x, y); g.scale(s, s);
+  g.fillStyle = beer; g.beginPath(); g.moveTo(-0.42, -0.62); g.lineTo(0.42, -0.62); g.lineTo(0.32, 0.6); g.lineTo(-0.32, 0.6); g.fill();
+  g.fillStyle = glass; g.beginPath(); g.moveTo(-0.48, -0.8); g.lineTo(0.48, -0.8); g.lineTo(0.44, -0.6);
+  for (let i = 4; i >= -4; i--) g.lineTo(i * 0.1, -0.6 + (i % 2 ? 0.07 : 0)); g.fill();
+  g.strokeStyle = glass; g.lineWidth = 0.06; g.beginPath(); g.moveTo(-0.48, -0.8); g.lineTo(-0.36, 0.66); g.lineTo(0.36, 0.66); g.lineTo(0.48, -0.8); g.stroke();
+  if (withKiss) kiss(g, 0.3, -0.78, 0.16, LIP, 0.3);
+  g.restore();
+}
+function cherries(g, x, y, s) {
+  g.save(); g.translate(x, y); g.scale(s, s);
+  g.strokeStyle = LEAF; g.lineWidth = 0.07; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(-0.38, 0.25); g.quadraticCurveTo(-0.2, -0.4, 0.1, -0.7); g.moveTo(0.38, 0.3); g.quadraticCurveTo(0.25, -0.3, 0.1, -0.7); g.stroke();
+  g.fillStyle = LEAF; g.beginPath(); g.ellipse(0.32, -0.72, 0.24, 0.1, -0.4, 0, 7); g.fill();
+  g.fillStyle = CHERRY; for (const [cx, cy] of [[-0.4, 0.42], [0.4, 0.47]]) { g.beginPath(); g.arc(cx, cy, 0.3, 0, 7); g.fill(); }
+  g.fillStyle = 'rgba(255,255,255,.7)'; for (const [cx, cy] of [[-0.5, 0.33], [0.3, 0.38]]) { g.beginPath(); g.arc(cx, cy, 0.06, 0, 7); g.fill(); }
+  g.restore();
+}
+function txt(g, s, x, y, size, font, fill, opts = {}) {
+  const k = g.getTransform().a;
+  g.save(); g.translate(x, y); if (opts.rot) g.rotate(opts.rot); g.scale(0.01, 0.01); size *= 100;
+  g.font = `${size}px "${font}"`; g.textAlign = opts.align || 'center'; g.textBaseline = 'middle';
+  if (opts.glow) { g.shadowColor = opts.glow; g.shadowBlur = size * 0.006 * k * 0.6; }
+  if (opts.stroke) { g.lineJoin = 'round'; g.lineWidth = (opts.sw || size * 0.0012) * 100; g.strokeStyle = opts.stroke; g.strokeText(s, 0, 0); }
+  g.fillStyle = fill; g.fillText(s, 0, 0);
+  if (opts.glow) { g.shadowBlur = size * 0.006 * k * 0.2; g.fillText(s, 0, 0); }
+  g.restore();
+}
+function numberBox(g, x, y, w, h, bg, ink, shape = 'round') {
+  g.fillStyle = bg; g.beginPath();
+  if (shape === 'circle') g.arc(x, y, h / 2, 0, 7); else g.roundRect(x - w / 2, y - h / 2, w, h, h * 0.2);
+  g.fill(); txt(g, '88', x, y + h * 0.04, h * 0.72, 'Bebas Neue', ink);
+}
+
+// ---------- face canvases ------------------------------------------------------------------
+// side(g, P): P(z, y) gives canvas metres for a point on the car's flank, nose on either end.
+function faces(opt) {
+  const mk = (w, h) => { const c = document.createElement('canvas'); c.width = Math.round(w * PPM); c.height = Math.round(h * PPM); const g = c.getContext('2d'); g.scale(PPM, PPM); return [c, g]; };
+  const out = {};
+  for (const left of [true, false]) {
+    const [c, g] = mk(L, H);
+    const X = z => left ? ZN - z : z - ZT, Y = y => H - y;
+    g.fillStyle = opt.base; g.fillRect(0, 0, L, H);
+    opt.side(g, X, Y, left);
+    out[left ? 'left' : 'right'] = c;
+  }
+  { // top: canvas x runs car's right to left, canvas y runs tail to nose. Decals upright read from the nose.
+    const [c, g] = mk(W, L); const X = x => HW - x, Y = z => ZN - z;
+    // nose at the bottom of the drawing: flip y so canvas bottom is the nose
+    g.fillStyle = opt.base; g.fillRect(0, 0, W, L);
+    opt.top(g, X, z => L - (ZN - z));
+    out.top = c;
+  }
+  for (const end of ['front', 'rear']) {
+    const [c, g] = mk(W, H);
+    g.fillStyle = opt.base; g.fillRect(0, 0, W, H);
+    opt.end(g, end);
+    out[end] = c;
+  }
+  return out;
+}
+
+// ---------- the five options -------------------------------------------------------------
+const OPTIONS = [
+{
+  name: 'Happy Hour', base: PINK,
+  note: 'The foam line rides the sill and kicks up over the side intake behind the door. The kiss sits on the rear haunch, just ahead of the tail lamps.',
+  side(g, X, Y, left) {
+    g.fillStyle = CREAM; g.beginPath(); g.moveTo(0, H); g.lineTo(0, Y(0.4));
+    for (let z = ZN; z >= ZT; z -= 0.12) { const k = (ZN - z) / 0.12; g.lineTo(X(z), Y(0.4 + (k % 2 ? 0.05 : 0) + (z < DOOR[1] ? (DOOR[1] - z) * 0.18 : 0))); }
+    g.lineTo(X(ZT), H); g.closePath(); g.fill();
+    txt(g, 'Sip Vanessa', X(0.45), Y(0.6), 0.32, 'Pacifico', CREAM, { stroke: PLUM, sw: 0.035 });
+    txt(g, 'CRAFT BEER & BAR FOOD', X(0.45), Y(0.24), 0.11, 'Bebas Neue', PLUM);
+    numberBox(g, X(1.9), Y(0.68), 0.3, 0.26, CREAM, PLUM, 'circle');
+    kiss(g, X(-1.75), Y(0.78), 0.11, LIP, left ? -0.2 : 0.2);
+  },
+  top(g, X, Y) {
+    pint(g, X(0), Y(1.65), 0.42);
+    numberBox(g, X(0), Y(0.35), 0.4, 0.34, CREAM, PLUM, 'circle');
+    txt(g, 'Sip Vanessa', X(0), Y(-1.35), 0.3, 'Pacifico', CREAM, { stroke: PLUM, sw: 0.03 });
+  },
+  end(g, end) {
+    g.fillStyle = CREAM; g.fillRect(0, H - 0.4, W, 0.4);
+    txt(g, end === 'front' ? 'SIP VANESSA' : 'CRAFT BEER & BAR FOOD', HW, H - 0.2, 0.14, 'Bebas Neue', PLUM);
+    if (end === 'rear') kiss(g, HW + 0.7, H - 0.7, 0.09);
+  }
+},
+{
+  name: 'Chalkboard', base: BLUSH,
+  note: 'The board fills the door skin inside its shut line, so it swings up with the door. The hot pink frame follows the window line above it.',
+  side(g, X, Y, left) {
+    const x0 = Math.min(X(DOOR[0]), X(DOOR[1])), x1 = Math.max(X(DOOR[0]), X(DOOR[1]));
+    g.fillStyle = HOT; g.beginPath(); g.roundRect(x0 - 0.05, Y(0.86), x1 - x0 + 0.1, 0.77, 0.06); g.fill();
+    g.fillStyle = CHALK; g.beginPath(); g.roundRect(x0, Y(0.82), x1 - x0, 0.69, 0.04); g.fill();
+    const cx = (x0 + x1) / 2;
+    txt(g, 'Sip Vanessa', cx, Y(0.7), 0.17, 'Caveat', '#ffffff');
+    const menu = ['Hazy IPA', 'Coxinhas', 'Pão de queijo', 'Loaded fries'];
+    menu.forEach((m, i) => txt(g, m, x0 + 0.12, Y(0.56 - i * 0.095), 0.085, 'Caveat', '#f4f1ea', { align: 'left' }));
+    txt(g, 'ask about the late show ;)', cx, Y(0.17), 0.055, 'Caveat', '#ffb3d1');
+    numberBox(g, x1 - 0.24, Y(0.46), 0.3, 0.26, BLUSH, CHALK);
+    txt(g, '★', X(-1.6), Y(0.72), 0.16, 'system-ui', HOT);
+  },
+  top(g, X, Y) {
+    g.fillStyle = CHALK; g.beginPath(); g.roundRect(X(0.6), Y(2.1), 1.2, 0.95, 0.05); g.fill();
+    txt(g, 'Sip Vanessa', X(0), Y(1.75), 0.2, 'Caveat', '#ffffff');
+    txt(g, 'kitchen open late', X(0), Y(1.45), 0.09, 'Caveat', '#ffb3d1');
+    numberBox(g, X(0), Y(0.35), 0.4, 0.34, CHALK, '#ffffff');
+  },
+  end(g, end) {
+    g.fillStyle = CHALK; g.beginPath(); g.roundRect(HW - 0.55, H - 0.42, 1.1, 0.3, 0.04); g.fill();
+    txt(g, end === 'front' ? 'Sip Vanessa' : 'see you later ;)', HW, H - 0.27, 0.13, 'Caveat', '#ffffff');
+  }
+},
+{
+  name: 'Neon Sign', base: NIGHT,
+  note: 'The tubes trace the side intake and the window line on the real car. The glow is painted on, so it reads in daylight as well as at night.',
+  side(g, X, Y, left) {
+    g.save(); g.strokeStyle = PINK; g.lineWidth = 0.025; g.shadowColor = PINK; g.shadowBlur = 0.08 * g.getTransform().a;
+    g.beginPath(); g.moveTo(X(ZN - 0.1), Y(0.35)); g.lineTo(X(DOOR[1] + 0.1), Y(0.35)); g.quadraticCurveTo(X(DOOR[1] - 0.3), Y(0.35), X(DOOR[1] - 0.5), Y(0.7)); g.stroke();
+    g.restore();
+    txt(g, 'Sip Vanessa', X(0.45), Y(0.6), 0.22, 'Monoton', '#ffd1e8', { glow: PINK });
+    txt(g, 'OPEN  LATE', X(-1.55), Y(0.62), 0.09, 'Monoton', '#e6fdff', { glow: CYAN });
+    numberBox(g, X(1.85), Y(0.62), 0.3, 0.26, PINK, NIGHT);
+  },
+  top(g, X, Y) {
+    pint(g, X(0), Y(1.65), 0.4, '#ffd1e8', 'rgba(0,0,0,0)', false);
+    g.save(); g.shadowColor = PINK; g.shadowBlur = 0.1 * g.getTransform().a; pint(g, X(0), Y(1.65), 0.4, '#ffd1e8', 'rgba(0,0,0,0)', false); g.restore();
+    kiss(g, X(0.12), Y(1.98), 0.08, PINK, 0.3);
+    numberBox(g, X(0), Y(0.35), 0.4, 0.34, PINK, NIGHT);
+    txt(g, 'OPEN  LATE', X(0), Y(-1.35), 0.13, 'Monoton', '#e6fdff', { glow: CYAN });
+  },
+  end(g, end) {
+    txt(g, end === 'front' ? 'Sip Vanessa' : 'OPEN  LATE', HW, H - 0.3, 0.12, 'Monoton', end === 'front' ? '#ffd1e8' : '#e6fdff', { glow: end === 'front' ? PINK : CYAN });
+  }
+},
+{
+  name: 'Cherry Awning', base: HOT,
+  note: 'The awning stripes run over the roof and drop down the flanks, ending in scallops above the side intake. The cherries sit on the front wings, ahead of the doors.',
+  side(g, X, Y, left) {
+    const top = 0.62;
+    for (let i = 0, z = ZN; z > ZT; z -= 0.22, i++) {
+      if (i % 2) continue;
+      const a = Math.min(X(z), X(z - 0.22)), b = Math.max(X(z), X(z - 0.22));
+      g.fillStyle = '#ffffff'; g.beginPath(); g.moveTo(a, 0); g.lineTo(b, 0); g.lineTo(b, Y(top)); g.arc((a + b) / 2, Y(top), (b - a) / 2, 0, Math.PI); g.fill();
+    }
+    txt(g, 'Sip Vanessa', X(0.4), Y(0.32), 0.26, 'Lobster', '#ffffff', { stroke: '#8a0c45', sw: 0.03 });
+    cherries(g, X(1.95), Y(0.4), 0.17);
+    numberBox(g, X(-0.85), Y(0.32), 0.3, 0.26, '#ffffff', HOT, 'circle');
+  },
+  top(g, X, Y) {
+    for (let i = 0, x = -HW; x < HW; x += 0.22, i++) if (!(i % 2)) { g.fillStyle = '#ffffff'; g.fillRect(X(x + 0.22), 0, 0.22, L); }
+    g.fillStyle = HOT; g.beginPath(); g.arc(X(0), Y(1.65), 0.42, 0, 7); g.fill();
+    cherries(g, X(0), Y(1.65), 0.4);
+    numberBox(g, X(0), Y(0.35), 0.4, 0.4, HOT, '#ffffff', 'circle');
+  },
+  end(g, end) {
+    for (let i = 0, x = 0; x < W; x += 0.22, i++) if (!(i % 2)) { g.fillStyle = '#ffffff'; g.fillRect(x, 0, 0.22, H - 0.62); g.beginPath(); g.arc(x + 0.11, H - 0.62, 0.11, 0, Math.PI); g.fill(); }
+    txt(g, 'Sip Vanessa', HW, H - 0.28, 0.16, 'Lobster', '#ffffff');
+  }
+},
+{
+  name: 'Lace & Lager', base: BUBBLE,
+  note: 'The lace trims the sill and the nose lip, following the splitter. The black garter band crosses the bonnet between the lamps and the screen.',
+  side(g, X, Y, left) {
+    lace(g, 0, L, Y(0.3), 0.07);
+    txt(g, 'Sip Vanessa', X(0.4), Y(0.6), 0.25, 'Abril Fatface', BLACK);
+    txt(g, 'artisan bar food', X(0.4), Y(0.42), 0.09, 'Abril Fatface', '#ffffff');
+    numberBox(g, X(1.9), Y(0.66), 0.3, 0.26, BLACK, BUBBLE);
+    kiss(g, X(-1.7), Y(0.75), 0.1, BLACK, left ? -0.2 : 0.2);
+  },
+  top(g, X, Y) {
+    g.fillStyle = BLACK; g.fillRect(0, Y(1.5) - 0.12, W, 0.24);
+    lace(g, 0, W, Y(1.5) - 0.12, 0.05, true); lace(g, 0, W, Y(1.5) + 0.12, 0.05);
+    bow(g, X(0), Y(1.5), 0.22);
+    numberBox(g, X(0), Y(0.35), 0.4, 0.34, BLACK, BUBBLE);
+  },
+  end(g, end) {
+    lace(g, 0, W, H - 0.25, 0.06);
+    txt(g, end === 'front' ? 'Sip Vanessa' : 'artisan bar food', HW, H - 0.48, 0.12, 'Abril Fatface', BLACK);
+  }
+}];
+function lace(g, x0, x1, y, r, up = false) {
+  g.fillStyle = BLACK; const d = up ? -1 : 1;
+  g.fillRect(x0, up ? y - 0.02 : y, x1 - x0, 0.02);
+  for (let x = x0; x < x1 + r; x += 2 * r) { g.beginPath(); g.arc(x + r, y + d * 0.02, r, up ? Math.PI : 0, up ? 0 : Math.PI, false); g.fill(); }
+  g.fillStyle = 'rgba(255,255,255,.55)';
+  for (let x = x0; x < x1 + r; x += 2 * r) { g.beginPath(); g.arc(x + r, y + d * (0.02 + r * 0.45), r * 0.22, 0, 7); g.fill(); }
+}
+function bow(g, x, y, s) {
+  g.save(); g.translate(x, y); g.scale(s, s); g.fillStyle = PINK;
+  g.beginPath(); g.moveTo(0, 0); g.bezierCurveTo(-0.6, -0.7, -1.1, -0.2, -1, 0); g.bezierCurveTo(-1.1, 0.3, -0.6, 0.7, 0, 0);
+  g.bezierCurveTo(0.6, -0.7, 1.1, -0.2, 1, 0); g.bezierCurveTo(1.1, 0.3, 0.6, 0.7, 0, 0); g.fill();
+  g.fillStyle = HOT; g.beginPath(); g.arc(0, 0, 0.18, 0, 7); g.fill(); g.restore();
+}
+
+// ---------- 3D ------------------------------------------------------------------------
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.domElement.className = 'gl'; stage.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(getComputedStyle(document.body).backgroundColor).convertSRGBToLinear();
+const camera = new THREE.PerspectiveCamera(30, 1, 0.05, 100); camera.position.set(6.4, 2.6, 5.8);
+const controls = new THREE.OrbitControls(camera, renderer.domElement); controls.target.set(0, 0.5, 0.1); controls.enableDamping = true;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x6a6470, 0.75));
+const sun = new THREE.DirectionalLight(0xffffff, 0.55); sun.position.set(4, 8, 5); scene.add(sun);
+const floor = new THREE.Mesh(new THREE.CircleGeometry(9, 64), new THREE.MeshStandardMaterial({ color: 0xd2d0d6, roughness: 1 }));
+floor.rotation.x = -Math.PI / 2; scene.add(floor);
+const box = new THREE.Mesh(new THREE.BoxGeometry(W, H, L)); box.position.set(0, H / 2, (ZN + ZT) / 2); scene.add(box);
+const tex = c => { const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.anisotropy = 8; return t; };
+const mat = c => new THREE.MeshStandardMaterial({ map: tex(c), roughness: 0.35, metalness: 0.05 });
+let built = [];
+function show(i) {
+  if (!built[i]) { const f = faces(OPTIONS[i]); built[i] = [f.left, f.right, f.top, f.top, f.front, f.rear].map(mat); built[i][3] = new THREE.MeshStandardMaterial({ color: 0x222222 }); }
+  box.material = built[i];
+  document.querySelectorAll('#opts button').forEach((b, j) => b.setAttribute('aria-pressed', j === i));
+  document.getElementById('note').textContent = OPTIONS[i].note;
+  try { localStorage.setItem('sv-opt', i); } catch (e) {}
+}
+function resize() { const w = stage.clientWidth, h = stage.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize);
+(function loop() { controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); })();
+
+const bar = document.getElementById('opts');
+OPTIONS.forEach((o, i) => { const b = document.createElement('button'); b.textContent = `${i + 1} ${o.name}`; b.onclick = () => show(i); bar.appendChild(b); });
+
+// ---------- logo mockups ----------------------------------------------------------------
+const LOGOS = [];
+function logo(draw, w = 3, h = 2) { LOGOS.push([draw, w, h]); }
+logo(g => { txt(g, 'Sip Vanessa', 1.5, 1.0, 0.5, 'Pacifico', HOT); kiss(g, 0.86, 0.5, 0.11); });
+logo(g => { pint(g, 1.5, 1.05, 0.75); txt(g, 'SV', 1.5, 1.2, 0.38, 'Abril Fatface', PLUM); });
+logo(g => {
+  g.fillStyle = HOT; g.beginPath(); for (let i = 0; i < 42; i++) { const a = i / 42 * Math.PI * 2, r = i % 2 ? 0.82 : 0.9; g.lineTo(1.5 + Math.cos(a) * r, 1 + Math.sin(a) * r); } g.fill();
+  g.fillStyle = CREAM; g.beginPath(); g.arc(1.5, 1, 0.66, 0, 7); g.fill();
+  txt(g, 'SV', 1.5, 1.04, 0.62, 'Lobster', HOT); txt(g, 'CRAFT BEER', 1.5, 1.52, 0.12, 'Bebas Neue', PLUM);
+});
+logo(g => { g.fillStyle = NIGHT; g.beginPath(); g.roundRect(0.1, 0.35, 2.8, 1.3, 0.15); g.fill(); txt(g, 'Sip Vanessa', 1.5, 0.9, 0.3, 'Monoton', '#ffd1e8', { glow: PINK }); txt(g, 'OPEN  LATE', 1.5, 1.38, 0.13, 'Monoton', '#e6fdff', { glow: CYAN }); });
+logo(g => {
+  g.fillStyle = PINK; g.beginPath(); g.arc(1.5, 1, 0.85, 0, 7); g.fill();
+  g.strokeStyle = PLUM; g.lineWidth = 0.09; g.lineCap = 'round';
+  g.fillStyle = PLUM; g.beginPath(); g.ellipse(1.22, 0.8, 0.08, 0.12, 0, 0, 7); g.fill();
+  g.beginPath(); g.moveTo(1.7, 0.78); g.quadraticCurveTo(1.82, 0.86, 1.94, 0.78); g.stroke();
+  g.beginPath(); g.arc(1.5, 1.08, 0.42, 0.25 * Math.PI, 0.75 * Math.PI); g.stroke();
+  g.fillStyle = CREAM; for (let i = 0; i < 5; i++) { g.beginPath(); g.arc(0.95 + i * 0.275, 0.2, 0.2, 0, 7); g.fill(); }
+});
+logo(g => { cherries(g, 0.75, 1.0, 0.55); txt(g, 'Sip', 2.0, 0.72, 0.42, 'Lobster', HOT); txt(g, 'Vanessa', 2.0, 1.25, 0.42, 'Lobster', HOT); });
+logo(g => {
+  g.fillStyle = PLUM; g.beginPath(); g.moveTo(0.4, 1.9); g.lineTo(0.4, 1.2); g.arc(1.5, 1.2, 1.1, Math.PI, 0); g.lineTo(2.6, 1.9); g.fill();
+  g.save(); g.font = '30px "Bebas Neue"'; g.fillStyle = PINK; g.textAlign = 'center'; g.textBaseline = 'middle';
+  const s = 'SIP VANESSA'; for (let i = 0; i < s.length; i++) { const a = Math.PI * (1.2 + 0.6 * i / (s.length - 1)); g.save(); g.translate(1.5 + Math.cos(a) * 0.86, 1.22 + Math.sin(a) * 0.86); g.rotate(a + Math.PI / 2); g.scale(0.01, 0.01); g.fillText(s[i], 0, 0); g.restore(); }
+  g.restore();
+  txt(g, 'craft beer & bar food', 1.5, 1.4, 0.15, 'Caveat', CREAM); txt(g, 'SÃO PAULO', 1.5, 1.7, 0.14, 'Bebas Neue', PINK);
+  kiss(g, 1.5, 1.05, 0.16);
+});
+logo(g => {
+  g.strokeStyle = '#b8682a'; g.lineWidth = 0.17; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(1.5, 1.75); g.bezierCurveTo(0.2, 0.9, 0.5, 0.1, 1.15, 0.35); g.bezierCurveTo(1.55, 0.5, 1.6, 1.0, 1.25, 1.2);
+  g.moveTo(1.5, 1.75); g.bezierCurveTo(2.8, 0.9, 2.5, 0.1, 1.85, 0.35); g.bezierCurveTo(1.45, 0.5, 1.4, 1.0, 1.75, 1.2); g.stroke();
+  g.fillStyle = CREAM; for (const [x, y] of [[0.75, 0.75], [1.1, 1.3], [2.25, 0.75], [1.9, 1.3]]) { g.beginPath(); g.arc(x, y, 0.035, 0, 7); g.fill(); }
+  txt(g, 'SV', 1.5, 0.98, 0.24, 'Lobster', HOT);
+});
+function drawLogos() {
+  const host = document.getElementById('logos');
+  LOGOS.forEach(([draw, w, h], i) => {
+    const d = document.createElement('div'); d.className = 'logo';
+    const c = document.createElement('canvas'); const s = 160; c.width = w * s; c.height = h * s; c.style.width = '100%'; c.style.display = 'block';
+    const g = c.getContext('2d'); g.scale(s, s); draw(g);
+    const b = document.createElement('b'); b.textContent = i + 1; d.append(b, c); host.appendChild(d);
+  });
+}
+
+document.fonts.ready.then(() => Promise.all(['Pacifico', 'Monoton', 'Bebas Neue', 'Caveat', 'Lobster', 'Abril Fatface'].map(f => document.fonts.load(`40px "${f}"`)))).then(() => {
+  resize();
+  let i = 0; try { i = Math.min(4, +localStorage.getItem('sv-opt') || 0); } catch (e) {}
+  show(i); drawLogos();
+});
+</script>
