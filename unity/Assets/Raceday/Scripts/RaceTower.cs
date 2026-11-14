@@ -307,6 +307,16 @@ namespace TarmacGauntlet.Raceday
             }
         }
 
+        /// <summary>
+        /// A stop's <paramref name="seconds"/> as race time, as the race clock counts it: minutes and seconds, with the
+        /// hours in front once it runs to an hour, as a long repair does.
+        /// </summary>
+        public static string StopTime(float seconds)
+        {
+            int s = Mathf.FloorToInt(Mathf.Max(0f, seconds) * TimeCompression);
+            return s >= 3600 ? $"{s / 3600}:{s / 60 % 60:00}:{s % 60:00}" : $"{s / 60}:{s % 60:00}";
+        }
+
         private string Clock()
         {
             float left = Mathf.Max(0f, RaceLength - clock * TimeCompression);

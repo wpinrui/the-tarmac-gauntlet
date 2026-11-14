@@ -45,7 +45,7 @@ namespace TarmacGauntlet.Raceday
         /// <summary>Each active issue's line under the repairs row, px on the layout.</summary>
         private const float IssueRow = 28f;
 
-        private GUIStyle tab, time, unit, row, key, issue;
+        private GUIStyle tab, time, row, key, issue;
         private readonly List<IssueTemplate> issues = new List<IssueTemplate>();
         private Texture2D fuel, tyre, helmet, spanner;
 
@@ -118,11 +118,9 @@ namespace TarmacGauntlet.Raceday
             Fill(new Rect(panel.x, panel.y, 72f * k, Header * k), Red, 9f * k, new Vector4(1f, 0f, 0f, 0f));
             Text(new Rect(panel.x, panel.y, 72f * k, Header * k), "PIT", tab, Color.white, TextAnchor.MiddleCenter);
 
-            // The stop's time, right aligned, its unit smaller beside it.
-            float unitWidth = unit.CalcSize(new GUIContent(" s")).x;
-            var timeRect = new Rect(panel.x, panel.y, panel.width - 22f * k - unitWidth, Header * k);
-            Text(timeRect, Planner.Seconds().ToString("0.0"), time, Color.white, TextAnchor.MiddleRight);
-            Text(new Rect(timeRect.xMax, panel.y + 6f * k, unitWidth, Header * k), " s", unit, Color.white, TextAnchor.MiddleLeft);
+            // The stop's time in race time, right aligned.
+            var timeRect = new Rect(panel.x, panel.y, panel.width - 22f * k, Header * k);
+            Text(timeRect, RaceTower.StopTime(Planner.Seconds()), time, Color.white, TextAnchor.MiddleRight);
 
             float y = panel.y + (Header + 8f) * k;
             float x = panel.x + 18f * k, right = panel.xMax - 18f * k;
@@ -204,7 +202,6 @@ namespace TarmacGauntlet.Raceday
             Font semiBold = Resources.Load<Font>("Fonts/TitilliumWeb-SemiBold");
             tab = Make(bold, 24f * k);
             time = Make(bold, 40f * k);
-            unit = Make(bold, 22f * k);
             row = Make(semiBold, 24f * k);
             key = Make(bold, 17f * k);
             issue = Make(semiBold, 20f * k);
