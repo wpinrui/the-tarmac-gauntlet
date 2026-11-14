@@ -23,13 +23,14 @@ const D = 'font-family="Saira Extra Condensed, Arial Narrow, sans-serif" font-we
 const T = 'font-family="Chakra Petch, Arial, sans-serif" font-weight="700" font-style="italic"';
 const J = 'font-family="Noto Sans JP, Hiragino Sans, sans-serif" font-weight="900"';
 const LOGOS = [
-  // 1. Red GT block, WORKS beside it, leaning forward.
-  `<g transform="translate(120 60) skewX(-12)">
-     <rect x="-104" y="-30" width="78" height="60" fill="${R}"/>
-     <text x="-65" y="2" ${D} font-size="62" fill="${W}" text-anchor="middle" dominant-baseline="central">GT</text>
-     <rect x="-24" y="-30" width="128" height="60" fill="${K}"/>
-     <text x="40" y="2" ${D} font-size="54" fill="${W}" text-anchor="middle" dominant-baseline="central" letter-spacing="2">WORKS</text>
-     <text x="-104" y="-40" ${D} font-size="20" fill="${K}" letter-spacing="6">TORA</text></g>`,
+  // 1. TORA tab over a red GT block and a black WORKS block, leaning forward. Every block keeps 12 units of padding.
+  `<g transform="translate(120 66) skewX(-12)">
+     <rect x="-100" y="-62" width="84" height="30" fill="${W}"/>
+     <text x="-58" y="-46" ${D} font-size="28" fill="${K}" text-anchor="middle" dominant-baseline="central" textLength="60" lengthAdjust="spacingAndGlyphs">TORA</text>
+     <rect x="-100" y="-28" width="66" height="60" fill="${R}"/>
+     <text x="-67" y="3" ${D} font-size="58" fill="${W}" text-anchor="middle" dominant-baseline="central" textLength="42" lengthAdjust="spacingAndGlyphs">GT</text>
+     <rect x="-30" y="-28" width="130" height="60" fill="${K}"/>
+     <text x="35" y="3" ${D} font-size="58" fill="${W}" text-anchor="middle" dominant-baseline="central" textLength="106" lengthAdjust="spacingAndGlyphs">WORKS</text></g>`,
   // 2. Hexagon with the kanji for tiger over GT WORKS.
   `<g transform="translate(120 60)">
      <polygon points="0,-58 50,-29 50,29 0,58 -50,29 -50,-29" fill="${K}" stroke="${W}" stroke-width="4"/>
