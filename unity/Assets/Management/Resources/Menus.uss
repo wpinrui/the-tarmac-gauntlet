@@ -183,6 +183,7 @@ Label, TextElement { white-space: nowrap; flex-shrink: 0; }
 .year-stepper { margin-bottom: 8px; }
 .settings-stepper { width: 250px; }
 .settings-stepper > .stepper-value { flex-grow: 1; letter-spacing: 0.6px; }
+.settings-stepper.long-value { width: 310px; }
 .qty-stepper > .chevron { width: 30px; height: 32px; }
 .qty-stepper > .stepper-value { min-width: 26px; font-size: 16px; letter-spacing: 0; }
 

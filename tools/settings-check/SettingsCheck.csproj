@@ -17,5 +17,6 @@
     <Compile Include="../../unity/Assets/Visuals/GraphicsRow.cs" />
     <Compile Include="../../unity/Assets/Rendering/Scripts/QualityLevels.cs" />
     <Compile Include="../../unity/Assets/Management/Scripts/GameSettings.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/DriveSettings.cs" />
   </ItemGroup>
 </Project>
