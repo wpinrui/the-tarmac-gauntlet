@@ -109,12 +109,13 @@ namespace TarmacGauntlet.Management
         }
 
         /// <summary>
-        /// The race settings: the gearbox, steering help, traction control and opposite lock assist for the car you drive, the track map on
-        /// screen and the racing line drawn on the track (0 off, 1 corners only, 2 the whole lap). The race
+        /// The race settings: the gearbox, steering help, traction control and opposite lock assist for the car you drive, the track map,
+        /// proximity arrows and rear mirror on screen, and the racing line drawn on the track (0 off, 1 corners only, 2 the whole lap). The race
         /// reads them from the same keys (DriveSettings in Raceday).
         /// </summary>
         public const string AutomaticKey = "settings.automatic", SteeringHelpKey = "settings.steeringhelp", TrackMapKey = "settings.trackmap";
         public const string TractionControlKey = "settings.tractioncontrol", OppositeLockKey = "settings.oppositelock", RacingLineKey = "settings.racingline";
+        public const string ProximityArrowsKey = "settings.proximityarrows", RearMirrorKey = "settings.rearmirror";
 
         public static bool OppositeLock
         {
@@ -161,6 +162,18 @@ namespace TarmacGauntlet.Management
                 PlayerPrefs.SetInt(RacingLineKey, Mathf.Clamp(value, 0, 2));
                 PlayerPrefs.Save();
             }
+        }
+
+        public static bool ProximityArrows
+        {
+            get => PlayerPrefs.GetInt(ProximityArrowsKey, 1) != 0;
+            set => SetFlag(ProximityArrowsKey, value);
+        }
+
+        public static bool RearMirror
+        {
+            get => PlayerPrefs.GetInt(RearMirrorKey, 1) != 0;
+            set => SetFlag(RearMirrorKey, value);
         }
 
         private static void SetFlag(string key, bool value)

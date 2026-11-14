@@ -55,6 +55,8 @@ namespace TarmacGauntlet.Management
             race.Add(Stepper("Opposite lock assist", new[] { "Off", "On" }, GameSettings.OppositeLock ? 1 : 0, i => GameSettings.OppositeLock = i == 1));
             race.Add(Stepper("Track map", new[] { "Off", "On" }, GameSettings.TrackMap ? 1 : 0, i => GameSettings.TrackMap = i == 1));
             race.Add(Stepper("Racing line", new[] { "Off", "Corners", "Full" }, GameSettings.RacingLine, i => GameSettings.RacingLine = i));
+            race.Add(Stepper("Proximity arrows", new[] { "Off", "On" }, GameSettings.ProximityArrows ? 1 : 0, i => GameSettings.ProximityArrows = i == 1));
+            race.Add(Stepper("Rear mirror", new[] { "Off", "On" }, GameSettings.RearMirror ? 1 : 0, i => GameSettings.RearMirror = i == 1));
             scroll.Add(race);
 
             VisualElement audio = SettingsGroup(2);

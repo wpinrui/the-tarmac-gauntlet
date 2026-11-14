@@ -50,6 +50,10 @@ internal static class Check
             GameSettings.TractionControl = TractionControl;
             Expect("a fresh game starts with the opposite lock assist off", GameSettings.OppositeLock, false);
             GameSettings.OppositeLock = true;
+            Expect("a fresh game starts with the proximity arrows on", GameSettings.ProximityArrows, true);
+            GameSettings.ProximityArrows = false;
+            Expect("a fresh game starts with the rear mirror on", GameSettings.RearMirror, true);
+            GameSettings.RearMirror = false;
             for (int i = 2; i < GameSettings.Sliders.Length; i++) GameSettings.SetLevel(GameSettings.Sliders[i], SliderAt(i));
             Expect("the master slider sets the listener's volume on its curve", AudioListener.volume, Volume * Volume);
             Application.Quit();
@@ -64,6 +68,8 @@ internal static class Check
             Expect("volume", GameSettings.Volume, Volume);
             Expect("music", GameSettings.Music, Music);
             Expect("opposite lock assist", GameSettings.OppositeLock, true);
+            Expect("proximity arrows", GameSettings.ProximityArrows, false);
+            Expect("rear mirror", GameSettings.RearMirror, false);
             Expect("traction control", GameSettings.TractionControlNames[GameSettings.TractionControl], GameSettings.TractionControlNames[TractionControl]);
             for (int i = 2; i < GameSettings.Sliders.Length; i++) Expect(GameSettings.Sliders[i] + " slider", GameSettings.Level(GameSettings.Sliders[i]), SliderAt(i));
             Expect("the listener comes back at the master slider's volume", AudioListener.volume, Volume * Volume);
