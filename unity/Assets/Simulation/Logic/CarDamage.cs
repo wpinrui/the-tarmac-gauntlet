@@ -34,15 +34,16 @@ namespace TarmacGauntlet.Simulation
         /// <summary>
         /// Crew seconds to repair damage down from each of these points to none, before the crew's size and the
         /// Engineer skill scale it: a race runs at 10 times the clock (1 race hour is 360 s), so a knock of 5 is 5
-        /// race minutes, 10 is 15 race minutes, a heavy hit of 15 (one just short of totalling the car) is a race hour, and damage at the
+        /// race minutes, a heavy hit of 15 (one just short of totalling the car) is a race hour, and damage at the
         /// retirement limit (<see cref="RetireDamage"/>) is 3 race hours. Between the points it grows in a straight line, and past the last at
-        /// the last slope.
+        /// the last slope. Each point costs at least as much as the one below it, so the crew repair the dearest first
+        /// and light damage is cheap to mend.
         /// </summary>
         private static readonly (double Points, double Seconds)[] RepairCurve =
         {
             (0, 0),
+            (2.5, 7.5),
             (5, 30),
-            (10, 90),
             (15, 360),
             (RetireDamage, 1080),
         };

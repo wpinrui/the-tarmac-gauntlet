@@ -153,7 +153,14 @@ namespace TarmacGauntlet.Simulation.Tests
         {
             Assert.That(CarDamage.RepairSeconds(0), Is.EqualTo(0));
             Assert.That(CarDamage.RepairSeconds(5), Is.EqualTo(5 * RaceMinute).Within(1e-9));
-            Assert.That(CarDamage.RepairSeconds(10), Is.EqualTo(15 * RaceMinute).Within(1e-9));
+            Assert.That(CarDamage.RepairSeconds(2.5), Is.EqualTo(1.25 * RaceMinute).Within(1e-9));
+            double last = 0;
+            for (int p = 1; p <= 40; p++)
+            {
+                double point = CarDamage.RepairSeconds(p, p - 1);
+                Assert.That(point, Is.GreaterThanOrEqualTo(last - 1e-9), $"point {p} costs less than the one below it");
+                last = point;
+            }
             Assert.That(CarDamage.RepairSeconds(CarDamage.FromImpact(30)), Is.EqualTo(60 * RaceMinute).Within(1e-9));
             Assert.That(CarDamage.RepairSeconds(CarDamage.RetireDamage), Is.EqualTo(180 * RaceMinute).Within(1e-9));
             Assert.That(CarDamage.RepairSeconds(60), Is.GreaterThan(180 * RaceMinute));
