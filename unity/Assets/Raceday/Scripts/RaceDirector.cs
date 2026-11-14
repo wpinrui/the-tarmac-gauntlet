@@ -23,7 +23,7 @@ namespace TarmacGauntlet.Raceday
     public sealed class RaceDirector : MonoBehaviour
     {
         /// <summary>The race is called this long after the time runs out, s, for cars that never come round.</summary>
-        public const float FlagWait = 400f;
+        public const float FlagWait = RaceEnd.FlagWait;
         /// <summary>How long the cooldown laps may take once <see cref="FlagWait"/> is up, s, for cars that never park.</summary>
         public const float CooldownWait = 700f;
         /// <summary>Share of its racing speed a car drives its cooldown lap at.</summary>
@@ -92,21 +92,8 @@ namespace TarmacGauntlet.Raceday
             if (RaceWeekend.CanSkipToEnd) FinishNow();
         }
 
-        /// <summary>
-        /// True once the time is up and the player's race is over: their car has taken the flag or is out.
-        /// With no car of the player's in the race, once the first car has taken the flag.
-        /// </summary>
-        private bool PlayerDone()
-        {
-            if (timeUpAt < 0f) return false;
-            bool any = false;
-            foreach (CarRaceLog log in Day.Cars)
-            {
-                if (log.Car.Player) return log.Flagged || log.Retired;
-                any |= log.Flagged;
-            }
-            return any;
-        }
+        /// <summary>True once the time is up and the player's race is over (<see cref="RaceEnd.PlayerDone"/>).</summary>
+        private bool PlayerDone() => RaceEnd.PlayerDone(Day, SinceTimeUp);
 
         /// <summary>A car past the flag: its cooldown lap, slow and off the line, then into its box (<see cref="Consumables.RaceOver"/>).</summary>
         private void TakeFlag(int i)
@@ -214,21 +201,8 @@ namespace TarmacGauntlet.Raceday
             if (AllParked() || (timeUpAt >= 0f && Time.time - timeUpAt > FlagWait + CooldownWait)) Finish();
         }
 
-        /// <summary>
-        /// True once every car still in the race has taken the flag, or been given up on after <see cref="FlagWait"/>:
-        /// the results stand, whatever is left of the cooldown laps.
-        /// </summary>
-        public bool FieldFlagged
-        {
-            get
-            {
-                if (Day == null || timeUpAt < 0f) return false;
-                if (Time.time - timeUpAt > FlagWait) return true;
-                foreach (CarRaceLog log in Day.Cars)
-                    if (!log.Retired && !log.Flagged) return false;
-                return true;
-            }
-        }
+        /// <summary>True once every car still in the race has taken the flag, or been given up on (<see cref="RaceEnd.FieldFlagged"/>).</summary>
+        public bool FieldFlagged => RaceEnd.FieldFlagged(Day, SinceTimeUp);
 
         /// <summary>True once every car still in the race has taken the flag and parked in its box.</summary>
         private bool AllParked()

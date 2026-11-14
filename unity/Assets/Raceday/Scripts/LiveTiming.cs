@@ -7,7 +7,7 @@ namespace TarmacGauntlet.Raceday
 {
     /// <summary>
     /// The full screen live timing page, on T while a teammate drives your car, pit lane or not: it closes as you take
-    /// the car over. Once your car is out of the race it opens and closes on T at any time. The race runs at the speed picked on the buttons left of the way back, 1x to 16x,
+    /// the car over. Once your car is out of the race it opens and closes on T at any time, until the race ends: once the time is up and your race is over it shuts, for the cooldown lap and the podiums. The race runs at the speed picked on the buttons left of the way back, 1x to 16x,
     /// or stepped through them with F,
     /// and back at 1x once the page closes. The scene behind the page is not drawn. Left: every car in race order, filtered by class, your row in white, a chequered flag by each car that has finished. Right: your car's
     /// onboard and the track map, or above 2x the map alone across both, as a second view of the scene costs too much there, then your car's driver, fuel, tyres, condition and the driver's fatigue,
@@ -36,6 +36,8 @@ namespace TarmacGauntlet.Raceday
         public KeyboardState Keys;
         /// <summary>The career, for the drivers' names.</summary>
         public GameState Game;
+        /// <summary>True once the race is over for live timing: the page shuts and won't open again (<see cref="RaceEnd.TimingAllowed"/>).</summary>
+        public System.Func<bool> Ended;
         public bool Open { get; private set; }
 
         /// <summary>How fast the race runs behind the page, times normal.</summary>
@@ -144,7 +146,7 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>Open from the moment a teammate takes your car, in the pit lane too, or at any time once the car is out of the race.</summary>
-        private bool CanOpen => Supplies != null && Log != null && Cars[Player] != null
+        private bool CanOpen => Supplies != null && Log != null && Cars[Player] != null && (Ended == null || !Ended())
             && (Log.Retired || Driver.enabled && Log.Driver.Id != RaceEntry.PlayerCharacterDriverId);
 
         private void Show(bool on)

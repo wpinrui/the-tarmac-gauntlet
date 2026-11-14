@@ -363,6 +363,8 @@ namespace TarmacGauntlet.Raceday
                 timing.Hud = views.Hud;
                 timing.Keys = keys;
                 timing.Game = setup.Game;
+                // Shut once your race is over after the time ran out, so the cooldown lap and the podiums are seen.
+                timing.Ended = () => director.Finished || !RaceEnd.TimingAllowed(day, director.SinceTimeUp);
 
                 // The player's stops follow the team's plan, the crew's call wherever it is left open.
                 CarController mine = cars[player];
@@ -478,6 +480,8 @@ namespace TarmacGauntlet.Raceday
             cooldown.Director = director;
             cooldown.Crews = pitCrews;
             cooldown.Player = playerIndex;
+            cooldown.Cameras = views;
+            cooldown.Cars = cars;
             outro.Add(cooldown);
             // The overall podium, then the player's class podium, on the race offices; the last opens the race summary.
             director.HoldSummary = podium != null;
