@@ -58,9 +58,10 @@ namespace TarmacGauntlet.Raceday
         public const float FloodLens = 10f, HeadlampGlow = 8f, TailGlow = 3f, BrakeGlow = 8f, WindowGlow = 1.6f;
         /// <summary>
         /// The pit building's glass smoothness at night, against its 0.92 by day: the floodlights on its roof light the
-        /// glass from just above, and a sharp sheen there glared and bloomed over the windows' own light.
+        /// glass from just above, and a sharp sheen there glared and bloomed over the windows' own light. Soft enough not to
+        /// glare, still smooth enough to show the circuit round it in its reflections (PitComplexView).
         /// </summary>
-        public const float WindowSheen = 0.45f;
+        public const float WindowSheen = 0.6f;
         /// <summary>
         /// A glow of this colour, linear, its brightest channel at <paramref name="level"/>. Material.SetColor takes sRGB,
         /// so a material is given its <c>.gamma</c>.
