@@ -395,14 +395,15 @@ namespace TarmacGauntlet.Raceday
         /// <summary>
         /// True while a car could pull out of its garage onto its route without cutting in: no car on its way out is
         /// within <see cref="JoinClearance"/> of where it joins. <c>along</c> is where each car is, from
-        /// <see cref="Along"/>, and <c>onRoute</c> which of them are on their routes.
+        /// <see cref="Along"/>, and <c>onRoute</c> which of them are on their routes. A car <c>ignore</c> says yes to
+        /// is no obstacle: a player behind in the grid, whom this car passes through.
         /// </summary>
-        public bool JoinClear(int slot, IReadOnlyList<float> along, IReadOnlyList<bool> onRoute)
+        public bool JoinClear(int slot, IReadOnlyList<float> along, IReadOnlyList<bool> onRoute, System.Func<int, bool> ignore = null)
         {
             float mine = MetresAt(joinAt[slot]);
             for (int j = 0; j < along.Count; j++)
             {
-                if (j == slot || !onRoute[j]) continue;
+                if (j == slot || !onRoute[j] || (ignore != null && ignore(j))) continue;
                 float off = MetresAt(along[j]) - mine;
                 if (off > -JoinClearance && off < JoinClearance * 0.6f) return false;
             }
