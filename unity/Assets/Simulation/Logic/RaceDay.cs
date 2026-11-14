@@ -205,8 +205,9 @@ namespace TarmacGauntlet.Simulation
         }
 
         /// <summary>
-        /// The car hit a barrier or another car at <paramref name="impact"/> m/s into it. Adds the damage, and a hit
-        /// hard enough totals the car and takes it out of the race. Returns true if it did.
+        /// The car hit a barrier or another car at <paramref name="impact"/> m/s into it. Adds the damage. A hit hard
+        /// enough totals the car and takes it out of the race, and so does damage piling up to
+        /// <see cref="CarDamage.RetireDamage"/>. Returns true if the car is out.
         /// </summary>
         public bool Hit(double raceTime, double impact, double front = 0.5)
         {
@@ -214,7 +215,12 @@ namespace TarmacGauntlet.Simulation
             double added = Math.Min(100 - Damage, CarDamage.FromImpact(impact));
             if (added > 0) DamageFront = (DamageFront * Damage + Math.Max(0, Math.Min(1, front)) * added) / (Damage + added);
             Damage += added;
-            if (!CarDamage.Totals(impact)) return false;
+            if (!CarDamage.Totals(impact))
+            {
+                if (!CarDamage.Retires(Damage)) return false;
+                Retire(raceTime, FailureType.Crash);
+                return true;
+            }
             Damage = 100;
             Totalled = true;
             Retire(raceTime, FailureType.Crash);

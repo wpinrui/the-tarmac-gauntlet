@@ -106,6 +106,21 @@ namespace TarmacGauntlet.Simulation.Tests
         }
 
         [Test]
+        public void HitsThatPileUpPastTheLimitPutTheCarOut()
+        {
+            CarRaceLog log = PlayerLog();
+            double impact = CarDamage.TotalImpact - 1;
+            int hits = 0;
+            while (!log.Hit(10 + hits, impact)) hits++;
+            Assert.That(hits, Is.GreaterThan(0), "one hit under the total leaves the car running");
+            Assert.That(log.Retired, Is.True);
+            Assert.That(log.RetirementReason, Is.EqualTo(FailureType.Crash));
+            Assert.That(log.Damage, Is.GreaterThanOrEqualTo(CarDamage.RetireDamage));
+            Assert.That(log.Totalled, Is.False);
+            Assert.That(log.ConditionAfterRace, Is.EqualTo(Math.Max(0, log.Condition - log.Damage)).Within(1e-9));
+        }
+
+        [Test]
         public void DamageLeftAtTheFlagComesOffTheCondition()
         {
             CarRaceLog log = PlayerLog();
@@ -140,7 +155,7 @@ namespace TarmacGauntlet.Simulation.Tests
         }
 
         [Test]
-        public void CarsWithNoPhysicsTakeAFewHitsAnHourAndRarelyATotal()
+        public void CarsWithNoPhysicsTakeAFewHitsAnHourAndAFewTotal()
         {
             var rng = new Random(3);
             int hits = 0, totals = 0;
@@ -153,7 +168,9 @@ namespace TarmacGauntlet.Simulation.Tests
                     if (CarDamage.Totals(impact)) totals++;
                 }
             Assert.That(hits / (double)hours, Is.EqualTo(CarDamage.HitsPerHour).Within(0.2));
-            Assert.That(totals / (double)hits, Is.LessThan(0.01));
+            // A few hits in a hundred total the car: over a 24-hour race that's one car in seven or so.
+            double share = totals / (double)hits;
+            Assert.That(share, Is.InRange(0.01, 0.04));
             Assert.That(CarDamage.RollHit(0, () => 0), Is.Null);
         }
 
