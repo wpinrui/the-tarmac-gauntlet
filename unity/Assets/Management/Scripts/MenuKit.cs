@@ -189,7 +189,10 @@ namespace TarmacGauntlet.Management
         /// <summary>A tab with a count after its name, such as STOPS 3.</summary>
         internal static Label CountTab(string text, int count, bool on, Action onClick)
         {
-            Label tab = Tab(text, on, onClick);
+            // The name is a child label, not the tab's own text: a label with children isn't sized to its own text,
+            // so the name would spill over the next tab.
+            Label tab = Tab("", on, onClick);
+            tab.Add(Text(text, "tab-name"));
             tab.Add(Text(Num(count), "tab-count", true));
             return tab;
         }
