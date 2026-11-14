@@ -13,7 +13,9 @@ namespace TarmacGauntlet.Raceday
     /// the heat (<see cref="HeatHazeFeature"/>) from the sun, the cloud and the wet. Cheap by design: smoke, sparks and haze
     /// are one particle system each, fed only by the cars nearest the camera, with a cap on cars and particles for each
     /// quality level; the discs' heat is a sum a car, and a car's glowing discs are four small quads drawn only while hot.
-    /// Each part follows its graphics option and draws nothing with it off.
+    /// Each part follows its graphics option and draws nothing with it off. None of it is drawn into a reflection probe:
+    /// a car's probe sits in its body, and the sparks under it or its own glowing discs filled the probe and whited out
+    /// the whole car's paint (CarReflections).
     /// </summary>
     public sealed class CarEffects : MonoBehaviour
     {
@@ -57,6 +59,8 @@ namespace TarmacGauntlet.Raceday
         private float[] discHeat;
         private Discs[] discs;
         private MaterialPropertyBlock block;
+        /// <summary>What this hid from the reflection probe drawing now, to show again after it.</summary>
+        private readonly List<Renderer> hidden = new List<Renderer>();
 
         private static readonly int GlowId = Shader.PropertyToID("_Glow"), SoftId = Shader.PropertyToID("_EffectsSoft"),
             DarkId = Shader.PropertyToID("_EffectsDark");
@@ -83,12 +87,45 @@ namespace TarmacGauntlet.Raceday
             ReadLevel();
             foreach (GraphicsOption o in new[] { GraphicsOptions.TyreSmoke, GraphicsOptions.Sparks, GraphicsOptions.ExhaustHaze, GraphicsOptions.BrakeGlow })
                 o.Changed += OnOption;
+            RenderPipelineManager.beginCameraRendering += HideFromProbe;
+            RenderPipelineManager.endCameraRendering += ShowAfterProbe;
+        }
+
+        /// <summary>Hides the smoke, sparks, haze and glowing discs while a reflection probe draws.</summary>
+        private void HideFromProbe(ScriptableRenderContext context, Camera camera)
+        {
+            if (camera == null || camera.cameraType != CameraType.Reflection) return;
+            Hide(smoke != null ? smoke.GetComponent<Renderer>() : null);
+            Hide(sparks != null ? sparks.GetComponent<Renderer>() : null);
+            Hide(haze != null ? haze.GetComponent<Renderer>() : null);
+            if (discs == null) return;
+            foreach (Discs d in discs)
+                if (d != null && d.Shown)
+                    foreach (MeshRenderer view in d.Views) Hide(view);
+        }
+
+        private void Hide(Renderer r)
+        {
+            if (r == null || r.forceRenderingOff) return;
+            r.forceRenderingOff = true;
+            hidden.Add(r);
+        }
+
+        private void ShowAfterProbe(ScriptableRenderContext context, Camera camera)
+        {
+            if (hidden.Count == 0) return;
+            foreach (Renderer r in hidden)
+                if (r != null) r.forceRenderingOff = false;
+            hidden.Clear();
         }
 
         private void OnDestroy()
         {
             foreach (GraphicsOption o in new[] { GraphicsOptions.TyreSmoke, GraphicsOptions.Sparks, GraphicsOptions.ExhaustHaze, GraphicsOptions.BrakeGlow })
                 o.Changed -= OnOption;
+            RenderPipelineManager.beginCameraRendering -= HideFromProbe;
+            RenderPipelineManager.endCameraRendering -= ShowAfterProbe;
+            ShowAfterProbe(default, null);
             HeatHazeFeature.Shimmer = 0f;
             HeatHazeFeature.ExhaustHaze = false;
             HeatHazeFeature.SoftParticles = false;

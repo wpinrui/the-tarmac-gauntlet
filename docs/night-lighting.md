@@ -52,6 +52,13 @@ All of it lives in `unity/Assets/Raceday/Scripts/Night/` and `unity/Assets/Rende
   (`NightBudget.WindowSheen`), so the floodlights on the roof above it do not glare off it. It still reflects the
   circuit in front of it through a cheap probe per stretch of glass (`PitComplexView`): small, not HDR, without the
   cars, and redrawn only as the sky's light changes. None of them light anything.
+- **Car reflections.** The cars mirror the circuit through HDR probes (`CarReflections`), and the paint makes the
+  small bright lights it mirrors brighter again, so the floodlights streak across it (`CarPaint.hlsl`'s glint, its
+  numbers mirrored as `NightBudget.Glint*`). Only a lens glints: something brighter than `GlintFrom`, which sits over
+  every lamp-lit surface and the pit windows, and more than `GlintSpread` times brighter than the world round it. When
+  the glint took everything over 1.2, the pit windows whited out the whole car. The smoke, sparks, haze and glowing
+  brake discs are never drawn into a probe (`CarEffects`). At night, from High up, the car nearest the camera has its
+  probe redrawn whole every frame, so the lights slide smoothly over its paint.
 - **Sheen.** The track shader's full Fresnel highlight is applied to the sun and the moon only. On the lamps it turned
   the whole floodlit road white, because their light grazes the road from every side at once. The lamps keep URP's
   own softer shine.
@@ -66,7 +73,10 @@ All of it lives in `unity/Assets/Raceday/Scripts/Night/` and `unity/Assets/Rende
 - the floodlit straight and pit lane (no dimmer than 0.6 of `Floodlit`, uniformity at least 0.55);
 - the full grid of 30 cars, every car's headlamps on with every floodlight: the road, and every car's tail, roof,
   bonnet and sides, under the caps; a white car shown below 0.95 and under the bloom's threshold; the back of the grid
-  lit by the floodlights alone.
+  lit by the floodlights alone;
+- a car swept round the whole lap and down the pit lane (`CarSweep.cs`): what its probe sees of the pit windows and the
+  floodlights' lenses, and how much of that its paint shows over the bloom's threshold with the glint, at most 2%, with
+  the lenses still glinting.
 
 `tools/night-budget/render` renders the full grid at night in headless Chromium: the circuit's real meshes, the real car
 models, every floodlight and twenty headlamps as URP spot lights, shaded as `Lamps.hlsl` shades them, then the night's

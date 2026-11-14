@@ -63,6 +63,14 @@ namespace TarmacGauntlet.Raceday
         /// </summary>
         public const float WindowSheen = 0.6f;
         /// <summary>
+        /// The paint's night glint (CarPaint.hlsl's CAR_GLINT_*, kept in step): what the coat reflects is boosted only where
+        /// it is brighter than <see cref="GlintFrom"/>, over every lamp-lit surface (<see cref="PixelMost"/>) and the pit
+        /// windows (<see cref="WindowGlow"/>), and more than <see cref="GlintSpread"/> times brighter than the world round
+        /// it seen at <see cref="GlintBroad"/> roughness: a lens, not a lit wall, a row of windows or a lamp filling the view.
+        /// The boost then rises towards <see cref="GlintGain"/>.
+        /// </summary>
+        public const float GlintFrom = 2f, GlintGain = 10f, GlintSpread = 4f, GlintBroad = 0.6f;
+        /// <summary>
         /// A glow of this colour, linear, its brightest channel at <paramref name="level"/>. Material.SetColor takes sRGB,
         /// so a material is given its <c>.gamma</c>.
         /// </summary>
