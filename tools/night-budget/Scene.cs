@@ -50,7 +50,8 @@ static class Scene
         ["Crowd"] = (0.45f, 0.4f, 0.38f, 0.1f, 0f),
         ["Catch fence posts"] = (0.6f, 0.62f, 0.63f, 0.5f, 0.6f),
         ["Pit building"] = (0.66f, 0.65f, 0.62f, 0.12f, 0f),
-        ["Pit building glass"] = (0.07f, 0.09f, 0.11f, 0.92f, 0.2f),
+        // The glass at night (PitMaterials.Night).
+        ["Pit building glass"] = (0.07f, 0.09f, 0.11f, NightBudget.WindowSheen, 0.2f),
         ["Pit building steel"] = (0.16f, 0.3f, 0.22f, 0.45f, 0.3f),
         ["Start gantry"] = (0.6f, 0.62f, 0.63f, 0.5f, 0.6f),
         ["Floodlight steel"] = (0.55f, 0.57f, 0.58f, 0.4f, 0.5f),
@@ -93,11 +94,14 @@ static class Scene
             if (!Looks.TryGetValue(g.Key, out var look)) continue;
             var pos = new List<Vector3>();
             var nrm = new List<Vector3>();
+            var uv = new List<Vector2>();
+            bool windows = g.Key == "Pit building glass";
             var idx = new List<int>();
             foreach (CircuitPart p in g)
             {
                 IReadOnlyList<Vector3> v = p.Kit.Vertices, n = p.Kit.Normals;
                 IReadOnlyList<int> t = p.Kit.Triangles;
+                IReadOnlyList<Vector2> u = p.Kit.UVs;
                 var map = new Dictionary<int, int>();
                 for (int i = 0; i < t.Count; i += 3)
                 {
@@ -113,6 +117,7 @@ static class Scene
                             map[a] = b;
                             pos.Add(v[a] - focus);
                             nrm.Add(n[a]);
+                            if (windows) uv.Add(u[a]);
                         }
                         idx.Add(b);
                     }
@@ -125,11 +130,14 @@ static class Scene
             foreach (Vector3 p in nrm) { w.Write((sbyte)Math.Round(p.x * 127)); w.Write((sbyte)Math.Round(p.y * 127)); w.Write((sbyte)Math.Round(p.z * 127)); w.Write((sbyte)0); }
             long iAt = bin.Position;
             foreach (int i in idx) w.Write(i);
+            long uvAt = bin.Position;
+            foreach (Vector2 p in uv) { w.Write(p.x); w.Write(p.y); }
             meshes.Add(new
             {
                 name = g.Key, vertices = pos.Count, indices = idx.Count, pos = at, nrm = nAt, idx = iAt,
                 colour = new[] { look.r, look.g, look.b }, smooth = look.smooth, metal = look.metal,
                 lens = g.Key == "Floodlight lenses", fresnel = Track.Contains(g.Key), grass = Grass.Contains(g.Key),
+                uv = windows ? uvAt : -1,
             });
         }
 
@@ -162,16 +170,23 @@ static class Scene
 
         var budget = new
         {
-            NightBudget.Exposure, NightBudget.Floodlit, NightBudget.GrassLamp, NightBudget.GrassColour, NightBudget.LampMost, NightBudget.AllMost, NightBudget.PixelMost,
+            NightBudget.Exposure, NightBudget.Bloom, NightBudget.Floodlit, NightBudget.GrassLamp, NightBudget.GrassColour, NightBudget.LampMost, NightBudget.AllMost, NightBudget.PixelMost,
             headlampIntensity = NightBudget.HeadlampIntensity / NightBudget.Luma(NightBudget.Headlamp),
             NightBudget.HeadlampRange, NightBudget.HeadlampCone, NightBudget.HeadlampCore, NightBudget.HeadlampAhead, NightBudget.HeadlampDip,
             flood = Rgb(NightBudget.Flood), headlamp = Rgb(NightBudget.Headlamp), red = Rgb(NightBudget.Red),
-            NightBudget.FloodLens, NightBudget.HeadlampGlow, NightBudget.TailGlow, NightBudget.BrakeGlow, NightBudget.StandGlow,
+            NightBudget.FloodLens, NightBudget.HeadlampGlow, NightBudget.TailGlow, NightBudget.BrakeGlow, NightBudget.StandGlow, NightBudget.WindowGlow,
             on = NightBudget.On(sky.Lights), floodLevel = NightBudget.On(sky.Lights) * NightBudget.FloodDark(sky.SunElevation),
             headlampLevel = NightBudget.On(sky.Lights) * NightBudget.HeadlampDark(sky.SunElevation),
         };
 
-        var info = new { meshes, lights, grid = grid.Select(g => new { at = Xyz(g.at - focus), forward = Xyz(g.forward) }), stand = Xyz(stand), night, budget };
+        // The pit building's lit windows, as PitMaterials paints them: each window's light, sRGB, a cell along and a storey up.
+        var windowLight = new
+        {
+            cells = new[] { PitComplexBuilder.WindowCells, PitComplexBuilder.StoreyCells },
+            rooms = PitComplexBuilder.WindowLight().Select(r => new[] { r.r, r.g, r.b }),
+        };
+
+        var info = new { meshes, windows = windowLight, lights, grid = grid.Select(g => new { at = Xyz(g.at - focus), forward = Xyz(g.forward) }), stand = Xyz(stand), night, budget };
         File.WriteAllBytes(Path.Combine(dir, "scene.bin"), bin.ToArray());
         File.WriteAllText(Path.Combine(dir, "scene.json"), JsonSerializer.Serialize(info, new JsonSerializerOptions { IncludeFields = true }));
         Console.WriteLine($"      wrote {meshes.Count} meshes, {bin.Length / 1024 / 1024} MB, {lights.Count} floodlights and {grid.Count} grid places to {dir}");

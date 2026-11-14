@@ -14,8 +14,8 @@ namespace TarmacGauntlet.Raceday
 
         /// <summary>Colour of a garage with no car in it.</summary>
         public static readonly Color Empty = new Color(0.55f, 0.56f, 0.57f);
-        /// <summary>Warm office light through the windows at night.</summary>
-        private static readonly Color WindowGlow = new Color(1f, 0.82f, 0.58f);
+        /// <summary>The glass's smoothness by day.</summary>
+        private const float GlassSheen = 0.92f;
         private static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
 
         private readonly Texture2D palette;
@@ -23,7 +23,7 @@ namespace TarmacGauntlet.Raceday
         public PitMaterials()
         {
             Concrete = Make("Pit concrete", Noise(new Color(0.66f, 0.65f, 0.62f), 0.035f, 11), 0.12f);
-            Glass = Make("Pit glass", null, 0.92f, new Color(0.07f, 0.09f, 0.11f), 0.2f);
+            Glass = Make("Pit glass", null, GlassSheen, new Color(0.07f, 0.09f, 0.11f), 0.2f);
             Glass.SetTexture("_EmissionMap", Windows());
             Glass.mainTextureScale = new Vector2(1f / PitComplexBuilder.WindowCells, 1f / PitComplexBuilder.StoreyCells);
             Glow(Glass, Color.black);
@@ -54,7 +54,11 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>Lights the office windows: 0 by day, 1 at night.</summary>
-        public void Night(float night) => Glow(Glass, WindowGlow * (1.4f * night));
+        public void Night(float night)
+        {
+            Glow(Glass, NightBudget.Glow(Color.white, NightBudget.WindowGlow * night).gamma);
+            Glass.SetFloat("_Smoothness", Mathf.Lerp(GlassSheen, NightBudget.WindowSheen, night));
+        }
 
         private static void Glow(Material m, Color c)
         {
@@ -75,26 +79,24 @@ namespace TarmacGauntlet.Raceday
 
         /// <summary>
         /// Lit and dark panes, a cell per window and a row per storey, each pane framed dark so the mullions read
-        /// between them. Some rooms are dimmer than others.
+        /// between them, in each room's own light (<see cref="PitComplexBuilder.WindowLight"/>).
         /// </summary>
         private static Texture2D Windows()
         {
             const int cell = 16;
             int w = PitComplexBuilder.WindowCells * cell, h = PitComplexBuilder.StoreyCells * cell;
             var tex = new Texture2D(w, h, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Bilinear, name = "Lit windows" };
-            var rng = new System.Random(17);
+            var rooms = PitComplexBuilder.WindowLight();
             var px = new Color[w * h];
             for (int cx = 0; cx < PitComplexBuilder.WindowCells; cx++)
                 for (int cy = 0; cy < PitComplexBuilder.StoreyCells; cy++)
                 {
-                    double roll = rng.NextDouble();
-                    float lit = roll < 0.3 ? 0f : roll < 0.45 ? 0.35f : 0.75f + 0.25f * (float)rng.NextDouble();
+                    var room = rooms[cy * PitComplexBuilder.WindowCells + cx];
                     for (int x = 0; x < cell; x++)
                         for (int y = 0; y < cell; y++)
                         {
-                            bool frame = x < 1 || x >= cell - 1 || y < 3 || y >= cell - 2;
-                            float v = frame ? 0f : lit;
-                            px[(cy * cell + y) * w + cx * cell + x] = new Color(v, v, v, 1f);
+                            bool frame = PitComplexBuilder.WindowFrame((x + 0.5f) / cell, (y + 0.5f) / cell);
+                            px[(cy * cell + y) * w + cx * cell + x] = frame ? new Color(0f, 0f, 0f, 1f) : new Color(room.r, room.g, room.b, 1f);
                         }
                 }
             tex.SetPixels(px);

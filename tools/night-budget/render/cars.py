@@ -12,12 +12,12 @@ import numpy as np
 
 # Material name prefixes and the look each takes: paint, glass, lens (headlamp), tail, chrome, dark, tyre, interior.
 LOOKS = [
-    ("lamp_head", "head"), ("head_glass", "glass"), ("lamp_tail", "tail"), ("lamp_brake", "tail"), ("tail_glass", "tailglass"),
+    ("lamp_head", "head"), ("head_glass", "headglass"), ("lamp_tail", "tail"), ("lamp_brake", "brake"), ("tail_glass", "tailglass"),
     ("body", "paint"), ("glass", "glass"), ("mirror_glass", "chrome"), ("chrome", "chrome"), ("rim", "chrome"),
     ("tyre", "tyre"), ("interior", "dark"), ("seat", "dark"), ("grille", "dark"), ("trim", "dark"), ("dark_metal", "dark"),
     ("housing", "dark"), ("reflector", "chrome"),
 ]
-KINDS = ["paint", "glass", "head", "tail", "tailglass", "chrome", "dark", "tyre"]
+KINDS = ["paint", "glass", "head", "tail", "brake", "headglass", "tailglass", "chrome", "dark", "tyre"]
 
 
 def look(name):

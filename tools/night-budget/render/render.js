@@ -1,7 +1,7 @@
 // Renders the night views of the full grid with render.html, from the scene tools/night-budget writes and the cars
 // cars.py packs. Needs Node with Playwright and Chromium.
 //   node render.js <scene-folder> <out-folder>
-// Writes head-on.png, stands.png, behind.png, head-on-uncapped.png, stands-floodlights-only.png and stands-no-lamps.png, each the full grid at night with every floodlight and the most
+// Writes head-on.png, stands.png, behind.png, behind-braking.png, head-on-uncapped.png, stands-floodlights-only.png and stands-no-lamps.png, each the full grid at night with every floodlight and the most
 // headlamps the graphics options allow.
 const http = require('http');
 const fs = require('fs');
@@ -49,6 +49,8 @@ const sub = (a, b) => a.map((x, i) => x - b[i]), add = (a, b) => a.map((x, i) =>
     'stands-floodlights-only': { eye: add(add(info.stand, mul(toward, 4)), mul(up, 2.5)), target: add(grid[10].at, mul(up, -1)), fov: 55, headlamps: 0 },
     'stands-no-lamps': { eye: add(add(info.stand, mul(toward, 4)), mul(up, 2.5)), target: add(grid[10].at, mul(up, -1)), fov: 55, headlamps: 0, floods: false },
     behind: { eye: add(add(last.at, mul(f, -16)), mul(up, 2.2)), target: add(grid[4].at, mul(up, 0.5)), fov: 38 },
+    // The same with every car on the brakes: the brake lamps lit over the tail lamps.
+    'behind-braking': { eye: add(add(last.at, mul(f, -16)), mul(up, 2.2)), target: add(grid[4].at, mul(up, 0.5)), fov: 38, braking: grid.map((g, i) => i) },
   };
   const only = process.env.VIEWS ? process.env.VIEWS.split(',') : Object.keys(views);
   for (const name of only) {

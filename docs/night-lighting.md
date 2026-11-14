@@ -44,6 +44,14 @@ All of it lives in `unity/Assets/Raceday/Scripts/Night/` and `unity/Assets/Rende
 - **Grass.** Grass takes the lamps' light dimmer and less green than its own colour (`NightBudget.GrassLamp`,
   `GrassColour`), so a floodlit verge sits near the road's brightness. The ground shader, the grass blades and Lit
   materials with `_TG_GRASS` (verges, runoff, terrain, stand banks) shade it so.
+- **Glow.** The lamps themselves glow in linear light (`NightBudget.Glow`): the floodlight lenses, the headlamps and
+  the tail lamps at night, and the brake lamps whenever a car brakes, all well over the bloom's threshold, so each shows
+  a halo. The night adds `NightBudget.Bloom` to the bloom's intensity. Nothing lamp-lit is meant to bloom, so only the
+  lamps do. The pit building's windows glow in each room's own light, warm or cool (`PitComplexBuilder.WindowLight`),
+  and the brightest only just pass the threshold, so they bloom faintly. At night the glass loses some of its sheen
+  (`NightBudget.WindowSheen`), so the floodlights on the roof above it do not glare off it. It still reflects the
+  circuit in front of it through a cheap probe per stretch of glass (`PitComplexView`): small, not HDR, without the
+  cars, and redrawn only as the sky's light changes. None of them light anything.
 - **Sheen.** The track shader's full Fresnel highlight is applied to the sun and the moon only. On the lamps it turned
   the whole floodlit road white, because their light grazes the road from every side at once. The lamps keep URP's
   own softer shine.
@@ -62,8 +70,8 @@ All of it lives in `unity/Assets/Raceday/Scripts/Night/` and `unity/Assets/Rende
 
 `tools/night-budget/render` renders the full grid at night in headless Chromium: the circuit's real meshes, the real car
 models, every floodlight and twenty headlamps as URP spot lights, shaded as `Lamps.hlsl` shades them, then the night's
-bloom, exposure and ACES tone curve. It writes the grid head-on, from the stands and from behind, the head-on view with
-the budget off, and the stands with the floodlights alone and with no lamps.
+bloom, exposure and ACES tone curve. It writes the grid head-on, from the stands and from behind, from behind again with
+every car braking, the head-on view with the budget off, and the stands with the floodlights alone and with no lamps.
 
 ```
 bash tools/night-budget/run.sh out/night-scene

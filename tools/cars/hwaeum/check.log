@@ -1,0 +1,112 @@
+open shell: window_trim_l (1 edges)
+intersecting: band_r_back x exhaust
+intersecting: body x door_l_mirror
+intersecting: body x door_r_mirror
+intersecting: body x exhaust
+intersecting: body x firewall
+intersecting: body x grille_surround
+intersecting: body x rear_base
+intersecting: body x seat_base_l
+intersecting: body x seat_base_r
+intersecting: dash x door_l_card
+intersecting: dash x door_r_card
+intersecting: dash x steering
+intersecting: door_l x door_l_mirror
+intersecting: door_l_mirror x door_l_trim
+intersecting: door_r x door_r_mirror
+intersecting: door_r_mirror x door_r_trim
+intersecting: exhaust x exhaust_in
+intersecting: opt_frontbadge_2_3 x opt_frontbadge_2_4
+intersecting: opt_frontbadge_4_3 x opt_frontbadge_4_4
+intersecting: opt_rearbadge_2_3 x opt_rearbadge_2_4
+intersecting: opt_rearbadge_4_3 x opt_rearbadge_4_4
+intersecting: rear_back x rear_base
+intersecting: wheel_rim_fl x wheel_spokes_fl
+intersecting: wheel_rim_fr x wheel_spokes_fr
+intersecting: wheel_rim_rl x wheel_spokes_rl
+intersecting: wheel_rim_rr x wheel_spokes_rr
+z-fighting: body x rear_trim (9 faces)
+z-fighting: opt_frontbadge_2_0 x opt_frontbadge_2_3 (545 faces)
+z-fighting: opt_frontbadge_2_1 x opt_frontbadge_2_3 (132 faces)
+z-fighting: opt_frontbadge_2_1 x opt_frontbadge_2_4 (148 faces)
+z-fighting: opt_frontbadge_2_2 x opt_frontbadge_2_3 (48 faces)
+z-fighting: opt_frontbadge_2_2 x opt_frontbadge_2_4 (72 faces)
+z-fighting: opt_frontbadge_2_2 x opt_frontbadge_2_5 (105 faces)
+z-fighting: opt_frontbadge_2_3 x opt_frontbadge_2_4 (1 faces)
+z-fighting: opt_frontbadge_4_0 x opt_frontbadge_4_3 (553 faces)
+z-fighting: opt_frontbadge_4_1 x opt_frontbadge_4_3 (116 faces)
+z-fighting: opt_frontbadge_4_1 x opt_frontbadge_4_4 (83 faces)
+z-fighting: opt_frontbadge_4_2 x opt_frontbadge_4_3 (44 faces)
+z-fighting: opt_frontbadge_4_2 x opt_frontbadge_4_4 (106 faces)
+z-fighting: opt_frontbadge_4_2 x opt_frontbadge_4_5 (172 faces)
+z-fighting: opt_frontbadge_4_3 x opt_frontbadge_4_4 (1 faces)
+z-fighting: opt_rearbadge_2_0 x opt_rearbadge_2_3 (586 faces)
+z-fighting: opt_rearbadge_2_1 x opt_rearbadge_2_3 (140 faces)
+z-fighting: opt_rearbadge_2_1 x opt_rearbadge_2_4 (141 faces)
+z-fighting: opt_rearbadge_2_2 x opt_rearbadge_2_3 (41 faces)
+z-fighting: opt_rearbadge_2_2 x opt_rearbadge_2_4 (79 faces)
+z-fighting: opt_rearbadge_2_2 x opt_rearbadge_2_5 (119 faces)
+z-fighting: opt_rearbadge_2_3 x opt_rearbadge_2_4 (2 faces)
+z-fighting: opt_rearbadge_4_0 x opt_rearbadge_4_3 (581 faces)
+z-fighting: opt_rearbadge_4_1 x opt_rearbadge_4_3 (124 faces)
+z-fighting: opt_rearbadge_4_1 x opt_rearbadge_4_4 (87 faces)
+z-fighting: opt_rearbadge_4_2 x opt_rearbadge_4_3 (48 faces)
+z-fighting: opt_rearbadge_4_2 x opt_rearbadge_4_4 (92 faces)
+z-fighting: opt_rearbadge_4_2 x opt_rearbadge_4_5 (112 faces)
+z-fighting: opt_rearbadge_4_3 x opt_rearbadge_4_4 (4 faces)
+door open, open shell: window_trim_l (1 edges)
+door open, floating: opt_name_3_10
+door open, floating: opt_name_3_2
+door open, floating: opt_name_3_4
+door open, floating: opt_name_3_8
+door open, intersecting: band_r_back x exhaust
+door open, intersecting: body x exhaust
+door open, intersecting: body x firewall
+door open, intersecting: body x grille_surround
+door open, intersecting: body x rear_base
+door open, intersecting: body x seat_base_l
+door open, intersecting: body x seat_base_r
+door open, intersecting: dash x steering
+door open, intersecting: door_l x door_l_mirror
+door open, intersecting: door_l_mirror x door_l_trim
+door open, intersecting: door_r x door_r_mirror
+door open, intersecting: door_r_mirror x door_r_trim
+door open, intersecting: exhaust x exhaust_in
+door open, intersecting: opt_frontbadge_2_3 x opt_frontbadge_2_4
+door open, intersecting: opt_frontbadge_4_3 x opt_frontbadge_4_4
+door open, intersecting: opt_rearbadge_2_3 x opt_rearbadge_2_4
+door open, intersecting: opt_rearbadge_4_3 x opt_rearbadge_4_4
+door open, intersecting: rear_back x rear_base
+door open, intersecting: wheel_rim_fl x wheel_spokes_fl
+door open, intersecting: wheel_rim_fr x wheel_spokes_fr
+door open, intersecting: wheel_rim_rl x wheel_spokes_rl
+door open, intersecting: wheel_rim_rr x wheel_spokes_rr
+door open, z-fighting: body x rear_trim (9 faces)
+door open, z-fighting: opt_frontbadge_2_0 x opt_frontbadge_2_3 (545 faces)
+door open, z-fighting: opt_frontbadge_2_1 x opt_frontbadge_2_3 (132 faces)
+door open, z-fighting: opt_frontbadge_2_1 x opt_frontbadge_2_4 (148 faces)
+door open, z-fighting: opt_frontbadge_2_2 x opt_frontbadge_2_3 (48 faces)
+door open, z-fighting: opt_frontbadge_2_2 x opt_frontbadge_2_4 (72 faces)
+door open, z-fighting: opt_frontbadge_2_2 x opt_frontbadge_2_5 (105 faces)
+door open, z-fighting: opt_frontbadge_2_3 x opt_frontbadge_2_4 (1 faces)
+door open, z-fighting: opt_frontbadge_4_0 x opt_frontbadge_4_3 (553 faces)
+door open, z-fighting: opt_frontbadge_4_1 x opt_frontbadge_4_3 (116 faces)
+door open, z-fighting: opt_frontbadge_4_1 x opt_frontbadge_4_4 (83 faces)
+door open, z-fighting: opt_frontbadge_4_2 x opt_frontbadge_4_3 (44 faces)
+door open, z-fighting: opt_frontbadge_4_2 x opt_frontbadge_4_4 (106 faces)
+door open, z-fighting: opt_frontbadge_4_2 x opt_frontbadge_4_5 (172 faces)
+door open, z-fighting: opt_frontbadge_4_3 x opt_frontbadge_4_4 (1 faces)
+door open, z-fighting: opt_rearbadge_2_0 x opt_rearbadge_2_3 (586 faces)
+door open, z-fighting: opt_rearbadge_2_1 x opt_rearbadge_2_3 (140 faces)
+door open, z-fighting: opt_rearbadge_2_1 x opt_rearbadge_2_4 (141 faces)
+door open, z-fighting: opt_rearbadge_2_2 x opt_rearbadge_2_3 (41 faces)
+door open, z-fighting: opt_rearbadge_2_2 x opt_rearbadge_2_4 (79 faces)
+door open, z-fighting: opt_rearbadge_2_2 x opt_rearbadge_2_5 (119 faces)
+door open, z-fighting: opt_rearbadge_2_3 x opt_rearbadge_2_4 (2 faces)
+door open, z-fighting: opt_rearbadge_4_0 x opt_rearbadge_4_3 (581 faces)
+door open, z-fighting: opt_rearbadge_4_1 x opt_rearbadge_4_3 (124 faces)
+door open, z-fighting: opt_rearbadge_4_1 x opt_rearbadge_4_4 (87 faces)
+door open, z-fighting: opt_rearbadge_4_2 x opt_rearbadge_4_3 (48 faces)
+door open, z-fighting: opt_rearbadge_4_2 x opt_rearbadge_4_4 (92 faces)
+door open, z-fighting: opt_rearbadge_4_2 x opt_rearbadge_4_5 (112 faces)
+door open, z-fighting: opt_rearbadge_4_3 x opt_rearbadge_4_4 (4 faces)

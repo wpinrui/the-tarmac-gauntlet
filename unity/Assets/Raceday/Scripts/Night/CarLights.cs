@@ -196,7 +196,7 @@ namespace TarmacGauntlet.Raceday
         public Material BrakeFor(Material source)
         {
             Material m = CopyOf(brakes, source, "braking");
-            m.SetColor(EmissionId, NightBudget.Red * NightBudget.BrakeGlow);
+            m.SetColor(EmissionId, Brake);
             return m;
         }
 
@@ -222,18 +222,21 @@ namespace TarmacGauntlet.Raceday
         public void Night(float amount)
         {
             night = amount;
-            Color head = headTint * (NightBudget.HeadlampGlow * NightBudget.On(amount));
-            Color tail = NightBudget.Red * (NightBudget.TailGlow * NightBudget.On(amount));
-            BoxHead.SetColor(EmissionId, head);
-            BoxTail.SetColor(EmissionId, tail);
-            BoxBrake.SetColor(EmissionId, NightBudget.Red * NightBudget.BrakeGlow);
-            foreach (Material m in heads.Values) m.SetColor(EmissionId, head);
-            foreach (Material m in tails.Values) m.SetColor(EmissionId, tail);
-            foreach (Material m in headLenses.Values) m.SetColor(EmissionId, head * LensGlow);
-            foreach (Material m in tailLenses.Values) m.SetColor(EmissionId, tail * LensGlow);
+            float on = NightBudget.On(amount);
+            Color head = NightBudget.Glow(headTint, NightBudget.HeadlampGlow * on), tail = NightBudget.Glow(NightBudget.Red, NightBudget.TailGlow * on);
+            BoxHead.SetColor(EmissionId, head.gamma);
+            BoxTail.SetColor(EmissionId, tail.gamma);
+            BoxBrake.SetColor(EmissionId, Brake);
+            foreach (Material m in heads.Values) m.SetColor(EmissionId, head.gamma);
+            foreach (Material m in tails.Values) m.SetColor(EmissionId, tail.gamma);
+            foreach (Material m in headLenses.Values) m.SetColor(EmissionId, (head * LensGlow).gamma);
+            foreach (Material m in tailLenses.Values) m.SetColor(EmissionId, (tail * LensGlow).gamma);
         }
 
         public Color HeadTint => headTint;
+
+        /// <summary>A lit brake lamp's glow, as the material takes it.</summary>
+        private static Color Brake => NightBudget.Glow(NightBudget.Red, NightBudget.BrakeGlow).gamma;
 
         private Material CopyOf(Dictionary<Material, Material> copies, Material source, string suffix)
         {

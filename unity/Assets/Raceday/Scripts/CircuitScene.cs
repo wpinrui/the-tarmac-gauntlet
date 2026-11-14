@@ -142,6 +142,7 @@ namespace TarmacGauntlet.Raceday
             PitComplexView view = buildings.AddComponent<PitComplexView>();
             view.Sky = sky;
             view.Materials = pitMaterials;
+            view.Complex = Complex;
             Trackside trackside = Trackside.Build(circuit, builder, stands.Footprints, trees);
             var plainArmco = new List<Renderer>();
             foreach (Transform child in track.transform)

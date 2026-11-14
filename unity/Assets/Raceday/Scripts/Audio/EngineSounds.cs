@@ -104,7 +104,6 @@ namespace TarmacGauntlet.Raceday
             // E
             ["e-07"] = s => { s.Layout = EngineLayout.Inline3; s.Asymmetry = 0.06f; s.Turbo = 0.45f; s.PipeLength = 2.3f; },  // Liberty Fantasy: small turbo triple
             ["e-08"] = s => { s.Turbo = 0f; s.Muffler = 0.9f; s.Roughness = 0.04f; },                                           // Seorak Hwaeum: plain and smooth
-            ["e-09"] = s => { s.Turbo = 0.4f; s.Brightness = 0.95f; },                                                           // Liberty Fortress
             ["e-10"] = s => { s.Turbo = 0.45f; s.TurboPitch = 4900f; s.PipeLength = 2.4f; },                                    // Kaiser Oboe
             ["e-11"] = s => { s.Turbo = 0.3f; s.PipeLength = 3.0f; s.Brightness = 0.8f; s.Muffler = 0.9f; },                  // Liberty Mantle: big and quiet
 
@@ -117,7 +116,6 @@ namespace TarmacGauntlet.Raceday
             // C
             ["c-16"] = s => { s.Layout = EngineLayout.V8Crossplane; s.IdleRpm = 700f; s.RedlineRpm = 7000f; s.PipeLength = 2.2f; s.BankSplit = 1.12f; s.Drive = 2.4f; s.Crackle = 0.35f; s.Turbo = 0.3f; }, // Archer Crescendo: V8 burble
             ["c-17"] = s => { s.Turbo = 0.45f; s.Muffler = 0.75f; s.RedlineRpm = 6500f; s.Crackle = 0.05f; },                 // Kaiser Elevate: refined turbo V6
-            ["c-18"] = s => { s.RedlineRpm = 8000f; s.Brightness = 1.1f; s.IntakeLevel = 0.45f; },                              // Tora Zero: high-revving V6
             ["c-19"] = s => { s.Layout = EngineLayout.Flat6; s.RedlineRpm = 9000f; s.Brightness = 1.15f; s.IntakePitch = 620f; s.MechLevel = 0.1f; }, // Kaiser Klassik: flat six
             ["c-20"] = s => { s.Turbo = 0.65f; s.TurboPitch = 4400f; s.RedlineRpm = 7000f; s.Brightness = 0.9f; },            // Tora Giga: twin turbo V6
 
@@ -129,7 +127,6 @@ namespace TarmacGauntlet.Raceday
             ["b-25"] = s => { s.Layout = EngineLayout.V6; s.Turbo = 0.7f; s.RedlineRpm = 7000f; s.Brightness = 0.95f; s.Drive = 2.6f; }, // Liberty Bounty: twin turbo V6
 
             // A
-            ["a-26"] = s => { s.Layout = EngineLayout.V8Flatplane; s.Turbo = 0f; s.RedlineRpm = 9150f; s.Brightness = 1.25f; s.Hybrid = 0.3f; }, // Kaiser Sceptre: NA V8 hybrid
             ["a-27"] = s => { s.Layout = EngineLayout.V8Flatplane; s.Turbo = 0.6f; s.RedlineRpm = 8500f; s.Hybrid = 0.3f; },  // Archer Hypernova: twin turbo V8 hybrid
             ["a-28"] = s => { s.IdleRpm = 900f; s.RedlineRpm = 5000f; s.PulseWidth = 0.65f; s.Turbo = 0.7f; s.TurboPitch = 3800f; s.Brightness = 0.7f; s.Drive = 1.8f; s.Crackle = 0f; s.Hybrid = 0.5f; }, // Kaiser K24 Dynamo: diesel V6
             ["a-29"] = s => { s.Hybrid = 0.55f; },                                                                               // Seorak Cheonma: the reference prototype
