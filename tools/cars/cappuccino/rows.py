@@ -137,7 +137,7 @@ INTAKE = [(0.0, .255), (0.30, .258), (0.62, .262), (0.66, .258), (0.69, .22), (0
 RAIN = [(0.50, .20), (0.67, .20), (0.68, .19), (0.66, .18), (0.52, .18), (0.50, .19)]
 
 # Ivan's picks from the viewer, filled in once he answers.
-PICKS = {}
+PICKS = {"rim": 1, "badgef": 2, "badger": 1, "name": 1}
 
 
 def main():
