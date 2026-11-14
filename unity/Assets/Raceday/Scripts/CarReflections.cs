@@ -8,16 +8,16 @@ namespace TarmacGauntlet.Raceday
 {
     /// <summary>
     /// What the cars reflect. A shared probe at the watched car draws the scene round it without the cars, one face a frame,
-    /// and covers every car in sight. At High and up the cars nearest the camera get a sharp probe each, sitting in the car
-    /// and drawing everything round it, the other cars too: the car's own body is hidden while its probe draws. Those probes
-    /// take turns, a few faces a frame, nearest car first. A probe moved to another car is left out until it is drawn
-    /// again, so the car shows the shared probe meanwhile, never an old view. All the probes are HDR, so the floodlights'
-    /// and the pit's lenses stay bright in the paint at night. At night, from High up, the car nearest the camera has its
-    /// probe drawn whole every frame instead of taking turns: the floodlights slide smoothly over its paint, where a probe
-    /// drawn a face a frame stepped them along every second or so. The others take turns with one face fewer to pay for it.
-    /// Sets <c>_TarmacCarGlint</c> from the night's lights for the paint (CarPaint.hlsl). Without
-    /// <see cref="GraphicsOptions.CarReflections"/> the cars reflect the sky alone.
-    /// Sits on the race camera beside <see cref="RaceCameras"/>.
+    /// and covers every car in sight. At High and up the cars get probes of their own, sitting in the car and drawing
+    /// everything round it, the other cars too, as far as the shared probe sees: the car's own body is hidden while its
+    /// probe draws. Which car has which, and when each is drawn, is <see cref="ProbePlan"/>'s: the watched car always
+    /// has one, drawn whole every frame, and the cars nearest the camera share the rest, a face a frame, each taking its
+    /// probe in and giving it back over half a second, so no car's paint jumps between probes. A probe's share of its car
+    /// is its blend distance: its box reaches <see cref="Margin"/> past the body, so a blend distance of half Margin over the
+    /// share gives every point of the body that share, the shared probe the rest. All the probes are HDR, so the
+    /// floodlights' and the pit's lenses stay bright in the paint at night. Sets <c>_TarmacCarGlint</c> from the night's
+    /// lights for the paint (CarPaint.hlsl). Without <see cref="GraphicsOptions.CarReflections"/> the cars reflect the sky
+    /// alone. Sits on the race camera beside <see cref="RaceCameras"/>.
     /// </summary>
     [RequireComponent(typeof(RaceCameras))]
     public sealed class CarReflections : MonoBehaviour
@@ -27,18 +27,18 @@ namespace TarmacGauntlet.Raceday
         {
             /// <summary>The shared probe's face, pixels.</summary>
             public readonly int Shared;
-            /// <summary>How many cars get their own probe, its face in pixels, and how many of them draw a face each frame.</summary>
+            /// <summary>
+            /// How many cars get their own probe, the watched car's among them, its face in pixels, and how many of the
+            /// others draw a face each frame.
+            /// </summary>
             public readonly int Near, NearSize, Busy;
-            /// <summary>At night the nearest car's probe is drawn whole every frame.</summary>
-            public readonly bool Live;
 
-            public Tier(int shared, int near = 0, int nearSize = 0, int busy = 0, bool live = false)
+            public Tier(int shared, int near = 0, int nearSize = 0, int busy = 0)
             {
                 Shared = shared;
                 Near = near;
                 NearSize = nearSize;
                 Busy = busy;
-                Live = live;
             }
         }
 
@@ -46,18 +46,12 @@ namespace TarmacGauntlet.Raceday
         {
             new Tier(64),
             new Tier(128),
-            new Tier(128, 3, 512, 2, true),
-            new Tier(256, 5, 512, 3, true),
+            new Tier(128, 3, 512, 1),
+            new Tier(256, 5, 512, 2),
         };
 
         /// <summary>How far round the watched car the shared probe reaches, and how far it sees, m.</summary>
         private const float Reach = 4000f, Sight = 1500f;
-        /// <summary>How far a car's own probe sees, m: the trackside and the cars about it.</summary>
-        private const float NearSight = 600f;
-        /// <summary>Cars further from the camera than this keep the shared probe, m.</summary>
-        private const float NearReach = 80f;
-        /// <summary>A car behind the camera counts as this much further off, m.</summary>
-        private const float Behind = 40f;
         /// <summary>The probe's height above the car's origin: about the middle of its body, m.</summary>
         private const float Height = 0.8f;
         /// <summary>A car's probe covers its body and this much more all round, m.</summary>
@@ -75,13 +69,8 @@ namespace TarmacGauntlet.Raceday
         {
             public ReflectionProbe Probe;
             public CarController Car;
-            /// <summary>The car the probe's drawing now was started at.</summary>
-            public CarController Drawing;
             public Renderer[] Body;
             public int Rendering = -1;
-            /// <summary>True once the probe has been drawn whole at the car it is on.</summary>
-            public bool Ready;
-            public int Started;
         }
 
         private RaceCameras views;
@@ -89,8 +78,9 @@ namespace TarmacGauntlet.Raceday
         private int sharedRendering = -1;
         private bool sharedFirst;
         private readonly List<Near> nears = new List<Near>();
-        private readonly List<CarController> picked = new List<CarController>();
-        private readonly List<float> pickedScore = new List<float>();
+        private ProbePlan plan = new ProbePlan(0);
+        private readonly List<Vector3?> places = new List<Vector3?>();
+        private readonly List<(int slot, bool whole)> draws = new List<(int, bool)>();
         private readonly List<Renderer> hidden = new List<Renderer>();
         private int level = -1;
         private TimeOfDay sky;
@@ -170,15 +160,16 @@ namespace TarmacGauntlet.Raceday
                 ReflectionProbe p = NewProbe("Car reflections " + (nears.Count + 1));
                 p.importance = WaitingImportance;
                 p.cullingMask = ~0;
-                p.farClipPlane = NearSight;
+                p.farClipPlane = Sight;
                 nears.Add(new Near { Probe = p });
             }
-            foreach (Near n in nears)
+            if (plan.Slots.Length != nears.Count) plan = new ProbePlan(nears.Count);
+            for (int i = 0; i < nears.Count; i++)
             {
+                Near n = nears[i];
                 if (n.Probe.resolution == tier.NearSize) continue;
                 n.Probe.resolution = tier.NearSize;
-                n.Ready = false;
-                n.Probe.importance = WaitingImportance;
+                plan.Invalidate(i);
             }
         }
 
@@ -189,19 +180,7 @@ namespace TarmacGauntlet.Raceday
             if (Time.frameCount % 30 == 0) Fit();
             DrawShared();
             if (nears.Count == 0) return;
-            Pick();
-            Tier tier = Tiers[Mathf.Clamp(level, 0, Tiers.Length - 1)];
-            Near live = tier.Live && NightBudget.On(sky != null ? sky.Lights : 0f) > 0f ? Live() : null;
-            DrawNear(live != null ? tier.Busy - 1 : tier.Busy, live);
-        }
-
-        /// <summary>The probe on the car nearest the camera, if it has one.</summary>
-        private Near Live()
-        {
-            if (picked.Count == 0) return null;
-            foreach (Near n in nears)
-                if (n.Car == picked[0]) return n;
-            return null;
+            DrawNear(Tiers[Mathf.Clamp(level, 0, Tiers.Length - 1)].Busy);
         }
 
         /// <summary>The paint's night boost, from how far the circuit's lights are on.</summary>
@@ -221,73 +200,54 @@ namespace TarmacGauntlet.Raceday
             sharedRendering = shared.RenderProbe();
         }
 
-        /// <summary>The cars nearest the camera, one per probe, each probe kept on its car while that car is still picked.</summary>
-        private void Pick()
+        /// <summary>Steps the plan, sets each probe's car and share, and starts the drawing it asks for.</summary>
+        private void DrawNear(int busy)
         {
-            picked.Clear();
-            pickedScore.Clear();
             CarController[] cars = views.Cars;
-            Vector3 at = transform.position, ahead = transform.forward;
+            places.Clear();
+            int watched = -1;
             if (cars != null)
-                foreach (CarController car in cars)
+                for (int c = 0; c < cars.Length; c++)
                 {
-                    if (car == null || !car.gameObject.activeInHierarchy) continue;
-                    Vector3 to = car.transform.position - at;
-                    float score = to.magnitude + (Vector3.Dot(to, ahead) < 0f ? Behind : 0f);
-                    if (score > NearReach) continue;
-                    int i = pickedScore.Count;
-                    while (i > 0 && pickedScore[i - 1] > score) i--;
-                    if (i >= nears.Count) continue;
-                    picked.Insert(i, car);
-                    pickedScore.Insert(i, score);
-                    if (picked.Count > nears.Count)
-                    {
-                        picked.RemoveAt(picked.Count - 1);
-                        pickedScore.RemoveAt(pickedScore.Count - 1);
-                    }
+                    CarController car = cars[c];
+                    bool racing = car != null && car.gameObject.activeInHierarchy;
+                    places.Add(racing ? car.transform.position : (Vector3?)null);
+                    if (racing && car == views.Car) watched = c;
                 }
-
-            // A probe whose car is no longer picked lets it go; the picked cars without a probe take the free ones.
-            foreach (Near n in nears)
-                if (n.Car != null && !picked.Contains(n.Car)) Release(n);
-            foreach (CarController car in picked)
+            plan.Step(Time.deltaTime, Time.frameCount, transform.position, transform.forward, places, watched, busy, Finished, draws);
+            for (int i = 0; i < nears.Count; i++)
             {
-                if (Holding(car)) continue;
-                foreach (Near n in nears)
+                Near n = nears[i];
+                ProbePlan.Slot s = plan.Slots[i];
+                CarController car = s.Car >= 0 ? cars[s.Car] : null;
+                if (car != n.Car)
                 {
-                    if (n.Car != null || (n.Rendering >= 0 && !n.Probe.IsFinishedRendering(n.Rendering))) continue;
                     n.Car = car;
-                    n.Body = car.GetComponentsInChildren<Renderer>(true);
-                    n.Ready = false;
-                    n.Probe.importance = WaitingImportance;
-                    break;
+                    n.Body = car != null ? car.GetComponentsInChildren<Renderer>(true) : null;
                 }
+                if (car != null)
+                {
+                    // The box follows its car every frame; only the drawing waits.
+                    Bounds b = BodyBounds(car.transform);
+                    n.Probe.center = b.center - n.Probe.transform.position;
+                    n.Probe.size = b.size;
+                }
+                n.Probe.importance = s.Weight > 0f ? NearImportance : WaitingImportance;
+                n.Probe.blendDistance = 0.5f * Margin / Mathf.Max(s.Weight, 1e-3f);
+                if (s.Rendering) continue;
+                n.Rendering = -1;
             }
-
-            // Each probe's box follows its car every frame; only the drawing waits.
-            foreach (Near n in nears)
+            foreach ((int slot, bool whole) in draws)
             {
-                if (n.Car == null) continue;
-                Bounds b = BodyBounds(n.Car.transform);
-                n.Probe.center = b.center - n.Probe.transform.position;
-                n.Probe.size = b.size;
+                Near n = nears[slot];
+                n.Probe.transform.position = Capture(n.Car);
+                n.Probe.center = BodyBounds(n.Car.transform).center - n.Probe.transform.position;
+                n.Probe.timeSlicingMode = whole ? ReflectionProbeTimeSlicingMode.NoTimeSlicing : ReflectionProbeTimeSlicingMode.IndividualFaces;
+                n.Rendering = n.Probe.RenderProbe();
             }
         }
 
-        private bool Holding(CarController car)
-        {
-            foreach (Near n in nears)
-                if (n.Car == car) return true;
-            return false;
-        }
-
-        private static void Release(Near n)
-        {
-            n.Car = null;
-            n.Body = null;
-            n.Ready = false;
-            n.Probe.importance = WaitingImportance;
-        }
+        private bool Finished(int slot) => nears[slot].Rendering < 0 || nears[slot].Probe.IsFinishedRendering(nears[slot].Rendering);
 
         /// <summary>The car's body, with the margin, as a box in the world.</summary>
         private static Bounds BodyBounds(Transform car)
@@ -302,59 +262,6 @@ namespace TarmacGauntlet.Raceday
             return new Bounds(car.TransformPoint(CarBuilder.BoxCentre), extent * 2f);
         }
 
-        /// <summary>
-        /// Draws the live probe whole, then starts drawing the other probes that are due, nearest car first, then the
-        /// longest waiting, up to the budget.
-        /// </summary>
-        private void DrawNear(int budget, Near live)
-        {
-            int busy = 0;
-            foreach (Near n in nears)
-            {
-                if (n.Rendering < 0 || n.Probe.IsFinishedRendering(n.Rendering))
-                {
-                    if (n.Rendering >= 0 && n.Car != null && !n.Ready && n.Drawing == n.Car)
-                    {
-                        n.Ready = true;
-                        n.Probe.importance = NearImportance;
-                    }
-                    n.Rendering = -1;
-                }
-                else if (n != live) busy++;
-            }
-            if (live != null && live.Rendering < 0) Draw(live, ReflectionProbeTimeSlicingMode.NoTimeSlicing);
-            while (busy < budget)
-            {
-                Near next = null;
-                foreach (CarController car in picked)
-                {
-                    foreach (Near n in nears)
-                        if (n != live && n.Car == car && n.Rendering < 0 && (next == null || Due(n, next))) next = n;
-                    if (next != null && !next.Ready) break;
-                }
-                if (next == null) return;
-                Draw(next, ReflectionProbeTimeSlicingMode.IndividualFaces);
-                busy++;
-            }
-        }
-
-        private static void Draw(Near n, ReflectionProbeTimeSlicingMode slicing)
-        {
-            n.Probe.transform.position = Capture(n.Car);
-            n.Probe.center = BodyBounds(n.Car.transform).center - n.Probe.transform.position;
-            n.Probe.timeSlicingMode = slicing;
-            n.Started = Time.frameCount;
-            n.Drawing = n.Car;
-            n.Rendering = n.Probe.RenderProbe();
-        }
-
-        /// <summary>True if a should be drawn before b: one not yet drawn at its car first, then the one waiting longest.</summary>
-        private static bool Due(Near a, Near b)
-        {
-            if (a.Ready != b.Ready) return !a.Ready;
-            return a.Started < b.Started;
-        }
-
         private static Vector3 Capture(CarController car) => car.transform.position + Vector3.up * Height;
 
         /// <summary>
@@ -365,9 +272,11 @@ namespace TarmacGauntlet.Raceday
         {
             if (camera == null || camera.cameraType != CameraType.Reflection) return;
             Vector3 at = camera.transform.position;
-            foreach (Near n in nears)
+            for (int i = 0; i < nears.Count; i++)
             {
-                if (n.Car == null || n.Body == null || n.Rendering < 0 || n.Drawing != n.Car) continue;
+                Near n = nears[i];
+                ProbePlan.Slot s = plan.Slots[i];
+                if (n.Car == null || n.Body == null || n.Rendering < 0 || !s.Rendering || s.Drawing != s.Car) continue;
                 if ((n.Probe.transform.position - at).sqrMagnitude > 0.0025f) continue;
                 foreach (Renderer r in n.Body)
                 {
