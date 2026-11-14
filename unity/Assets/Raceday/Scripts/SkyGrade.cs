@@ -34,6 +34,8 @@ namespace TarmacGauntlet.Raceday
                 Saturation = 6f + 10f * golden - 6f * blue - 22f * night - 18f * grey + 5f * sunny - 7f * shaded,
                 Temperature = 14f * golden - 10f * blue - 8f * night - 6f * grey + 4f * sunny - 4f * shaded,
                 Tint = 3f * golden - 2f * blue,
+                // At night only the lamps reach the bloom's threshold: more of it gives each lamp its halo.
+                Bloom = NightBudget.Bloom * night,
             };
         }
 

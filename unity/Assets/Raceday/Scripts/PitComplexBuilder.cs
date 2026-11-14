@@ -48,6 +48,31 @@ namespace TarmacGauntlet.Raceday
         public const int WindowCells = 32, StoreyCells = 4;
         private const float ChunkSize = 150f;
 
+        /// <summary>The rooms' light: warm lamps, warm white office light and cool tubes, sRGB.</summary>
+        private static readonly (float r, float g, float b)[] RoomLight = { (1f, 0.62f, 0.3f), (1f, 0.8f, 0.55f), (0.78f, 0.9f, 1f) };
+
+        /// <summary>
+        /// Each window's light by night, sRGB, a window a cell along and a storey a row up (<see cref="WindowCells"/>,
+        /// <see cref="StoreyCells"/>): some rooms dark, some dim, most lit in one of <see cref="RoomLight"/>.
+        /// </summary>
+        public static (float r, float g, float b)[] WindowLight()
+        {
+            var rng = new System.Random(17);
+            var rooms = new (float, float, float)[WindowCells * StoreyCells];
+            for (int cx = 0; cx < WindowCells; cx++)
+                for (int cy = 0; cy < StoreyCells; cy++)
+                {
+                    double roll = rng.NextDouble();
+                    float lit = roll < 0.3 ? 0f : roll < 0.45 ? 0.35f : 0.75f + 0.25f * (float)rng.NextDouble();
+                    var c = RoomLight[rng.Next(RoomLight.Length)];
+                    rooms[cy * WindowCells + cx] = (c.r * lit, c.g * lit, c.b * lit);
+                }
+            return rooms;
+        }
+
+        /// <summary>Whether a point in a window's cell, 0 to 1 across and up, is its frame rather than its pane.</summary>
+        public static bool WindowFrame(float across, float up) => across < 1f / 16f || across >= 15f / 16f || up < 3f / 16f || up >= 14f / 16f;
+
         /// <summary>
         /// Props in every garage with a car, all against the back wall or the sides, clear of the crew's front and the
         /// car bay: the tools, the engineers' desk and its stools, the stools of the crew's corner (one under each

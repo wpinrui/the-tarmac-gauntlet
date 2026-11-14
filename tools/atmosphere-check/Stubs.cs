@@ -85,7 +85,7 @@ namespace TarmacGauntlet.Rendering
     {
         public struct Grade
         {
-            public float Exposure, Contrast, Saturation, Temperature, Tint;
+            public float Exposure, Contrast, Saturation, Temperature, Tint, Bloom;
         }
     }
 }
