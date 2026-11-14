@@ -229,23 +229,33 @@ def hatch_glass():
     return Polygon(top + bot).buffer(0)
 
 
-def bonnet_outline():
+def bonnet_outline(bvh):
     """Bonnet shut line on the top view (x, y): from the windscreen's base, inboard of its
     corners, out to the bonnet's rear corners, forward along the wings and over the lamps,
     across the nose."""
     half = [(-0.80, .50), (-0.86, .60), (-0.93, .685), (-1.10, .695), (-1.30, .695), (-1.40, .688),
             (-1.48, .655), (-1.56, .60), (-1.64, .52), (-1.70, .42), (-1.74, .30), (-1.765, .15), (-1.772, 0)]
     pts = [(float(X(s)), float(W(w))) for s, w in half]
-    return Polygon(pts + [(x, -y) for x, y in pts[-2::-1]]).buffer(0)
+    poly = Polygon(pts + [(x, -y) for x, y in pts[-2::-1]]).buffer(0)
+    # the front edge crosses the nose above the grille, so the grille stays on the bumper
+    zg = max(z for _w, z in R["grille"]) + 0.025
+    edge = []
+    for y in np.linspace(-1.0, 1.0, 81):
+        loc, _n = B.cast(bvh, FRONT, y, zg)
+        if loc is not None:
+            edge.append((loc[0] - 0.012, y))
+    keep = Polygon([(-9, edge[0][1] - 1)] + [(edge[0][0], edge[0][1] - 1)] + edge
+                   + [(edge[-1][0], edge[-1][1] + 1), (-9, edge[-1][1] + 1)])
+    return poly.intersection(keep).buffer(0)
 
 
 def hatch_outline():
     """Hatch shut line on the rear view (y, z): below the roof's rear edge, down the sides of
-    the glass, in between the tail lamps and across above the bumper. One smooth closed curve
-    through these points."""
+    the glass, straight on down under the tail lamps, which cover it, and across above the
+    bumper. One smooth closed curve through these points."""
     from geom import catmull_closed
-    half = [(0.0, .958), (0.30, .956), (0.46, .948), (0.515, .925), (0.535, .86), (0.532, .77), (0.51, .715),
-            (0.45, .68), (0.395, .645), (0.378, .58), (0.372, .50), (0.355, .455), (0.30, .45), (0.0, .45)]
+    half = [(0.0, .958), (0.30, .956), (0.46, .948), (0.515, .925), (0.535, .86), (0.532, .77), (0.522, .70),
+            (0.512, .60), (0.505, .50), (0.497, .47), (0.475, .452), (0.42, .45), (0.0, .45)]
     pts = [(float(W(w)), float(Z(z))) for w, z in half]
     loop = pts + [(-y, z) for y, z in pts[-2:0:-1]]
     return Polygon(catmull_closed(loop, 8)).buffer(0)
@@ -322,7 +332,7 @@ def body_pieces(opts):
         DOORS[name] = ((xf, s * yw, 0.40), (xf - 0.04, s * (yw - 0.07), 1.10), -s * 66.0)
 
     # bonnet and hatch: panels cut free along their shut lines
-    for nm, poly, fr in (("bonnet", bonnet_outline(), TOP), ("hatch", hatch_outline(), REAR)):
+    for nm, poly, fr in (("bonnet", bonnet_outline(bvh), TOP), ("hatch", hatch_outline(), REAR)):
         inner = B.cutter(bvh, f"{nm}_in", [(poly, 0.03)], fr, grow=-GAP, step=0.025)
         outr = B.cutter(bvh, f"{nm}_out", [(poly, 0.03)], fr, grow=GAP, step=0.025)
         B.split_off(ob, inner, outr, nm)
@@ -345,10 +355,11 @@ def interior(cab, opts):
         y = 0.37 * s
         parts.append(boxob(f"seat_base_{s}", x_seat - 0.28, x_seat + 0.24, y - 0.24, y + 0.24, FLOOR + 0.03, FLOOR + 0.18, "seat"))
         back = boxob(f"seat_back_{s}", x_seat - 0.34, x_seat - 0.22, y - 0.24, y + 0.24, FLOOR + 0.16, FLOOR + 0.81, "seat")
-        B.swing([back], (x_seat - 0.28, y - 1, FLOOR + 0.16), (x_seat - 0.28, y + 1, FLOOR + 0.16), 12)
+        B.swing([back], (x_seat - 0.28, y - 1, FLOOR + 0.16), (x_seat - 0.28, y + 1, FLOOR + 0.16), -14)
         parts.append(back)
     parts.append(boxob("rear_seat", float(X(0.95)), float(X(0.62)), -0.62, 0.62, FLOOR + 0.03, FLOOR + 0.21, "seat"))
     rb = boxob("rear_back", float(X(1.05)), float(X(0.93)), -0.62, 0.62, FLOOR + 0.16, FLOOR + 0.68, "seat")
+    B.swing([rb], (float(X(0.99)), -1, FLOOR + 0.16), (float(X(0.99)), 1, FLOOR + 0.16), -10)
     parts.append(rb)
     for p in parts:
         clip = cab.copy(); clip.data = cab.data.copy()
