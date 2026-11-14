@@ -97,7 +97,7 @@ namespace TarmacGauntlet.Simulation
 
         // --- Failure probability modifiers ---
         /// <summary>Base chance of a race-ending failure per lap under ideal conditions.</summary>
-        private const double BaseFailureProb = 0.003;
+        private const double BaseFailureProb = 0.0049;
 
         /// <summary>
         /// At 0% condition this factor is added on top of 1.0, quintupling the failure probability.

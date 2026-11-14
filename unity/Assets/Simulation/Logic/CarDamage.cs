@@ -8,7 +8,8 @@ namespace TarmacGauntlet.Simulation
     /// (wrecked) with the speed of each hit. It is not condition: it costs grip, more at the end of the car that was
     /// hit (a nose hit understeers, a tail hit oversteers), and adds drag from the broken bodywork. The crew can
     /// repair it at a stop, all of it or some, at a cost in time and spare parts for each point. One hit hard enough
-    /// totals the car: it is out of the race and goes back to the garage at 0% condition. Damage still on the car at
+    /// totals the car: it is out of the race and goes back to the garage at 0% condition. Damage piling up to
+    /// <see cref="RetireDamage"/> puts the car out too, and the damage comes off its condition as at the flag. Damage still on the car at
     /// the flag comes off its condition, one for one (<see cref="ConditionPerPoint"/>).
     /// </summary>
     public static class CarDamage
@@ -17,8 +18,10 @@ namespace TarmacGauntlet.Simulation
         public const double MinImpact = 5;
         /// <summary>Damage for each m/s of a hit above <see cref="MinImpact"/>: 18 m/s into a barrier is 7.8.</summary>
         public const double DamagePerImpact = 0.6;
-        /// <summary>A hit at least this hard, m/s into what was hit (about 160 km/h), totals the car.</summary>
-        public const double TotalImpact = 45;
+        /// <summary>A hit at least this hard, m/s into what was hit (about 110 km/h), totals the car.</summary>
+        public const double TotalImpact = 30;
+        /// <summary>Damage on the car at which it is out of the race: hits that each leave it running add up to a wreck.</summary>
+        public const double RetireDamage = 35;
         /// <summary>Share of its grip a car loses for each point of damage spread evenly: 15 damage, a heavy hit, costs 17%.</summary>
         public const double GripLossPerPoint = 0.01125;
         /// <summary>Grip an axle keeps however damaged: a wreck still crawls back to its box.</summary>
@@ -42,7 +45,7 @@ namespace TarmacGauntlet.Simulation
         /// </summary>
         public const double HitsPerHour = 3;
         /// <summary>Mean m/s above <see cref="MinImpact"/> of a rolled hit: most are knocks, a very few total the car.</summary>
-        public const double MeanRolledImpact = 6;
+        public const double MeanRolledImpact = 6.8;
 
         /// <summary>
         /// For a car with no physics: the speed of a hit it takes over <paramref name="seconds"/> of driving, or null
@@ -61,6 +64,9 @@ namespace TarmacGauntlet.Simulation
 
         /// <summary>True for a hit hard enough to total the car.</summary>
         public static bool Totals(double impact) => impact >= TotalImpact;
+
+        /// <summary>True for damage enough to put the car out of the race (<see cref="RetireDamage"/>).</summary>
+        public static bool Retires(double damage) => damage >= RetireDamage;
 
         private static double Points(double damage) => Math.Max(0, Math.Min(100, damage));
 
