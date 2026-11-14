@@ -404,7 +404,7 @@ def export(obs, out_dir, name, materials, game=False):
 
 
 # ---------------------------------------------------------------- doors
-def cutter(bvh, name, regions, fr, out=0.35, grow=0.0):
+def cutter(bvh, name, regions, fr, out=0.35, grow=0.0, step=0.01):
     """A solid for cutting a panel free of the body, laid along fr's rays. regions: [(shape,
     depth)], each running from depth inside the skin (negative: outside it) to out beyond it.
     grow widens each shape and deepens it, so a cutter grown a little more than its pair leaves
@@ -413,7 +413,7 @@ def cutter(bvh, name, regions, fr, out=0.35, grow=0.0):
     obs = []
     for i, (g, depth) in enumerate(regions):
         obs += lay(bvh, f"{name}_{i}", g.buffer(grow, join_style=2), fr, -(depth + grow), out + grow + 0.004 * i,
-                   "interior", 0.01, along_ray=True)
+                   "interior", step, along_ray=True)
     return union_all(obs, name)
 
 
@@ -448,7 +448,7 @@ def write_doors(path, doors):
     Path(path).write_text(json.dumps(out, indent=2) + "\n")
 
 
-def free_door(ref, fr, regions, gap, shell, trims, roles, outline, name="door_l", solids=None):
+def free_door(ref, fr, regions, gap, shell, trims, roles, outline, name="door_l", solids=None, step=0.01):
     """Cut a door free: its panel out of shell and out of each trim object in trims (each
     split piece named <name>_trim, _trim_1, ...), with a gap of 2 * gap all round. solids, if
     given, is a function of grow returning more cutter solids to add to the regions'. Then each
@@ -458,7 +458,7 @@ def free_door(ref, fr, regions, gap, shell, trims, roles, outline, name="door_l"
     from shapely.geometry import Point
     sgn = -float(np.sign(fr[3][1]))
     def one(tag, grow):
-        obs = [cutter(ref, name + tag, regions, fr, grow=grow)] if regions else []
+        obs = [cutter(ref, name + tag, regions, fr, grow=grow, step=step)] if regions else []
         return union_all(obs + (solids(grow) if solids else []), name + tag)
     pair = lambda: (one("_in", -gap), one("_out", gap))
     pieces = [split_off(shell, *pair(), name)]
