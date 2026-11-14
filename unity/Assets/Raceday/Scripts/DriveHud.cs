@@ -11,7 +11,8 @@ namespace TarmacGauntlet.Raceday
     /// lane limiter is on.
     ///
     /// In the bottom right corner, three cards. The top one is the car's condition, as a number and a bar. Once the
-    /// car is damaged, the damage sits under it on the same card, apart from the condition: a number and a bar, amber,
+    /// car is damaged, the damage sits under it on the same card, apart from the condition: a number and a bar out of the
+    /// retirement limit, so 100% puts the car out (<see cref="CarDamage.RetireDamage"/>), amber,
     /// red once the damage would bring an AI car in (<see cref="PitPlan.DamageLimit"/>). The bar's end is striped as far
     /// as the spare parts on hand would repair at a stop, and a line under it gives the parts on hand, the parts a full
     /// repair takes and how much of the damage a stop would fix. The middle card is the fuel and tyres, each a bar with the laps
@@ -170,12 +171,14 @@ namespace TarmacGauntlet.Raceday
             if (!damaged) return;
             y += bar + section;
 
-            float damage = (float)log.Damage;
+            // Shown out of the retirement limit: a full bar puts the car out of the race.
+            float scale = 100f / (float)CarDamage.RetireDamage;
+            float damage = Mathf.Min(100f, (float)log.Damage * scale);
             Color hurt = log.Damage >= PitPlan.DamageLimit ? Red : Amber;
             Heading("Damage", damage, hurt, x0, inner, y, head);
             y += head + gapY;
             // The striped end of the bar is what the spare parts on hand would repair at a stop.
-            float fixes = Mathf.Min(damage, (float)CarDamage.PointsFrom(log.SpareParts));
+            float fixes = Mathf.Min(damage, (float)CarDamage.PointsFrom(log.SpareParts) * scale);
             Fill(new Rect(x0, y, inner, bar), Track, bar / 2f);
             Fill(new Rect(x0, y, inner * (damage - fixes) / 100f, bar), hurt, bar / 2f);
             var striped = new Rect(x0 + inner * (damage - fixes) / 100f, y, inner * fixes / 100f, bar);
