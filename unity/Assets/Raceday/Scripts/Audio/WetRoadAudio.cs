@@ -28,6 +28,8 @@ namespace TarmacGauntlet.Raceday
         private AudioSource source;
         private WetRoadSynth synth;
         private float[] mono = new float[4096];
+        /// <summary>The hiss's gain, on the samples: the source itself stays at <see cref="SynthGain.Carrier"/>.</summary>
+        private readonly SynthGain gain = new SynthGain();
         private volatile bool playing;
 
         public static WetRoadAudio Fit(CarController car, int seed)
@@ -56,6 +58,7 @@ namespace TarmacGauntlet.Raceday
             s.minDistance = 5f;
             s.maxDistance = Range;
             s.priority = 100;   // below the tyres when Unity runs short of voices
+            s.volume = SynthGain.Carrier;
             w.source = s;
             return w;
         }
@@ -73,7 +76,7 @@ namespace TarmacGauntlet.Raceday
             if (synth == null) return;
             if (rankedFrame != Time.frameCount) Rank();
             if (!playing) return;
-            source.volume = Level * Mix.Gain(SoundGroup.Tyres);
+            gain.Target = Level * Mix.Gain(SoundGroup.Tyres);
             int grounded = 0;
             for (int i = 0; i < 4; i++) if (car.Ground(i, out _)) grounded++;
             WeatherState weather = RaceWeather.Now;
@@ -114,6 +117,7 @@ namespace TarmacGauntlet.Raceday
             int frames = data.Length / channels;
             if (mono.Length < frames) mono = new float[frames];
             synth.Render(mono, frames);
+            gain.Apply(mono, frames);
             for (int i = 0, k = 0; i < frames; i++)
                 for (int c = 0; c < channels; c++, k++)
                     data[k] *= mono[i];

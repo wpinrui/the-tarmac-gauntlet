@@ -31,6 +31,7 @@ public static class Check
     {
         string assets = args[0], outDir = args[1];
         Rules();
+        SynthGains.Run(assets);
         Budget();
         if (args.Skip(2).Contains("check")) return Done();
         Render.All(assets, outDir);

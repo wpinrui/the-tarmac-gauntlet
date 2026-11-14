@@ -30,6 +30,8 @@ namespace TarmacGauntlet.Raceday
         private AudioSource source;
         private EngineSynth synth;
         private float[] mono = new float[4096];
+        /// <summary>The engines' gain, on the samples: the source itself stays at <see cref="SynthGain.Carrier"/>.</summary>
+        private readonly SynthGain gain = new SynthGain();
         private int lastGear;
         private volatile bool playing;
         /// <summary>Switched off: the race is over and the car parked, so it makes no sound.</summary>
@@ -65,6 +67,7 @@ namespace TarmacGauntlet.Raceday
             source.minDistance = 6f;
             source.maxDistance = Range;
             source.priority = 64;
+            source.volume = SynthGain.Carrier;
         }
 
         private void OnEnable() => all.Add(this);
@@ -80,7 +83,7 @@ namespace TarmacGauntlet.Raceday
             if (synth == null) return;
             if (rankedFrame != Time.frameCount) Rank();
             if (!playing) return;
-            source.volume = Mix.Gain(SoundGroup.Engines);
+            gain.Target = Mix.Gain(SoundGroup.Engines);
 
             CarSpec spec = car.Spec;
             int gear = Mathf.Max(car.Gear, 1);
@@ -133,6 +136,7 @@ namespace TarmacGauntlet.Raceday
             int frames = data.Length / channels;
             if (mono.Length < frames) mono = new float[frames];
             synth.Render(mono, frames);
+            gain.Apply(mono, frames);
             for (int i = 0, k = 0; i < frames; i++)
                 for (int c = 0; c < channels; c++, k++)
                     data[k] *= mono[i];
