@@ -58,7 +58,7 @@ namespace TarmacGauntlet.Simulation
         /// </summary>
         public const double HitsPerHour = 3;
         /// <summary>Mean m/s above <see cref="MinImpact"/> of a rolled hit: most are knocks, a very few total the car.</summary>
-        public const double MeanRolledImpact = 6.8;
+        public const double MeanRolledImpact = 6.3;
 
         /// <summary>
         /// For a car with no physics: the speed of a hit it takes over <paramref name="seconds"/> of driving, or null
