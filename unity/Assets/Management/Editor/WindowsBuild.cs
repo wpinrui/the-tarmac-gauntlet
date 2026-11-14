@@ -14,7 +14,9 @@ namespace TarmacGauntlet.Management.Editor
     /// <summary>
     /// One click Windows builds. "Build" writes the game to Builds/Windows next to Assets. "Build and Install" then
     /// copies it to %LOCALAPPDATA%\Programs\The Tarmac Gauntlet, replacing the last install, and puts the game on the
-    /// Start menu and the desktop.
+    /// Start menu and the desktop. "Build and Install (Ultra Only)" does the same for quick rebuilds while developing: only
+    /// Ultra's pipeline asset goes in, so URP compiles only the shader variants Ultra uses, and the game is locked to Ultra
+    /// (TG_ULTRA_ONLY, QualityLevels).
     /// </summary>
     internal static class WindowsBuild
     {
@@ -39,9 +41,14 @@ namespace TarmacGauntlet.Management.Editor
         }
 
         [MenuItem("Tarmac Gauntlet/Build and Install", priority = 101)]
-        private static void BuildAndInstall()
+        private static void BuildAndInstall() => BuildAndInstall(false);
+
+        [MenuItem("Tarmac Gauntlet/Build and Install (Ultra Only)", priority = 102)]
+        private static void BuildAndInstallUltraOnly() => BuildAndInstall(true);
+
+        private static void BuildAndInstall(bool ultraOnly)
         {
-            if (!Build()) return;
+            if (!Build(ultraOnly)) return;
             try
             {
                 Install();
@@ -57,9 +64,13 @@ namespace TarmacGauntlet.Management.Editor
 
         [MenuItem("Tarmac Gauntlet/Build", true)]
         [MenuItem("Tarmac Gauntlet/Build and Install", true)]
+        [MenuItem("Tarmac Gauntlet/Build and Install (Ultra Only)", true)]
         private static bool CanBuild() => !EditorApplication.isPlayingOrWillChangePlaymode && !BuildPipeline.isBuildingPlayer;
 
-        private static bool Build()
+        /// <summary>The define that locks an Ultra-only build to Ultra (QualityLevels).</summary>
+        private const string UltraOnlyDefine = "TG_ULTRA_ONLY";
+
+        private static bool Build(bool ultraOnly = false)
         {
             if (!UnityEditor.SceneManagement.EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return false;
             string[] scenes = EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => s.path).ToArray();
@@ -74,7 +85,7 @@ namespace TarmacGauntlet.Management.Editor
             // Lighting and blending are done in linear light (UsePipeline sets this in the editor too).
             if (PlayerSettings.colorSpace != ColorSpace.Linear) PlayerSettings.colorSpace = ColorSpace.Linear;
             if (Directory.Exists(BuildFolder)) Directory.Delete(BuildFolder, true);
-            UnityEngine.Rendering.RenderPipelineAsset[] pipelines = UseQualityAssets();
+            UnityEngine.Rendering.RenderPipelineAsset[] pipelines = UseQualityAssets(ultraOnly);
             BuildReport report;
             try
             {
@@ -84,6 +95,7 @@ namespace TarmacGauntlet.Management.Editor
                     locationPathName = Path.Combine(BuildFolder, ExeName),
                     target = BuildTarget.StandaloneWindows64,
                     options = BuildOptions.None,
+                    extraScriptingDefines = ultraOnly ? new[] { UltraOnlyDefine } : null,
                 });
             }
             finally
@@ -94,7 +106,7 @@ namespace TarmacGauntlet.Management.Editor
             {
                 // CC BY music and sounds need their credits shipped with the game.
                 File.Copy(CreditsFile, Path.Combine(BuildFolder, "Credits.txt"), true);
-                Debug.Log($"Built {GameName} to {BuildFolder} in {report.summary.totalTime.TotalSeconds:0}s");
+                Debug.Log($"Built {GameName}{(ultraOnly ? " (Ultra only)" : "")} to {BuildFolder} in {report.summary.totalTime.TotalSeconds:0}s");
                 return true;
             }
             EditorUtility.DisplayDialog("Build failed", $"The build {report.summary.result.ToString().ToLowerInvariant()} with {report.summary.totalErrors} errors. The Console has the details.", "OK");
@@ -158,9 +170,10 @@ namespace TarmacGauntlet.Management.Editor
         /// URP keeps only the shader variants the build's pipeline assets use, and finds those assets on Unity's quality
         /// levels. The game picks its own asset in code (QualityLevels), so while the build runs each of Unity's levels holds
         /// one of the game's, Low to Ultra. Without this the variants only High and Ultra use, such as their soft shadows,
-        /// the other lights' shadows and the screen shadows, would be left out. Returns the levels' own assets.
+        /// the other lights' shadows and the screen shadows, would be left out. Ultra only, every level holds Ultra's, so
+        /// URP leaves out what only Low to High use. Returns the levels' own assets.
         /// </summary>
-        private static UnityEngine.Rendering.RenderPipelineAsset[] UseQualityAssets()
+        private static UnityEngine.Rendering.RenderPipelineAsset[] UseQualityAssets(bool ultraOnly)
         {
             int current = QualitySettings.GetQualityLevel();
             var before = new UnityEngine.Rendering.RenderPipelineAsset[QualitySettings.count];
@@ -170,7 +183,7 @@ namespace TarmacGauntlet.Management.Editor
             {
                 QualitySettings.SetQualityLevel(i, false);
                 before[i] = QualitySettings.renderPipeline;
-                string name = QualityLevels.Names[Mathf.Min(i, QualityLevels.Names.Length - 1)];
+                string name = QualityLevels.Names[ultraOnly ? QualityLevels.Names.Length - 1 : Mathf.Min(i, QualityLevels.Names.Length - 1)];
                 QualitySettings.renderPipeline = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.RenderPipelineAsset>(
                     "Assets/Rendering/Resources/Quality/" + name + ".asset");
             }
@@ -191,8 +204,8 @@ namespace TarmacGauntlet.Management.Editor
 
         /// <summary>
         /// The game makes its URP Lit materials in code, so the build only keeps the Lit variants some built material
-        /// uses. One material per mix of Lit.cs modes and emission, in a Resources folder, keeps every one the game
-        /// can ask for.
+        /// uses. One material per mix of Lit.cs modes and emission, and one for the grass, in a Resources folder, keeps
+        /// every one the game can ask for.
         /// </summary>
         private static void FillLitVariants()
         {
@@ -214,6 +227,10 @@ namespace TarmacGauntlet.Management.Editor
                 if (emission) m.EnableKeyword("_EMISSION");
                 AssetDatabase.CreateAsset(m, $"{folder}/{surface}{(normal ? "Normal" : "")}{(metallic ? "Metallic" : "")}{(emission ? "Emission" : "")}.mat");
             }
+            // The grass the night's lamps light as grass (Lit.GrassKeyword): opaque, with nothing else.
+            var grass = new Material(Lit.Shader);
+            grass.EnableKeyword(Lit.GrassKeyword);
+            AssetDatabase.CreateAsset(grass, $"{folder}/OpaqueGrass.mat");
             AssetDatabase.SaveAssets();
         }
 

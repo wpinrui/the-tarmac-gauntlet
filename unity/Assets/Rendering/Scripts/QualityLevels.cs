@@ -15,7 +15,8 @@ namespace TarmacGauntlet.Rendering
     /// Low and Medium share a renderer; High and Ultra each have their own, with finer ambient occlusion at full resolution
     /// that darkens the ambient light fully and the sunlight a little. Every game camera gets post-processing and SMAA;
     /// URP swaps the SMAA for STP wherever STP runs, so SMAA only smooths the edges on hardware that cannot run STP.
-    /// The level is remembered between runs.
+    /// The level is remembered between runs. A build made with "Build and Install (Ultra Only)" (TG_ULTRA_ONLY) holds only
+    /// Ultra's shader variants, so it always runs at Ultra, and starts with every graphics option at Ultra's setting.
     /// <para>
     /// Each renderer carries URP's Screen Space Shadows, drawn with the game's own shader (ScreenShadows.shader): soft
     /// penumbrae, cascades blended at their edges and contact shadows, as much of each as the level's
@@ -89,7 +90,11 @@ namespace TarmacGauntlet.Rendering
         /// <summary>0 Low, 1 Medium, 2 High, 3 Ultra.</summary>
         public static int Level
         {
+#if TG_ULTRA_ONLY
+            get => Names.Length - 1;
+#else
             get => Mathf.Clamp(PlayerPrefs.GetInt(Key, DefaultLevel), 0, Names.Length - 1);
+#endif
             set
             {
                 PlayerPrefs.SetInt(Key, Mathf.Clamp(value, 0, Names.Length - 1));
@@ -103,6 +108,15 @@ namespace TarmacGauntlet.Rendering
         {
             if (started) return;
             started = true;
+#if TG_ULTRA_ONLY
+            // The first run of an Ultra-only build sets every graphics option to Ultra's, as picking Ultra in the menu does.
+            if (PlayerPrefs.GetInt(Key, DefaultLevel) != Names.Length - 1)
+            {
+                PlayerPrefs.SetInt(Key, Names.Length - 1);
+                PlayerPrefs.Save();
+                GraphicsOptions.ApplyQuality(Names.Length - 1);
+            }
+#endif
             pipelineBefore = QualitySettings.renderPipeline;
             occlusion.Clear();
             screenShadows.Clear();

@@ -58,6 +58,8 @@ namespace TarmacGauntlet.Simulation
             { "Flatbed Legends", "Assets/Art/Liveries/FlatbedLegends" },
             { "Steelworks Motorsport", "Assets/Art/Liveries/SteelworksMotorsport" },
             { "Mapleton Autosport", "Assets/Art/Liveries/MapletonAutosport" },
+            { "Southgate Motorsport", "Assets/Art/Liveries/SouthgateMotorsport" },
+            { "Vespro Corse", "Assets/Art/Liveries/VesproCorse" },
         };
 
         /// <summary>The team's livery folder, or null for a team with no livery yet.</summary>
