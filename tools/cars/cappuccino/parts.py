@@ -261,18 +261,28 @@ def hatch_outline():
     return Polygon(catmull_closed(loop, 8)).buffer(0)
 
 
-def paint_jambs(ob, outline, sign):
-    """Paint the cut faces round a door opening in body colour: interior faces inside the
-    door outline seen from the side, whose normal does not point across the car."""
+def paint_jambs(bvh, ob, outline, sign, depth=True):
+    """Paint the cut faces round a door opening in body colour: interior faces near the door
+    outline seen from the side, whose normal does not point across the car. depth: also keep
+    only faces between the outer skin and the hollow behind it, so the door's own inner wall
+    stays interior."""
     if "body" not in [m.name for m in ob.data.materials]:
         ob.data.materials.append(bpy.data.materials["body"])
     names = [m.name for m in ob.data.materials]
     k, ki = names.index("body"), names.index("interior") if "interior" in names else -1
-    ring = outline.buffer(0.012).difference(outline.buffer(-0.012))
+    r = 0.02 if depth else 0.012
+    ring = outline.buffer(r).difference(outline.buffer(-r))
+    fr = side_frame(sign)
     for p in ob.data.polygons:
         c = p.center
-        if p.material_index == ki and c[1] * sign > 0.3 and abs(p.normal[1]) < 0.75 \
-                and ring.contains(Point(c[0], c[2])):
+        if p.material_index != ki or c[1] * sign < 0.3 or abs(p.normal[1]) > 0.75 \
+                or not ring.contains(Point(c[0], c[2])):
+            continue
+        if not depth:
+            p.material_index = k
+            continue
+        loc, _n = B.cast(bvh, fr, c[0], c[2])
+        if loc is not None and abs(loc[1]) - abs(c[1]) < SKIN * 0.8:
             p.material_index = k
 
 
@@ -321,11 +331,11 @@ def body_pieces(opts):
         roles = {f"glass_door_{tag}": "glass", f"band_door_{tag}": "band", f"mirror_{tag}": "mirror",
                  f"mirror_glass_{tag}": "mirror_glass", f"card_{tag}": "card"}
         pil = [p for p in pillars if p.name.startswith(f"pillar_{tag}")]
-        free = B.free_door(bvh, side_frame(s), [(out, 0.11)], GAP, ob, pil, roles, out, name=name, step=0.025)
+        free = B.free_door(bvh, side_frame(s), [(out, 0.11)], GAP, ob, pil, roles, out, name=name, step=0.012)
         cut(free[0], cutter(f"door_{tag}"))
         cut(ob, cutter(f"quarter_{tag}"))
-        paint_jambs(free[0], out, s)
-        paint_jambs(ob, out, s)
+        paint_jambs(bvh, free[0], out, s)
+        paint_jambs(bvh, ob, out, s, depth=False)
         f = R["door"]
         xf = max(p[0] for p in f) - 0.03
         yw = float(body.CURVES["side"]["w"](xf)) - 0.03
@@ -376,6 +386,12 @@ def interior(cab, opts):
     sw.data.transform(Matrix.Rotation(math.radians(-24), 4, "Y"))
     sw.data.transform(Matrix.Translation(tuple(c)))
     sw.name = "steering"
+    # three spokes from the hub out to the rim: left, right and down, in the wheel's plane
+    for k, (y0, y1, z0, z1) in enumerate(((0.05, 0.18, -0.014, 0.014), (-0.18, -0.05, -0.014, 0.014),
+                                          (-0.014, 0.014, -0.18, -0.05))):
+        sp = boxob(f"steering_spoke_{k}", -0.008, 0.008, y0, y1, z0, z1, "interior")
+        sp.data.transform(Matrix.Rotation(math.radians(-24), 4, "Y"))
+        sp.data.transform(Matrix.Translation(tuple(c)))
     col = boxob("column", c[0] + 0.01, x_fw - 0.38, y - 0.03, y + 0.03, c[2] - 0.04, c[2] + 0.02, "interior")
     hub = boxob("steering_hub", c[0] - 0.02, c[0] + 0.03, y - 0.06, y + 0.06, c[2] - 0.05, c[2] + 0.05, "interior")
     B.swing([hub], tuple(c - [0, 1, 0]), tuple(c + [0, 1, 0]), -24)
@@ -564,7 +580,7 @@ def wheels(opts, game):
             ob = prism(f"{pref}wheel_spokes_{corner}", sp, "y", face - 0.022 * s, face, "rim", 0.04)
             place(ob)
             cap = Point(0, 0).buffer(0.035, 32)
-            ob = prism(f"{pref}wheel_cap_{corner}", cap, "y", face, face + 0.006 * s, "badge", 0.01)
+            ob = prism(f"{pref}wheel_cap_{corner}", cap, "y", face - 0.003 * s, face + 0.006 * s, "badge", 0.01)
             place(ob)
 
 
