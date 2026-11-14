@@ -31,8 +31,6 @@ namespace TarmacGauntlet.Raceday
         private const float OpenTime = 7f, PanelTime = 8f;
         /// <summary>The preview's lens, degrees.</summary>
         private const float Fov = 50f;
-        /// <summary>How fast the camera's aim follows its target, 1/s.</summary>
-        private const float Aim = 3f;
         /// <summary>How long a graphic takes to come in and to go, real seconds.</summary>
         private const float In = 0.35f, Out = 0.3f;
         /// <summary>The title comes in this long into the opening shot, real seconds.</summary>
@@ -62,6 +60,7 @@ namespace TarmacGauntlet.Raceday
         private bool done;
         private float clock;
         private int shown = -1;
+        /// <summary>The camera's heading, a unit vector.</summary>
         private Vector3 aim;
         private bool hidTower;
         /// <summary>The turn called out, and when, on the preview's clock.</summary>
@@ -150,12 +149,13 @@ namespace TarmacGauntlet.Raceday
                 : p.Kind == Kind.Fly ? path.Fly(into)
                 : p.Corner >= 0 ? path.Orbit(p.Corner, u)
                 : path.Open(u);
-            // A new part is a cut: the aim starts on its target. Within a part it follows, so turns stay smooth.
-            aim = i != shown ? pose.Target : Vector3.Lerp(aim, pose.Target, 1f - Mathf.Exp(-Aim * Time.unscaledDeltaTime));
+            // A new part is a cut: the camera starts looking at its target. Within a part its heading follows, eased
+            // and no faster than PreviewPath.TurnRate, so a hairpin is a pan rather than a whip.
+            Vector3 want = pose.Target - pose.Position;
+            want = want.sqrMagnitude > 1e-4f ? want.normalized : Vector3.forward;
+            aim = i != shown ? want : PreviewPath.Turn(aim, want, Time.unscaledDeltaTime);
             shown = i;
-            Vector3 look = aim - pose.Position;
-            if (look.sqrMagnitude < 1e-4f) look = Vector3.forward;
-            cam.transform.SetPositionAndRotation(pose.Position, Quaternion.LookRotation(look, Vector3.up));
+            cam.transform.SetPositionAndRotation(pose.Position, Quaternion.LookRotation(aim, Vector3.up));
             cam.fieldOfView = Fov;
             if (Cameras.Hud != null) Cameras.Hud.Hidden = true;
         }
