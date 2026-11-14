@@ -204,8 +204,8 @@ TAIL_R = 0.25
 
 
 def taillamps(ref, cutters, out):
-    """Each tail lamp is the traced sweep from the boot lid round onto the side, split where the
-    lid's side runs through it. Our own interior: the tail lamp a thin ring just inside the whole
+    """Each tail lamp is the traced sweep from the boot lid round onto the side, whole: the lid's
+    shut line stops at its edges. Our own interior: the tail lamp a thin ring just inside the whole
     outline, the brake lamp one long bar through its middle."""
     shp = soft(wrap_outline(ref, R["tail_axis"], -1, TAIL_R, R["tail"], R["tail_side"], R["tail_top"], rear_fr()),
                0.008)
@@ -215,13 +215,7 @@ def taillamps(ref, cutters, out):
     zc = (b[1] + b[3]) / 2
     bar = soft(inner.buffer(-0.022).intersection(box(b[0] - 1, zc - 0.014, b[2] + 1, zc + 0.014)), 0.004)
     bar = biggest(bar)
-    # the boot lid's side runs straight through each lamp: split the lamp's glass and lights there
-    xa, ya = R["tail_axis"]
-    p, _n = blend.cast(ref, rear_fr(), R["lid_w"], (b[1] + b[3]) / 2)
-    a = np.arctan2(p[1] - ya, -(p[0] - xa)) * TAIL_R
-    gap = box(a - 0.004, -5, a + 0.004, 5)
-    ring, bar = ring.difference(gap), bar.difference(gap)
-    glass = shp.buffer(-0.002).difference(gap)
+    glass = shp.buffer(-0.002)
     for sgn, side in ((1, "l"), (-1, "r")):
         fr = wrap_fr(R["tail_axis"], sgn, -1, TAIL_R)
         cutters += blend.lay(ref, f"cut_tail_{side}", shp, fr, -0.035, 0.006, "housing", LAMP_STEP, along_ray=True)
