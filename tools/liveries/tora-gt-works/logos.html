@@ -1,0 +1,97 @@
+<title>Tora GT Works Logos</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@1,700&family=Saira+Extra+Condensed:wght@800&family=Noto+Sans+JP:wght@900&display=swap">
+<style>
+/* Grid of eight logo plates, each on the greyscale facets the car will wear. */
+:root { --bg: #eceef0; --fg: #1a1c1f; --red: #d7261e; --ink: #16171a; --paper: #f5f5f3; --line: #c9cdd2;
+  --display: "Saira Extra Condensed", "Arial Narrow", sans-serif; --tech: "Chakra Petch", "Arial", sans-serif; --jp: "Noto Sans JP", "Hiragino Sans", sans-serif; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #141619; --fg: #e9ebee; --line: #3a3f46; color-scheme: dark; } }
+:root[data-theme="dark"] { --bg: #141619; --fg: #e9ebee; --line: #3a3f46; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 600 15px/1 system-ui, sans-serif; padding-block: 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 16px; max-width: 1360px; margin: 0 auto; }
+figure { margin: 0; display: grid; gap: 8px; }
+.plate { position: relative; aspect-ratio: 16 / 10; max-width: 100%; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); }
+.plate canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.plate svg { overflow: visible; position: absolute; inset: 12% 10%; width: 80%; height: 76%; }
+figcaption { font-variant-numeric: tabular-nums; }
+</style>
+<div class="grid" id="grid"></div>
+<script>
+const R = 'var(--red)', K = 'var(--ink)', W = 'var(--paper)';
+const D = 'font-family="Saira Extra Condensed, Arial Narrow, sans-serif" font-weight="800"';
+const T = 'font-family="Chakra Petch, Arial, sans-serif" font-weight="700" font-style="italic"';
+const J = 'font-family="Noto Sans JP, Hiragino Sans, sans-serif" font-weight="900"';
+const LOGOS = [
+  // 1. TORA tab over a red GT block and a black WORKS block, leaning forward. Every block keeps 12 units of padding.
+  `<g transform="translate(120 66) skewX(-12)">
+     <rect x="-100" y="-62" width="84" height="30" fill="${W}"/>
+     <text x="-58" y="-46" ${D} font-size="28" fill="${K}" text-anchor="middle" dominant-baseline="central" textLength="60" lengthAdjust="spacingAndGlyphs">TORA</text>
+     <rect x="-100" y="-28" width="66" height="60" fill="${R}"/>
+     <text x="-67" y="3" ${D} font-size="58" fill="${W}" text-anchor="middle" dominant-baseline="central" textLength="42" lengthAdjust="spacingAndGlyphs">GT</text>
+     <rect x="-30" y="-28" width="130" height="60" fill="${K}"/>
+     <text x="35" y="3" ${D} font-size="58" fill="${W}" text-anchor="middle" dominant-baseline="central" textLength="106" lengthAdjust="spacingAndGlyphs">WORKS</text></g>`,
+  // 2. Hexagon with the kanji for tiger over GT WORKS.
+  `<g transform="translate(120 60)">
+     <polygon points="0,-58 50,-29 50,29 0,58 -50,29 -50,-29" fill="${K}" stroke="${W}" stroke-width="4"/>
+     <polygon points="0,-48 41,-24 41,24 0,48 -41,24 -41,-24" fill="none" stroke="${R}" stroke-width="3"/>
+     <text x="0" y="-8" ${J} font-size="40" fill="${W}" text-anchor="middle" dominant-baseline="central">虎</text>
+     <text x="0" y="25" ${D} font-size="14" fill="${W}" text-anchor="middle" dominant-baseline="central" letter-spacing="1.5">GT WORKS</text></g>`,
+  // 3. Three red claw slashes and a stacked wordmark.
+  `<g transform="translate(14 14) scale(0.86)">
+     <path d="M8 92 L40 4 L52 4 L22 92Z M36 92 L68 4 L80 4 L50 92Z M64 92 L96 4 L108 4 L78 92Z" fill="${R}"/>
+     <text x="118" y="34" ${D} font-size="40" fill="${K}" letter-spacing="1">TORA</text>
+     <text x="118" y="80" ${D} font-size="40" fill="${K}" letter-spacing="1">GT WORKS</text></g>`,
+  // 4. Roundel: ring lettering round a red GT core.
+  `<g transform="translate(120 60)">
+     <defs><path id="ring" d="M -40 0 A 40 40 0 1 1 40 0 A 40 40 0 1 1 -40 0"/></defs>
+     <circle r="57" fill="${K}"/><circle r="30" fill="${R}"/>
+     <circle r="57" fill="none" stroke="${W}" stroke-width="3"/>
+     <text ${D} font-size="15" fill="${W}"><textPath href="#ring" textLength="246" lengthAdjust="spacing">TORA GT WORKS &#160; TORA GT WORKS &#160;</textPath></text>
+     <text y="2" ${D} font-size="34" fill="${W}" text-anchor="middle" dominant-baseline="central">GT</text></g>`,
+  // 5. Katakana wordmark over a red speed bar.
+  `<g transform="translate(120 56) skewX(-10)">
+     <text x="0" y="0" ${J} font-size="30" fill="${K}" text-anchor="middle" dominant-baseline="central">トラGTワークス</text>
+     <path d="M-112 26 L112 26 L106 35 L-118 35Z" fill="${R}"/></g>`,
+  // 6. Angular TGW monogram in a shield, red stripe through it.
+  `<g transform="translate(120 60)">
+     <path d="M-46 -54 L46 -54 L46 12 L0 56 L-46 12Z" fill="${W}" stroke="${K}" stroke-width="5"/>
+     <path d="M-46 -6 L46 -26 L46 -12 L-46 8Z" fill="${R}"/>
+     <text x="0" y="-26" ${T} font-size="34" fill="${K}" text-anchor="middle" dominant-baseline="central">TGW</text>
+     <text x="0" y="17" ${D} font-size="13" fill="${K}" text-anchor="middle" dominant-baseline="central" letter-spacing="1">GT WORKS</text></g>`,
+  // 7. A tiger's eye cut from a blade, the name beside it.
+  `<g transform="translate(6 60) scale(0.84)">
+     <path d="M0 0 Q 44 -40 96 -6 Q 52 32 0 0Z" fill="${K}"/>
+     <path d="M30 -2 Q 50 -22 72 -4 Q 50 14 30 -2Z" fill="${R}"/>
+     <path d="M48 -14 L56 -14 L54 10 L50 10Z" fill="${K}"/>
+     <text x="110" y="-14" ${T} font-size="30" fill="${K}" dominant-baseline="central">TORA</text>
+     <text x="110" y="18" ${T} font-size="30" fill="${R}" dominant-baseline="central">GT WORKS</text></g>`,
+  // 8. Outlined stamp of the kanji for works, with TORA GT beside it.
+  `<g transform="translate(24 16)">
+     <rect x="0" y="0" width="88" height="88" fill="${W}" stroke="${K}" stroke-width="6"/>
+     <rect x="9" y="9" width="70" height="70" fill="none" stroke="${R}" stroke-width="3"/>
+     <text x="44" y="47" ${J} font-size="56" fill="${K}" text-anchor="middle" dominant-baseline="central">工</text>
+     <text x="104" y="30" ${D} font-size="38" fill="${K}" letter-spacing="1">TORA GT</text>
+     <text x="104" y="70" ${D} font-size="38" fill="${R}" letter-spacing="1">WORKS</text></g>`,
+];
+// Greyscale facets, the same triangle field the livery uses, light to dark.
+const GREYS = ['#d9d9d9', '#bdbdbd', '#a3a3a3', '#8a8a8a', '#707070', '#575757'];
+function facets(c, seed) {
+  let s = seed; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  const w = c.width = c.clientWidth * devicePixelRatio, h = c.height = c.clientHeight * devicePixelRatio, g = c.getContext('2d');
+  const cell = w / 5, nx = 8, ny = 6, P = [];
+  for (let j = 0; j < ny; j++) { P.push([]); for (let i = 0; i < nx; i++) P[j].push([(i - 1) * cell + (rnd() - .5) * cell * .8 + j * cell * .3, (j - 1) * cell + (rnd() - .5) * cell * .8]); }
+  const tri = (a, b, d) => { const cx = (a[0] + b[0] + d[0]) / 3 / w; const t = Math.max(0, Math.min(.999, .2 + cx * .5 + (rnd() - .5) * .75));
+    g.fillStyle = GREYS[Math.floor(t * 6)]; g.beginPath(); g.moveTo(...a); g.lineTo(...b); g.lineTo(...d); g.closePath(); g.fill(); g.strokeStyle = g.fillStyle; g.stroke(); };
+  for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) { const A = P[j][i], B = P[j][i + 1], C = P[j + 1][i + 1], E = P[j + 1][i];
+    if (rnd() < .5) { tri(A, B, C); tri(A, C, E); } else { tri(A, B, E); tri(B, C, E); } }
+}
+const grid = document.getElementById('grid');
+LOGOS.forEach((svg, i) => {
+  const f = document.createElement('figure');
+  f.innerHTML = `<div class="plate"><canvas></canvas><svg viewBox="0 0 240 120">${svg}</svg></div><figcaption>${i + 1}</figcaption>`;
+  grid.appendChild(f);
+});
+const draw = () => document.querySelectorAll('canvas').forEach((c, i) => facets(c, 71 + i * 13));
+document.fonts.ready.then(draw); addEventListener('resize', draw);
+</script>
