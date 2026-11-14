@@ -28,6 +28,7 @@ internal static class Check
     private const bool VSync = false;
     private const float Volume = 0.35f, Music = 0.45f;
     private const int RealLights = 17;
+    private const int TractionControl = 2; // Full
 
     private static int Main(string[] args)
     {
@@ -45,6 +46,10 @@ internal static class Check
             GameSettings.VSync = VSync;
             GameSettings.Volume = Volume;
             GameSettings.Music = Music;
+            Expect("a fresh game starts with traction control off", GameSettings.TractionControl, 0);
+            GameSettings.TractionControl = TractionControl;
+            Expect("a fresh game starts with the opposite lock assist off", GameSettings.OppositeLock, false);
+            GameSettings.OppositeLock = true;
             for (int i = 2; i < GameSettings.Sliders.Length; i++) GameSettings.SetLevel(GameSettings.Sliders[i], SliderAt(i));
             Expect("the master slider sets the listener's volume on its curve", AudioListener.volume, Volume * Volume);
             Application.Quit();
@@ -58,6 +63,8 @@ internal static class Check
             Expect("v-sync", GameSettings.VSync, VSync);
             Expect("volume", GameSettings.Volume, Volume);
             Expect("music", GameSettings.Music, Music);
+            Expect("opposite lock assist", GameSettings.OppositeLock, true);
+            Expect("traction control", GameSettings.TractionControlNames[GameSettings.TractionControl], GameSettings.TractionControlNames[TractionControl]);
             for (int i = 2; i < GameSettings.Sliders.Length; i++) Expect(GameSettings.Sliders[i] + " slider", GameSettings.Level(GameSettings.Sliders[i]), SliderAt(i));
             Expect("the listener comes back at the master slider's volume", AudioListener.volume, Volume * Volume);
             Expect("the master and music keep the keys they were saved under before the mixer",

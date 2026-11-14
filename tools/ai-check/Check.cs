@@ -85,11 +85,6 @@ static partial class Check
             }
             return 0;
         }
-        if (args.Length > 1 && args[1] == "traction")
-        {
-            TractionReport();
-            return 0;
-        }
         if (args.Length > 1 && args[1] == "solo")
         {
             foreach (float pace in new[] { 75f, 100f })
@@ -161,7 +156,10 @@ static partial class Check
         }
         if (args.Length > 1 && args[1] == "garageslow")
         {
-            RollingStartCheck(100, verbose: false, glide: Environment.GetEnvironmentVariable("GARAGE_PHYSICS") == null, garages: true, slowPlayer: 40);
+            // The player last in the grid, then in the middle: run.sh garageslow [slot] for one.
+            bool glideOut = Environment.GetEnvironmentVariable("GARAGE_PHYSICS") == null;
+            foreach (int slot in args.Length > 2 ? new[] { int.Parse(args[2]) } : new[] { 99, 40 })
+                RollingStartCheck(100, verbose: false, glide: glideOut, garages: true, slowPlayer: slot);
             return failed ? 1 : 0;
         }
         if (args.Length > 1 && args[1] == "garagestart")

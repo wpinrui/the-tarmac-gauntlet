@@ -145,8 +145,8 @@ namespace TarmacGauntlet.Raceday
 
         /// <summary>
         /// What the driven rear tyres can still put down while carrying their share of a cornering
-        /// acceleration. The differential sends what the inside wheel, lightened by the car leaning, can't
-        /// put down to the outside one, so the axle as a whole sets it: its grip, less what the corner uses.
+        /// acceleration. The drive is split evenly, and the inside wheel is lightened by the car
+        /// leaning, so it is the one that spins first and lets go sideways.
         /// </summary>
         public float RearGripLeft(int k, float v, float lateral)
         {
@@ -156,7 +156,10 @@ namespace TarmacGauntlet.Raceday
             float axleCap = mu * axleLoad;
             float side = Mathf.Abs(lateral) * rearShare;
             float used = Mathf.Clamp01(side / Mathf.Max(axleCap, 0.01f));
-            return GripUsable * axleCap * Mathf.Sqrt(1f - used * used);
+            // Weight moved off the inside rear wheel, per unit mass.
+            float lean = Mathf.Abs(lateral) * spec.CentreOfMass.y / (2f * spec.HalfTrack) * rearShare;
+            float insideCap = mu * rearWeight * Mathf.Max(axleLoad / rearWeight * 0.5f - lean, 0f);
+            return 2f * 0.9f * insideCap * Mathf.Sqrt(1f - used * used);
         }
 
         /// <summary>Drag, rolling resistance and the hill, as a deceleration.</summary>
@@ -180,16 +183,11 @@ namespace TarmacGauntlet.Raceday
             return Mathf.Lerp(engineTable[j], engineTable[j + 1], f - j);
         }
 
-        /// <summary>
-        /// What the rear tyres can put down before they spin, as an acceleration: the car squats as it
-        /// pulls away, moving weight onto them.
-        /// </summary>
+        /// <summary>What the rear tyres can put down before they spin, as an acceleration.</summary>
         public float Traction(float v)
         {
-            float grip = GripUsable * 1.06f * spec.Grip;
-            float rearLoad = (1f - frontShare) * G + 0.6f * aero * v * v;
-            float squat = grip * spec.CentreOfMass.y / (2f * spec.HalfWheelbase);
-            return grip * rearLoad / (1f - squat);
+            float rearLoad = 0.5f * spec.Mass * G + 0.6f * aero * spec.Mass * v * v;
+            return 0.9f * 1.06f * spec.Grip * rearLoad / spec.Mass;
         }
 
         /// <summary>

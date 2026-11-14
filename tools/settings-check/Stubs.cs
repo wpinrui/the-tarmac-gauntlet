@@ -78,6 +78,9 @@ namespace UnityEngine
 
     public static class AudioListener { public static float volume = 1; }
 
+    public static class SystemInfo { public static bool supportsComputeShaders => true; }
+    public static class Time { public static int frameCount => 0; }
+
     public static class Application
     {
         public static event Action quitting;

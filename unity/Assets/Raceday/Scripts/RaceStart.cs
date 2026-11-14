@@ -127,11 +127,13 @@ namespace TarmacGauntlet.Raceday
             }
             float dt = Time.fixedDeltaTime;
             start.Tick(dt);
+            if (passing.Count > 0 && pitOutDone) PassPlayers();   // collisions back once apart
             if (Racing && !AnyHeld()) return;
             if (exit != null && !pitOutDone)
             {
                 exit.Tick(dt);
                 FollowPlayers();
+                PassPlayers();
                 DrivePaceCarOut();
                 pitOutDone = AllOut();
                 if (pitOutDone) EndGarages();
@@ -266,7 +268,7 @@ namespace TarmacGauntlet.Raceday
             switch (leaving[slot])
             {
                 case Leaving.Parked:
-                    if (Holding || !exit.Launch(slot) || !exit.JoinClear(slot, along, onRoute))
+                    if (Holding || !exit.Launch(slot) || !exit.JoinClear(slot, along, onRoute, j => Passes(slot, j)))
                     {
                         controls.Brake = 1f;
                         hold = true;
@@ -318,11 +320,60 @@ namespace TarmacGauntlet.Raceday
                 cap = exit.Behind(along[slot], speed, spec, paceAlong, PaceCar.Speed, PaceCar.Spec);
             for (int j = 0; j < Grid.Length; j++)
             {
-                if (j == slot || !onRoute[j] || !Close(slot, k, along[j], Grid[j].transform.position)) continue;
+                if (j == slot || !onRoute[j] || Passes(slot, j) || !Close(slot, k, along[j], Grid[j].transform.position)) continue;
                 CarController ahead = Grid[j].GetComponent<CarController>();
                 cap = Mathf.Min(cap, exit.Behind(along[slot], speed, spec, along[j], ahead.Speed, ahead.Spec));
             }
             return cap;
+        }
+
+        /// <summary>
+        /// True when car <c>slot</c> takes no notice of car <c>j</c> on the way out: j is a player behind it in the grid.
+        /// Only the cars behind a player wait for them. The cars ahead drive on to their places, through the player.
+        /// </summary>
+        private bool Passes(int slot, int j) => j > slot && (drivers[j] == null || !drivers[j].enabled);
+
+        /// <summary>The pairs whose collisions <see cref="PassPlayers"/> has switched off.</summary>
+        private readonly HashSet<(Collider, Collider)> passing = new HashSet<(Collider, Collider)>();
+        private readonly HashSet<(Collider, Collider)> passingNow = new HashSet<(Collider, Collider)>();
+
+        /// <summary>
+        /// A car ahead of a player in the grid, and the pace car, pass through them on the way out, so they never wait for them. Their
+        /// collisions come back once the drive out is over, or the player hands the car back, and the two are apart.
+        /// </summary>
+        private void PassPlayers()
+        {
+            passingNow.Clear();
+            for (int j = 0; j < Grid.Length && !pitOutDone; j++)
+            {
+                if (drivers[j] != null && drivers[j].enabled) continue;
+                Collider player = Grid[j].GetComponent<Collider>();
+                if (player == null) continue;
+                Collider pace = PaceCar.GetComponent<Collider>();
+                if (pace != null)
+                {
+                    passingNow.Add((pace, player));
+                    passing.Add((pace, player));
+                    Physics.IgnoreCollision(pace, player, true);
+                }
+                for (int i = 0; i < j; i++)
+                {
+                    if (drivers[i] == null || !drivers[i].enabled) continue;
+                    Collider ai = Grid[i].GetComponent<Collider>();
+                    if (ai == null) continue;
+                    passingNow.Add((ai, player));
+                    passing.Add((ai, player));
+                    Physics.IgnoreCollision(ai, player, true);   // every step, as a ghost ending switches it back on
+                }
+            }
+            passing.RemoveWhere(pair =>
+            {
+                if (passingNow.Contains(pair)) return false;
+                if (pair.Item1 == null || pair.Item2 == null) return true;
+                if (pair.Item1.bounds.Intersects(pair.Item2.bounds)) return false;   // not inside each other
+                Physics.IgnoreCollision(pair.Item1, pair.Item2, false);
+                return true;
+            });
         }
 
         /// <summary>How far ahead a car on its way out looks for a car in its way, m.</summary>
