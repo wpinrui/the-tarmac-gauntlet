@@ -1,6 +1,6 @@
 """Tora GT Works on the Tora Giga: Team Tora Racing's folded facets in greyscale, with the
-team's own logo (a TORA tab over a red GT block and a black WORKS block) in place of the
-seal and the tiger head.
+team's own logo (a TORA tab over a red GT block and a black WORKS block) behind the doors,
+the official Tora badge on the front fenders and race numbers in Saira Extra Condensed.
 
 Run: python3 design.py   (after views.js has drawn out/views)
 """
@@ -15,6 +15,7 @@ import livery  # noqa: E402
 from livery import Livery  # noqa: E402
 
 VIEWS = HERE / "out" / "views" / "views.json"
+BADGE = HERE / "marks" / "tora-badge-colour.svg"  # the official Tora badge
 
 SHADES = ["#d9d9d9", "#bdbdbd", "#a3a3a3", "#8a8a8a", "#707070", "#575757"]
 BLACK = "#16171a"
@@ -107,8 +108,8 @@ def folded():
     for x in (-0.15, 0.15):
         end(lv, "front", streak(x * 5, 0.62, x * 2, 0.9, 0.2), BLACK)
     lv.side_number(0.1, 0.6, 0.74, 0.42, BLACK, edge=WHITE)
-    side_logo(lv, -0.9, 0.68, 0.2)   # where the tiger head was
-    side_logo(lv, 0.92, 0.8, 0.14)   # where the seal was
+    side_logo(lv, -0.8, 0.7, 0.2)   # where the tiger head was, clear of the arch
+    lv.side_mark(BADGE, 0.92, 0.8, 0.14)   # the Tora badge where the seal was
     # Bonnet and roof read from in front of the car.
     lv.number("top", (0, 0, -0.4), 0.8, 0.44, BLACK, rotate=-90, edge=WHITE)
     logo(lv, "top", (0, 0, 1.45), 0.36, rotate=-90)
