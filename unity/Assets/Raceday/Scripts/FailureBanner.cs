@@ -1,3 +1,4 @@
+using TarmacGauntlet.Audio;
 using TarmacGauntlet.Rendering;
 using TarmacGauntlet.Simulation;
 using UnityEngine;
@@ -10,6 +11,10 @@ namespace TarmacGauntlet.Raceday
     /// It shows for your own car whatever the cameras are on, and for the car the cameras are on. Another team's car has
     /// its team's name before the failure. Drawn as the tower's chequered flag banner is, in the same place, and laid out
     /// in the tower's design units.
+    ///
+    /// The same slot flashes up any issue as it hits your car (<see cref="CarRaceLog.Issues"/>), with a chime from
+    /// Resources/IssueChimes: its name in red for a major issue, amber for any other, blinking at first, then fading out
+    /// after <see cref="FlashTime"/>. Your car's failure, once it breaks down, takes the slot over.
     /// </summary>
     public sealed class FailureBanner : MonoBehaviour
     {
@@ -23,6 +28,12 @@ namespace TarmacGauntlet.Raceday
 
         /// <summary>Real seconds the banner takes to fade in.</summary>
         private const float FadeIn = 0.25f;
+        /// <summary>Real seconds an issue's flash stays up, the first <see cref="BlinkTime"/> of them blinking, and its fade out at the end.</summary>
+        public const float FlashTime = 4.5f, BlinkTime = 1.2f, FadeOut = 0.5f;
+
+        /// <summary>An issue's colour wherever it is named: red for a major one, amber for any other.</summary>
+        public static readonly Color MajorColour = new Color(0.95f, 0.27f, 0.24f), MinorColour = new Color(1f, 0.75f, 0.2f);
+        public static Color IssueColour(IssueTemplate issue) => issue != null && issue.Severity == IssueSeverity.Major ? MajorColour : MinorColour;
         /// <summary>Layout, in the tower's design units.</summary>
         private const float Margin = 1.6f, Height = 4.2f, Pad = 1.2f, Gap = 0.8f, Radius = 0.45f, Row = 4.6f;
         private const float BarWidth = 0.42f, BarHeight = 2.4f, BarSkew = 24f;
@@ -35,6 +46,39 @@ namespace TarmacGauntlet.Raceday
         private Texture2D slash;
         private int styledFor = -1;
         private float[] shownAt;
+        /// <summary>How many issues your car had picked up as of the last frame, or -1 before the first.</summary>
+        private int issuesSeen = -1;
+        private IssueTemplate flashing;
+        private float flashAt = -1f;
+        private AudioSource chime;
+        private AudioClip minorChime, majorChime;
+
+        private void Start()
+        {
+            minorChime = Resources.Load<AudioClip>("IssueChimes/issue-minor");
+            majorChime = Resources.Load<AudioClip>("IssueChimes/issue-major");
+            chime = gameObject.AddComponent<AudioSource>();
+            chime.playOnAwake = false;
+            chime.spatialBlend = 0f;
+            chime.priority = 32;
+        }
+
+        /// <summary>Watches your car for a new issue: it flashes up with its chime.</summary>
+        private void Update()
+        {
+            if (Director == null || Director.Day == null || Player < 0 || Player >= Director.Day.Cars.Count) return;
+            CarRaceLog log = Director.Day.Cars[Player];
+            int count = log.Issues.Count;
+            if (issuesSeen >= 0 && count > issuesSeen && !log.Retired)
+            {
+                flashing = IssueTemplates.Find(log.Issues[count - 1].TemplateId);
+                flashAt = Time.unscaledTime;
+                bool major = flashing != null && flashing.Severity == IssueSeverity.Major;
+                AudioClip clip = major ? majorChime : minorChime;
+                if (flashing != null && clip != null && chime != null) chime.PlayOneShot(clip, Mix.Gain(SoundGroup.Ui));
+            }
+            issuesSeen = count;
+        }
 
         private void OnGUI()
         {
@@ -59,7 +103,7 @@ namespace TarmacGauntlet.Raceday
             float u = Screen.height / 1080f * 19.2f * 0.7f;
             Style(u);
             float y = Margin * u;
-            if (Player >= 0 && Draw(Player, false, y, u)) y += Row * u;
+            if (Player >= 0 && (Draw(Player, false, y, u) || Flash(y, u))) y += Row * u;
             if (watched >= 0 && watched != Player) Draw(watched, true, y, u);
         }
 
@@ -69,11 +113,29 @@ namespace TarmacGauntlet.Raceday
             IssueTemplate failure = Director.BrokenDown(i);
             if (failure == null) return false;
             if (shownAt[i] < 0f) shownAt[i] = Time.unscaledTime;
-            float alpha = Mathf.Clamp01((Time.unscaledTime - shownAt[i]) / FadeIn);
+            Banner(i, named, failure.Description, Color.white, Mathf.Clamp01((Time.unscaledTime - shownAt[i]) / FadeIn), y, u);
+            return true;
+        }
 
+        /// <summary>The issue that just hit your car, at height y, while its flash lasts. Returns true if it drew one.</summary>
+        private bool Flash(float y, float u)
+        {
+            if (flashing == null || flashAt < 0f) return false;
+            float age = Time.unscaledTime - flashAt;
+            if (age > FlashTime) return false;
+            float alpha = Mathf.Clamp01(age / FadeIn) * Mathf.Clamp01((FlashTime - age) / FadeOut);
+            // Blinking at first: the name dips three times.
+            float text = age < BlinkTime ? Mathf.Lerp(0.25f, 1f, 0.5f + 0.5f * Mathf.Cos(age / BlinkTime * 3f * 2f * Mathf.PI)) : 1f;
+            Banner(Player, false, flashing.Description, IssueColour(flashing), alpha, y, u, text);
+            return true;
+        }
+
+        /// <summary>One banner: a slash in car i's team colour, its team's name if <paramref name="named"/>, and the words in their colour.</summary>
+        private void Banner(int i, bool named, string words, Color ink, float alpha, float y, float u, float textAlpha = 1f)
+        {
             string teamName = named && Teams != null && i < Teams.Length ? Teams[i].ToUpperInvariant() : null;
             float barSpan = (BarWidth + BarHeight * Mathf.Tan(BarSkew * Mathf.Deg2Rad)) * u;
-            float nameWidth = nameStyle.CalcSize(new GUIContent(failure.Description)).x;
+            float nameWidth = nameStyle.CalcSize(new GUIContent(words)).x;
             float teamWidth = teamName != null ? teamStyle.CalcSize(new GUIContent(teamName)).x + Gap * u : 0f;
             float h = Height * u, pad = Pad * u;
             float width = pad + barSpan + Gap * u + teamWidth + nameWidth + pad;
@@ -93,9 +155,8 @@ namespace TarmacGauntlet.Raceday
                 GUI.Label(new Rect(x, r.y, teamWidth, h), teamName, teamStyle);
                 x += teamWidth;
             }
-            nameStyle.normal.textColor = new Color(1f, 1f, 1f, alpha);
-            GUI.Label(new Rect(x, r.y, nameWidth, h), failure.Description, nameStyle);
-            return true;
+            nameStyle.normal.textColor = new Color(ink.r, ink.g, ink.b, alpha * textAlpha);
+            GUI.Label(new Rect(x, r.y, nameWidth, h), words, nameStyle);
         }
 
         private void Style(float u)

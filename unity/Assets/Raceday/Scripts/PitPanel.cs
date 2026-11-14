@@ -9,7 +9,8 @@ namespace TarmacGauntlet.Raceday
     /// The next stop's plan for your car, on P, through your own stint and a teammate's: beside the HUD, a red PIT tab
     /// with the time the stop would stand the car in its box, over four rows, each with its keys. 4 and 5 take a lap
     /// of fuel off and put one on, up to a full tank. 6 swaps new tyres and keep. 7 steps through the lineup for the
-    /// next driver. 8 steps the repairs through the crew's call, all and none. A row left alone is the crew's call
+    /// next driver. 8 steps the repairs through the crew's call, all and none, with the car's active issues named under
+    /// it, each in its colour (<see cref="FailureBanner.IssueColour"/>). A row left alone is the crew's call
     /// (<see cref="StopPlanner"/>). While a teammate drives, a fifth row calls the car in on 9, as live timing's
     /// Pit now does (<see cref="PitOrders.Requested"/>), and 9 again calls it off. Laid out on a 1920 by 1080 screen
     /// and scaled to the screen's height.
@@ -41,8 +42,11 @@ namespace TarmacGauntlet.Raceday
         private const float Width = 380f, Header = 56f, Row = 38f, Right = DriveHud.CardsWidth + 16f, Bottom = 32f;
         /// <summary>Space above the Pit now row, px on the layout.</summary>
         private const float CallGap = 10f;
+        /// <summary>Each active issue's line under the repairs row, px on the layout.</summary>
+        private const float IssueRow = 28f;
 
-        private GUIStyle tab, time, unit, row, key;
+        private GUIStyle tab, time, unit, row, key, issue;
+        private readonly List<IssueTemplate> issues = new List<IssueTemplate>();
         private Texture2D fuel, tyre, helmet, spanner;
 
         private Consumables Supplies => Car.Supplies;
@@ -102,8 +106,13 @@ namespace TarmacGauntlet.Raceday
                 rows.Add((spanner, Supplies.Orders.Repairs.ToString().ToUpperInvariant(), Log.ActiveIssues.Count > 0 || Log.Damage > 0, new[] { "8" }));
             }
 
+            issues.Clear();
+            if (Log != null)
+                foreach (ActiveIssue a in Log.ActiveIssues)
+                    if (IssueTemplates.Find(a.TemplateId) is IssueTemplate t) issues.Add(t);
+
             bool callIn = Teammate;
-            float height = Header + 8f + rows.Count * Row + (callIn ? CallGap + Row : 0f) + 14f;
+            float height = Header + 8f + rows.Count * Row + issues.Count * IssueRow + (callIn ? CallGap + Row : 0f) + 14f;
             var panel = new Rect(Screen.width - (Right + Width) * k, Screen.height - (Bottom + height) * k, Width * k, height * k);
             Fill(panel, Panel, 9f * k, Vector4.one);
             Fill(new Rect(panel.x, panel.y, 72f * k, Header * k), Red, 9f * k, new Vector4(1f, 0f, 0f, 0f));
@@ -132,6 +141,13 @@ namespace TarmacGauntlet.Raceday
                 }
                 y += Row * k;
             }
+            // The issues the repairs would fix, under the spanner's row, lined up with its words.
+            float issueX = x + 34f * k, issueWidth = right - issueX;
+            foreach (IssueTemplate t in issues)
+            {
+                Text(new Rect(issueX, y, issueWidth, IssueRow * k), Fit(t.Description, issue, issueWidth), issue, FailureBanner.IssueColour(t), TextAnchor.MiddleLeft);
+                y += IssueRow * k;
+            }
 
             if (callIn)
             {
@@ -150,6 +166,18 @@ namespace TarmacGauntlet.Raceday
         {
             GUI.DrawTexture(r, Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, Cap, Vector4.one * Mathf.Max(1f, 2f * k), Vector4.one * 5f * k);
             Text(r, label, key, CapText, TextAnchor.MiddleCenter);
+        }
+
+        /// <summary>The words as they fit in the width, cut short with an ellipsis if they don't.</summary>
+        private static string Fit(string words, GUIStyle style, float width)
+        {
+            if (style.CalcSize(new GUIContent(words)).x <= width) return words;
+            for (int n = words.Length - 1; n > 0; n--)
+            {
+                string cut = words.Substring(0, n).TrimEnd() + "…";
+                if (style.CalcSize(new GUIContent(cut)).x <= width) return cut;
+            }
+            return "…";
         }
 
         /// <summary>A driver's surname in capitals.</summary>
@@ -179,6 +207,7 @@ namespace TarmacGauntlet.Raceday
             unit = Make(bold, 22f * k);
             row = Make(semiBold, 24f * k);
             key = Make(bold, 17f * k);
+            issue = Make(semiBold, 20f * k);
         }
 
         private static GUIStyle Make(Font font, float size) => new GUIStyle(GUI.skin.label)
