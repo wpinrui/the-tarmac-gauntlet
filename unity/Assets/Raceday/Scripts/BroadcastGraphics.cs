@@ -252,7 +252,7 @@ namespace TarmacGauntlet.Raceday
             Label(R(x + 110f, y, tw, 56f), teamName, team, Color.white, TextAnchor.MiddleLeft);
             Badge(R(x + 124f + tw, y + 16f, 30f, 24f), letter, RaceTower.ClassColour(Classes[i]));
             GUI.DrawTexture(R(x, y + 56f, width, 72f), Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, Under, Vector4.zero, new Vector4(0f, 0f, 9f * k, 9f * k));
-            Label(R(x + 24f, y + 56f, 160f, 72f), service.Elapsed.ToString("0.0"), timer, Color.white, TextAnchor.MiddleLeft);
+            Label(R(x + 24f, y + 56f, 200f, 72f), RaceTower.StopTime(service.Elapsed), timer, Color.white, TextAnchor.MiddleLeft);
             float ix = x + width - 24f - 30f;
             if (service.NewDriver) { Draw(R(ix, y + 77f, 30f, 30f), helmet, service.Done ? Color.white : Dim, false); ix -= 48f; }
             if (service.NewTyres) { Draw(R(ix, y + 77f, 30f, 30f), tyre, service.Done ? Color.white : Dim, false); ix -= 48f; }
