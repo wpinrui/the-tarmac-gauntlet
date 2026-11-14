@@ -66,7 +66,7 @@ namespace TarmacGauntlet.Management
                     p.Shadow.style.display = shown ? DisplayStyle.Flex : DisplayStyle.None;
                     Rect r = g.layout;
                     FitShadow(p, r);
-                    // box-shadow: 0 0 12px: centred on the pane, reaching ShadowReach px past every side.
+                    // No offset: centred on the pane, reaching ShadowReach px past every side.
                     p.Shadow.style.left = r.x - ShadowReach;
                     p.Shadow.style.top = r.y - ShadowReach;
                     p.Shadow.style.width = r.width + 2 * ShadowReach;
@@ -117,8 +117,9 @@ namespace TarmacGauntlet.Management
             return t;
         }
 
-        /// <summary>How far the shadow reaches past the pane, and over how much of that it fades in, px.</summary>
-        private const int ShadowReach = 12, ShadowSoft = 10;
+        /// <summary>How far the shadow reaches past the pane (and in under it), px, and how dark it is at its darkest.</summary>
+        private const int ShadowReach = 16;
+        private const float ShadowAlpha = 0.30f;
 
         /// <summary>Gives the pane's shadow the corners the pane has: a round button casts a round shadow.</summary>
         private void FitShadow(Pane p, Rect r)
@@ -140,15 +141,17 @@ namespace TarmacGauntlet.Management
         }
 
         /// <summary>
-        /// Black at 35% under a rounded box with these corner radii, fading out over <see cref="ShadowSoft"/>px to
-        /// nothing <see cref="ShadowReach"/>px outside it, for 9-slicing: each corner tile holds its own rounded corner
-        /// and the middle two pixels stretch.
+        /// Black at <see cref="ShadowAlpha"/> under a rounded box with these corner radii, blurred across its edge: full
+        /// <see cref="ShadowReach"/>px inside it, half at the edge, nothing <see cref="ShadowReach"/>px outside it. For
+        /// 9-slicing: each corner tile holds its own rounded corner and the middle two pixels stretch.
         /// </summary>
         private static Texture2D ShadowTexture((int TopLeft, int TopRight, int BottomRight, int BottomLeft) c)
         {
             int most = Mathf.Max(Mathf.Max(c.TopLeft, c.TopRight), Mathf.Max(c.BottomRight, c.BottomLeft));
-            int n = 2 * (ShadowReach + most + 1);
-            float centre = n / 2f, half = most + 1;
+            // The box reaches at least ShadowReach in from each corner tile's inner edge, so the fade fits inside the tile.
+            int inset = Mathf.Max(most, ShadowReach);
+            int n = 2 * (ShadowReach + inset + 1);
+            float centre = n / 2f, half = inset + 1;
             var t = new Texture2D(n, n, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, hideFlags = HideFlags.HideAndDontSave };
             var px = new Color32[n * n];
             for (int y = 0; y < n; y++)
@@ -160,8 +163,8 @@ namespace TarmacGauntlet.Management
                 // Distance outside the rounded box, negative inside.
                 float qx = Mathf.Abs(dx) - (half - radius), qy = Mathf.Abs(dy) - (half - radius);
                 float outside = new Vector2(Mathf.Max(qx, 0), Mathf.Max(qy, 0)).magnitude + Mathf.Min(Mathf.Max(qx, qy), 0) - radius;
-                float k = Mathf.SmoothStep(0, 1, Mathf.Clamp01((ShadowReach - outside) / ShadowSoft));
-                px[y * n + x] = UiBlend.Alpha(new Color(0, 0, 0, 0.35f * k));
+                float k = Mathf.SmoothStep(0, 1, Mathf.Clamp01((ShadowReach - outside) / (2f * ShadowReach)));
+                px[y * n + x] = UiBlend.Alpha(new Color(0, 0, 0, ShadowAlpha * k));
             }
             t.SetPixels32(px);
             t.Apply();
