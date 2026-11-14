@@ -25,6 +25,9 @@ namespace TarmacGauntlet.Raceday
         /// <summary>True while the TV view shows the broadcast.</summary>
         [System.NonSerialized] public bool Hidden;
 
+        /// <summary>True while the HUD shows: you are at the wheel and nothing has it hidden.</summary>
+        public bool Showing => isActiveAndEnabled && Car != null && !Hidden && !DebugMenu.Bare && Car.InputEnabled;
+
         /// <summary>Height the dial takes up from the bottom of the screen, px on the layout, while it shows; else 0.</summary>
         public static float Clearance { get; private set; }
 
@@ -68,7 +71,7 @@ namespace TarmacGauntlet.Raceday
         private void DrawGui()
         {
             if (Event.current.type != EventType.Repaint) return;
-            if (Car == null || Hidden || DebugMenu.Bare || !Car.InputEnabled) { Clearance = 0f; return; }
+            if (!Showing) { Clearance = 0f; return; }
             k = Screen.height / 1080f;
             if (bold == null)
             {

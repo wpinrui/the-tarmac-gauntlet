@@ -56,6 +56,8 @@ namespace TarmacGauntlet.Raceday
         public bool Broadcasting => broadcast;
         /// <summary>True in the bonnet and bumper views, riding on the car.</summary>
         public bool Onboard => !broadcast && (view == View.Bonnet || view == View.Bumper);
+        /// <summary>True while B is held to look back.</summary>
+        public bool LookingBack => lookedBack;
         /// <summary>True in the chase view.</summary>
         public bool Chasing => !broadcast && view == View.Chase;
         private Camera cam;

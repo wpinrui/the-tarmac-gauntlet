@@ -48,6 +48,8 @@ namespace TarmacGauntlet.Raceday
         public Func<int, bool> Flagged;
         /// <summary>How long the finishing banner stays up, real seconds.</summary>
         public const float BannerTime = 6f;
+        /// <summary>True while the chequered flag banner shows at the top of the screen.</summary>
+        public bool BannerShowing => bannerAt >= 0f && Time.unscaledTime - bannerAt <= BannerTime;
 
         // Layout, in design units.
         private const float Margin = 1.6f, Width = 24f;

@@ -285,6 +285,15 @@ namespace TarmacGauntlet.Raceday
             }
             if (resumed) tower.SetRaceTime(resume.RaceTime);
             views.Tower = tower;
+            // Proximity arrows for the cars close behind you, and the rear view mirror, both with the driving HUD.
+            ProximityArrows arrows = views.gameObject.AddComponent<ProximityArrows>();
+            arrows.Hud = views.Hud;
+            arrows.Cars = cars;
+            arrows.Racing = racing;
+            arrows.Classes = tower.Classes;
+            RearMirror mirror = views.gameObject.AddComponent<RearMirror>();
+            mirror.Hud = views.Hud;
+            mirror.Views = views;
             if (player >= 0 && TeamColour(setup.Game, grid[player].TeamId) is Color own) tower.Colours[player] = own;
             var carGarages = new int[racing.Length];
             for (int i = 0; i < racing.Length; i++) carGarages[i] = racing[i].Garage;
