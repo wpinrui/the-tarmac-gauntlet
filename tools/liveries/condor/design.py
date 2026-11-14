@@ -83,7 +83,7 @@ def end_diamond(lv, cx, cy, r, fill):
         lv.poly(view, [(cx + r, cy, 0), (cx, cy + r, 0), (cx - r, cy, 0), (cx, cy - r, 0)], fill)
 
 
-def vueltiao(bend=0.80, back=(-1.75, -2.20)):
+def vueltiao(bend=0.80, back=(-1.75, -2.05)):
     """The sombrero vueltiao: cream cane with a black woven band of pintas round the sills."""
     dark = logo(MARKS / "condor-dark.svg", BLK, CRM, BLK)
     lv = Livery(VIEWS, CRM)
@@ -155,7 +155,7 @@ def carnaval():
 
 
 DESIGNS = {"vueltiao": vueltiao, "carnaval": carnaval,
-           "vueltiao-steep": lambda: vueltiao(back=(-1.85, -2.15))}
+           "vueltiao-early": lambda: vueltiao(back=(-1.65, -1.95))}
 
 if __name__ == "__main__":
     for name, fn in DESIGNS.items():
