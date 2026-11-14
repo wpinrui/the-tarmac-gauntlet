@@ -133,11 +133,11 @@ def folded():
         side(lv, s, SHADE)
     for x in (-0.15, 0.15):
         end(lv, "front", streak(x * 5, 0.62, x * 2, 0.9, 0.2), BLACK)
-    lv.side_mark(BADGE, 0.06, 0.62, 0.44)
-    door_number(lv, -0.86, 0.68, 0.4, 0.3)
+    door_number(lv, 0.1, 0.6, 0.74, 0.42)
+    lv.side_mark(BADGE, -0.86, 0.68, 0.32)
+    lv.side_mark(SEAL, 0.84, 0.8, 0.24)
     roof_number(lv, -0.4)
     badge_top(lv, 1.45, 0.7)
-    lv.mark("top", SEAL, (0, 0, -2.05), 0.28, rotate=-90)
     for view in ("left", "right"):
         team_name(lv, view, lv._side(view, 0.16, 0.28), 0.09)
     team_name(lv, "rear", (0, 0.58, 0), 0.08)
