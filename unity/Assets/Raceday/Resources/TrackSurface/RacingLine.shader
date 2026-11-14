@@ -1,4 +1,4 @@
-// The racing line assist: solid chevrons floating over the track ahead of the car you drive (RacingLineAssist.cs). Each vertex
+// The racing line assist: translucent chevrons sitting on the track ahead of the car you drive (RacingLineAssist.cs). Each vertex
 // carries its colour and how strongly it shows. Unlit, so it reads the same by day and night. The mesh is laid
 // far to near and writes depth, so the blocks stack right. Fogged.
 Shader "Hidden/TarmacGauntlet/RacingLine"

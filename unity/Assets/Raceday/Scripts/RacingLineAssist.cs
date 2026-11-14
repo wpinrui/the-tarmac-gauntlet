@@ -7,11 +7,12 @@ using UnityEngine.Rendering;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// The racing line assist for the car you drive (<see cref="DriveSettings.RacingLine"/>): solid chevrons floating
-    /// over the line tuned for your car, from just ahead of it to <see cref="Ahead"/> metres on. Each chevron is
-    /// coloured by your speed against the speed the line asks for there: red where you need to be braking already,
-    /// amber where you need to lift, green elsewhere. "Corners" shows only the braking zones and corners. One mesh,
-    /// rebuilt each frame from the samples ahead.
+    /// The racing line assist for the car you drive (<see cref="DriveSettings.RacingLine"/>): chevrons on the line
+    /// tuned for your car, from just ahead of it to <see cref="Ahead"/> metres on. Each chevron is coloured by your
+    /// speed against the speed the line asks for there: red where you need to be braking already, amber where you need
+    /// to lift, green elsewhere. Green lies flat on the road. Amber and red stand up off it as solid blocks, taller the
+    /// faster you are over the line's speed, red the tallest. "Corners" shows only the braking zones and corners. One
+    /// mesh, rebuilt each frame from the samples ahead.
     /// </summary>
     public sealed class RacingLineAssist : MonoBehaviour
     {
@@ -30,9 +31,14 @@ namespace TarmacGauntlet.Raceday
         private const float Spacing = 2f;
         /// <summary>Chevron shape, m: tip ahead of its sample, arms back and out, arm thickness along the line.</summary>
         private const float Tip = 0.55f, ArmBack = 0.45f, ArmOut = 0.75f, ArmThick = 0.5f;
-        /// <summary>The underside floats this high over the road, and the block is this tall, m.</summary>
-        private const float Lift = 0.1f, Height = 0.12f;
-        private const float Opacity = 0.9f, SideShade = 0.55f;
+        /// <summary>A flat chevron lies this far over the road, m.</summary>
+        private const float Lift = 0.03f;
+        /// <summary>
+        /// A chevron over the line's speed stands up to <see cref="Rise"/> m, reached at <see cref="FullRise"/> m/s over it,
+        /// easing in from nothing at <see cref="AmberBelow"/> under it (a quarter sine).
+        /// </summary>
+        private const float Rise = 0.8f, FullRise = 10f;
+        private const float Opacity = 0.6f, SideShade = 0.55f;
         /// <summary>Faster than the line's speed by this much is red, and within <see cref="AmberBelow"/> under it amber, m/s.</summary>
         private const float RedAbove = 1.5f, AmberBelow = 2.5f;
         /// <summary>"Corners" pads each braking zone and corner by this many metres, fading over <see cref="CornerFade"/>.</summary>
@@ -187,7 +193,8 @@ namespace TarmacGauntlet.Raceday
                 float alpha = Mathf.Clamp01((d - NearStart) / NearFade) * Mathf.Clamp01((Ahead - d) / FarFade);
                 if (cornersOnly) alpha *= corner[k];
                 if (alpha <= 0.01f) continue;
-                Color top = ColourAt(k, speed);
+                Color top = ColourAt(k, speed, out bool raised);
+                float height = raised ? RiseAt(k, speed) : 0f;
                 byte a = (byte)Mathf.RoundToInt(alpha * Opacity * 255f);
                 Color32 lit = new Color32((byte)(top.r * 255f), (byte)(top.g * 255f), (byte)(top.b * 255f), a);
                 Color32 side = new Color32((byte)(top.r * SideShade * 255f), (byte)(top.g * SideShade * 255f), (byte)(top.b * SideShade * 255f), a);
@@ -199,17 +206,27 @@ namespace TarmacGauntlet.Raceday
                 {
                     Vector3 back = centre - t * ArmBack + left * (s * ArmOut);
                     Vector3 b0 = tip, b1 = back, b2 = back - t * ArmThick, b3 = tip - t * ArmThick;
-                    Vector3 h = Vector3.up * Height;
-                    Quad(ref used, b0, b1, b1 + h, b0 + h, side);
-                    Quad(ref used, b1, b2, b2 + h, b1 + h, side);
-                    Quad(ref used, b2, b3, b3 + h, b2 + h, side);
-                    Quad(ref used, b3, b0, b0 + h, b3 + h, side);
+                    Vector3 h = Vector3.up * height;
+                    if (height > 0.005f)
+                    {
+                        Quad(ref used, b0, b1, b1 + h, b0 + h, side);
+                        Quad(ref used, b1, b2, b2 + h, b1 + h, side);
+                        Quad(ref used, b2, b3, b3 + h, b2 + h, side);
+                        Quad(ref used, b3, b0, b0 + h, b3 + h, side);
+                    }
                     Quad(ref used, b0 + h, b1 + h, b2 + h, b3 + h, lit);
                 }
             }
             // Unused quads collapse to nothing.
             Array.Clear(vertices, used * 4, vertices.Length - used * 4);
             mesh.SetVertexBufferData(vertices, 0, 0, vertices.Length, 0, Quiet);
+        }
+
+        /// <summary>How tall an amber or red chevron stands, m: rising with how far over the line's speed you are.</summary>
+        private float RiseAt(int k, float speed)
+        {
+            float over = Mathf.Clamp01((speed - profile.Speed[k] + AmberBelow) / (AmberBelow + FullRise));
+            return Rise * Mathf.Sin(over * Mathf.PI * 0.5f);
         }
 
         private void Quad(ref int used, Vector3 a, Vector3 b, Vector3 c, Vector3 d, Color32 colour)
@@ -226,12 +243,14 @@ namespace TarmacGauntlet.Raceday
         /// or holds its speed, close to it means lift (amber); where it speeds up or runs flat out, green. The red so
         /// starts where braking from your own speed must start, and stays away for a car already slow enough.
         /// </summary>
-        private Color ColourAt(int k, float speed)
+        private Color ColourAt(int k, float speed, out bool raised)
         {
             float want = profile.Speed[k];
+            raised = true;
             if (speed > want + RedAbove) return Red;
-            if (profile.Speed[line.Circuit.Wrap(k + 1)] > want + 0.01f || want >= Car.Spec.TopSpeed - 0.5f) return Green;
-            return speed > want - AmberBelow ? Amber : Green;
+            if (profile.Speed[line.Circuit.Wrap(k + 1)] <= want + 0.01f && want < Car.Spec.TopSpeed - 0.5f && speed > want - AmberBelow) return Amber;
+            raised = false;
+            return Green;
         }
     }
 }
