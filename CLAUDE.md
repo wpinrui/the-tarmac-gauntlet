@@ -24,6 +24,7 @@
 ## Menu text
 - Menu text never wraps. `Menus.uss` sets every Label to `white-space: nowrap` and `flex-shrink: 0`. Only text meant to run as a paragraph gets `white-space: normal` on its own class.
 - Before merging menu UI, check every new label at its longest real value. It must sit on one line and must not be squeezed. Give it room, or clip it with an ellipsis.
+- A label never has both its own text and child elements. Put the text in its own child label.
 
 ## Team leads
 A thread titled `[TEAM LEAD] <area>` owns one area. It plans and directs. It never builds.
