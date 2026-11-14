@@ -91,6 +91,9 @@ namespace TarmacGauntlet.Raceday
             public Vector3 Contact, ContactNormal;
             public float Skid;
             public SurfaceKind Kind;
+            /// <summary>This step's contact: the spring's load, the tyre's grip and cornering force (N), its speed along the road, and its axes.</summary>
+            public float Load, Cap, Fy, VLong, SlopeAlong, Rolling;
+            public Vector3 Forward, Side;
         }
 
         /// <summary>Wheel i's visual pivot, at its centre: 0 front left, 1 front right, 2 rear left, 3 rear right. Null with none.</summary>
@@ -262,7 +265,6 @@ namespace TarmacGauntlet.Raceday
 
             UpdateSteering(dt, speed);
             float driveForce = Engine(dt, along);
-            if (Supplies != null) Supplies.Burn(driveForce * along, dt);
 
             // Aerodynamics: drag at the centre of mass, downforce split 40/60 front to rear for stability.
             float q = 0.5f * CarSpec.AirDensity * speed * speed;
@@ -275,12 +277,21 @@ namespace TarmacGauntlet.Raceday
             float brakeTotal = braking * Spec.BrakeDecel * Spec.Mass * Gravity;
             gripUsed = 0f;
             gripCount = 0;
+            for (int i = 0; i < 4; i++) Contact(wheels[i], dt);
+            // Traction control trims the drive to what the rear tyres can take, and the differential sends
+            // what one rear wheel can't put down to the other.
+            float roomLeft = Room(wheels[2]), roomRight = Room(wheels[3]);
+            float engineDrive = driveForce;
+            driveForce = Traction.Control(driveForce, roomLeft + roomRight, Rolling(wheels[2]) + Rolling(wheels[3]));
+            if (Supplies != null) Supplies.Burn(driveForce * along, dt);
+            Traction.SplitDrive(driveForce, roomLeft, roomRight, out float driveLeft, out float driveRight);
             for (int i = 0; i < 4; i++)
             {
                 Wheel w = wheels[i];
-                float drive = w.Front ? 0f : driveForce * 0.5f;
+                // A wheel in the air spins up on its half of the engine's drive.
+                float drive = w.Front ? 0f : !w.Grounded ? 0.5f * engineDrive : w.Left ? driveLeft : driveRight;
                 float wheelBrake = brakeTotal * (w.Front ? Spec.FrontBrakeShare : 1f - Spec.FrontBrakeShare) * 0.5f;
-                TyreAndSpring(w, dt, drive, wheelBrake);
+                Forces(w, dt, drive, wheelBrake);
             }
             if (Supplies != null && gripCount > 0) Supplies.Scrub(speed * dt, Mathf.Sqrt(gripUsed / gripCount));
         }
@@ -337,7 +348,14 @@ namespace TarmacGauntlet.Raceday
             return -Mathf.Sign(along) * drag;
         }
 
-        private void TyreAndSpring(Wheel w, float dt, float drive, float wheelBrake)
+        /// <summary>Grip a grounded wheel has left along the road once it corners, N: 0 in the air.</summary>
+        private static float Room(Wheel w) => w.Grounded ? Traction.Room(w.Cap, w.Fy) : 0f;
+
+        /// <summary>Rolling resistance a grounded rear wheel's drive must overcome before it adds to its grip, N.</summary>
+        private static float Rolling(Wheel w) => w.Grounded ? Mathf.Max(w.Rolling, 0f) : 0f;
+
+        /// <summary>Finds where the wheel touches, pushes the spring, and works out the tyre's grip and cornering force.</summary>
+        private void Contact(Wheel w, float dt)
         {
             Vector3 origin = transform.TransformPoint(w.Mount);
             Vector3 up = transform.up;
@@ -346,88 +364,82 @@ namespace TarmacGauntlet.Raceday
             w.Grounded = Physics.Raycast(origin, -up, out RaycastHit hit, reach, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
             w.Compression = w.Grounded ? reach - hit.distance : 0f;
             w.Skid = 0f;
+            if (!w.Grounded) return;
 
+            float load = Spec.SpringRate * w.Compression + Spec.Damping * (w.Compression - previous) / dt;
+            load = Mathf.Max(0f, load);
+            body.AddForceAtPosition(up * load, origin);
+            w.Load = load;
+
+            SurfaceKind kind = SurfaceOf(hit.collider);
+            w.Kind = kind;
+            float angle = w.Front ? steer : 0f;
+            Vector3 n = hit.normal;
+            w.Forward = Vector3.ProjectOnPlane(Quaternion.AngleAxis(angle * Mathf.Rad2Deg, up) * transform.forward, n).normalized;
+            w.Side = Vector3.Cross(n, w.Forward);
+            w.Contact = hit.point;
+            w.ContactNormal = n;
+            Vector3 pv = body.GetPointVelocity(hit.point);
+            w.VLong = Vector3.Dot(pv, w.Forward);
+            w.Rolling = Mathf.Clamp(w.VLong * 4f, -1f, 1f) * TrackSurface.Rolling(kind) * load;
+            float vLat = Vector3.Dot(pv, w.Side);
+            float corner = Spec.Mass / 4f;
+            // Rear tyres grip a little more than the fronts, so the car leans towards understeer.
+            float cap = Spec.Grip * TrackSurface.Grip(kind) * load * (w.Front ? 0.97f : 1.06f);
+            if (Supplies != null) cap *= Supplies.WheelGrip(w.Front);
+            w.Cap = cap;
+
+            // Static grip: when nearly stopped the tyre holds against the slope it stands on,
+            // up to its grip limit, instead of creeping down it.
+            float upright = Mathf.Max(-Vector3.Dot(Physics.gravity, n), 1f);
+            float slopeSide = -Vector3.Dot(Physics.gravity, w.Side) / upright * load;
+            w.SlopeAlong = -Vector3.Dot(Physics.gravity, w.Forward) / upright * load;
+
+            // Lateral: slip-angle curve at speed, static grip when nearly stopped.
+            if (Mathf.Abs(w.VLong) < 4f && Mathf.Abs(vLat) < 4f)
+                w.Fy = Mathf.Clamp(-vLat * corner * 8f + slopeSide, -cap, cap);
+            else
+            {
+                float slip = Mathf.Atan2(vLat, Mathf.Abs(w.VLong));
+                // Peaks at PeakSlip and falls away gently past it.
+                float b = 2.64f / Spec.PeakSlip;
+                w.Fy = -cap * Mathf.Sin(1.3f * Mathf.Atan(b * slip));
+                // A tyre well past its peak slip angle is sliding, and leaves rubber behind.
+                w.Skid = Mathf.Clamp01((Mathf.Abs(slip) - 1.3f * Spec.PeakSlip) / (1.5f * Spec.PeakSlip));
+            }
+        }
+
+        /// <summary>The tyre's drive, brakes and cornering force, fitted into its grip, and the wheel's spin.</summary>
+        private void Forces(Wheel w, float dt, float drive, float wheelBrake)
+        {
             if (w.Grounded)
             {
-                float load = Spec.SpringRate * w.Compression + Spec.Damping * (w.Compression - previous) / dt;
-                load = Mathf.Max(0f, load);
-                body.AddForceAtPosition(up * load, origin);
-
-                SurfaceKind kind = SurfaceOf(hit.collider);
-                w.Kind = kind;
-                float angle = w.Front ? steer : 0f;
-                Vector3 n = hit.normal;
-                Vector3 forward = Vector3.ProjectOnPlane(Quaternion.AngleAxis(angle * Mathf.Rad2Deg, up) * transform.forward, n).normalized;
-                Vector3 side = Vector3.Cross(n, forward);
-                Vector3 pv = body.GetPointVelocity(hit.point);
-                float vLong = Vector3.Dot(pv, forward);
-                float vLat = Vector3.Dot(pv, side);
+                float cap = w.Cap, fy = w.Fy, vLong = w.VLong;
                 float corner = Spec.Mass / 4f;
-                // Rear tyres grip a little more than the fronts, so the car leans towards understeer.
-                float cap = Spec.Grip * TrackSurface.Grip(kind) * load * (w.Front ? 0.97f : 1.06f);
-                if (Supplies != null) cap *= Supplies.WheelGrip(w.Front);
-
-                // Static grip: when nearly stopped the tyre holds against the slope it stands on,
-                // up to its grip limit, instead of creeping down it.
-                float upright = Mathf.Max(-Vector3.Dot(Physics.gravity, n), 1f);
-                float slopeSide = -Vector3.Dot(Physics.gravity, side) / upright * load;
-                float slopeAlong = -Vector3.Dot(Physics.gravity, forward) / upright * load;
-
-                // Lateral: slip-angle curve at speed, static grip when nearly stopped.
-                float fy;
-                if (Mathf.Abs(vLong) < 4f && Mathf.Abs(vLat) < 4f)
-                    fy = Mathf.Clamp(-vLat * corner * 8f + slopeSide, -cap, cap);
-                else
-                {
-                    float slip = Mathf.Atan2(vLat, Mathf.Abs(vLong));
-                    // Peaks at PeakSlip and falls away gently past it.
-                    float b = 2.64f / Spec.PeakSlip;
-                    fy = -cap * Mathf.Sin(1.3f * Mathf.Atan(b * slip));
-                    // A tyre well past its peak slip angle is sliding, and leaves rubber behind.
-                    w.Skid = Mathf.Clamp01((Mathf.Abs(slip) - 1.3f * Spec.PeakSlip) / (1.5f * Spec.PeakSlip));
-                }
-
                 // Longitudinal: drive, brakes (holding the car still when nearly stopped), rolling resistance.
                 float fx = drive;
                 bool braking = wheelBrake > 0f;
                 bool holding = throttle < 0.01f && Mathf.Abs(vLong) < 0.5f;
                 if (holding)
-                    fx += Mathf.Clamp(-vLong * corner * 10f + slopeAlong, -cap, cap);
+                    fx += Mathf.Clamp(-vLong * corner * 10f + w.SlopeAlong, -cap, cap);
                 else
                 {
                     if (braking) fx -= Mathf.Sign(vLong) * wheelBrake;
-                    fx -= Mathf.Clamp(vLong * 4f, -1f, 1f) * TrackSurface.Rolling(kind) * load;
+                    fx -= w.Rolling;
                 }
 
                 // Friction circle. Anti-lock keeps steering under braking; wheelspin costs side grip.
-                if (fx * fx + fy * fy > cap * cap)
-                {
-                    if (braking && drive == 0f)
-                    {
-                        fx = Mathf.Sign(fx) * Mathf.Sqrt(Mathf.Max(cap * cap - fy * fy, 0.09f * cap * cap));
-                        // Braking far past what the tyre holds: the anti-lock lets it scrub, faintly.
-                        if (Mathf.Abs(vLong) > 3f) w.Skid = Mathf.Max(w.Skid, 0.4f * Mathf.Clamp01(wheelBrake / cap - 1.3f));
-                    }
-                    else if (Mathf.Abs(fx) > cap * 0.95f)
-                    {
-                        fx = Mathf.Sign(fx) * cap * 0.9f;
-                        fy *= 0.6f;
-                        // Wheelspin, as hard as the drive overpowers the tyre. A wheel that has gone light over a bump
-                        // or kerb skips for an instant rather than spinning up, so it leaves no rubber.
-                        if (load > LightWheel * corner * Gravity)
-                            w.Skid = Mathf.Max(w.Skid, 0.85f * Mathf.Clamp01((Mathf.Abs(drive) / cap - 0.95f) / 0.5f));
-                    }
-                    float total = Mathf.Sqrt(fx * fx + fy * fy);
-                    if (total > cap)
-                    {
-                        fx *= cap / total;
-                        fy *= cap / total;
-                    }
-                }
-                body.AddForceAtPosition(forward * fx + side * fy, hit.point);
-                if (kind != SurfaceKind.Tarmac && kind != SurfaceKind.Kerb) w.Skid = 0f;
-                w.Contact = hit.point;
-                w.ContactNormal = n;
+                bool over = fx * fx + fy * fy > cap * cap;
+                float spin = Traction.Fit(ref fx, ref fy, cap, drive, braking);
+                // Braking far past what the tyre holds: the anti-lock lets it scrub, faintly.
+                if (over && braking && drive == 0f && Mathf.Abs(vLong) > 3f)
+                    w.Skid = Mathf.Max(w.Skid, 0.4f * Mathf.Clamp01(wheelBrake / cap - 1.3f));
+                // Wheelspin, as hard as the drive overpowers the tyre. A wheel that has gone light over a bump
+                // or kerb skips for an instant rather than spinning up, so it leaves no rubber.
+                if (spin > 0f && w.Load > LightWheel * corner * Gravity)
+                    w.Skid = Mathf.Max(w.Skid, 0.85f * spin);
+                body.AddForceAtPosition(w.Forward * fx + w.Side * fy, w.Contact);
+                if (w.Kind != SurfaceKind.Tarmac && w.Kind != SurfaceKind.Kerb) w.Skid = 0f;
                 if (cap > 1f)
                 {
                     gripUsed += Mathf.Min((fx * fx + fy * fy) / (cap * cap), 1f);

@@ -36,6 +36,13 @@ sealed class StandInCar
     public PitLane Pits;
 
     float steer, shiftTimer, ax, ay;
+
+    struct WheelState
+    {
+        public float A, B, Load, Cap, Fy, VLong, Rolling, Fx, Fz, Rx, Rz;
+        public SurfaceKind Kind;
+    }
+    readonly WheelState[] wheels = new WheelState[4];
     readonly float inertia;
 
     public StandInCar(CarSpec spec, RacingLine line)
@@ -95,6 +102,8 @@ sealed class StandInCar
 
     /// <summary>The pedals and steering asked for in the last step, for traces.</summary>
     public float LastThrottle, LastBrake, LastSteer;
+    /// <summary>Rear wheels spinning in the last step: the drive overpowered the tyre.</summary>
+    public int Spinning;
 
     public void Step(float dt, float throttle, float brake, float steerTarget)
     {
@@ -111,7 +120,6 @@ sealed class StandInCar
         steer = Mathf.MoveTowards(steer, target, rate * dt);
 
         float drive = Engine(dt, vLongCar, throttle);
-        Supplies?.Burn(drive * vLongCar, dt);
         float gripUsed = 0f;
         int gripCount = 0;
 
@@ -127,7 +135,9 @@ sealed class StandInCar
         float roll = Spec.Mass * ay * h / (2f * Spec.HalfTrack);   // to the outside (left wheels in a right-hander)
 
         float fx = 0f, fz = 0f, torque = 0f;
+        Spinning = 0;
         float brakeTotal = brake * Spec.BrakeDecel * Spec.Mass * G;
+        float corner = Spec.Mass / 4f;
         for (int i = 0; i < 4; i++)
         {
             bool front = i < 2, left = i % 2 == 0;
@@ -146,7 +156,6 @@ sealed class StandInCar
             float wrx = R.x * ca - F.x * sa, wrz = R.z * ca - F.z * sa;   // wheel right
             float vLong = pvx * wfx + pvz * wfz;
             float vLat = pvx * wrx + pvz * wrz;                             // CarController's side axis points right
-            float corner = Spec.Mass / 4f;
             SurfaceKind kind = WheelSurface(a, b);
             float cap = Spec.Grip * TrackSurface.Grip(kind) * load * (front ? 0.97f : 1.06f);
             if (Supplies != null) cap *= Supplies.GripScale;
@@ -159,7 +168,19 @@ sealed class StandInCar
                 float bb = 2.64f / Spec.PeakSlip;
                 fy = -cap * (float)Math.Sin(1.3f * Math.Atan(bb * slip));
             }
-            float wheelDrive = front ? 0f : drive * 0.5f;
+            float rolling = Mathf.Clamp(vLong * 4f, -1f, 1f) * TrackSurface.Rolling(kind) * load;
+            wheels[i] = new WheelState { A = a, B = b, Load = load, Cap = cap, Fy = fy, VLong = vLong, Rolling = rolling, Kind = kind, Fx = wfx, Fz = wfz, Rx = wrx, Rz = wrz };
+        }
+        float roomLeft = Traction.Room(wheels[2].Cap, wheels[2].Fy), roomRight = Traction.Room(wheels[3].Cap, wheels[3].Fy);
+        drive = Traction.Control(drive, roomLeft + roomRight, Math.Max(wheels[2].Rolling, 0f) + Math.Max(wheels[3].Rolling, 0f));
+        Supplies?.Burn(drive * vLongCar, dt);
+        Traction.SplitDrive(drive, roomLeft, roomRight, out float driveLeft, out float driveRight);
+        for (int i = 0; i < 4; i++)
+        {
+            bool front = i < 2, left = i % 2 == 0;
+            WheelState w = wheels[i];
+            float cap = w.Cap, fy = w.Fy, vLong = w.VLong;
+            float wheelDrive = front ? 0f : left ? driveLeft : driveRight;
             float wheelBrake = brakeTotal * (front ? Spec.FrontBrakeShare : 1f - Spec.FrontBrakeShare) * 0.5f;
             float fl = wheelDrive;
             bool braking = wheelBrake > 0f;
@@ -168,24 +189,13 @@ sealed class StandInCar
             else
             {
                 if (braking) fl -= Math.Sign(vLong) * wheelBrake;
-                fl -= Mathf.Clamp(vLong * 4f, -1f, 1f) * TrackSurface.Rolling(kind) * load;
+                fl -= w.Rolling;
             }
-            if (fl * fl + fy * fy > cap * cap)
-            {
-                if (braking && wheelDrive == 0f)
-                    fl = Math.Sign(fl) * (float)Math.Sqrt(Math.Max(cap * cap - fy * fy, 0.09f * cap * cap));
-                else if (Math.Abs(fl) > cap * 0.95f)
-                {
-                    fl = Math.Sign(fl) * cap * 0.9f;
-                    fy *= 0.6f;
-                }
-                float total = (float)Math.Sqrt(fl * fl + fy * fy);
-                if (total > cap) { fl *= cap / total; fy *= cap / total; }
-            }
+            if (Traction.Fit(ref fl, ref fy, cap, wheelDrive, braking) > 0.1f && !front) Spinning++;
             if (cap > 1f) { gripUsed += Math.Min((fl * fl + fy * fy) / (cap * cap), 1f); gripCount++; }
-            float wx = wfx * fl + wrx * fy, wz = wfz * fl + wrz * fy;
+            float wx = w.Fx * fl + w.Rx * fy, wz = w.Fz * fl + w.Rz * fy;
             fx += wx; fz += wz;
-            torque += wx * (-a * F.x + b * R.x) + wz * (-a * F.z + b * R.z);
+            torque += wx * (-w.A * F.x + w.B * R.x) + wz * (-w.A * F.z + w.B * R.z);
         }
 
         if (speed > 0.1f) { fx -= Vx / speed * q * Spec.DragArea * DragScale; fz -= Vz / speed * q * Spec.DragArea * DragScale; }

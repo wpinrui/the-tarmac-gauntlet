@@ -85,6 +85,11 @@ static partial class Check
             }
             return 0;
         }
+        if (args.Length > 1 && args[1] == "traction")
+        {
+            TractionReport();
+            return 0;
+        }
         if (args.Length > 1 && args[1] == "solo")
         {
             foreach (float pace in new[] { 75f, 100f })

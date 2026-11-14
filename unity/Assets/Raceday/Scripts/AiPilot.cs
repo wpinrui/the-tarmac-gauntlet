@@ -437,9 +437,9 @@ namespace TarmacGauntlet.Raceday
             var controls = new Controls { Steer = steer };
             if (needed >= 0f)
             {
-                // Only as much throttle as the rear tyres can take on top of the corner, and less
-                // again once the tail is stepping out.
-                float force = Mathf.Min(needed, Mathf.Min(Profile.Traction(speed), Profile.RearGripLeft(Index, speed, speed * yawRate)));
+                // Traction control holds the rear tyres at what they can take on top of the corner, so
+                // the driver asks for what the plan needs, and lifts once the tail is stepping out.
+                float force = needed;
                 float grip = Mathf.Clamp01(2f - Mathf.Abs(slide) / (0.5f * Spec.PeakSlip));
                 controls.Throttle = Mathf.Clamp01(force / Mathf.Max(Profile.EngineAccel(speed), 0.5f)) * grip;
             }
