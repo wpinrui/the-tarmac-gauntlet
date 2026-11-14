@@ -10,7 +10,7 @@ namespace TarmacGauntlet.Raceday
     /// the fields' colours on the ground, the trees and hedges, and the hills out to the haze.
     /// Trees are impostors (Resources/Landscape/Impostor.shader) in square chunks, each drawn twice: depth alone first,
     /// then lit, so only the tree in front of each pixel is lit. Each has a thinner far version past about 900 m that
-    /// casts no shadow. Nothing here collides.
+    /// casts no shadow. Each tree's trunk is solid (<see cref="Trunks"/>), the hedge bushes and the ground's colours not.
     /// </summary>
     public static class Landscape
     {
@@ -125,6 +125,33 @@ namespace TarmacGauntlet.Raceday
                 LODGroup lod = go.AddComponent<LODGroup>();
                 lod.SetLODs(new[] { new LOD(FarAt, new[] { near }), new LOD(0.002f, new[] { distant }) });
                 lod.RecalculateBounds();
+                Trunks(go.transform, chunk.Near);
+            }
+        }
+
+        /// <summary>Height of a trunk's collider from the tree's foot, m: tall enough for a car leaving the ground.</summary>
+        private const float TrunkHeight = 4f;
+
+        /// <summary>
+        /// The trees' trunks, solid to a car: a capsule each, one object a chunk, sized by the baked tree's height,
+        /// a fiftieth of it plus 12 cm across the radius, so a tall pine's is about half a metre.
+        /// </summary>
+        private static void Trunks(Transform parent, List<TreeSpot> trees)
+        {
+            GameObject go = null;
+            foreach (TreeSpot t in trees)
+            {
+                if (t.Kind == TreeKind.Bush) continue;
+                if (go == null)
+                {
+                    go = new GameObject("Trunks") { isStatic = true };
+                    go.transform.SetParent(parent, false);
+                    Barriers.Tag(go);
+                }
+                CapsuleCollider trunk = go.AddComponent<CapsuleCollider>();
+                trunk.radius = (0.02f * LandscapePlan.ModelHeight[(int)t.Kind] + 0.12f) * t.Scale;
+                trunk.height = TrunkHeight;
+                trunk.center = t.Base + Vector3.up * (TrunkHeight * 0.5f);
             }
         }
 

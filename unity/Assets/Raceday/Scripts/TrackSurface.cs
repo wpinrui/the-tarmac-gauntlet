@@ -32,7 +32,10 @@ namespace TarmacGauntlet.Raceday
             "Kerbs" => SurfaceKind.Kerb,
             "Verges" or "Grass runoff" or "Pit lane infield" or "Ground" => SurfaceKind.Grass,
             "Gravel traps" => SurfaceKind.Gravel,
-            "Armco" or "Tyre walls" or "Pit wall" or "Garages" or "Pit entry bollard" => SurfaceKind.Barrier,
+            "Armco" or "Tyre walls" or "Pit wall" or "Garages" or "Pit entry bollard"
+                or "Stand concrete" or "Stand steel" or "Stand cladding" or "Stand seats" or "Stand roofs" or "Stand banks"
+                or "Catch fence" or "Catch fence posts" or "Pit building" or "Pit building glass" or "Pit building steel"
+                or "Floodlight steel" => SurfaceKind.Barrier,
             _ => SurfaceKind.Tarmac,
         };
     }

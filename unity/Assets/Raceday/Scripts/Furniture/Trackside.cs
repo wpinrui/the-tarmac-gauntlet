@@ -11,7 +11,8 @@ namespace TarmacGauntlet.Raceday
     /// The trackside furniture in the scene: the start gantry, marshal posts with their marshals and flag panels,
     /// the distance boards, the armco's rails, posts and catch fences (<see cref="ArmcoBuilder"/>), and the hoardings,
     /// camera towers and cabins (<see cref="TracksideProps"/>). Each frame race
-    /// control (<see cref="RaceFlags"/>) watches the cars and sets the start lights and every panel. None of it has a collider, so it never touches the racing.
+    /// control (<see cref="RaceFlags"/>) watches the cars and sets the start lights and every panel. All of it is solid:
+    /// a car that leaves the road hits it as a barrier (<see cref="Barriers"/>).
     /// </summary>
     public sealed class Trackside : MonoBehaviour
     {
@@ -46,6 +47,8 @@ namespace TarmacGauntlet.Raceday
         private RaceFlags.Lights lights = (RaceFlags.Lights)(-1);
         private RaceFlags.Car[] states = new RaceFlags.Car[0];
         private readonly List<Renderer> armcoDetail = new List<Renderer>();
+        /// <summary>The armco's catch fences and their posts: solid only while drawn, as the plain armco has none.</summary>
+        private readonly List<Collider> fences = new List<Collider>();
         private Renderer[] armcoPlain = new Renderer[0];
         private GameObject props;
 
@@ -61,7 +64,7 @@ namespace TarmacGauntlet.Raceday
             Transform root = t.transform;
 
             foreach (CircuitPart part in built.Parts)
-                t.Add(root, part.Name, part.Kit, part.Material, true);
+                t.Add(root, part.Name, part.Kit, part.Material, true, true);
             t.red = t.Add(root, "Start lights red", built.RedLenses, t.materials.RedOff, false);
             t.green = t.Add(root, "Start lights green", built.GreenLenses, t.materials.GreenOff, false);
 
@@ -79,14 +82,20 @@ namespace TarmacGauntlet.Raceday
             var armco = new ArmcoBuilder(circuit, track.ArmcoRuns, stands, placed.GantryLeft, placed.GantryRight);
             var steel = new GameObject("Armco").transform;
             steel.SetParent(root, false);
-            foreach ((MeshKit kit, Material material, string name) in new[]
+            // The rails are hit as the circuit's plain armco, always there. The catch fences above them are hit only while drawn.
+            foreach ((MeshKit kit, Material material, string name, bool solid) in new[]
             {
-                (armco.Steel, t.materials.ArmcoSteel, "Armco steel"),
-                (armco.Fence, t.materials.CatchFence, "Armco catch fence"),
-                (armco.FencePosts, t.materials.Galvanised, "Armco catch fence posts"),
+                (armco.Steel, t.materials.ArmcoSteel, "Armco steel", false),
+                (armco.Fence, t.materials.CatchFence, "Armco catch fence", true),
+                (armco.FencePosts, t.materials.Galvanised, "Armco catch fence posts", true),
             })
                 foreach (MeshKit chunk in kit.Indexed().Chunks(ArmcoChunk))
-                    if (!chunk.IsEmpty) t.armcoDetail.Add(t.Add(steel, name, chunk, material, true));
+                    if (!chunk.IsEmpty)
+                    {
+                        Renderer r = t.Add(steel, name, chunk, material, true, solid);
+                        t.armcoDetail.Add(r);
+                        if (solid) t.fences.Add(r.GetComponent<Collider>());
+                    }
 
             var spots = new TracksideProps(circuit, track, stands, placed, armco.Ends, trees);
             t.AddProps(root, new PropBuilder(circuit, spots, t.materials));
@@ -161,22 +170,25 @@ namespace TarmacGauntlet.Raceday
             var tri = kit.Triangles;
             for (int i = 0; i < tri.Count; i += 3)
                 moved.Triangle(v[tri[i]] - origin, v[tri[i + 1]] - origin, v[tri[i + 2]] - origin, n[tri[i]], n[tri[i + 1]], n[tri[i + 2]], uv[tri[i]], uv[tri[i + 1]], uv[tri[i + 2]]);
-            Renderer r = Add(parent, name, moved.Indexed(), material, true);
-            return r;
+            return Add(parent, name, moved.Indexed(), material, true, true);
         }
 
         private void ShowArmco(GraphicsOption option)
         {
             bool detail = option.On;
             foreach (Renderer r in armcoDetail) r.enabled = detail;
+            foreach (Collider c in fences) c.enabled = detail;
             foreach (Renderer r in armcoPlain) r.enabled = !detail;
         }
 
-        private Renderer Add(Transform parent, string name, MeshKit kit, Material material, bool shadows)
+        /// <param name="solid">Cars hit it, as a barrier.</param>
+        private Renderer Add(Transform parent, string name, MeshKit kit, Material material, bool shadows, bool solid = false)
         {
             var go = new GameObject(name) { isStatic = true };
             go.transform.SetParent(parent, false);
-            go.AddComponent<MeshFilter>().sharedMesh = kit.ToMesh(name);
+            Mesh mesh = kit.ToMesh(name);
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            if (solid) Barriers.FromMesh(go, mesh);
             var r = go.AddComponent<MeshRenderer>();
             r.sharedMaterial = material;
             r.shadowCastingMode = shadows ? ShadowCastingMode.On : ShadowCastingMode.Off;
@@ -208,6 +220,7 @@ namespace TarmacGauntlet.Raceday
                 // The baked body faces -z.
                 go.transform.rotation = Quaternion.LookRotation(-facing, Vector3.up);
                 go.AddComponent<MeshFilter>().sharedMesh = meshes[pose];
+                Barriers.Person(go);
                 var r = go.AddComponent<MeshRenderer>();
                 r.sharedMaterials = look;
                 r.shadowCastingMode = ShadowCastingMode.On;
