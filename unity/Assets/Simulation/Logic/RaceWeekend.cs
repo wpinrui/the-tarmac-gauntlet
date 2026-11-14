@@ -302,6 +302,7 @@ namespace TarmacGauntlet.Simulation
                     Laps = c.Laps,
                     Retired = c.Retired,
                     RetirementReason = c.RetirementReason,
+                    FailureId = c.FailureId,
                     BestLap = c.BestLap,
                     PrizeMoney = history.Results[i].PrizeMoney,
                 };

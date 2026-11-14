@@ -177,23 +177,46 @@ namespace TarmacGauntlet.Simulation.Tests
         }
 
         [Test]
-        public void AFailureRetiresTheCar()
+        public void AFailureRetiresTheCarMidLap()
         {
-            // A failure (first roll low) that isn't a crash (second roll high).
-            var rolls = new Queue<double>(new[] { 0.0, 0.9 });
+            // No issue at the line (first roll high), then a failure (low) and what broke: the first of the failures.
+            var rolls = new Queue<double>(new[] { 0.999, 0.0, 0.0 });
             (RaceDay race, CarRaceLog me) = PlayerRace(() => rolls.Count > 0 ? rolls.Dequeue() : 0.999);
             race.CompleteLap(me.Index, 90, 90, InstructionMode.Normal, false);
+            Assert.That(me.Retired, Is.False, "the line rolls no failure");
+            Assert.That(race.Drive(me.Index, 130, 0.5, InstructionMode.Normal), Is.True);
             Assert.That(me.Retired, Is.True);
             Assert.That(me.RetirementReason, Is.EqualTo(FailureType.Mechanical));
+            Assert.That(me.Failure, Is.EqualTo(IssueTemplates.MechanicalFailures[0]));
             race.CompleteLap(me.Index, 180, 90, InstructionMode.Normal, false);
             Assert.That(me.Laps, Is.EqualTo(1));
+            Assert.That(me.Save().FailureId, Is.EqualTo(me.FailureId));
+        }
+
+        [Test]
+        public void ARetirementNamesOnlyAMechanicalFailure()
+        {
+            (RaceDay race, CarRaceLog me) = PlayerRace(Never);
+            me.Retire(10, FailureType.Crash);
+            Assert.That(me.Failure, Is.Null);
+            CarRaceLog other = race.Cars.First(c => c != me);
+            other.Retire(10, FailureType.Mechanical);
+            Assert.That(IssueTemplates.MechanicalFailures, Does.Contain(other.Failure));
+        }
+
+        [Test]
+        public void ARunningCarRarelyFailsInASecond()
+        {
+            (RaceDay race, CarRaceLog me) = PlayerRace(() => 0.01);
+            Assert.That(race.Drive(me.Index, 10, 1.0 / 60, InstructionMode.Normal), Is.False);
+            Assert.That(race.Drive(me.Index, 10, 0, InstructionMode.Normal), Is.False);
         }
 
         [Test]
         public void AnIssueDebuffsTheCarUntilFixed()
         {
-            // No failure (first roll high), then an issue (second roll low), then pick the first template.
-            var rolls = new Queue<double>(new[] { 0.999, 0.0, 0.0 });
+            // An issue (first roll low), then pick the first template.
+            var rolls = new Queue<double>(new[] { 0.0, 0.0 });
             (RaceDay race, CarRaceLog me) = PlayerRace(() => rolls.Count > 0 ? rolls.Dequeue() : 0.999);
             IReadOnlyList<ActiveIssue> found = race.CompleteLap(me.Index, 90, 90, InstructionMode.Normal, false);
             Assert.That(found, Has.Count.EqualTo(1));
@@ -213,7 +236,7 @@ namespace TarmacGauntlet.Simulation.Tests
         [Test]
         public void IssuesWaitWhenThereAreNoSpares()
         {
-            var rolls = new Queue<double>(new[] { 0.999, 0.0, 0.0 });
+            var rolls = new Queue<double>(new[] { 0.0, 0.0 });
             var setup = RaceWeekend.BuildSetup(Career());
             setup = setup with { Grid = setup.Grid.Select(g => g.Player ? g with { SpareParts = 0 } : g).ToArray() };
             var race = new RaceDay(setup, () => rolls.Count > 0 ? rolls.Dequeue() : 0.999);

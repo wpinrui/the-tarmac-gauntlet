@@ -39,6 +39,12 @@ namespace TarmacGauntlet.Raceday
         public AiDriver[] Drivers;
         public RaceTower Tower;
 
+        /// <summary>
+        /// A car's engine or running gear gave out on track, at any point in the lap: its index, and what broke. Raised
+        /// as the car is taken out of the race, before it stops.
+        /// </summary>
+        public event Action<int, IssueTemplate> MechanicalFailure;
+
         public bool Finished { get; private set; }
         /// <summary>True once the race is under way: from the green.</summary>
         public bool Started => started;
@@ -181,6 +187,13 @@ namespace TarmacGauntlet.Raceday
                         TakeFlag(i);
                         continue;
                     }
+                }
+                // A race-ending failure can strike anywhere on the lap: it is rolled for every second on track.
+                if (!Cars[i].InPitLane && Day.Drive(i, Tower.RaceTime, Time.deltaTime, supplies.Mode))
+                {
+                    if (log.Failure != null) MechanicalFailure?.Invoke(i, log.Failure);
+                    Retire(i);
+                    continue;
                 }
                 // A car far from the camera runs with no physics, so it can't hit anything: it takes its hits by chance.
                 if (controllers[i].Asleep && !Cars[i].InPitLane && CarDamage.RollHit(Time.deltaTime, hitRoll.NextDouble) is double impact)

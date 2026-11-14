@@ -347,5 +347,12 @@ namespace TarmacGauntlet.Simulation
         /// <summary>Complete catalogue: all issues combined.</summary>
         public static readonly IReadOnlyList<IssueTemplate> AllIssueTemplates =
             MechanicalIssues.Concat(CrashIssues).ToArray();
+
+        /// <summary>The race-ending mechanical failures: a car that fails is out, and this names what broke.</summary>
+        public static readonly IReadOnlyList<IssueTemplate> MechanicalFailures = MechanicalMajor;
+
+        /// <summary>The template with this id, or null.</summary>
+        public static IssueTemplate? Find(string? id) =>
+            id == null ? null : AllIssueTemplates.FirstOrDefault(t => t.Id == id);
     }
 }
