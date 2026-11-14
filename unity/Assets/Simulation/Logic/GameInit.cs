@@ -186,12 +186,10 @@ namespace TarmacGauntlet.Simulation
         private static int globalCarId = 0;
         private static string NextCarId() => $"car-{++globalCarId}";
 
-        private static (AITeam Team, IReadOnlyList<Contract> Contracts) CreateAiTeam(
+        private static AITeam CreateAiTeam(
             int index,
             AiTeamEntry entry,
             AiTierSpec spec,
-            IReadOnlyList<Driver> drivers,
-            int driverOffset,
             Func<double> random)
         {
             var teamId = $"ai-{index}";
@@ -206,43 +204,62 @@ namespace TarmacGauntlet.Simulation
             };
 
             var budget = JsMath.Round(spec.BudgetMin + random() * (spec.BudgetMax - spec.BudgetMin));
-
-            // Assign 3 drivers from the pool
-            var contracts = new List<Contract>();
-            for (var d = 0; d < DriversPerAiTeam; d++)
-            {
-                var driver = drivers[driverOffset + d];
-                var stats = DriverLifecycle.CalculateDriverStats(driver);
-                var annualSalary = DriverLifecycle.CalculateAnnualSalary(stats);
-                var length = (int)Math.Floor(random() * 3) + 1;
-                contracts.Add(new Contract
-                {
-                    DriverId = driver.Id,
-                    TeamId = teamId,
-                    Length = length,
-                    RemainingYears = length,
-                    AnnualSalary = annualSalary,
-                });
-            }
-
             var prestige = JsMath.Round(spec.PrestigeMin + random() * (spec.PrestigeMax - spec.PrestigeMin));
 
-            var team = new AITeam
+            return new AITeam
             {
                 Id = teamId,
                 Name = entry.Name,
                 ModelId = modelId,
+                Status = entry.Status,
                 Budget = budget,
                 Prestige = prestige,
                 PrestigeHistory = new[] { prestige },
                 Cars = new[] { car },
-                Contracts = contracts,
+                Contracts = Array.Empty<Contract>(),
                 EnteredCarId = car.Id,
                 SpareParts = 5,
                 TyreSets = 5,
             };
+        }
 
-            return (team, contracts);
+        /// <summary>
+        /// Signs the starting drivers. The pool is in random order: its tail stays free for the player,
+        /// and the rest go 3 to a team, best drivers to the most appealing teams.
+        /// </summary>
+        private static (List<AITeam> Teams, List<Contract> Contracts) SignStartingDrivers(
+            IReadOnlyList<AITeam> teams,
+            IReadOnlyList<Driver> drivers,
+            Func<double> random)
+        {
+            var signed = drivers
+                .Take(teams.Count * DriversPerAiTeam)
+                .OrderByDescending(DriverLifecycle.DriverRating)
+                .ToList();
+            var contractsByTeam = new Dictionary<string, List<Contract>>();
+            var next = 0;
+            foreach (var team in teams.OrderByDescending(DriverLifecycle.TeamAppeal))
+            {
+                var contracts = new List<Contract>();
+                for (var d = 0; d < DriversPerAiTeam; d++)
+                {
+                    var driver = signed[next++];
+                    var length = (int)Math.Floor(random() * 3) + 1;
+                    contracts.Add(new Contract
+                    {
+                        DriverId = driver.Id,
+                        TeamId = team.Id,
+                        Length = length,
+                        RemainingYears = length,
+                        AnnualSalary = DriverLifecycle.CalculateAnnualSalary(DriverLifecycle.CalculateDriverStats(driver)),
+                    });
+                }
+                contractsByTeam[team.Id] = contracts;
+            }
+
+            return (
+                teams.Select(t => t with { Contracts = contractsByTeam[t.Id] }).ToList(),
+                teams.SelectMany(t => contractsByTeam[t.Id]).ToList());
         }
 
         // ---------------------------------------------------------------------------
@@ -308,7 +325,7 @@ namespace TarmacGauntlet.Simulation
         /// Creates a complete initial GameState.
         ///
         /// - Seeds 310 drivers with age distribution
-        /// - Creates 99 AI teams across all tiers, each with 1 car, 3 contracted drivers and a crew sized by prestige (AiCrew)
+        /// - Creates 99 AI teams across all tiers, each with 1 car, 3 contracted drivers (best to the most appealing) and a crew sized by prestige (AiCrew)
         /// - Gives every team its race number (RaceNumbers)
         /// - Creates the player team: $1,000 budget, plot armour car, no drivers, 0 crew
         /// - Generates the car market (new + used)
@@ -324,30 +341,18 @@ namespace TarmacGauntlet.Simulation
             // 1. Seed driver pool
             var drivers = SeedDriverPool(rng);
 
-            // 2. Create AI teams: assign drivers in order from the pool
-            //    First 99 x 3 = 297 drivers go to AI teams, remainder are free agents
-            var allContracts = new List<Contract>();
-            var aiTeams = new List<AITeam>();
-            var driverOffset = 0;
+            // 2. Create AI teams, then sign their drivers (DriverPoolSize - 99 x 3 are left free)
+            var unsigned = new List<AITeam>();
             var teamIndex = 0;
-
             foreach (var spec in AiTierSpecs)
             {
                 for (var i = 0; i < spec.Count; i++)
                 {
-                    var (team, contracts) = CreateAiTeam(
-                        teamIndex,
-                        AiTeamRoster.All[teamIndex],
-                        spec,
-                        drivers,
-                        driverOffset,
-                        rng);
-                    aiTeams.Add(team);
-                    allContracts.AddRange(contracts);
-                    driverOffset += DriversPerAiTeam;
+                    unsigned.Add(CreateAiTeam(teamIndex, AiTeamRoster.All[teamIndex], spec, rng));
                     teamIndex++;
                 }
             }
+            var (aiTeams, allContracts) = SignStartingDrivers(unsigned, drivers, rng);
 
             // 3. Create player team
             var playerTeam = CreatePlayerTeam(

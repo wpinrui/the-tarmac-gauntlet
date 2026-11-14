@@ -59,7 +59,7 @@ namespace TarmacGauntlet.Simulation
         ///      salaries and crew costs for all teams.
         ///   4. Age all car instances by 1 year (across all teams).
         ///   5. Generate new used car inventory.
-        ///   6. Run AI spending for each AI team (greedy algorithm, highest-value-first).
+        ///   6. Run AI spending for each AI team, most appealing team first (greedy algorithm, highest-value-first).
         ///   7. Trim race history to the rolling window.
         ///
         /// Player spending is NOT handled here: the player acts via the UI before this
@@ -127,17 +127,11 @@ namespace TarmacGauntlet.Simulation
             // 5. Generate new used car inventory
             var usedListings = CarMarketLogic.GenerateUsedInventoryByClass(input.CarModels, input.PlayerHasWon, random);
 
-            // 6. Run AI spending for each AI team
+            // 6. Run AI spending for each AI team, most appealing first, so the best drivers go to the teams they most want
             var activeContracts = updatedContracts;
-            var finalTeams = new List<BaseTeam>(agedTeams.Count);
-            foreach (var team in agedTeams)
+            var spent = new Dictionary<string, BaseTeam>();
+            foreach (var ai in agedTeams.OfType<AITeam>().OrderByDescending(DriverLifecycle.TeamAppeal))
             {
-                if (!(team is AITeam ai))
-                {
-                    finalTeams.Add(team); // skip player team
-                    continue;
-                }
-
                 var result = AiSpending.RunAiSpending(new AiSpendingContext
                 {
                     Team = ai,
@@ -150,8 +144,9 @@ namespace TarmacGauntlet.Simulation
 
                 // Accumulate new contracts into the shared pool so subsequent AI teams see them
                 activeContracts = activeContracts.Concat(result.NewContracts).ToArray();
-                finalTeams.Add(result.UpdatedTeam);
+                spent[ai.Id] = result.UpdatedTeam;
             }
+            var finalTeams = agedTeams.Select(team => spent.TryGetValue(team.Id, out var updated) ? updated : team).ToList();
 
             // 7. Trim race history rolling window: strip rich data, keep results + fastest lap only
             var trimmedHistory = input.RaceHistory.Select(entry =>

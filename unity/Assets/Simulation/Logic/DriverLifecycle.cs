@@ -220,6 +220,28 @@ namespace TarmacGauntlet.Simulation
         public static bool IsDriverFreeAgent(string driverId, IReadOnlyList<Contract> contracts) =>
             !contracts.Any(c => c.DriverId == driverId && c.RemainingYears > 0);
 
+        /// <summary>Appeal a factory team adds on top of its prestige.</summary>
+        private const double FactoryAppeal = 6;
+        /// <summary>Appeal a satellite team adds on top of its prestige.</summary>
+        private const double SatelliteAppeal = 3;
+
+        /// <summary>
+        /// How much drivers want to race for a team. The more appealing team signs first.
+        ///
+        /// Prestige bands follow class, each about 15 points wide. Status is worth a few points:
+        /// it reorders teams within a class, and only lifts the top of one class past the bottom of the next.
+        /// </summary>
+        public static double TeamAppeal(AITeam team) =>
+            team.Prestige + team.Status switch
+            {
+                TeamStatus.Factory => FactoryAppeal,
+                TeamStatus.Satellite => SatelliteAppeal,
+                _ => 0,
+            };
+
+        /// <summary>Total stats for a driver at their current age.</summary>
+        public static double DriverRating(Driver driver) => TotalDriverStats(CalculateDriverStats(driver));
+
         // ---------------------------------------------------------------------------
         // Rookie generation
         // ---------------------------------------------------------------------------

@@ -250,5 +250,36 @@ namespace TarmacGauntlet.Simulation.Tests
             var game = InitializeGame(Options, Stable);
             Assert.That(game.RaceHistory, Is.Empty);
         }
+
+        [Test]
+        public void InitializeGame_AiTeamsTakeTheirStatusFromTheRoster()
+        {
+            var game = InitializeGame(Options, DefaultRandom.Next);
+            foreach (var team in game.Teams.OfType<AITeam>())
+                Assert.That(team.Status, Is.EqualTo(AiTeamRoster.All.Single(e => e.Name == team.Name).Status));
+            Assert.That(game.Teams.OfType<AITeam>().Single(t => t.Name == "Scuderia Feretti").Status, Is.EqualTo(TeamStatus.Factory));
+        }
+
+        [Test]
+        public void InitializeGame_MoreAppealingTeamsStartWithBetterDrivers()
+        {
+            var game = InitializeGame(Options, DefaultRandom.Next);
+            var rating = game.Drivers.ToDictionary(d => d.Id, DriverLifecycle.DriverRating);
+            var byAppeal = game.Teams.OfType<AITeam>().OrderByDescending(DriverLifecycle.TeamAppeal).ToList();
+            for (var i = 1; i < byAppeal.Count; i++)
+            {
+                var worstAbove = byAppeal[i - 1].Contracts.Min(c => rating[c.DriverId]);
+                var bestBelow = byAppeal[i].Contracts.Max(c => rating[c.DriverId]);
+                Assert.That(worstAbove, Is.GreaterThanOrEqualTo(bestBelow));
+            }
+        }
+
+        [Test]
+        public void InitializeGame_LeavesThirteenFreeAgentsForThePlayer()
+        {
+            var game = InitializeGame(Options, DefaultRandom.Next);
+            Assert.That(game.Drivers.Count(d => DriverLifecycle.IsDriverFreeAgent(d.Id, game.Contracts)), Is.EqualTo(13));
+            Assert.That(game.Teams.OfType<AITeam>().All(t => t.Contracts.Count == 3), Is.True);
+        }
     }
 }

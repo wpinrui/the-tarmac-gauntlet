@@ -80,10 +80,6 @@ namespace TarmacGauntlet.Simulation
             return power + handling;
         }
 
-        /// <summary>Total stats for a driver at their current age.</summary>
-        private static double DriverScore(Driver driver) =>
-            DriverLifecycle.TotalDriverStats(DriverLifecycle.CalculateDriverStats(driver));
-
         /// <summary>A team locked to one model only buys that model.</summary>
         private static bool RunsModel(AITeam team, string modelId) =>
             team.ModelId == "" || team.ModelId == modelId;
@@ -181,7 +177,7 @@ namespace TarmacGauntlet.Simulation
             {
                 foreach (var agent in agents)
                 {
-                    var agentScore = DriverScore(agent);
+                    var agentScore = DriverLifecycle.DriverRating(agent);
                     var annualSalary = DriverLifecycle.CalculateAnnualSalary(DriverLifecycle.CalculateDriverStats(agent));
                     options.Add(new SpendingOption
                     {

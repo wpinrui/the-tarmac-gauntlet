@@ -58,6 +58,7 @@ namespace TarmacGauntlet.Simulation
     {
         /// <summary>The one car model this team ever runs, so its livery always fits. Empty means any model.</summary>
         public string ModelId { get; init; } = "";
+        public TeamStatus Status { get; init; }
         public int SpareParts { get; init; }
         public int TyreSets { get; init; }
     }

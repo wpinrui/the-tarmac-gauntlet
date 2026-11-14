@@ -210,6 +210,17 @@ namespace TarmacGauntlet.Simulation.Tests
             Assert.That(byId["player1"].CrewSize, Is.EqualTo(player.CrewSize));
         }
 
+        [Test]
+        public void AiSpending_TheMoreAppealingTeamSignsTheBestDriverFirst()
+        {
+            var drivers = Drivers(20, i => i == 0 ? 400 : 100);
+            var plain = MakeAiTeam("plain", 1_000_000) with { Prestige = 50 };
+            var factory = MakeAiTeam("factory", 1_000_000) with { Prestige = 50, Status = TeamStatus.Factory };
+            var result = Advance(drivers, teams: new BaseTeam[] { plain, factory });
+            Assert.That(result.Contracts.Single(c => c.DriverId == "d0").TeamId, Is.EqualTo("factory"));
+            Assert.That(result.Teams.Select(t => t.Id), Is.EqualTo(new[] { "plain", "factory" }));
+        }
+
         // ---------------------------------------------------------------------------
         // Full-field smoke test
         // ---------------------------------------------------------------------------
