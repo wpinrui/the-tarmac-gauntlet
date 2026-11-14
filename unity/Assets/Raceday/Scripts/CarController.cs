@@ -21,6 +21,10 @@ namespace TarmacGauntlet.Raceday
         private const float Turn = 2f * Mathf.PI;
         private const float AirSpinDown = 0.3f;   // share of its spin a wheel in the air loses each second
         private const float AirSpinUp = 60f;      // rad/s² a driven wheel in the air gains on full throttle
+        private const float TractionShare = 0.9f; // most of a rear tyre's grip traction control lets the drive ask for
+        private const float CatchFrom = 0.08f;     // slide angle, rad, from which the opposite lock assist helps
+        private const float CatchRate = 4f;        // the assist's steering speed, in full locks a second
+        private const float CatchDamping = 4f;     // share of the tail-swinging turn the assist takes off each second
 
         public CarSpec Spec { get; private set; }
         public KeyboardState Keys;
@@ -91,6 +95,8 @@ namespace TarmacGauntlet.Raceday
             public Vector3 Contact, ContactNormal;
             public float Skid;
             public SurfaceKind Kind;
+            /// <summary>Last step's grip, cornering force and rolling resistance, N, for traction control: grip 0 in the air.</summary>
+            public float Cap, Fy, Rolling;
         }
 
         /// <summary>Wheel i's visual pivot, at its centre: 0 front left, 1 front right, 2 rear left, 3 rear right. Null with none.</summary>
@@ -261,7 +267,9 @@ namespace TarmacGauntlet.Raceday
             float along = Vector3.Dot(v, transform.forward);
 
             UpdateSteering(dt, speed);
+            CatchSlide();
             float driveForce = Engine(dt, along);
+            if (!AiDriving) driveForce = TractionControl(driveForce, DriveSettings.TractionControl);
             if (Supplies != null) Supplies.Burn(driveForce * along, dt);
 
             // Aerodynamics: drag at the centre of mass, downforce split 40/60 front to rear for stability.
@@ -285,6 +293,14 @@ namespace TarmacGauntlet.Raceday
             if (Supplies != null && gripCount > 0) Supplies.Scrub(speed * dt, Mathf.Sqrt(gripUsed / gripCount));
         }
 
+        /// <summary>
+        /// The player's opposite lock assist (<see cref="DriveSettings.OppositeLock"/>), set each step: true while the tail
+        /// is out and the player steers into the slide.
+        /// </summary>
+        private bool catching;
+        /// <summary>The body's angle to its direction of travel, rad, positive when the car moves to the right of its nose.</summary>
+        private float slideAngle;
+
         private void UpdateSteering(float dt, float speed)
         {
             float limit = Spec.SteerLock;
@@ -298,7 +314,32 @@ namespace TarmacGauntlet.Raceday
             }
             float target = AiDriving ? Mathf.Clamp(aiSteer, -limit, limit) : steerInput * limit;
             float rate = (Mathf.Abs(target) < Mathf.Abs(steer) || target * steer < 0f ? 3f : 1.3f) * Spec.SteerLock;
+
+            // Opposite lock assist: with the tail out and the player steering into the slide, the front wheels turn
+            // quickly to point where the car is going, past the steering help's limit if need be.
+            Vector3 local = transform.InverseTransformDirection(Velocity);
+            slideAngle = speed > 5f ? Mathf.Atan2(local.x, Mathf.Abs(local.z)) : 0f;
+            catching = !AiDriving && DriveSettings.OppositeLock && Mathf.Abs(slideAngle) > CatchFrom && steerInput * slideAngle > 0f;
+            if (catching)
+            {
+                target = Mathf.Sign(slideAngle) * Mathf.Min(Mathf.Max(Mathf.Abs(target), Mathf.Abs(slideAngle)), Spec.SteerLock);
+                rate = CatchRate * Spec.SteerLock;
+            }
             steer = Mathf.MoveTowards(steer, target, rate * dt);
+        }
+
+        /// <summary>
+        /// While the opposite lock assist catches a slide, damps the turn that would swing the tail further out, so a
+        /// slide the player steers into settles instead of spinning.
+        /// </summary>
+        private void CatchSlide()
+        {
+            if (!catching) return;
+            float yaw = YawRate;
+            // A turn to the left (negative) swings the tail further out when the car slides to the right of its nose.
+            if (yaw * slideAngle >= 0f) return;
+            float inertia = body.inertiaTensor.y;
+            body.AddTorque(transform.up * (-yaw * inertia * CatchDamping));
         }
 
         /// <summary>Drive force at the rear wheels, and automatic gear changes.</summary>
@@ -337,6 +378,28 @@ namespace TarmacGauntlet.Raceday
             return -Mathf.Sign(along) * drag;
         }
 
+        /// <summary>
+        /// The player's traction control (<see cref="DriveSettings.TractionControl"/>): cuts the drive so neither rear
+        /// wheel is asked for more than 90% of its grip, which is short of where it spins. Full counts only the grip
+        /// the corner leaves, so the tail stays put on the way out. Medium counts all of it, so the wheels never
+        /// spin but too much throttle in a corner can still step the tail out. Each rear wheel takes half the drive,
+        /// so the one with less grip sets the cut. It reads last step's tyres, as a real system lags a moment.
+        /// </summary>
+        private float TractionControl(float drive, TractionAssist assist)
+        {
+            if (assist == TractionAssist.Off || drive <= 0f) return drive;
+            float most = float.PositiveInfinity;
+            for (int i = 2; i < 4; i++)
+            {
+                Wheel w = wheels[i];
+                if (w.Cap <= 0f) continue;
+                // Never under 30% of the grip, as with the anti-lock, so a car sliding sideways can still drive away.
+                float room = assist == TractionAssist.Full ? Mathf.Sqrt(Mathf.Max(w.Cap * w.Cap - w.Fy * w.Fy, 0.09f * w.Cap * w.Cap)) : w.Cap;
+                most = Mathf.Min(most, 2f * (TractionShare * room + w.Rolling));
+            }
+            return Mathf.Min(drive, most);
+        }
+
         private void TyreAndSpring(Wheel w, float dt, float drive, float wheelBrake)
         {
             Vector3 origin = transform.TransformPoint(w.Mount);
@@ -346,6 +409,7 @@ namespace TarmacGauntlet.Raceday
             w.Grounded = Physics.Raycast(origin, -up, out RaycastHit hit, reach, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
             w.Compression = w.Grounded ? reach - hit.distance : 0f;
             w.Skid = 0f;
+            w.Cap = 0f;
 
             if (w.Grounded)
             {
@@ -398,6 +462,9 @@ namespace TarmacGauntlet.Raceday
                     if (braking) fx -= Mathf.Sign(vLong) * wheelBrake;
                     fx -= Mathf.Clamp(vLong * 4f, -1f, 1f) * TrackSurface.Rolling(kind) * load;
                 }
+                w.Cap = cap;
+                w.Fy = fy;
+                w.Rolling = Mathf.Max(Mathf.Clamp(vLong * 4f, -1f, 1f) * TrackSurface.Rolling(kind) * load, 0f);
 
                 // Friction circle. Anti-lock keeps steering under braking; wheelspin costs side grip.
                 if (fx * fx + fy * fy > cap * cap)

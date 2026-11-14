@@ -51,6 +51,8 @@ namespace TarmacGauntlet.Management
             VisualElement race = SettingsGroup(1);
             race.Add(Stepper("Gearbox", new[] { "Manual", "Automatic" }, GameSettings.Automatic ? 1 : 0, i => GameSettings.Automatic = i == 1));
             race.Add(Stepper("Steering help", new[] { "Off", "On" }, GameSettings.SteeringHelp ? 1 : 0, i => GameSettings.SteeringHelp = i == 1));
+            race.Add(Stepper("Traction control", GameSettings.TractionControlNames, GameSettings.TractionControl, i => GameSettings.TractionControl = i));
+            race.Add(Stepper("Opposite lock assist", new[] { "Off", "On" }, GameSettings.OppositeLock ? 1 : 0, i => GameSettings.OppositeLock = i == 1));
             race.Add(Stepper("Track map", new[] { "Off", "On" }, GameSettings.TrackMap ? 1 : 0, i => GameSettings.TrackMap = i == 1));
             scroll.Add(race);
 

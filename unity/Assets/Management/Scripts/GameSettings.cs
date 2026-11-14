@@ -109,10 +109,30 @@ namespace TarmacGauntlet.Management
         }
 
         /// <summary>
-        /// The race settings: the gearbox and steering help for the car you drive, and the track map on screen. The race
+        /// The race settings: the gearbox, steering help, traction control and opposite lock assist for the car you drive, and the track map on screen. The race
         /// reads them from the same keys (DriveSettings in Raceday).
         /// </summary>
         public const string AutomaticKey = "settings.automatic", SteeringHelpKey = "settings.steeringhelp", TrackMapKey = "settings.trackmap";
+        public const string TractionControlKey = "settings.tractioncontrol", OppositeLockKey = "settings.oppositelock";
+
+        public static bool OppositeLock
+        {
+            get => PlayerPrefs.GetInt(OppositeLockKey, 0) != 0;
+            set => SetFlag(OppositeLockKey, value);
+        }
+
+        /// <summary>The traction control steps, in order: the race reads the index (TractionAssist in Raceday).</summary>
+        public static readonly string[] TractionControlNames = { "Off", "Medium", "Full" };
+
+        public static int TractionControl
+        {
+            get => Mathf.Clamp(PlayerPrefs.GetInt(TractionControlKey, 0), 0, TractionControlNames.Length - 1);
+            set
+            {
+                PlayerPrefs.SetInt(TractionControlKey, value);
+                PlayerPrefs.Save();
+            }
+        }
 
         public static bool Automatic
         {
