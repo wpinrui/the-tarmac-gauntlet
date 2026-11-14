@@ -161,7 +161,8 @@ namespace TarmacGauntlet.Raceday
             }
 
             float lights = Night != null ? Night() : 0f;
-            Shader.SetGlobalFloat(DarkId, NightBudget.On(lights));
+            float night = NightBudget.On(lights);
+            Shader.SetGlobalFloat(DarkId, night);
 
             Glow(dt);
             if (dt <= 1e-5f) return;
