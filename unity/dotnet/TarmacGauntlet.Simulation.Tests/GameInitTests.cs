@@ -261,17 +261,32 @@ namespace TarmacGauntlet.Simulation.Tests
         }
 
         [Test]
-        public void InitializeGame_MoreAppealingTeamsStartWithBetterDrivers()
+        public void InitializeGame_EachTeamTakesTheDriversItRatesBestFromThoseLeft()
+        {
+            var game = InitializeGame(Options, DefaultRandom.Next);
+            var byAppeal = game.Teams.OfType<AITeam>().OrderByDescending(DriverLifecycle.TeamAppeal).ToList();
+            var driver = game.Drivers.ToDictionary(d => d.Id);
+            var left = byAppeal.SelectMany(t => t.Contracts.Select(c => c.DriverId)).ToHashSet();
+            foreach (var team in byAppeal)
+            {
+                var own = team.Contracts.Select(c => c.DriverId).ToList();
+                left.ExceptWith(own);
+                var worstOwn = own.Min(id => DriverLifecycle.PerceivedRating(driver[id], team.Id));
+                foreach (var id in left) Assert.That(DriverLifecycle.PerceivedRating(driver[id], team.Id), Is.LessThanOrEqualTo(worstOwn));
+            }
+        }
+
+        [Test]
+        public void InitializeGame_HigherClassesStartWithBetterDrivers()
         {
             var game = InitializeGame(Options, DefaultRandom.Next);
             var rating = game.Drivers.ToDictionary(d => d.Id, DriverLifecycle.DriverRating);
-            var byAppeal = game.Teams.OfType<AITeam>().OrderByDescending(DriverLifecycle.TeamAppeal).ToList();
-            for (var i = 1; i < byAppeal.Count; i++)
-            {
-                var worstAbove = byAppeal[i - 1].Contracts.Min(c => rating[c.DriverId]);
-                var bestBelow = byAppeal[i].Contracts.Max(c => rating[c.DriverId]);
-                Assert.That(worstAbove, Is.GreaterThanOrEqualTo(bestBelow));
-            }
+            var averages = game.Teams.OfType<AITeam>()
+                .GroupBy(t => AiTeamRoster.All.Single(e => e.Name == t.Name).CarClass)
+                .OrderByDescending(g => g.Key)
+                .Select(g => g.SelectMany(t => t.Contracts).Average(c => rating[c.DriverId]))
+                .ToList();
+            Assert.That(averages, Is.Ordered.Descending);
         }
 
         [Test]

@@ -242,6 +242,35 @@ namespace TarmacGauntlet.Simulation
         /// <summary>Total stats for a driver at their current age.</summary>
         public static double DriverRating(Driver driver) => TotalDriverStats(CalculateDriverStats(driver));
 
+        /// <summary>Furthest an AI team misjudges any one driver stat, as a fraction of it.</summary>
+        private const double MaxMisjudgement = 0.05;
+
+        private static readonly DriverStatKey[] StatKeys =
+            { DriverStatKey.Pace, DriverStatKey.Consistency, DriverStatKey.Stamina, DriverStatKey.Safety, DriverStatKey.Smoothness };
+
+        /// <summary>
+        /// A driver's total stats as one team sees them. Each stat is off by up to ±5%,
+        /// and a team misjudges a given driver the same way every time.
+        /// </summary>
+        public static double PerceivedRating(Driver driver, string teamId)
+        {
+            var stats = CalculateDriverStats(driver);
+            return StatKeys.Sum(key => stats.Get(key) * (1 + Misjudgement(driver.Id, teamId, key)));
+        }
+
+        /// <summary>How far a team misjudges one driver stat: from -5% to +5%, fixed for that driver, team and stat.</summary>
+        public static double Misjudgement(string driverId, string teamId, DriverStatKey key)
+        {
+            // FNV-1a: the same on every run and platform, unlike string.GetHashCode.
+            uint hash = 2166136261;
+            foreach (char c in $"{driverId}|{teamId}|{key}")
+            {
+                hash ^= c;
+                hash *= 16777619;
+            }
+            return (hash / (double)uint.MaxValue * 2 - 1) * MaxMisjudgement;
+        }
+
         // ---------------------------------------------------------------------------
         // Rookie generation
         // ---------------------------------------------------------------------------

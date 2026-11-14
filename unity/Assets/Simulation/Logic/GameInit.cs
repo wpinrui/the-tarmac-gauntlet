@@ -225,25 +225,22 @@ namespace TarmacGauntlet.Simulation
 
         /// <summary>
         /// Signs the starting drivers. The pool is in random order: its tail stays free for the player,
-        /// and the rest go 3 to a team, best drivers to the most appealing teams.
+        /// and the rest go 3 to a team. The most appealing team picks first, taking the 3 it rates best.
         /// </summary>
         private static (List<AITeam> Teams, List<Contract> Contracts) SignStartingDrivers(
             IReadOnlyList<AITeam> teams,
             IReadOnlyList<Driver> drivers,
             Func<double> random)
         {
-            var signed = drivers
-                .Take(teams.Count * DriversPerAiTeam)
-                .OrderByDescending(DriverLifecycle.DriverRating)
-                .ToList();
+            var available = drivers.Take(teams.Count * DriversPerAiTeam).ToList();
             var contractsByTeam = new Dictionary<string, List<Contract>>();
-            var next = 0;
             foreach (var team in teams.OrderByDescending(DriverLifecycle.TeamAppeal))
             {
+                var picks = available.OrderByDescending(d => DriverLifecycle.PerceivedRating(d, team.Id)).Take(DriversPerAiTeam).ToList();
+                available.RemoveAll(picks.Contains);
                 var contracts = new List<Contract>();
-                for (var d = 0; d < DriversPerAiTeam; d++)
+                foreach (var driver in picks)
                 {
-                    var driver = signed[next++];
                     var length = (int)Math.Floor(random() * 3) + 1;
                     contracts.Add(new Contract
                     {

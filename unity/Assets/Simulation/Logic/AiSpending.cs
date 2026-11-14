@@ -177,7 +177,7 @@ namespace TarmacGauntlet.Simulation
             {
                 foreach (var agent in agents)
                 {
-                    var agentScore = DriverLifecycle.DriverRating(agent);
+                    var agentScore = DriverLifecycle.PerceivedRating(agent, team.Id);
                     var annualSalary = DriverLifecycle.CalculateAnnualSalary(DriverLifecycle.CalculateDriverStats(agent));
                     options.Add(new SpendingOption
                     {

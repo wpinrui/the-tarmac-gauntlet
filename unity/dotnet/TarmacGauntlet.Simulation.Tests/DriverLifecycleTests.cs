@@ -434,5 +434,32 @@ namespace TarmacGauntlet.Simulation.Tests
             Assert.That(Appeal(TeamStatus.Factory), Is.GreaterThan(Appeal(TeamStatus.Satellite)));
             Assert.That(Appeal(TeamStatus.Satellite), Is.GreaterThan(Appeal(TeamStatus.Privateer)));
         }
+
+        [Test]
+        public void Misjudgement_StaysWithinFivePercentAndIsFixedPerPairing()
+        {
+            var all = new List<double>();
+            for (var d = 0; d < 200; d++)
+                for (var t = 0; t < 20; t++)
+                    foreach (DriverStatKey key in System.Enum.GetValues(typeof(DriverStatKey)))
+                    {
+                        var e = Misjudgement($"driver-{d}", $"ai-{t}", key);
+                        Assert.That(e, Is.InRange(-0.05, 0.05));
+                        Assert.That(Misjudgement($"driver-{d}", $"ai-{t}", key), Is.EqualTo(e));
+                        all.Add(e);
+                    }
+            Assert.That(all.Average(), Is.InRange(-0.005, 0.005));
+            Assert.That(all.Count(e => e > 0.04), Is.GreaterThan(all.Count / 20));
+            Assert.That(all.Count(e => e < -0.04), Is.GreaterThan(all.Count / 20));
+        }
+
+        [Test]
+        public void PerceivedRating_DiffersBetweenTeamsForTheSameDriver()
+        {
+            var driver = new Driver { Id = "driver-7", Age = 28, CurveParams = new DriverCurveParams { PeakAge = 28, PeakStats = new DriverStats { Pace = 60, Consistency = 60, Stamina = 60, Safety = 60, Smoothness = 60 }, PhaseOffsets = new DriverStats() } };
+            var views = Enumerable.Range(0, 10).Select(t => PerceivedRating(driver, $"ai-{t}")).ToList();
+            Assert.That(views.Distinct().Count(), Is.GreaterThan(1));
+            Assert.That(views, Is.All.InRange(DriverRating(driver) * 0.95, DriverRating(driver) * 1.05));
+        }
     }
 }
