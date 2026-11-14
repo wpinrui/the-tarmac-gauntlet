@@ -2,8 +2,8 @@
 # Draws, bakes and previews both designs. Run from this folder after views.js has drawn out/views.
 set -e
 python3 design.py
-for n in shatter folded; do
+for n in folded; do
   node ../common/bake.js out/views out/$n out/$n-baked --model Assets/Art/Vehicles/ToraGiga/ToraGiga.obj
-  node ../common/digits.js --font font/ChakraPetch-Bold.ttf --edge 0.09 --out out/$n-baked
+  node ../common/digits.js --font font/ChakraPetch-Bold.ttf --edge 0.05 --out out/$n-baked
 done
-python3 ../common/viewer.py ../../../unity/Assets/Art/Vehicles/ToraGiga/ToraGiga.obj "$1" "Team Tora Racing" Shatter=out/shatter-baked Folded=out/folded-baked --number 8
+python3 ../common/viewer.py ../../../unity/Assets/Art/Vehicles/ToraGiga/ToraGiga.obj "$1" "Team Tora Racing" Folded=out/folded-baked --number 8

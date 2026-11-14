@@ -10,6 +10,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "common"))
+import livery  # noqa: E402
 from livery import Livery  # noqa: E402
 
 VIEWS = HERE / "out" / "views" / "views.json"
@@ -21,6 +22,8 @@ BLACK = "#16130f"
 SHADE = "rgba(22,19,15,0.5)"  # side streaks darken the facets under them
 WHITE = "#f6f3ee"
 BASE = "#ee6a1f"
+NAME = "TEAM TORA RACING"
+livery.FONTS["Saira"] = HERE / "font" / "SairaExtraCondensed-ExtraBold.ttf"
 
 
 def facets(a0, a1, b0, b1, cell, tilt, bias, seed):
@@ -79,7 +82,14 @@ def door_number(lv, z, y, w, h):
 
 def roof_number(lv, z):
     # Reads from in front of the car: the panel's width runs across the car.
-    lv.number("top", (0, 0, z), 0.64, 0.34, BLACK, rotate=-90, edge=WHITE)
+    lv.number("top", (0, 0, z), 0.8, 0.44, BLACK, rotate=-90, edge=WHITE)
+
+
+def team_name(lv, view, p, height):
+    """The team name in logo 5's lettering: Saira Extra Condensed, leaning forward 12 degrees."""
+    u, v = lv.uv(view, p)
+    lv.raw(view, f'<text transform="translate({u:.4f} {v:.4f}) skewX(-12)" font-family="Saira" font-size="{height / 0.7:.4f}" '
+                 f'letter-spacing="{0.03 * height:.4f}" fill="{WHITE}" text-anchor="middle" dominant-baseline="central">{NAME}</text>')
 
 
 def badge_top(lv, z, h):
@@ -121,18 +131,19 @@ def folded():
     fill_views(lv, 0.55, 0.6, lambda z, y: 0.5 + 0.4 * math.sin(z * 1.6 + y * 2), lambda z, x: 0.5 + 0.4 * math.sin(z * 1.6 + x * 2), 71)
     for s in (streak(2.3, 0.8, -2.2, 0.98, 0.22), streak(-2.45, 0.42, -0.6, 0.33, 0.14)):
         side(lv, s, SHADE)
-    for x in (-0.45, 0.45):
-        top(lv, streak(x, 2.3, x * 1.65, -1.2, 0.22), BLACK)
     for x in (-0.15, 0.15):
         end(lv, "front", streak(x * 5, 0.62, x * 2, 0.9, 0.2), BLACK)
-    lv.side_mark(BADGE, 0.0, 0.55, 0.46)
-    door_number(lv, -0.86, 0.66, 0.34, 0.22)
+    lv.side_mark(BADGE, 0.06, 0.62, 0.44)
+    door_number(lv, -0.86, 0.68, 0.4, 0.3)
     roof_number(lv, -0.4)
     badge_top(lv, 1.45, 0.7)
     lv.mark("top", SEAL, (0, 0, -2.05), 0.28, rotate=-90)
+    for view in ("left", "right"):
+        team_name(lv, view, lv._side(view, 0.16, 0.28), 0.09)
+    team_name(lv, "rear", (0, 0.58, 0), 0.08)
     return lv
 
 
 if __name__ == "__main__":
-    for name, make in (("shatter", shatter), ("folded", folded)):
+    for name, make in (("folded", folded),):
         make().write(HERE / "out" / name)
