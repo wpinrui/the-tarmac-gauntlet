@@ -107,7 +107,8 @@ def shatter():
         top(lv, streak(x, -2.45, x * 0.9, 0.3, 0.18), BLACK)
     for x in (-0.9, 0.9):
         end(lv, "front", streak(x, 1.0, x * 0.25, 0.78, 0.14), BLACK)
-    end(lv, "rear", streak(-1.05, 0.92, 1.05, 0.76, 0.16), BLACK)
+    for x in (-1.05, 1.05):
+        end(lv, "rear", streak(x, 0.92, 0.0, 0.78, 0.16), BLACK)
     door_number(lv, 0.0, 0.58, 0.66, 0.36)
     roof_number(lv, -0.4)
     badge_top(lv, 1.5, 0.72)
