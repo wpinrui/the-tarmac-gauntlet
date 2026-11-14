@@ -410,5 +410,29 @@ namespace TarmacGauntlet.Simulation.Tests
             // d1 is now at peak (30), d2 is post-peak (45): peak should be worth more
             Assert.That(peakResult.MarketValue, Is.GreaterThan(oldResult.MarketValue));
         }
+
+        [Test]
+        public void TeamAppeal_StatusLiftsTheTopOfAClassPastTheBottomOfTheNext()
+        {
+            var topFactoryB = new AITeam { Prestige = 80, Status = TeamStatus.Factory };
+            var worstA = new AITeam { Prestige = 80 };
+            Assert.That(DriverLifecycle.TeamAppeal(topFactoryB), Is.GreaterThan(DriverLifecycle.TeamAppeal(worstA)));
+        }
+
+        [Test]
+        public void TeamAppeal_StatusDoesNotCarryAMidfieldTeamUpAClass()
+        {
+            var midFactoryB = new AITeam { Prestige = 72, Status = TeamStatus.Factory };
+            var worstA = new AITeam { Prestige = 80 };
+            Assert.That(DriverLifecycle.TeamAppeal(midFactoryB), Is.LessThan(DriverLifecycle.TeamAppeal(worstA)));
+        }
+
+        [Test]
+        public void TeamAppeal_FactoryBeatsSatelliteBeatsPrivateerAtEqualPrestige()
+        {
+            double Appeal(TeamStatus s) => DriverLifecycle.TeamAppeal(new AITeam { Prestige = 50, Status = s });
+            Assert.That(Appeal(TeamStatus.Factory), Is.GreaterThan(Appeal(TeamStatus.Satellite)));
+            Assert.That(Appeal(TeamStatus.Satellite), Is.GreaterThan(Appeal(TeamStatus.Privateer)));
+        }
     }
 }

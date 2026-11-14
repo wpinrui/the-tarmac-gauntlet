@@ -13,7 +13,7 @@ namespace TarmacGauntlet.Career
     public static class SaveJson
     {
         /// <summary>The save format written today. Raise it when the format changes and teach <see cref="Migrate"/> the old one.</summary>
-        public const int Version = 2;
+        public const int Version = 3;
 
         private static readonly JsonSerializerSettings Settings = new JsonSerializerSettings
         {
@@ -57,6 +57,18 @@ namespace TarmacGauntlet.Career
         private static void Migrate(JObject root, int version)
         {
             if (version < 2) DropCutModels(root);
+            if (version < 3) AddTeamStatus(root);
+        }
+
+        /// <summary>Format 3 gave AI teams a factory, satellite or privateer status. Older saves take it from the roster.</summary>
+        private static void AddTeamStatus(JObject root)
+        {
+            foreach (JObject team in (root["Teams"] as JArray)?.OfType<JObject>() ?? Enumerable.Empty<JObject>())
+            {
+                string name = team["Name"]?.Value<string>() ?? "";
+                AiTeamEntry? entry = AiTeamRoster.All.FirstOrDefault(e => e.Name == name);
+                if (entry != null && team["Kind"]?.Value<string>() != "player") team["Status"] = entry.Status.ToString();
+            }
         }
 
         /// <summary>

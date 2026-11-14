@@ -210,6 +210,19 @@ namespace TarmacGauntlet.Career.Tests
         }
 
         [Test]
+        public void AFormat2SaveGetsTeamStatusFromTheRoster()
+        {
+            var root = Newtonsoft.Json.Linq.JObject.Parse(SaveJson.Serialize(RichGame()));
+            root["Meta"]!["Version"] = 2;
+            foreach (var team in root["Teams"]!) ((Newtonsoft.Json.Linq.JObject)team).Remove("Status");
+            GameState back = SaveJson.Deserialize(root.ToString());
+
+            Assert.That(back.Teams.OfType<AITeam>().Single(t => t.Name == "Scuderia Feretti").Status, Is.EqualTo(TeamStatus.Factory));
+            Assert.That(back.Teams.OfType<AITeam>().Single(t => t.Name == "Apex Archer").Status, Is.EqualTo(TeamStatus.Satellite));
+            Assert.That(back.Teams.OfType<AITeam>().Single(t => t.Name == "Duct Tape Dynamics").Status, Is.EqualTo(TeamStatus.Privateer));
+        }
+
+        [Test]
         public void ANewCareerIsSavedAndContinued()
         {
             Assert.That(GameSession.HasSave, Is.False);

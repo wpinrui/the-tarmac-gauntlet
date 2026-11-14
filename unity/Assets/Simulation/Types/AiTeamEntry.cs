@@ -12,5 +12,14 @@ namespace TarmacGauntlet.Simulation
         /// <summary>The one car model this team ever runs.</summary>
         public string ModelId { get; init; } = "";
         public CarClass CarClass { get; init; }
+        public TeamStatus Status { get; init; }
+    }
+
+    /// <summary>A team's tie to a car maker. Drivers rate factory teams above satellites, and satellites above privateers.</summary>
+    public enum TeamStatus
+    {
+        Privateer,
+        Satellite,
+        Factory,
     }
 }
