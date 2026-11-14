@@ -38,6 +38,30 @@ def logo(path, ink, band, text):
     return path
 
 
+def belt_line(lv, bend, t=0.025):
+    """The shoulder pinstripe: along the belt from the tail, then angled down from bend (z) to
+    end in the top of the front wheel arch, where the arch cuts it off."""
+    pts = [(TAIL, belt(TAIL) - 0.07), (bend, belt(bend) - 0.07), (1.42, 0.60)]
+    top, bot = [], []
+    for i, (z, y) in enumerate(pts):
+        a = pts[max(i - 1, 0)]
+        b = pts[min(i + 1, len(pts) - 1)]
+        dz, dy = b[0] - a[0], b[1] - a[1]
+        n = (dz * dz + dy * dy) ** 0.5
+        nz, ny = -dy / n, dz / n          # unit normal
+        if 0 < i < len(pts) - 1:          # mitre at the bend
+            d1 = (z - a[0], y - a[1]); d2 = (b[0] - z, b[1] - y)
+            n1 = (-d1[1], d1[0]); n2 = (-d2[1], d2[0])
+            l1 = (n1[0] ** 2 + n1[1] ** 2) ** 0.5; l2 = (n2[0] ** 2 + n2[1] ** 2) ** 0.5
+            m = (n1[0] / l1 + n2[0] / l2, n1[1] / l1 + n2[1] / l2)
+            ml = (m[0] ** 2 + m[1] ** 2) ** 0.5
+            cos = (m[0] * n1[0] / l1 + m[1] * n1[1] / l1) / ml
+            nz, ny = m[0] / ml / cos, m[1] / ml / cos
+        top.append((z + nz * t / 2, y + ny * t / 2))
+        bot.append((z - nz * t / 2, y - ny * t / 2))
+    lv.side_poly(top + bot[::-1], INK)
+
+
 def side_band(lv, y0, y1, fill, z0=NOSE, z1=TAIL):
     lv.side_poly([(z0, y0), (z1, y0), (z1, y1), (z0, y1)], fill)
 
@@ -57,7 +81,7 @@ def end_diamond(lv, cx, cy, r, fill):
         lv.poly(view, [(cx + r, cy, 0), (cx, cy + r, 0), (cx - r, cy, 0), (cx, cy - r, 0)], fill)
 
 
-def vueltiao():
+def vueltiao(bend=1.15):
     """The sombrero vueltiao: cream cane with a black woven band of pintas round the sills."""
     dark = logo(MARKS / "condor-dark.svg", BLK, CRM, BLK)
     lv = Livery(VIEWS, CRM)
@@ -81,7 +105,7 @@ def vueltiao():
     # pinstripes: one over the band, one along the belt
     side_band(lv, 0.46, 0.485, INK)
     end_band(lv, 0.46, 0.485, INK)
-    lv.side_poly([(NOSE, belt(NOSE) - 0.07), (TAIL, belt(TAIL) - 0.07), (TAIL, belt(TAIL) - 0.095), (NOSE, belt(NOSE) - 0.095)], INK)
+    belt_line(lv, bend)
     # the roof carries the hat's rings
     for inset, t in ((0.04, 0.06), (0.14, 0.035)):
         x0, z0, z1 = 0.66 - inset, 0.33 - inset, -1.26 + inset
@@ -128,7 +152,8 @@ def carnaval():
     return lv
 
 
-DESIGNS = {"vueltiao": vueltiao, "carnaval": carnaval}
+DESIGNS = {"vueltiao": vueltiao, "carnaval": carnaval,
+           "vueltiao-door": lambda: vueltiao(0.80)}
 
 if __name__ == "__main__":
     for name, fn in DESIGNS.items():
