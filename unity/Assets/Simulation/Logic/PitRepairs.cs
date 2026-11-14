@@ -25,6 +25,8 @@ namespace TarmacGauntlet.Simulation
         public double LitresPerLap { get; init; }
         /// <summary>Seconds in the box each extra litre costs at the next stop.</summary>
         public double SecondsPerLitre { get; init; }
+        /// <summary>Seconds of racing left before the flag, for damage, which stays on the car past the stint. 0 for the stint alone.</summary>
+        public double SecondsLeft { get; init; }
         /// <summary>How much the crew and the Engineer skill scale the work (<see cref="PitStop.CrewMultiplier"/>).</summary>
         public double CrewMultiplier { get; init; } = 1;
     }

@@ -109,6 +109,7 @@ namespace TarmacGauntlet.Raceday
             {
                 Laps = Laps,
                 LapSeconds = lapSeconds(),
+                SecondsLeft = secondsLeft(),
                 LitresPerLap = s.LitresPerLap,
                 SecondsPerLitre = PitService.SecondsPerLitre(spec) * crew,
                 CrewMultiplier = crew,

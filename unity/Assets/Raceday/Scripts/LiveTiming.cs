@@ -7,7 +7,8 @@ namespace TarmacGauntlet.Raceday
 {
     /// <summary>
     /// The full screen live timing page, on T while a teammate drives your car, pit lane or not: it closes as you take
-    /// the car over. Once your car is out of the race it opens and closes on T at any time, until the race ends: once the time is up and your race is over it shuts, for the cooldown lap and the podiums. The race runs at the speed picked on the buttons left of the way back, 1x to 16x,
+    /// the car over. It also opens while your car stands in its box for repairs, whoever drove it in, so the hours a
+    /// wreck takes to mend can be run through fast: it closes as the stop ends. Once your car is out of the race it opens and closes on T at any time, until the race ends: once the time is up and your race is over it shuts, for the cooldown lap and the podiums. The race runs at the speed picked on the buttons left of the way back, 1x to 16x,
     /// or stepped through them with F,
     /// and back at 1x once the page closes. The scene behind the page is not drawn. Left: every car in race order, filtered by class, your row in white, a chequered flag by each car that has finished. Right: your car's
     /// onboard and the track map, or above 2x the map alone across both, as a second view of the scene costs too much there, then your car's driver, fuel, tyres, condition and the driver's fatigue,
@@ -145,9 +146,22 @@ namespace TarmacGauntlet.Raceday
             foreach (Standings.Car c in order) if (filter == null || c.Class == filter) shown.Add(c);
         }
 
-        /// <summary>Open from the moment a teammate takes your car, in the pit lane too, or at any time once the car is out of the race.</summary>
+        /// <summary>
+        /// Open from the moment a teammate takes your car, in the pit lane too, while your car stands in its box for
+        /// repairs, whoever drove it in, or at any time once the car is out of the race.
+        /// </summary>
         private bool CanOpen => Supplies != null && Log != null && Cars[Player] != null && (Ended == null || !Ended())
-            && (Log.Retired || Driver.enabled && Log.Driver.Id != RaceEntry.PlayerCharacterDriverId);
+            && (Log.Retired || Repairing || Driver.enabled && Log.Driver.Id != RaceEntry.PlayerCharacterDriverId);
+
+        /// <summary>True while your car's stop in its box repairs damage and isn't over: the AI's stop if it drives, yours if you do.</summary>
+        private bool Repairing
+        {
+            get
+            {
+                PitService stop = Driver.enabled ? Driver.Racer?.Pit?.Service : Cars[Player].Service;
+                return stop != null && stop.Repairs && !stop.Done;
+            }
+        }
 
         private void Show(bool on)
         {

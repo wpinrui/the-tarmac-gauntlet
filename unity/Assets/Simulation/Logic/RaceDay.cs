@@ -29,6 +29,8 @@ namespace TarmacGauntlet.Simulation
         public RaceDriver? NewDriver { get; init; }
         /// <summary>Seconds of driver change and repairs, already scaled by the crew.</summary>
         public double ExtraSeconds { get; init; }
+        /// <summary>True when the crew repair damage in the stop.</summary>
+        public bool Repairs { get; init; }
         /// <summary>How much the crew and the Engineer skill scale the refuel and tyre change.</summary>
         public double CrewMultiplier { get; init; } = 1;
     }
@@ -308,6 +310,7 @@ namespace TarmacGauntlet.Simulation
                 ChangeTyres = tyres,
                 NewDriver = nextId != null ? Driver : null,
                 ExtraSeconds = work.Duration + repairSeconds,
+                Repairs = repaired > 0,
                 CrewMultiplier = PitStop.CrewMultiplier(Car.CrewSize, Car.EngineerSkill),
             };
         }
@@ -325,7 +328,7 @@ namespace TarmacGauntlet.Simulation
             double points = Math.Max(0, Damage - Math.Max(0, damageTo ?? 0));
             points = Math.Min(points, CarDamage.PointsFrom(parts));
             if (points <= 0) return (0, 0, 0);
-            double seconds = points * CarDamage.RepairSecondsPerPoint * PitStop.CrewMultiplier(Car.CrewSize, Car.EngineerSkill);
+            double seconds = CarDamage.RepairSeconds(Damage, Damage - points) * PitStop.CrewMultiplier(Car.CrewSize, Car.EngineerSkill);
             return (points, CarDamage.PartsFor(points), seconds);
         }
 

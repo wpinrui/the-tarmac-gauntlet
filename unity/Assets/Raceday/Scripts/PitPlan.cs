@@ -33,6 +33,8 @@ namespace TarmacGauntlet.Raceday
         public bool Fuelled { get; private set; }
         /// <summary>True when the stop changes the tyres, and when it changes the driver.</summary>
         public readonly bool NewTyres, NewDriver;
+        /// <summary>True when the crew repair damage in the stop: minutes to hours of race time (<see cref="CarDamage.RepairSeconds(double)"/>).</summary>
+        public readonly bool Repairs;
 
         private readonly Consumables supplies;
         private readonly float startFuel, litres, scale;
@@ -49,6 +51,7 @@ namespace TarmacGauntlet.Raceday
             tyres = work == null ? plan.Tyres : work.ChangeTyres;
             NewTyres = tyres;
             NewDriver = work?.NewDriver != null;
+            Repairs = work != null && work.Repairs;
             if (NewDriver) supplies.Stint.NewStint();
             supplies.Orders.Reset();
             if (work != null) scale *= (float)work.CrewMultiplier;

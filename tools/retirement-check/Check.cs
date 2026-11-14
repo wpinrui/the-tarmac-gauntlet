@@ -137,6 +137,7 @@ static class Check
                 {
                     Laps = StintLaps,
                     LapSeconds = LapSeconds,
+                    SecondsLeft = Math.Max(0, RaceSeconds - t),
                     CrewMultiplier = PitStop.CrewMultiplier(c.Car.CrewSize, c.Car.EngineerSkill),
                 };
                 c.Pit(true, null, CarDamage.Target(RepairMode.Crew, c.Damage, stint));
