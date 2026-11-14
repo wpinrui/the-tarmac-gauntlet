@@ -117,7 +117,7 @@ namespace TarmacGauntlet.Management
             return t;
         }
 
-        /// <summary>How far the shadow reaches past the pane (and in under it), px, and how dark it is at its darkest.</summary>
+        /// <summary>How far the shadow reaches past the pane, px, and how dark it is at its darkest.</summary>
         private const int ShadowReach = 16;
         private const float ShadowAlpha = 0.30f;
 
@@ -141,17 +141,15 @@ namespace TarmacGauntlet.Management
         }
 
         /// <summary>
-        /// Black at <see cref="ShadowAlpha"/> under a rounded box with these corner radii, blurred across its edge: full
-        /// <see cref="ShadowReach"/>px inside it, half at the edge, nothing <see cref="ShadowReach"/>px outside it. For
-        /// 9-slicing: each corner tile holds its own rounded corner and the middle two pixels stretch.
+        /// Black at <see cref="ShadowAlpha"/> under a rounded box with these corner radii, blurred across its edge: half strength at
+        /// the edge, nothing <see cref="ShadowReach"/>px outside it. For 9-slicing: each corner tile holds its own rounded corner and the middle two pixels stretch.
         /// </summary>
         private static Texture2D ShadowTexture((int TopLeft, int TopRight, int BottomRight, int BottomLeft) c)
         {
             int most = Mathf.Max(Mathf.Max(c.TopLeft, c.TopRight), Mathf.Max(c.BottomRight, c.BottomLeft));
-            // The box reaches at least ShadowReach in from each corner tile's inner edge, so the fade fits inside the tile.
-            int inset = Mathf.Max(most, ShadowReach);
-            int n = 2 * (ShadowReach + inset + 1);
-            float centre = n / 2f, half = inset + 1;
+            // Only the part outside the box shows: the pane's glass is opaque and covers the rest.
+            int n = 2 * (ShadowReach + most + 1);
+            float centre = n / 2f, half = most + 1;
             var t = new Texture2D(n, n, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, hideFlags = HideFlags.HideAndDontSave };
             var px = new Color32[n * n];
             for (int y = 0; y < n; y++)
