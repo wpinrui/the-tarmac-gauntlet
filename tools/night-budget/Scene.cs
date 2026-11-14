@@ -50,7 +50,8 @@ static class Scene
         ["Crowd"] = (0.45f, 0.4f, 0.38f, 0.1f, 0f),
         ["Catch fence posts"] = (0.6f, 0.62f, 0.63f, 0.5f, 0.6f),
         ["Pit building"] = (0.66f, 0.65f, 0.62f, 0.12f, 0f),
-        ["Pit building glass"] = (0.07f, 0.09f, 0.11f, 0.92f, 0.2f),
+        // The glass at night (PitMaterials.Night).
+        ["Pit building glass"] = (0.07f, 0.09f, 0.11f, NightBudget.WindowSheen, 0.2f),
         ["Pit building steel"] = (0.16f, 0.3f, 0.22f, 0.45f, 0.3f),
         ["Start gantry"] = (0.6f, 0.62f, 0.63f, 0.5f, 0.6f),
         ["Floodlight steel"] = (0.55f, 0.57f, 0.58f, 0.4f, 0.5f),

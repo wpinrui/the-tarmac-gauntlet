@@ -53,9 +53,14 @@ namespace TarmacGauntlet.Raceday
         /// How bright the lamps themselves glow, linear light in their brightest channel (<see cref="Glow"/>): the floodlights'
         /// lenses, the headlamps and the tail lamps at night, the brake lamps whenever the brakes are on, and the pit
         /// building's brightest windows at night. All but the windows sit well over the bloom's threshold (1.2), so each
-        /// lamp shows a halo; the windows just reach it, so they bloom slightly.
+        /// lamp shows a halo; the brightest windows only reach it, so the halo round them is faint.
         /// </summary>
-        public const float FloodLens = 10f, HeadlampGlow = 8f, TailGlow = 3f, BrakeGlow = 8f, WindowGlow = 2f;
+        public const float FloodLens = 10f, HeadlampGlow = 8f, TailGlow = 3f, BrakeGlow = 8f, WindowGlow = 1.6f;
+        /// <summary>
+        /// The pit building's glass smoothness at night, against its 0.92 by day: the floodlights on its roof light the
+        /// glass from just above, and a sharp sheen there glared and bloomed over the windows' own light.
+        /// </summary>
+        public const float WindowSheen = 0.45f;
         /// <summary>
         /// A glow of this colour, linear, its brightest channel at <paramref name="level"/>. Material.SetColor takes sRGB,
         /// so a material is given its <c>.gamma</c>.

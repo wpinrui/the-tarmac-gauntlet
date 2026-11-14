@@ -14,6 +14,8 @@ namespace TarmacGauntlet.Raceday
 
         /// <summary>Colour of a garage with no car in it.</summary>
         public static readonly Color Empty = new Color(0.55f, 0.56f, 0.57f);
+        /// <summary>The glass's smoothness by day.</summary>
+        private const float GlassSheen = 0.92f;
         private static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
 
         private readonly Texture2D palette;
@@ -21,7 +23,7 @@ namespace TarmacGauntlet.Raceday
         public PitMaterials()
         {
             Concrete = Make("Pit concrete", Noise(new Color(0.66f, 0.65f, 0.62f), 0.035f, 11), 0.12f);
-            Glass = Make("Pit glass", null, 0.92f, new Color(0.07f, 0.09f, 0.11f), 0.2f);
+            Glass = Make("Pit glass", null, GlassSheen, new Color(0.07f, 0.09f, 0.11f), 0.2f);
             Glass.SetTexture("_EmissionMap", Windows());
             Glass.mainTextureScale = new Vector2(1f / PitComplexBuilder.WindowCells, 1f / PitComplexBuilder.StoreyCells);
             Glow(Glass, Color.black);
@@ -52,7 +54,11 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>Lights the office windows: 0 by day, 1 at night.</summary>
-        public void Night(float night) => Glow(Glass, NightBudget.Glow(Color.white, NightBudget.WindowGlow * night).gamma);
+        public void Night(float night)
+        {
+            Glow(Glass, NightBudget.Glow(Color.white, NightBudget.WindowGlow * night).gamma);
+            Glass.SetFloat("_Smoothness", Mathf.Lerp(GlassSheen, NightBudget.WindowSheen, night));
+        }
 
         private static void Glow(Material m, Color c)
         {
