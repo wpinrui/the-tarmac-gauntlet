@@ -19,20 +19,5 @@ namespace TarmacGauntlet.Rendering
         /// bright as it was a third of the way out, brighter nearer the lamp and dimmer near the edge of its range.
         /// </summary>
         public static float Urp(float builtIn, float range) => builtIn * Match * range * range;
-
-        /// <summary>The share of its intensity a URP point or spot light of this range gives at this distance, m.</summary>
-        public static float At(float distance, float range)
-        {
-            float d2 = Mathf.Max(distance * distance, 1e-4f), f = d2 / (range * range);
-            float smooth = Mathf.Clamp01(1f - f * f);
-            return smooth * smooth / d2;
-        }
-
-        /// <summary>
-        /// <see cref="Urp"/> for Linear colour space: a lamp set at <paramref name="builtIn"/> while the game rendered in
-        /// Gamma, as bright as it was there at <paramref name="distance"/>, m, where it mostly lights things.
-        /// </summary>
-        public static float UrpLinear(Color colour, float builtIn, float range, float distance) =>
-            LinearLight.Lamp(colour, Urp(builtIn, range), At(distance, range));
     }
 }

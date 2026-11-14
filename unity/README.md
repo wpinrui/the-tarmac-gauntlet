@@ -41,8 +41,14 @@ reflection over itself: the track (`TrackSurface.hlsl`, shared with its forward 
 (`CarPaintReflect.hlsl`). Each such pixel traces its reflection through the depth buffer, a pixel a step up to a step
 count set by the quality level, and the hit swaps out the probe's reflection as far as it is trusted. Off screen, past
 80 m, or with the option off, the probes stay. Its row is on at High and above. The track shades with
-`ShadeDielectric`, which adds the full GGX Fresnel URP's fit leaves out, so the road shines towards a low sun or a
-floodlight, and its smoothness varies along the lap from a polish map in the patches texture's alpha.
+`ShadeDielectric`, which adds the full GGX Fresnel URP's fit leaves out, so the road shines towards a low sun or the
+moon, and its smoothness varies along the lap from a polish map in the patches texture's alpha.
+
+At night the floodlights and the headlamps of the cars nearest the camera are real URP spot lights, drawn with Forward+
+so every surface takes every light near it. Every lit shader shades them through `Lamps.hlsl` under one exposure budget
+(`Raceday/Scripts/Night/NightBudget.cs`): one lamp, all lamps together and the pixel each have a ceiling, so no number
+of overlapping headlamps can white a car or the road out. `docs/night-lighting.md` explains the system and why the one
+before it failed, and `tools/night-budget` checks the budget on the real circuit and renders the full grid at night.
 
 Each scene's global volume carries `PostEffects`: the ACES tone curve and a colour grade, half resolution bloom, and
 Gaussian depth of field for a camera that calls `PostEffects.Focus` that frame. The

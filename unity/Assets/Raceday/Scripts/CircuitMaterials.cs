@@ -64,6 +64,8 @@ namespace TarmacGauntlet.Raceday
             Concrete = Make("Concrete", Noise(new Color(0.74f, 0.73f, 0.7f), 0.03f, 6), 0.15f);
             Hatch = Make("Red and white hatching", Stripes(new Color(0.8f, 0.1f, 0.1f), new Color(0.93f, 0.93f, 0.91f), true), 0.35f);
             Terrain = Make("Terrain", Noise(new Color(0.2f, 0.35f, 0.13f), 0.1f, 7), 0.05f);
+            // Grass takes the lamps' light as grass at night (Lamps.hlsl's LampGrassAlbedo).
+            foreach (Material m in new[] { Verge, Grass, Terrain }) m.EnableKeyword(Lit.GrassKeyword);
             GarageInside = Make("Garage", null, 0.2f, new Color(0.32f, 0.33f, 0.35f));
             Bollard = Make("Bollard", Stripes(new Color(0.95f, 0.78f, 0.1f), new Color(0.08f, 0.08f, 0.08f), false), 0.3f);
             ShowOptions();

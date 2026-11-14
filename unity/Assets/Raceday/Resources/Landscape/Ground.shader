@@ -59,8 +59,6 @@ Shader "Hidden/TarmacGauntlet/Ground"
             #pragma fragment frag
             #pragma multi_compile_local_fragment _ _GROUND_STRIPES
             #include_with_pragmas "Assets/Rendering/Shaders/LitKeywords.hlsl"
-            // The cars' headlamps light it at night (Headlamps.hlsl).
-            #define TARMAC_HEADLAMPS
             #include "Assets/Rendering/Shaders/TarmacLit.hlsl"
 
             struct Attributes
@@ -111,7 +109,7 @@ Shader "Hidden/TarmacGauntlet/Ground"
                     half lean = dot(view, along) / max(length(view), 1e-3);
                     albedo *= GammaScale(1 + _StripeContrast * wave * fade * (0.35 + 0.65 * lean));
                 #endif
-                return ShadePbr(i.positionWS, i.normalWS, i.positionCS, i.fog, albedo, 0, _Smoothness);
+                return ShadeGrass(i.positionWS, i.normalWS, i.positionCS, i.fog, albedo, _Smoothness);
             }
             ENDHLSL
         }

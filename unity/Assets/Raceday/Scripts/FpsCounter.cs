@@ -6,7 +6,8 @@ namespace TarmacGauntlet.Raceday
     /// <summary>
     /// Frames per second, averaged over half a second, with frame times after it, on one line left of the top right
     /// buttons and level with them. It keeps to the same 1920 by 1080 layout as those buttons, centred across a wider
-    /// screen, so it sits clear of them, the timing tower and the timing page's map at every resolution. Always shown.
+    /// screen, so it sits clear of them, the timing tower and the timing page's map at every resolution. Hidden until `
+    /// (the backquote key) shows it, and ` again hides it; the choice is kept between runs of the game.
     /// The frame times come from Unity's FrameTimingManager: CPU is the main thread's work, RT the render thread's and GPU
     /// the graphics card's, each in milliseconds. Each row is the average over the last second and, dimmer, the worst
     /// frame in it. Waiting for v-sync is left out of the CPU figure, so the rows show the headroom under a 60 fps cap.
@@ -40,6 +41,22 @@ namespace TarmacGauntlet.Raceday
                 Worst = count > 0 ? worst.ToString("0.0") : "";
                 sum = worst = 0;
                 count = 0;
+            }
+        }
+
+        private const string ShownKey = "fpsCounter.shown";
+        private static bool? visible;
+        private bool toggleHeld;
+
+        /// <summary>Whether the counter shows: off on a fresh game, then as last toggled with `.</summary>
+        public static bool Visible
+        {
+            get => visible ??= PlayerPrefs.GetInt(ShownKey, 0) != 0;
+            set
+            {
+                visible = value;
+                PlayerPrefs.SetInt(ShownKey, value ? 1 : 0);
+                PlayerPrefs.Save();
             }
         }
 
@@ -82,6 +99,15 @@ namespace TarmacGauntlet.Raceday
 
         private void OnGUI()
         {
+            Event ev = Event.current;
+            if (ev.keyCode == KeyCode.BackQuote)
+            {
+                // Once per press: a held key repeats its KeyDown.
+                if (ev.type == EventType.KeyDown && !toggleHeld) Visible = !Visible;
+                if (ev.type == EventType.KeyDown) toggleHeld = true;
+                if (ev.type == EventType.KeyUp) toggleHeld = false;
+            }
+            if (!Visible) return;
             using (GammaGui.Begin()) DrawGui();
         }
 

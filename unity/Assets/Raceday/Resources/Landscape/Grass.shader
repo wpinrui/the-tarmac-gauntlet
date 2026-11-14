@@ -208,8 +208,6 @@ Shader "Hidden/TarmacGauntlet/Grass"
             #pragma vertex vert
             #pragma fragment frag
             #include_with_pragmas "Assets/Rendering/Shaders/LitKeywords.hlsl"
-            // The cars' headlamps light it at night (Headlamps.hlsl).
-            #define TARMAC_HEADLAMPS
             #include "Assets/Rendering/Shaders/TarmacLit.hlsl"
 
             struct Varyings
@@ -235,7 +233,7 @@ Shader "Hidden/TarmacGauntlet/Grass"
 
             half4 frag(Varyings i) : SV_Target
             {
-                return ShadePbr(i.positionWS, normalize(i.normalWS), i.positionCS, i.fog, i.albedo, 0, _Smoothness);
+                return ShadeGrass(i.positionWS, normalize(i.normalWS), i.positionCS, i.fog, i.albedo, _Smoothness);
             }
             ENDHLSL
         }

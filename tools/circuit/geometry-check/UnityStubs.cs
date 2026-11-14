@@ -35,6 +35,7 @@ namespace UnityEngine
         public static float Dot(Vector3 a, Vector3 b) => a.x * b.x + a.y * b.y + a.z * b.z;
         public static Vector3 Cross(Vector3 a, Vector3 b) => new Vector3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
         public static float Distance(Vector3 a, Vector3 b) => (a - b).magnitude;
+        public static float Angle(Vector3 a, Vector3 b) { float d = a.magnitude * b.magnitude; return d < 1e-15f ? 0f : (float)(Math.Acos(Mathf.Clamp(Dot(a, b) / d, -1f, 1f)) * 180.0 / Math.PI); }
         public static Vector3 Lerp(Vector3 a, Vector3 b, float t) { t = Mathf.Clamp01(t); return a + (b - a) * t; }
         public static Vector3 up => new Vector3(0, 1, 0); public static Vector3 down => new Vector3(0, -1, 0);
         public static Vector3 forward => new Vector3(0, 0, 1); public static Vector3 back => new Vector3(0, 0, -1);
@@ -61,6 +62,7 @@ namespace UnityEngine
         public static int CeilToInt(float v) => (int)Math.Ceiling(v);
         public static float Floor(float v) => (float)Math.Floor(v);
         public static float Lerp(float a, float b, float t) => a + (b - a) * Clamp01(t);
+        public static float Tan(float v) => (float)Math.Tan(v); public static float Acos(float v) => (float)Math.Acos(v);
         public static float Sin(float v) => (float)Math.Sin(v); public static float Asin(float v) => (float)Math.Asin(v); public static float Cos(float v) => (float)Math.Cos(v);
         public static float DeltaAngle(float a, float b) { float d = Repeat(b - a, 360); if (d > 180) d -= 360; return d; }
         public const float Rad2Deg = (float)(180 / Math.PI);

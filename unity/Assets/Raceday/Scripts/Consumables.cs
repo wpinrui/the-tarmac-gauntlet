@@ -154,9 +154,20 @@ namespace TarmacGauntlet.Raceday
 
         /// <summary>
         /// Share of new tyres' grip on a dry track: falls slowly, then quickly once the tyres are past
-        /// three quarters worn, and falls again on a wet track (<see cref="RaceWeather"/>).
+        /// three quarters worn, and falls again on a wet track (<see cref="RaceWeather"/>). Damage takes off more, at
+        /// the weaker end of the car (<see cref="WheelGrip"/> has each end's own).
         /// </summary>
-        public float GripScale
+        public float GripScale => BaseGrip * Mathf.Min(AxleGrip(true), AxleGrip(false));
+
+        /// <summary>As <see cref="GripScale"/>, for the front or rear wheels: damage at one end of the car cuts that end most.</summary>
+        public float WheelGrip(bool front) => BaseGrip * AxleGrip(front);
+
+        /// <summary>How the car's damage scales its drag: broken bodywork.</summary>
+        public float DamageDrag => Log != null ? (float)CarDamage.Drag(Log.Damage) : 1f;
+
+        private float AxleGrip(bool front) => Log != null ? (float)Log.AxleGrip(front) : 1f;
+
+        private float BaseGrip
         {
             get
             {

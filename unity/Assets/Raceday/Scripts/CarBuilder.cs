@@ -49,7 +49,7 @@ namespace TarmacGauntlet.Raceday
             car.Circuit = circuit;
             car.Setup(spec, wheels);
             WheelBlur.Fit(car, wheels);
-            CarLamps.Fit(car, model != null ? root.transform.Find("Model")?.gameObject : null);
+            CarLights.Fit(car, model != null ? root.transform.Find("Model")?.gameObject : null);
             root.AddComponent<EngineAudio>().Setup(modelId, ++spawned);
             TyreAudio.Fit(car, spawned);
             WetRoadAudio.Fit(car, spawned);

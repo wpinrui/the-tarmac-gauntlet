@@ -63,6 +63,7 @@ namespace UnityEngine
         public static float Min(float a, float b) => a < b ? a : b;
         public static float Abs(float v) => Math.Abs(v);
         public static float Exp(float v) => (float)Math.Exp(v);
+        public static float Pow(float a, float b) => (float)Math.Pow(a, b);
         public static float Sqrt(float v) => (float)Math.Sqrt(v);
         public static float Lerp(float a, float b, float t) => a + (b - a) * Clamp01(t);
         public static int RoundToInt(float v) => (int)Math.Round(v, MidpointRounding.ToEven);

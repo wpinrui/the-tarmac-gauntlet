@@ -71,11 +71,13 @@ namespace TarmacGauntlet.Simulation
         public double Fatigue { get; private set; }
         /// <summary>Damage from real hits, 0 untouched to 100 wrecked (<see cref="CarDamage"/>). It costs grip until the crew repair it.</summary>
         public double Damage { get; private set; }
+        /// <summary>Share of the damage at the front of the car: 1 all on the nose, 0 all on the tail, 0.5 even.</summary>
+        public double DamageFront { get; private set; } = 0.5;
         /// <summary>True once a hit has totalled the car: it is out, and goes back to the garage at 0% condition.</summary>
         public bool Totalled { get; private set; }
 
         /// <summary>The car's condition as it goes back to the garage: what the race left, less the damage still on it, or 0 if totalled.</summary>
-        public double ConditionAfterRace => Totalled ? 0 : Math.Max(0, Condition - Damage);
+        public double ConditionAfterRace => Totalled ? 0 : Math.Max(0, Condition - Damage * CarDamage.ConditionPerPoint);
 
         /// <summary>
         /// Driven seconds that count as one lap of the race maths: the GDD's 48 laps over the 24 hours,
@@ -178,10 +180,12 @@ namespace TarmacGauntlet.Simulation
         /// The car hit a barrier or another car at <paramref name="impact"/> m/s into it. Adds the damage, and a hit
         /// hard enough totals the car and takes it out of the race. Returns true if it did.
         /// </summary>
-        public bool Hit(double raceTime, double impact)
+        public bool Hit(double raceTime, double impact, double front = 0.5)
         {
             if (Retired || Flagged) return false;
-            Damage = Math.Min(100, Damage + CarDamage.FromImpact(impact));
+            double added = Math.Min(100 - Damage, CarDamage.FromImpact(impact));
+            if (added > 0) DamageFront = (DamageFront * Damage + Math.Max(0, Math.Min(1, front)) * added) / (Damage + added);
+            Damage += added;
             if (!CarDamage.Totals(impact)) return false;
             Damage = 100;
             Totalled = true;
@@ -211,18 +215,20 @@ namespace TarmacGauntlet.Simulation
         /// <summary>Sets how tired the driver at the wheel is, 0 to 100. For the debug menu.</summary>
         public void SetFatigue(double fatigue) => Fatigue = Math.Max(0, Math.Min(100, fatigue));
 
-        /// <summary>How the active issues scale the car's stats, with the grip damage takes off folded into Handling.</summary>
+        /// <summary>How the active issues scale the car's stats. Damage is apart (<see cref="CarDamage"/>).</summary>
         public IssueEffects Effects
         {
             get
             {
-                double grip = CarDamage.Grip(Damage);
-                if (active.Count == 0) return grip >= 1 ? IssueEffects.None : new IssueEffects(1, grip, 1, 1);
+                if (active.Count == 0) return IssueEffects.None;
                 var one = new CarStats { Power = 1, Handling = 1, FuelEfficiency = 1, TyreDurability = 1 };
                 CarStats s = Debuffed(one);
-                return new IssueEffects(s.Power, s.Handling * grip, s.FuelEfficiency, s.TyreDurability);
+                return new IssueEffects(s.Power, s.Handling, s.FuelEfficiency, s.TyreDurability);
             }
         }
+
+        /// <summary>How the damage scales the grip of the front or rear wheels.</summary>
+        public double AxleGrip(bool front) => CarDamage.AxleGrip(Damage, DamageFront, front);
 
         /// <summary>
         /// The car stops in its box. The crew changes the tyres if the car wants them and a set is
@@ -336,6 +342,7 @@ namespace TarmacGauntlet.Simulation
             FuelLeft = FuelLeft,
             Fatigue = Fatigue,
             Damage = Damage,
+            DamageFront = DamageFront,
             Totalled = Totalled,
             Modes = Modes,
             ActiveIssues = active.ToArray(),
@@ -364,6 +371,7 @@ namespace TarmacGauntlet.Simulation
             FuelLeft = s.FuelLeft;
             Fatigue = s.Fatigue;
             Damage = s.Damage;
+            DamageFront = s.DamageFront;
             Totalled = s.Totalled;
             Modes = s.Modes;
             active.Clear();

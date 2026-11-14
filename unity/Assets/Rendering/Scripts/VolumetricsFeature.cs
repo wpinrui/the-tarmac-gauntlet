@@ -11,7 +11,7 @@ namespace TarmacGauntlet.Rendering
     /// <summary>
     /// The race's volumetric clouds and fog, drawn once the sky is: real clouds in place of the sky shader's painted ones,
     /// lit towards the sun and shaped by the same cloud map as their shadows (<see cref="CloudShadows"/>), and a low mist
-    /// that the sun shines through in shafts between the trees and the floodlights light in beams at night. Each follows
+    /// that the sun shines through in shafts between the trees. Each follows
     /// its graphics option. Both are worked out at a third of the resolution across and down at High and a half at Ultra,
     /// skipping the 3D noise wherever the cloud map is clear, then smoothed over frames and laid
     /// over the picture by depth (the Volumetrics shader). Only the race's own cameras draw them, and only while a race sky

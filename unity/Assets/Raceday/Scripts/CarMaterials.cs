@@ -77,7 +77,7 @@ namespace TarmacGauntlet.Raceday
 
         /// <summary>
         /// Finishes a car model's glass, lenses and trims, with each option as it is now, and keeps track of them so the
-        /// options can change them live. Call after the paint, before <see cref="CarLamps.Fit"/>.
+        /// options can change them live. Call after the paint, before <see cref="CarLights.Fit"/>.
         /// </summary>
         public static void Dress(GameObject model)
         {
