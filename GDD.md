@@ -412,6 +412,7 @@ AI teams follow the same contract system. A desired driver may be locked into an
 
 - The player has **first pick** each year — they hire before AI teams make their selections
 - AI teams then sign in order of appeal: prestige, plus a few points for factory teams and fewer for satellites. The most appealing team signs first and takes the best driver it can afford
+- AI teams misjudge drivers: each team sees every stat of every driver off by a fixed amount from -5% to +5%, the same every time it looks at that driver
 - At a new game, the starting drivers go out the same way: best drivers to the most appealing teams
 - Drivers under contract with any team are unavailable unless bought out
 
