@@ -57,6 +57,7 @@ namespace TarmacGauntlet.Simulation
             { "Flatbed Legends", "Assets/Art/Liveries/FlatbedLegends" },
             { "Steelworks Motorsport", "Assets/Art/Liveries/SteelworksMotorsport" },
             { "Mapleton Autosport", "Assets/Art/Liveries/MapletonAutosport" },
+            { "Southgate Motorsport", "Assets/Art/Liveries/SouthgateMotorsport" },
             { "Vespro Corse", "Assets/Art/Liveries/VesproCorse" },
         };
 

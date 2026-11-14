@@ -6,6 +6,7 @@ Run: node ../common/views.js ../../../unity/Assets/Art/Vehicles/SeorakHwaeum/Seo
      node ../common/digits.js --font fonts/Cinzel-Bold.ttf --out out/digits
      python3 bonnet.py
      python3 design.py
+     ./game.sh
 
 Side art is given as (z, y) in the car's metres: z runs nose (+2.26) to tail (-2.06), y up from the
 ground. Landmarks on the Hwaeum: wheels at z +-1.325 (radius 0.34, arch tops at y 0.70); front
@@ -177,6 +178,10 @@ if __name__ == "__main__":
     views = HERE / "out" / "views" / "views.json"
     for name, make in OPTIONS.items():
         make(views).write(HERE / "out" / name)
+    # Ivan's pick: Dusk with the elephant on the bonnet. game.sh bakes it into the game.
+    lv = dusk_option(views)
+    bonnet(lv, "elephant")
+    lv.write(HERE / "out" / "savanna")
     # The Dusk take with each bonnet centrepiece, for Ivan to pick from.
     for name in BONNETS:
         lv = dusk_option(views)
