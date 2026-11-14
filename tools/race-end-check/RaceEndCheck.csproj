@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Checks how the race ends outside Unity: live timing shuts, the cooldown lap ends and the camera follows the right car, for each way your race can end. Run through run.sh. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)../../out/race-end-check/obj/</BaseIntermediateOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Check.cs" />
+    <Compile Include="../../unity/Assets/Simulation/**/*.cs" />
+    <Compile Include="../../unity/Assets/Raceday/Scripts/Stages/RaceEnd.cs" />
+  </ItemGroup>
+</Project>
