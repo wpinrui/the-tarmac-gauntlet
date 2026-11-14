@@ -52,6 +52,8 @@ Every door that opens is its own closed shell, cut from the body along its shut 
 Open each door and look for a sliver of body left across the opening. It forms at the belt, where the shoulder curves in above the door and the cut stops short of the cabin's hollow.
 Every piece is a closed shell with thickness. Shut lines are V grooves.
 A bonnet shut line starts at the windscreen's base, inboard of its lower corners. It bends out to the bonnet's rear corners, then runs forward along the panels it meets, such as the lamps and the wings, then across the nose. The bonnet reaches back to the windscreen, so its line has no rear edge.
+The bonnet's front edge crosses the nose above the grille. The grille stays on the bumper and is never part of the bonnet.
+A tailgate shut line runs straight down under the tail lamps and never bends round them. The lamps lie over it, so no groove shows inside a lamp.
 Wheel arches step round at even angles.
 The bonnet crown narrows with the nose, so no beak forms at the centre.
 
