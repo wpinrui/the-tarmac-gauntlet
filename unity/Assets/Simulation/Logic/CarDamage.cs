@@ -7,8 +7,9 @@ namespace TarmacGauntlet.Simulation
     /// Damage from real hits in the driven race: a barrier, or another car. It builds from 0 (untouched) to 100
     /// (wrecked) with the speed of each hit. It is not condition: it costs grip, more at the end of the car that was
     /// hit (a nose hit understeers, a tail hit oversteers), and adds drag from the broken bodywork. The crew can
-    /// repair it at a stop, all of it or some, at a cost in time and spare parts for each point. One hit hard enough
-    /// totals the car: it is out of the race and goes back to the garage at 0% condition. Damage piling up to
+    /// repair it at a stop, all of it or some, at a cost in spare parts for each point and in time that grows with the
+    /// damage, from minutes of race time for a knock to hours for a wreck (<see cref="RepairSeconds(double)"/>). One hit
+    /// hard enough totals the car: it is out of the race and goes back to the garage at 0% condition. Damage piling up to
     /// <see cref="RetireDamage"/> puts the car out too, and the damage comes off its condition as at the flag. Damage still on the car at
     /// the flag comes off its condition, one for one (<see cref="ConditionPerPoint"/>).
     /// </summary>
@@ -30,8 +31,20 @@ namespace TarmacGauntlet.Simulation
         public const double DragPerPoint = 0.015;
         /// <summary>Condition a point of damage still on the car at the flag takes off: one for one.</summary>
         public const double ConditionPerPoint = 1;
-        /// <summary>Crew seconds to repair one point of damage, before the crew's size and the Engineer skill scale it.</summary>
-        public const double RepairSecondsPerPoint = 3;
+        /// <summary>
+        /// Crew seconds to repair damage down from each of these points to none, before the crew's size and the
+        /// Engineer skill scale it: a race runs at 10 times the clock (1 race hour is 360 s), so a knock of 5 is 5
+        /// race minutes, a heavy hit of 15 (one just short of totalling the car) is a race hour, and damage at the
+        /// retirement limit (<see cref="RetireDamage"/>) is 3 race hours. Between the points it grows in a straight line, and past the last at
+        /// the last slope.
+        /// </summary>
+        private static readonly (double Points, double Seconds)[] RepairCurve =
+        {
+            (0, 0),
+            (5, 30),
+            (15, 360),
+            (RetireDamage, 1080),
+        };
         /// <summary>Points of damage one spare part repairs.</summary>
         public const double PointsPerPart = 4;
         /// <summary>Share of a lap's time spent where grip sets the speed, for weighing a repair against the laps to come.</summary>
@@ -95,6 +108,25 @@ namespace TarmacGauntlet.Simulation
         public static double FrontShare(double along, double halfLength) =>
             halfLength <= 0 ? 0.5 : Math.Max(0, Math.Min(1, 0.5 + 0.5 * along / halfLength));
 
+        /// <summary>Most damage the crew leave on a car: one heavy hit (<see cref="FromImpact"/> of <see cref="TotalImpact"/>) short of <see cref="RetireDamage"/>.</summary>
+        public static double SafeDamage => RetireDamage - FromImpact(TotalImpact);
+
+        /// <summary>Crew seconds to repair all of <paramref name="damage"/>, before the crew's size and the Engineer skill scale it (<see cref="RepairCurve"/>).</summary>
+        public static double RepairSeconds(double damage)
+        {
+            double d = Math.Max(0, damage);
+            for (int i = 1; i < RepairCurve.Length; i++)
+            {
+                (double p0, double s0) = RepairCurve[i - 1];
+                (double p1, double s1) = RepairCurve[i];
+                if (d <= p1 || i == RepairCurve.Length - 1) return s0 + (d - p0) * (s1 - s0) / (p1 - p0);
+            }
+            return 0;
+        }
+
+        /// <summary>Crew seconds to repair damage from <paramref name="from"/> down to <paramref name="to"/>, before the crew's size and the Engineer skill scale it.</summary>
+        public static double RepairSeconds(double from, double to) => Math.Max(0, RepairSeconds(from) - RepairSeconds(Math.Max(0, to)));
+
         /// <summary>Spare parts it takes to repair <paramref name="points"/> of damage.</summary>
         public static int PartsFor(double points) => points <= 0 ? 0 : (int)Math.Ceiling(points / PointsPerPart - 1e-9);
 
@@ -102,20 +134,23 @@ namespace TarmacGauntlet.Simulation
         public static double PointsFrom(int parts) => Math.Max(0, parts) * PointsPerPart;
 
         /// <summary>
-        /// The damage the crew leave on the car: they repair point by point, worst first, while each point gains
-        /// more over the stint to come than it costs in the box. Heavy damage is mostly repaired; light damage may
-        /// be left. Repair all of it, or none, is the team's call (<see cref="RepairMode"/>).
+        /// The damage the crew leave on the car. They always repair it down to <see cref="SafeDamage"/>, as they
+        /// always fix an issue that could end the race. Below that they repair point by point, worst first, while each point gains
+        /// more over the rest of the race than it costs in the box. Damage stays on the car until it is repaired, and
+        /// a repair costs the same later, so a point worth repairing at all is worth it now. Heavy damage early on is
+        /// mostly repaired; light damage, or damage late in the race, may be left. Repair all of it, or none, is the
+        /// team's call (<see cref="RepairMode"/>).
         /// </summary>
         public static double CrewTarget(double damage, StintOutlook stint)
         {
-            double cost = RepairSecondsPerPoint * stint.CrewMultiplier;
-            double stintSeconds = stint.Laps * stint.LapSeconds;
-            double left = Math.Max(0, Math.Min(100, damage));
+            double racing = Math.Max(stint.Laps * stint.LapSeconds, stint.SecondsLeft);
+            // Past a heavy hit short of the retirement limit, whatever it costs: one more could end the race.
+            double left = Math.Max(0, Math.Min(SafeDamage, damage));
             while (left > 0)
             {
                 double next = Math.Max(0, left - 1);
-                double gain = stintSeconds * (LapSlowdown(left) - LapSlowdown(next));
-                if (gain <= cost * (left - next)) break;
+                double gain = racing * (LapSlowdown(left) - LapSlowdown(next));
+                if (gain <= RepairSeconds(left, next) * stint.CrewMultiplier) break;
                 left = next;
             }
             return left;

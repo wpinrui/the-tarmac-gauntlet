@@ -30,6 +30,9 @@ namespace TarmacGauntlet.Simulation.Tests
 
         private static readonly StintOutlook LongStint = new StintOutlook { Laps = 12, LapSeconds = 120, CrewMultiplier = 1 };
         private static readonly StintOutlook ShortStint = new StintOutlook { Laps = 1, LapSeconds = 120, CrewMultiplier = 1 };
+        /// <summary>A stint early in the race: most of the 24 hours, 8640 s at 10 times the clock, still to come.</summary>
+        private static readonly StintOutlook EarlyStint = LongStint with { SecondsLeft = 8000 };
+        private const double RaceMinute = 6;
 
         [Test]
         public void ATouchDoesNoDamage()
@@ -76,9 +79,10 @@ namespace TarmacGauntlet.Simulation.Tests
         [Test]
         public void TheCrewRepairHeavyDamageMoreThanLight()
         {
-            double heavy = CarDamage.CrewTarget(30, LongStint);
+            double heavy = CarDamage.CrewTarget(30, EarlyStint);
             Assert.That(heavy, Is.LessThan(30));
             Assert.That(CarDamage.CrewTarget(30, ShortStint), Is.GreaterThan(heavy));
+            Assert.That(CarDamage.CrewTarget(30, LongStint), Is.GreaterThan(heavy), "late in the race, with only the stint left, less is worth the hours");
             Assert.That(CarDamage.Target(RepairMode.All, 80, ShortStint), Is.EqualTo(0));
             Assert.That(CarDamage.Target(RepairMode.None, 80, LongStint), Is.EqualTo(80));
         }
@@ -142,6 +146,29 @@ namespace TarmacGauntlet.Simulation.Tests
             shortOfParts.Pit(false, Array.Empty<string>());
             Assert.That(shortOfParts.Damage, Is.EqualTo(60 - CarDamage.PointsFrom(3)).Within(1e-9));
             Assert.That(shortOfParts.SpareParts, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void RepairsTakeMinutesForAKnockAndHoursForAWreck()
+        {
+            Assert.That(CarDamage.RepairSeconds(0), Is.EqualTo(0));
+            Assert.That(CarDamage.RepairSeconds(5), Is.EqualTo(5 * RaceMinute).Within(1e-9));
+            Assert.That(CarDamage.RepairSeconds(CarDamage.FromImpact(30)), Is.EqualTo(60 * RaceMinute).Within(1e-9));
+            Assert.That(CarDamage.RepairSeconds(CarDamage.RetireDamage), Is.EqualTo(180 * RaceMinute).Within(1e-9));
+            Assert.That(CarDamage.RepairSeconds(60), Is.GreaterThan(180 * RaceMinute));
+            Assert.That(CarDamage.RepairSeconds(30, 15) + CarDamage.RepairSeconds(15, 0), Is.EqualTo(CarDamage.RepairSeconds(30)).Within(1e-9));
+            Assert.That(CarDamage.RepairSeconds(15, 20), Is.EqualTo(0));
+        }
+
+        [Test]
+        public void AStopRepairingAHeavyHitTakesAnHourOfRaceTime()
+        {
+            CarRaceLog log = PlayerLog(spares: 10);
+            log.SetDamage(15);
+            double crew = PitStop.CrewMultiplier(log.Car.CrewSize, log.Car.EngineerSkill);
+            double none = log.WorkSeconds(Array.Empty<string>(), damageTo: 15);
+            Assert.That(log.WorkSeconds(Array.Empty<string>()) - none, Is.EqualTo(60 * RaceMinute * crew).Within(1e-6));
+            Assert.That(log.Pit(false, Array.Empty<string>()).Repairs, Is.True);
         }
 
         [Test]
