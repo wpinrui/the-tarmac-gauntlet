@@ -20,7 +20,7 @@
 | 7 | Liberty Fantasy | 2009 Ford Fiesta | $20,000 | 24 | 26 | 82 | 78 | 32 | 86 | 88 | 42 |
 | 8 | Seorak Hwaeum | 2011 Kia cee'd | $22,500 | 22 | 24 | 86 | 82 | 62 | 94 | 88 | 50 |
 | 10 | Kaiser Oboe | 2009 VW Golf | $27,500 | 24 | 28 | 78 | 76 | 56 | 84 | 86 | 55 |
-| 11 | Liberty Mantle | 2011 Ford Mondeo | $30,000 | 22 | 24 | 74 | 78 | 72 | 96 | 84 | 60 |
+| 11 | Liberty Mantle | 2013 Ford Fusion | $30,000 | 22 | 24 | 74 | 78 | 72 | 96 | 84 | 60 |
 
 ### Class D
 
