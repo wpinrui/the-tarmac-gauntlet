@@ -557,6 +557,33 @@ namespace TarmacGauntlet.Simulation.Tests
         }
 
         [Test]
+        public void TheRaceHistoryNamesWhatBroke()
+        {
+            GameState game = Career();
+            var race = new RaceDay(RaceWeekend.BuildSetup(game), Never);
+            CarRaceLog me = race.Cars.First(c => c.Car.Player);
+            for (int lap = 1; lap <= 3; lap++)
+                foreach (CarRaceLog c in race.Cars)
+                    if (c != me || lap < 3) race.CompleteLap(c.Index, lap * 100 + c.Index, 100, InstructionMode.Normal, lap == 3);
+            me.Retire(250, FailureType.Mechanical, "gearbox-seizure");
+            GameState after = RaceWeekend.Settle(race).Game;
+            RaceHistoryEntry entry = after.RaceHistory.Last();
+            Assert.That(entry.Events!.Any(e => e.Type == RaceEventType.Retirement && e.Text.EndsWith("retired — gearbox seizure")), Is.True);
+            RaceSummary replay = RaceReplay.FromHistory(after, entry);
+            Assert.That(replay.Issues.Last().TemplateId, Is.EqualTo("Gearbox seizure"));
+            Assert.That(replay.Player!.FailureId, Is.Null.Or.EqualTo("gearbox-seizure"));
+        }
+
+        [Test]
+        public void TheNewspaperNamesAFailureWithItsArticle()
+        {
+            Assert.That(NewspaperWriter.Failure(IssueTemplates.Find("gearbox-seizure")!), Is.EqualTo("a gearbox seizure"));
+            Assert.That(NewspaperWriter.Failure(IssueTemplates.Find("injector-failure")!), Is.EqualTo("an injector failure"));
+            Assert.That(NewspaperWriter.Failure(IssueTemplates.Find("engine-overheating")!), Is.EqualTo("engine overheating"));
+            foreach (IssueTemplate t in IssueTemplates.MechanicalFailures) Assert.That(NewspaperWriter.Failure(t), Does.Not.StartWith(" "));
+        }
+
+        [Test]
         public void ARetiredCarKeepsWhenItCompletedItsLaps()
         {
             var race = new RaceDay(RaceWeekend.BuildSetup(Career()), Never);
