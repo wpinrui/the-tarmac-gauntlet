@@ -259,7 +259,7 @@ static partial class Check
     /// <summary>The field, quickest first, on the grid in that order or, reversed, quickest at the back.</summary>
     static List<Entry> Pack(bool reversed, int seed = -1)
     {
-        string[] models = { "a-29", "a-27", "a-26", "b-24", "b-22", "b-21", "c-19", "c-18", "c-16", "d-15", "d-13", "e-09", "e-07", "f-06", "f-03", "f-01" };
+        string[] models = { "a-29", "a-27", "b-24", "b-22", "b-21", "c-19", "c-16", "d-15", "d-13", "e-07", "f-06", "f-03", "f-01" };
         var rng = new Random(seed >= 0 ? seed : int.TryParse(Environment.GetEnvironmentVariable("AI_PACK_SEED"), out int packSeed) ? packSeed : 11);
         var entries = new List<Entry>();
         for (int i = 0; i < models.Length; i++)

@@ -216,7 +216,7 @@ Crash issues (e.g., "front wing damage," "rear impact damage," "bent suspension 
 
 ### Overview
 
-- **31 car models** across **7 performance classes** (F, E, D, C, B, A, F1)
+- **28 car models** across **7 performance classes** (F, E, D, C, B, A, F1)
 - All 100 cars race for **overall position** — classes are not separate races
 - Classes give players **intermediate goals**: finishing top of your class is a milestone even if overall position is mid-pack
 - New car dealer prices range from **$4,500** (Class F) to **$3,000,000** (Class A). F1 is not sold new (see §3: F1 Class Rules). Second-hand prices can be much lower — a heavily aged Class F car can cost under $1,000.
@@ -752,7 +752,7 @@ The following are explicitly **out of scope for v1** but the design accommodates
 | Total laps per race | 48 |
 | Typical pit stops per race | 8–12 |
 | Cars in field | 100 (99 AI + 1 player) |
-| Car models | 31 |
+| Car models | 28 |
 | Car classes | 7 (F, E, D, C, B, A, F1) |
 | Car stats | 8 (Power, Handling, Fuel Efficiency, Tyre Durability, Comfort, Reliability, Pit Stop Time, Fuel Capacity) |
 | Upgrade packs per car | Up to 3 (Power, Handling, Comfort) — varies by class |

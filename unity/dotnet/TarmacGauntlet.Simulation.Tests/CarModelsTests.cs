@@ -10,14 +10,14 @@ namespace TarmacGauntlet.Simulation.Tests
         private static CarModel Model(string id) => CarModels.All.Single(m => m.Id == id);
 
         [Test]
-        public void Has31ModelsInClassOrder()
+        public void Has28ModelsInClassOrder()
         {
-            Assert.That(CarModels.All, Has.Count.EqualTo(31));
+            Assert.That(CarModels.All, Has.Count.EqualTo(28));
             var counts = CarModels.All.GroupBy(m => m.CarClass).Select(g => (g.Key, g.Count())).ToArray();
             Assert.That(counts, Is.EqualTo(new[]
             {
-                (CarClass.F, 6), (CarClass.E, 5), (CarClass.D, 4), (CarClass.C, 5),
-                (CarClass.B, 5), (CarClass.A, 5), (CarClass.F1, 1),
+                (CarClass.F, 6), (CarClass.E, 4), (CarClass.D, 4), (CarClass.C, 4),
+                (CarClass.B, 5), (CarClass.A, 4), (CarClass.F1, 1),
             }));
         }
 
@@ -28,15 +28,15 @@ namespace TarmacGauntlet.Simulation.Tests
             {
                 ("f-01", "Nusa Carrier"), ("f-02", "Liberty Omaha"), ("f-03", "Tora Daruma"),
                 ("f-04", "Kaiser Firefly"), ("f-05", "Liberty Collier"), ("f-06", "Nusa Fox"),
-                ("e-07", "Liberty Fantasy"), ("e-08", "Seorak Hwaeum"), ("e-09", "Liberty Fortress"),
+                ("e-07", "Liberty Fantasy"), ("e-08", "Seorak Hwaeum"),
                 ("e-10", "Kaiser Oboe"), ("e-11", "Liberty Mantle"),
                 ("d-12", "Seorak Hoeori"), ("d-13", "Kaiser Cappuccino"), ("d-14", "Seorak Rally"),
                 ("d-15", "Tora Hanabi"),
-                ("c-16", "Archer Crescendo"), ("c-17", "Kaiser Elevate"), ("c-18", "Tora Zero"),
+                ("c-16", "Archer Crescendo"), ("c-17", "Kaiser Elevate"),
                 ("c-19", "Kaiser Klassik"), ("c-20", "Tora Giga"),
                 ("b-21", "Feretti Vortice"), ("b-22", "Archer Tachyon"), ("b-23", "Archer Jet Black"),
                 ("b-24", "Kaiser Scream"), ("b-25", "Liberty Bounty"),
-                ("a-26", "Kaiser Sceptre"), ("a-27", "Archer Hypernova"), ("a-28", "Kaiser K24 Dynamo"),
+                ("a-27", "Archer Hypernova"), ("a-28", "Kaiser K24 Dynamo"),
                 ("a-29", "Seorak Cheonma CX-24Si"), ("a-30", "Liberty GE67"),
                 ("f1-31", "Feretti F-256V8T"),
             };

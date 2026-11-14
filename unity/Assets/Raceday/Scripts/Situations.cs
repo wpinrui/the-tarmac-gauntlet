@@ -343,7 +343,7 @@ namespace TarmacGauntlet.Raceday
             new Situation
             {
                 Id = "T11", Title = "lap one from the grid", At = 7341.5f, Seconds = 40f,
-                Cars = Grid("a-29", "b-25", "c-19", "d-15", "e-11", "f-01", "c-18", "b-24", "e-10", "a-28"),
+                Cars = Grid("a-29", "b-25", "c-19", "d-15", "e-11", "f-01", "c-17", "b-24", "e-10", "a-28"),
             },
             new Situation
             {

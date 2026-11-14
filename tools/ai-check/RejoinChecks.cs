@@ -98,7 +98,7 @@ static partial class Check
     /// <summary>Traffic coming up behind a spot: one car at each gap, on the racing line at racing speed.</summary>
     static IEnumerable<Entry> Coming(float at, float[] gaps, int seed)
     {
-        string[] models = { "c-18", "a-27", "e-07", "b-22", "f-03", "d-13" };
+        string[] models = { "c-17", "a-27", "e-07", "b-22", "f-03", "d-13" };
         for (int i = 0; i < gaps.Length; i++)
         {
             string m = models[(i + seed) % models.Length];

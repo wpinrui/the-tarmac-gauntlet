@@ -90,14 +90,14 @@ namespace TarmacGauntlet.Simulation.Tests
         [Test]
         public void InstallUpgrade_SetsPackDeductsCostAndLogsCapitalisedLabel()
         {
-            var g = InstallUpgrade(MakeGame(MakePlayer(new[] { Car("c1"), Car("c2") })), "c1", UpgradePackType.Handling, 4_000, "Tora Zero");
+            var g = InstallUpgrade(MakeGame(MakePlayer(new[] { Car("c1"), Car("c2") })), "c1", UpgradePackType.Handling, 4_000, "Tora Giga");
             var p = Player(g);
             Assert.That(p.Budget, Is.EqualTo(6_000));
             Assert.That(p.Cars[0].InstalledUpgrades, Is.EqualTo(new InstalledUpgrades { Handling = true }));
             Assert.That(p.Cars[1].InstalledUpgrades, Is.EqualTo(new InstalledUpgrades()));
             Assert.That(p.Transactions.Single().Category, Is.EqualTo(TransactionCategory.Upgrade));
             Assert.That(p.Transactions.Single().Amount, Is.EqualTo(-4_000));
-            Assert.That(p.Transactions.Single().Description, Is.EqualTo("Handling Pack on Tora Zero"));
+            Assert.That(p.Transactions.Single().Description, Is.EqualTo("Handling Pack on Tora Giga"));
         }
 
         [Test]
