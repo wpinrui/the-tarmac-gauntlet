@@ -29,6 +29,7 @@ internal static class Check
     private const float Volume = 0.35f, Music = 0.45f;
     private const int RealLights = 17;
     private const int TractionControl = 2; // Full
+    private const int Invulnerability = 2; // Full invulnerability
 
     private static int Main(string[] args)
     {
@@ -54,6 +55,9 @@ internal static class Check
             GameSettings.ProximityArrows = false;
             Expect("a fresh game starts with the rear mirror on", GameSettings.RearMirror, true);
             GameSettings.RearMirror = false;
+            Expect("a fresh game starts with invulnerability off", GameSettings.Invulnerability, 0);
+            Expect("the race reads invulnerability off on a fresh game", TarmacGauntlet.Raceday.DriveSettings.Invulnerability, TarmacGauntlet.Raceday.Invulnerability.Off);
+            GameSettings.Invulnerability = Invulnerability;
             for (int i = 2; i < GameSettings.Sliders.Length; i++) GameSettings.SetLevel(GameSettings.Sliders[i], SliderAt(i));
             Expect("the master slider sets the listener's volume on its curve", AudioListener.volume, Volume * Volume);
             Application.Quit();
@@ -70,6 +74,8 @@ internal static class Check
             Expect("opposite lock assist", GameSettings.OppositeLock, true);
             Expect("proximity arrows", GameSettings.ProximityArrows, false);
             Expect("rear mirror", GameSettings.RearMirror, false);
+            Expect("invulnerability", GameSettings.InvulnerabilityNames[GameSettings.Invulnerability], GameSettings.InvulnerabilityNames[Invulnerability]);
+            Expect("the race reads the invulnerability the menu saved", TarmacGauntlet.Raceday.DriveSettings.Invulnerability, TarmacGauntlet.Raceday.Invulnerability.Full);
             Expect("traction control", GameSettings.TractionControlNames[GameSettings.TractionControl], GameSettings.TractionControlNames[TractionControl]);
             for (int i = 2; i < GameSettings.Sliders.Length; i++) Expect(GameSettings.Sliders[i] + " slider", GameSettings.Level(GameSettings.Sliders[i]), SliderAt(i));
             Expect("the listener comes back at the master slider's volume", AudioListener.volume, Volume * Volume);

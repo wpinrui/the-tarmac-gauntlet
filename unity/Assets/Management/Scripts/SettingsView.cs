@@ -53,6 +53,7 @@ namespace TarmacGauntlet.Management
             race.Add(Stepper("Steering help", new[] { "Off", "On" }, GameSettings.SteeringHelp ? 1 : 0, i => GameSettings.SteeringHelp = i == 1));
             race.Add(Stepper("Traction control", GameSettings.TractionControlNames, GameSettings.TractionControl, i => GameSettings.TractionControl = i));
             race.Add(Stepper("Opposite lock assist", new[] { "Off", "On" }, GameSettings.OppositeLock ? 1 : 0, i => GameSettings.OppositeLock = i == 1));
+            race.Add(Stepper("Invulnerability", GameSettings.InvulnerabilityNames, GameSettings.Invulnerability, i => GameSettings.Invulnerability = i, "long-value"));
             race.Add(Stepper("Track map", new[] { "Off", "On" }, GameSettings.TrackMap ? 1 : 0, i => GameSettings.TrackMap = i == 1));
             race.Add(Stepper("Racing line", new[] { "Off", "Corners", "Full" }, GameSettings.RacingLine, i => GameSettings.RacingLine = i));
             race.Add(Stepper("Proximity arrows", new[] { "Off", "On" }, GameSettings.ProximityArrows ? 1 : 0, i => GameSettings.ProximityArrows = i == 1));
@@ -142,7 +143,8 @@ namespace TarmacGauntlet.Management
             return row;
         }
 
-        private static VisualElement Stepper(string label, string[] options, int index, Action<int> set)
+        /// <param name="stepperClass">An extra class for the stepper, such as long-value for options too long for the usual width.</param>
+        private static VisualElement Stepper(string label, string[] options, int index, Action<int> set, string stepperClass = null)
         {
             VisualElement row = Setting(label);
             int current = Mathf.Clamp(index, 0, Mathf.Max(0, options.Length - 1));
@@ -158,6 +160,7 @@ namespace TarmacGauntlet.Management
                     set(current);
                     Draw();
                 });
+                if (stepperClass != null) next.AddToClassList(stepperClass);
                 if (stepper != null) row.Remove(stepper);
                 row.Add(stepper = next);
             }
