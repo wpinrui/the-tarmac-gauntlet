@@ -191,8 +191,8 @@ namespace TarmacGauntlet.Management.Editor
 
         /// <summary>
         /// The game makes its URP Lit materials in code, so the build only keeps the Lit variants some built material
-        /// uses. One material per mix of Lit.cs modes and emission, in a Resources folder, keeps every one the game
-        /// can ask for.
+        /// uses. One material per mix of Lit.cs modes and emission, and one for the grass, in a Resources folder, keeps
+        /// every one the game can ask for.
         /// </summary>
         private static void FillLitVariants()
         {
@@ -214,6 +214,10 @@ namespace TarmacGauntlet.Management.Editor
                 if (emission) m.EnableKeyword("_EMISSION");
                 AssetDatabase.CreateAsset(m, $"{folder}/{surface}{(normal ? "Normal" : "")}{(metallic ? "Metallic" : "")}{(emission ? "Emission" : "")}.mat");
             }
+            // The grass the night's lamps light as grass (Lit.GrassKeyword): opaque, with nothing else.
+            var grass = new Material(Lit.Shader);
+            grass.EnableKeyword(Lit.GrassKeyword);
+            AssetDatabase.CreateAsset(grass, $"{folder}/OpaqueGrass.mat");
             AssetDatabase.SaveAssets();
         }
 
