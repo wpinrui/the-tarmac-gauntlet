@@ -19,6 +19,7 @@ NOSE, TAIL = 2.50, -2.50
 SILL = 0.20                       # the paint's lowest band starts here, under the door bottoms
 FRONT_DOOR = (1.00, -0.19)        # z of its front and rear shut lines
 REAR_DOOR = (-0.19, -1.23)
+LOWER = 0.4725                    # the lower pinstripe's centre line
 
 
 def belt(z):
@@ -38,10 +39,11 @@ def logo(path, ink, band, text):
     return path
 
 
-def belt_line(lv, bend, t=0.025):
-    """The shoulder pinstripe: along the belt from the tail, then angled down from bend (z) to
-    end in the top of the front wheel arch, where the arch cuts it off."""
-    pts = [(TAIL, belt(TAIL) - 0.07), (bend, belt(bend) - 0.07), (1.42, 0.60)]
+def belt_line(lv, bend, back=(-1.75, -2.20), t=0.025):
+    """The shoulder pinstripe along the belt. At the front it angles down from bend (z) and ends
+    in the top of the front wheel arch, where the arch cuts it off. At the back it angles down
+    behind the rear wheel, under the tail lamp, and runs into the lower pinstripe."""
+    pts = [(TAIL - 0.2, LOWER), (back[1], LOWER), (back[0], belt(back[0]) - 0.07), (bend, belt(bend) - 0.07), (1.42, 0.60)]
     top, bot = [], []
     for i, (z, y) in enumerate(pts):
         a = pts[max(i - 1, 0)]
@@ -81,7 +83,7 @@ def end_diamond(lv, cx, cy, r, fill):
         lv.poly(view, [(cx + r, cy, 0), (cx, cy + r, 0), (cx - r, cy, 0), (cx, cy - r, 0)], fill)
 
 
-def vueltiao(bend=1.15):
+def vueltiao(bend=0.80, back=(-1.75, -2.20)):
     """The sombrero vueltiao: cream cane with a black woven band of pintas round the sills."""
     dark = logo(MARKS / "condor-dark.svg", BLK, CRM, BLK)
     lv = Livery(VIEWS, CRM)
@@ -103,9 +105,9 @@ def vueltiao(bend=1.15):
             end_diamond(lv, sx, y0 + h / 2, h * 0.12, INK)
         x += step
     # pinstripes: one over the band, one along the belt
-    side_band(lv, 0.46, 0.485, INK)
+    side_band(lv, LOWER - 0.0125, LOWER + 0.0125, INK)
     end_band(lv, 0.46, 0.485, INK)
-    belt_line(lv, bend)
+    belt_line(lv, bend, back)
     # the roof carries the hat's rings
     for inset, t in ((0.04, 0.06), (0.14, 0.035)):
         x0, z0, z1 = 0.66 - inset, 0.33 - inset, -1.26 + inset
@@ -153,7 +155,7 @@ def carnaval():
 
 
 DESIGNS = {"vueltiao": vueltiao, "carnaval": carnaval,
-           "vueltiao-door": lambda: vueltiao(0.80)}
+           "vueltiao-steep": lambda: vueltiao(back=(-1.85, -2.15))}
 
 if __name__ == "__main__":
     for name, fn in DESIGNS.items():
