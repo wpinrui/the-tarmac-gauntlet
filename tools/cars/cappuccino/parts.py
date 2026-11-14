@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import bpy
+from mathutils import Matrix  # noqa: E402
 from shapely.geometry import Point, Polygon, box as sbox
 from shapely import affinity
 from shapely.ops import unary_union
@@ -22,6 +23,7 @@ TYRE_R, TYRE_W, RIM_R = R["tyre"]["r"], R["tyre"]["w"], R["tyre"]["rim_r"]
 TRACK = 0.775                       # wheel centre plane, half track
 SKIN = 0.022                        # panel thickness round the cabin
 GAP = 0.0025                        # half the shut line gap round each opening panel
+FLOOR = float(rows.z_of(0.03)) + 0.13   # cabin floor, above the sills
 X, Z, W = rows.x_of, rows.z_of, rows.w_of
 DOORS = {}
 OPTION_GROUPS = {"rim": "Rims", "badgef": "Front badge", "badger": "Rear badge", "name": "Name"}
@@ -128,21 +130,55 @@ def half_to_full(pts):
 
 # ---------------------------------------------------------------- body
 
-def cut(target, other, op="DIFFERENCE"):
-    """A boolean on a large shell: the exact mode first, and the hole tolerant mode again from
-    a copy when the exact one loses most of the shell."""
+def _volume(ob):
+    import bmesh
+    bm = bmesh.new(); bm.from_mesh(ob.data)
+    v = bm.calc_volume(signed=True)
+    bm.free()
+    return v
+
+
+_exact = B.boolean
+
+
+def safe_boolean(target, other, op, tolerant=False):
+    """Blender's exact boolean can quietly lose a large shell or skip a cut. Check the result's
+    volume against what the operation allows, and run it again in the hole tolerant mode, then
+    with the cutter nudged a hair, when it is wrong."""
+    from mathutils import Vector
+    from mathutils.bvhtree import BVHTree
+    v0, vo = _volume(target), _volume(other)
+    dg = bpy.context.evaluated_depsgraph_get()
+    touch = bool(BVHTree.FromObject(target, dg).overlap(BVHTree.FromObject(other, dg)))
     keep_t = target.data.copy()
-    keep_o = other.copy(); keep_o.data = other.data.copy()
-    bpy.context.scene.collection.objects.link(keep_o)
-    n0 = len(target.data.polygons)
+    keep_o = other.data.copy()
+    tries = [(tolerant, 0.0), (True, 0.0), (False, 0.0004), (True, 0.0007)]
+    for i, (tol, nudge) in enumerate(tries):
+        if i:
+            target.data = keep_t.copy()
+            other = bpy.data.objects.new(other_name, keep_o.copy())
+            bpy.context.scene.collection.objects.link(other)
+            other.data.transform(__import__("mathutils").Matrix.Translation((nudge, nudge * 0.7, nudge * 0.4)))
+        other_name = other.name
+        _exact(target, other, op, tol)
+        v1 = _volume(target)
+        if op == "DIFFERENCE":
+            ok = v0 - vo - 1e-6 <= v1 <= v0 + 1e-6 and (not touch or len(target.data.polygons) > 0)
+        elif op == "INTERSECT":
+            ok = -1e-6 <= v1 <= min(v0, vo) + 1e-6 and (not touch or v1 > 1e-7)
+        else:
+            ok = v1 >= max(v0, vo) - 1e-6
+        if ok:
+            return
+        print("boolean retry", op, target.name, other_name, round(v0, 5), round(vo, 5), "->", round(v1, 5))
+    print("boolean failed", op, target.name, other_name)
+
+
+B.boolean = safe_boolean
+
+
+def cut(target, other, op="DIFFERENCE"):
     B.boolean(target, other, op)
-    if len(target.data.polygons) < 0.5 * n0:
-        print("tolerant", target.name, keep_o.name)
-        target.data = keep_t
-        B.boolean(target, keep_o, op, tolerant=True)
-    else:
-        bpy.data.objects.remove(keep_o)
-        bpy.data.meshes.remove(keep_t)
 
 
 def outer():
@@ -161,10 +197,15 @@ def cabin(ob):
     x0, x1 = R["screen"]["base"] + 0.04, float(X(1.66))
     v, f = close_rings(body.inner_skin(x0, x1, SKIN))
     inner = B.make("cabin", v, f, "interior")
-    keep = prism("cabin_box", sbox(x1 - 1, 0.34, x0 + 1, 3.0), "y", -1.2, 1.2)
+    keep = prism("cabin_box", sbox(x1 - 1, FLOOR, x0 + 1, 3.0), "y", -1.2, 1.2)
     B.boolean(inner, keep, "INTERSECT")
-    for t in arch_tub("tub", AX_R, 0.05, 0.40) + arch_tub("tubf", AX_F, 0.05, 0.40):
-        B.boolean(inner, t, "DIFFERENCE")
+    r = R["arch_r"] + 0.05
+    for ax in (AX_F, AX_R):
+        for s in (1, -1):
+            v, f = lathe([(r, 0.40 * s), (r, 1.5 * s), (0.01, 1.5 * s), (0.01, 0.40 * s)], n=48, axis="y")
+            t = B.make("tub", v, f, "interior")
+            t.data.transform(Matrix.Translation((ax, 0, AX_Z)))
+            B.boolean(inner, t, "DIFFERENCE")
     inner.name = "cabin"
     return inner
 
@@ -200,11 +241,14 @@ def bonnet_outline():
 
 def hatch_outline():
     """Hatch shut line on the rear view (y, z): below the roof's rear edge, down the sides of
-    the glass, in between the tail lamps and across above the bumper."""
-    half = [(0.0, .962), (0.40, .958), (0.50, .945), (0.535, .85), (0.53, .76), (0.50, .70), (0.40, .672),
-            (0.375, .62), (0.37, .52), (0.36, .45), (0.0, .45)]
+    the glass, in between the tail lamps and across above the bumper. One smooth closed curve
+    through these points."""
+    from geom import catmull_closed
+    half = [(0.0, .958), (0.30, .956), (0.46, .948), (0.515, .925), (0.535, .86), (0.532, .77), (0.51, .715),
+            (0.45, .68), (0.395, .645), (0.378, .58), (0.372, .50), (0.355, .455), (0.30, .45), (0.0, .45)]
     pts = [(float(W(w)), float(Z(z))) for w, z in half]
-    return Polygon(pts + [(-y, z) for y, z in pts[-2:0:-1]]).buffer(0)
+    loop = pts + [(-y, z) for y, z in pts[-2:0:-1]]
+    return Polygon(catmull_closed(loop, 8)).buffer(0)
 
 
 def paint_jambs(ob, outline, sign):
@@ -296,15 +340,15 @@ def interior(cab, opts):
     parts = []
     parts.append(boxob("firewall", x_fw - 0.02, x_fw + 0.01, -0.9, 0.9, 0.30, 1.2, "interior"))
     parts.append(boxob("dash", x_fw - 0.42, x_fw + 0.01, -0.9, 0.9, 0.78, 1.04, "interior"))
-    parts.append(boxob("floor", -2.2, x_fw + 0.01, -0.9, 0.9, 0.30, 0.38, "interior"))
+    parts.append(boxob("floor", -2.2, x_fw + 0.01, -0.9, 0.9, FLOOR - 0.04, FLOOR + 0.04, "interior"))
     for s in (1, -1):
         y = 0.37 * s
-        parts.append(boxob(f"seat_base_{s}", x_seat - 0.28, x_seat + 0.24, y - 0.24, y + 0.24, 0.37, 0.52, "seat"))
-        back = boxob(f"seat_back_{s}", x_seat - 0.34, x_seat - 0.22, y - 0.24, y + 0.24, 0.50, 1.15, "seat")
-        B.swing([back], (x_seat - 0.28, y - 1, 0.50), (x_seat - 0.28, y + 1, 0.50), 12)
+        parts.append(boxob(f"seat_base_{s}", x_seat - 0.28, x_seat + 0.24, y - 0.24, y + 0.24, FLOOR + 0.03, FLOOR + 0.18, "seat"))
+        back = boxob(f"seat_back_{s}", x_seat - 0.34, x_seat - 0.22, y - 0.24, y + 0.24, FLOOR + 0.16, FLOOR + 0.81, "seat")
+        B.swing([back], (x_seat - 0.28, y - 1, FLOOR + 0.16), (x_seat - 0.28, y + 1, FLOOR + 0.16), 12)
         parts.append(back)
-    parts.append(boxob("rear_seat", float(X(0.95)), float(X(0.62)), -0.62, 0.62, 0.37, 0.55, "seat"))
-    rb = boxob("rear_back", float(X(1.05)), float(X(0.93)), -0.62, 0.62, 0.50, 1.02, "seat")
+    parts.append(boxob("rear_seat", float(X(0.95)), float(X(0.62)), -0.62, 0.62, FLOOR + 0.03, FLOOR + 0.21, "seat"))
+    rb = boxob("rear_back", float(X(1.05)), float(X(0.93)), -0.62, 0.62, FLOOR + 0.16, FLOOR + 0.68, "seat")
     parts.append(rb)
     for p in parts:
         clip = cab.copy(); clip.data = cab.data.copy()
@@ -363,22 +407,47 @@ def quarter(sign, front):
     return B.frame(-d * 4 + [0, 0, 0.6], u, v, d)
 
 
+def _open_chain(poly, drop):
+    """The outline of poly as one open chain, with the points drop(p) removed: the run of
+    kept points, started just after the dropped stretch."""
+    pts = np.array(poly.exterior.coords)[:-1]
+    if poly.exterior.is_ccw:
+        pts = pts[::-1]
+    gone = np.array([drop(q) for q in pts])
+    k = int(np.argmax(gone))
+    pts, gone = np.roll(pts, -k, axis=0), np.roll(gone, -k)
+    j = int(np.argmin(gone))
+    return [q for q in pts[j:] if not drop(q)]
+
+
 def lamp_region(bvh, side_pts, face_pts, sign, front):
-    """A lamp traced on two views (the side, and the front or rear), carried onto the skin
-    and seen together from the quarter, where it wraps the corner."""
-    f = (FRONT if front else REAR)
+    """A lamp traced on two views, carried onto the skin and seen from the quarter, where it
+    wraps the corner. The side trace is kept where the body faces sideways, the front or rear
+    trace where it faces that way, and the two are joined into one outline."""
+    f = FRONT if front else REAR
     fr_q = quarter(sign, front)
-    shapes = []
-    for pts, fr in ((side_pts, side_frame(sign)), (face_pts, f)):
-        poly = Polygon(pts).buffer(0)
+    xc = float(X(-1.62)) if front else float(X(1.58))
+    side = Polygon(dense(Polygon(side_pts).buffer(0), 0.006)).buffer(0)
+    zmid = side.centroid.y
+    wc = abs(B.cast(bvh, side_frame(sign), xc, zmid)[0][1]) - 0.004
+    behind = (lambda q: q[0] > xc) if front else (lambda q: q[0] < xc)
+    outer = lambda q: abs(q[0]) > wc
+    chains = []
+    for pts, fr, drop in ((_open_chain(side, behind), side_frame(sign), None),
+                          (_open_chain(Polygon(dense(Polygon(face_pts).buffer(0), 0.006)).buffer(0), outer), f, None)):
         q = []
-        for p in dense(poly, 0.006):
+        for p in pts:
             loc, _n = B.cast(bvh, fr, *p)
             if loc is not None:
                 o, u, v, d = fr_q
                 q.append(((loc - o).dot(u), (loc - o).dot(v)))
-        shapes.append(Polygon(q).buffer(0.002).buffer(-0.002))
-    return fr_q, unary_union(shapes).buffer(0.003).buffer(-0.003)
+        chains.append(np.array(q))
+    a, c = chains
+    # join the chains whichever way round gives one clean outline, not a bow tie
+    joins = [Polygon(np.vstack([a, cc])) for cc in (c, c[::-1])]
+    poly = max(joins, key=lambda g: (g.is_valid, g.buffer(0).area))
+    # the two traces meet with small steps; the hull of both reads as one smooth lamp
+    return fr_q, Polygon(dense(poly.buffer(0).convex_hull, 0.006))
 
 
 def lamps(bvh):
@@ -420,10 +489,9 @@ def grille(bvh):
     B.lay(bvh, "grille", band, FRONT, -0.003, 0.004, "trim", 0.012)
     zs = [z for _w, z in R["grille"]]
     z0, z1 = min(zs), max(zs)
-    for k, t in enumerate((0.35, 0.65)):
-        z = z0 + (z1 - z0) * t
-        slat = sbox(-W(0.30), z - 0.004, W(0.30), z + 0.004)
-        B.lay(bvh, f"grille_slat_{k}", slat, FRONT, 0.0035, 0.008, "chrome", 0.006)
+    z = (z0 + z1) / 2
+    slat = sbox(-W(0.38), z - 0.003, W(0.38), z + 0.003)
+    B.lay(bvh, "grille_slat", slat, FRONT, 0.0035, 0.007, "lamp_housing", 0.006)
     intake = half_to_full(R["intake"])
     B.lay(bvh, "intake", intake, FRONT, -0.003, 0.004, "trim", 0.025)
     zs = [z for _w, z in R["intake"]]

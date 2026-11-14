@@ -3,16 +3,16 @@ of the model Ivan supplied (side, front, rear, top on a plain background, 500 px
 unit). Points are read in render units: s along the car (front -), z up, w half width.
 Writes rows.json in build space: metres, x forward from mid wheelbase, y left, z up.
 
-Published: wheelbase 2578 mm, length 4256 mm, width 1810 mm. Tyres 205/55 R16 (Ivan: no low
-profile tyres)."""
+Published: wheelbase 2578 mm, length 4256 mm, width 1810 mm. Tyres 235/50 R18 (Ivan: no low
+profile tyres, but filling the arches)."""
 import json
 from pathlib import Path
 
 import numpy as np
 
 WHEELBASE, LENGTH, WIDTH = 2.578, 4.256, 1.810
-TYRE_W, RIM_D = 0.205, 16 * 0.0254
-TYRE_R = RIM_D / 2 + 0.55 * TYRE_W
+TYRE_W, RIM_D, PROFILE = 0.235, 18 * 0.0254, 0.50
+TYRE_R = RIM_D / 2 + PROFILE * TYRE_W
 
 # wheel centres on the side render
 S_FRONT, S_REAR, Z_HUB = -1.0345, 1.1875, 0.123
@@ -129,8 +129,8 @@ TAIL_REAR = [(0.40, .535), (0.42, .57), (0.45, .60), (0.50, .625), (0.55, .638),
              (0.68, .635), (0.70, .62), (0.715, .60), (0.72, .57), (0.715, .545), (0.70, .525), (0.65, .515),
              (0.60, .51), (0.55, .512), (0.50, .515), (0.45, .52), (0.41, .528)]
 
-# Upper grille band and lower intake on the front render (w, z), centre to the side.
-GRILLE = [(0.0, .442), (0.34, .443), (0.41, .447), (0.42, .40), (0.40, .362), (0.33, .373), (0.0, .375)]
+# Upper grille band (centre to the headlamp's inner end) and lower intake on the front render (w, z).
+GRILLE = [(0.0, .442), (0.40, .446), (0.40, .378), (0.0, .375)]
 INTAKE = [(0.0, .255), (0.30, .258), (0.62, .262), (0.66, .258), (0.69, .22), (0.70, .17), (0.69, .14),
           (0.66, .128), (0.60, .115), (0.40, .10), (0.20, .10), (0.0, .10)]
 # Rear bumper slots (w, z), lit as the rain light.
