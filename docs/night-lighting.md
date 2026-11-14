@@ -48,7 +48,8 @@ All of it lives in `unity/Assets/Raceday/Scripts/Night/` and `unity/Assets/Rende
   the tail lamps at night, and the brake lamps whenever a car brakes, all well over the bloom's threshold, so each shows
   a halo. The night adds `NightBudget.Bloom` to the bloom's intensity. Nothing lamp-lit is meant to bloom, so only the
   lamps do. The pit building's windows glow in each room's own light, warm or cool (`PitComplexBuilder.WindowLight`),
-  and the brightest just reach the threshold, so they bloom slightly. None of them light anything.
+  and the brightest only just pass the threshold, so they bloom faintly. At night the glass loses most of its sheen
+  (`NightBudget.WindowSheen`), so the floodlights on the roof above it do not glare off it. None of them light anything.
 - **Sheen.** The track shader's full Fresnel highlight is applied to the sun and the moon only. On the lamps it turned
   the whole floodlit road white, because their light grazes the road from every side at once. The lamps keep URP's
   own softer shine.
