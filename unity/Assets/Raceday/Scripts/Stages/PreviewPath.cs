@@ -6,7 +6,7 @@ namespace TarmacGauntlet.Raceday
     /// <summary>
     /// Where the race preview's camera goes (<see cref="BroadcastIntro"/>), with no Unity objects so it can be checked
     /// outside Unity. The opening shot rises over the start line. The flyover runs one lap above the track in
-    /// <see cref="Duration"/>, slowing for each bend so its heading never turns faster than <see cref="TurnRate"/>, looking down the road ahead. The track is smoothed under it, so
+    /// <see cref="Duration"/> at one even pace, <see cref="Speed"/>, slow corners included, looking down the road ahead. The track is smoothed under it, so
     /// it sweeps through a hairpin rather than turning on the spot. Each corner shot swings slowly round a corner from
     /// its outside, looking at its middle. Every shot keeps clear of the ground.
     /// </summary>
@@ -29,18 +29,14 @@ namespace TarmacGauntlet.Raceday
         public const float Smoothing = 90f;
         /// <summary>The least height above the ground for any shot, m.</summary>
         public const float Clearance = 25f;
-        /// <summary>The flyover's speed on the straights, m/s.</summary>
-        private const float Fast = 320f;
-        /// <summary>The fastest the flyover's heading turns, degrees a second: it slows for a bend to keep to it.</summary>
-        private const float TurnRate = 60f;
-        /// <summary>How hard the flyover speeds up and slows down, m/s².</summary>
-        private const float Accel = 100f;
+        /// <summary>The flyover's speed along the track, m/s: one even pace for the whole lap, slow corners included.</summary>
+        private const float Speed = 220f;
         /// <summary>The flyover's heading is measured over this far either side of a point, m.</summary>
         private const float Bend = 20f;
         /// <summary>A corner is called out this far before it starts, m.</summary>
         public const float CallOut = 250f;
         /// <summary>A corner's call stays up this far past its end, m.</summary>
-        public const float CallOff = 100f;
+        public const float CallOff = 160f;
 
         /// <summary>The corner shot's distance from the corner, its height, and how far it swings round, degrees.</summary>
         private const float OrbitRadius = 110f, OrbitHeight = 40f, OrbitSwing = 40f;
@@ -70,36 +66,8 @@ namespace TarmacGauntlet.Raceday
                 smooth[k] = sum / (2 * half + 1);
                 sum += circuit.Centre[circuit.Wrap(k + half + 1)] - circuit.Centre[circuit.Wrap(k - half)];
             }
-            // As fast as the bend of the smoothed track lets the heading keep to TurnRate, then eased in and out of each bend.
-            var speed = new float[n];
-            int m = Mathf.Max(1, Mathf.RoundToInt(Bend / step));
-            float rate = TurnRate * Mathf.Deg2Rad;
-            for (int k = 0; k < n; k++)
-            {
-                Vector3 a = smooth[k] - smooth[circuit.Wrap(k - m)], b = smooth[circuit.Wrap(k + m)] - smooth[k];
-                float turn = Mathf.Abs(Mathf.DeltaAngle(Mathf.Atan2(a.x, a.z) * Mathf.Rad2Deg, Mathf.Atan2(b.x, b.z) * Mathf.Rad2Deg)) * Mathf.Deg2Rad;
-                float length = (a.magnitude + b.magnitude) / 2f;
-                speed[k] = turn > 1e-4f ? Mathf.Min(Fast, rate * length / turn) : Fast;
-            }
-            // The camera looks along the heading Lead ahead, so it slows for that bend too.
-            int lead = Mathf.RoundToInt(Lead / step);
-            var bend = (float[])speed.Clone();
-            for (int k = 0; k < n; k++) speed[k] = Mathf.Min(bend[k], bend[circuit.Wrap(k + lead)]);
-            for (int pass = 0; pass < 2; pass++)
-            {
-                for (int k = 1; k < 2 * n; k++)
-                {
-                    int i = k % n, prev = (k - 1) % n;
-                    speed[i] = Mathf.Min(speed[i], Mathf.Sqrt(speed[prev] * speed[prev] + 2f * Accel * step));
-                }
-                for (int k = 2 * n - 2; k >= 0; k--)
-                {
-                    int i = k % n, next = (k + 1) % n;
-                    speed[i] = Mathf.Min(speed[i], Mathf.Sqrt(speed[next] * speed[next] + 2f * Accel * step));
-                }
-            }
             clock = new float[n + 1];
-            for (int k = 0; k < n; k++) clock[k + 1] = clock[k] + step / Mathf.Max(speed[k], 1f);
+            for (int k = 0; k < n; k++) clock[k + 1] = clock[k] + step / Speed;
             Duration = clock[n];
         }
 
@@ -141,6 +109,28 @@ namespace TarmacGauntlet.Raceday
             Vector3 target = at + heading * Ahead;
             target.y = Smooth(d + Ahead).y;
             return new Pose { Position = at, Target = target };
+        }
+
+        /// <summary>How fast the camera's heading eases towards where a shot looks, 1/s.</summary>
+        public const float Aim = 3f;
+        /// <summary>The fastest the camera's heading turns, degrees a second: through a hairpin it pans round rather than whips.</summary>
+        public const float TurnRate = 90f;
+
+        /// <summary>
+        /// The camera's heading a frame on: eased from <paramref name="from"/> towards <paramref name="to"/>, both unit vectors,
+        /// turning round no faster than <see cref="TurnRate"/>. The flyover keeps its pace; only the look lags.
+        /// </summary>
+        public static Vector3 Turn(Vector3 from, Vector3 to, float dt)
+        {
+            Vector3 eased = Vector3.Lerp(from, to, 1f - Mathf.Exp(-Aim * dt)).normalized;
+            float fromYaw = Mathf.Atan2(from.x, from.z) * Mathf.Rad2Deg, yaw = Mathf.Atan2(eased.x, eased.z) * Mathf.Rad2Deg;
+            float turn = Mathf.DeltaAngle(fromYaw, yaw), most = TurnRate * dt;
+            if (eased.sqrMagnitude < 1e-6f) eased = from;
+            if (Mathf.Abs(turn) <= most) return eased;
+            // Too fast: turn the most allowed, keeping the eased pitch.
+            float y = (fromYaw + Mathf.Sign(turn) * most) * Mathf.Deg2Rad;
+            float flat = Mathf.Sqrt(Mathf.Max(0f, 1f - eased.y * eased.y));
+            return new Vector3(Mathf.Sin(y) * flat, eased.y, Mathf.Cos(y) * flat);
         }
 
         /// <summary>The opening shot, u from 0 to 1 through it: rising and closing on the start line from behind.</summary>

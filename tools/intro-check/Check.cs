@@ -53,7 +53,7 @@ static class Check
     /// <summary>Runs a shot at 60 fps with the stage's eased aim: least clearance, share of frames hidden, fastest turn and move.</summary>
     static void Shot(string name, Func<float, PreviewPath.Pose> at, float length, Func<float, Vector3> subject = null)
     {
-        const float Dt = 1f / 60f, Aim = 3f;
+        const float Dt = 1f / 60f;
         float least = float.MaxValue, turn = 0f, speed = 0f, turnAt = 0f;
         int hidden = 0, frames = 0;
         Vector3 aim = Vector3.zero, was = Vector3.zero;
@@ -61,9 +61,9 @@ static class Check
         for (float t = 0f; t <= length; t += Dt, frames++)
         {
             PreviewPath.Pose p = at(t);
-            // The stage eases the camera's heading, not its target, so a target swinging round a hairpin can't spin it.
+            // The stage's heading: eased, and turning no faster than PreviewPath.TurnRate.
             Vector3 want = (p.Target - p.Position).normalized;
-            aim = frames == 0 ? want : Vector3.Lerp(aim, want, 1f - Mathf.Exp(-Aim * Dt)).normalized;
+            aim = frames == 0 ? want : PreviewPath.Turn(aim, want, Dt);
             float y = Yaw(aim);
             if (frames > 0)
             {
@@ -80,7 +80,7 @@ static class Check
         float share = hidden / (float)frames;
         Expect(least >= PreviewPath.Clearance - 0.01f, name + " keeps clear of the ground", $"least {least:0.0} m");
         Expect(share <= 0.02f, name + (subject == null ? " sees its target" : " sees the road ahead"), $"{share:P1} of frames hidden");
-        Expect(turn <= 60f, name + " turns smoothly", $"fastest turn {turn:0} deg/s at {turnAt:0.00} s, fastest move {speed:0} m/s");
+        Expect(turn <= PreviewPath.TurnRate + 0.5f, name + " turns smoothly", $"fastest turn {turn:0} deg/s at {turnAt:0.00} s, fastest move {speed:0} m/s");
     }
 
     static void Path()
