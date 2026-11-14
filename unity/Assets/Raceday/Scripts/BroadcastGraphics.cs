@@ -14,9 +14,7 @@ namespace TarmacGauntlet.Raceday
     /// The bottom graphics share one baseline, keep right of the timing tower, and the driver strip and
     /// pit timer rise above the battle strip rather than sit over it.
     /// The track map, right, shows during helicopter shots, and always with Track map on in the settings.
-    /// While you drive your own car the director doesn't have the camera, and only the graphics that involve you show:
-    /// the battle strip while you fight a car of your class, and the pit timer during your stop. Both sit centred
-    /// above the driving HUD's dial and keep clear of the pit panel. Laid out on a 1920 by 1080 screen.
+    /// Off the broadcast none of it shows. Laid out on a 1920 by 1080 screen.
     /// </summary>
     public sealed class BroadcastGraphics : MonoBehaviour
     {
@@ -72,23 +70,9 @@ namespace TarmacGauntlet.Raceday
             map = new TrackMap(Circuit, 300, 400, 20f, 5f);
         }
 
-        /// <summary>True while you drive your own car: the driving HUD is up and the director doesn't have the camera.</summary>
-        private bool Driving => Director != null && !Director.OnAir && Player >= 0 && Player < Cars.Length && Cars[Player] != null && DriveHud.Clearance > 0f;
-
-        /// <summary>Your fight this frame while you drive, front car then chasing car, or -1 for none.</summary>
-        private int ownFront = -1, ownBack = -1;
-
         private void Update()
         {
-            if (Director == null) return;
-            if (Driving)
-            {
-                (ownFront, ownBack) = OwnBattle();
-                Trend(ownFront, ownBack);
-                return;
-            }
-            (ownFront, ownBack) = (-1, -1);
-            if (!Director.OnAir) return;
+            if (Director == null || !Director.OnAir) return;
             // A new story: name the driver the first time their car is on air in a stint.
             if (Director.Stories != stories)
             {
@@ -124,41 +108,6 @@ namespace TarmacGauntlet.Raceday
             }
         }
 
-        /// <summary>
-        /// Your fight, as the director judges one: the nearest car of your class ahead or behind on the track,
-        /// within <see cref="BroadcastDirector.BattleGap"/>, or <see cref="BroadcastDirector.LeadBattleGap"/> for the
-        /// class lead. The closer of the two when both are near. None while you are in the pit lane.
-        /// </summary>
-        private (int front, int back) OwnBattle()
-        {
-            int me = Player;
-            if (!Live(me) || Cars[me].InPitLane || PastFlag(me)) return (-1, -1);
-            float mine = Cars[me].Traffic.Distance;
-            int ahead = -1, behind = -1;
-            float toAhead = float.MaxValue, toBehind = float.MaxValue;
-            for (int i = 0; i < Cars.Length; i++)
-            {
-                if (i == me || !Live(i) || Cars[i].InPitLane || PastFlag(i) || Classes[i] != Classes[me]) continue;
-                float d = Cars[i].Traffic.Distance - mine;
-                if (d > 0f && d < toAhead) (toAhead, ahead) = (d, i);
-                else if (d <= 0f && -d < toBehind) (toBehind, behind) = (-d, i);
-            }
-            float aheadSeconds = ahead >= 0 ? Gap(ahead, me) : float.MaxValue;
-            float behindSeconds = behind >= 0 ? Gap(me, behind) : float.MaxValue;
-            bool aheadIn = ahead >= 0 && aheadSeconds <= Within(ahead);
-            bool behindIn = behind >= 0 && behindSeconds <= Within(me);
-            if (aheadIn && (!behindIn || aheadSeconds <= behindSeconds)) return (ahead, me);
-            if (behindIn) return (me, behind);
-            return (-1, -1);
-        }
-
-        /// <summary>How close a car must be chased for a fight, s: further for a fight for the class lead.</summary>
-        private float Within(int front) => ClassLeader(front) ? BroadcastDirector.LeadBattleGap : BroadcastDirector.BattleGap;
-
-        private bool Live(int i) => Cars[i] != null && Cars[i].isActiveAndEnabled;
-
-        private bool PastFlag(int i) => Director.Flagged != null && Director.Flagged(i);
-
         private float Gap(int front, int back) =>
             (Cars[front].Traffic.Distance - Cars[back].Traffic.Distance) / Mathf.Max(Cars[back].Traffic.Speed, 10f);
 
@@ -170,8 +119,7 @@ namespace TarmacGauntlet.Raceday
         private void DrawGui()
         {
             if (Event.current.type != EventType.Repaint || Director == null) return;
-            bool driving = Driving;
-            if (!driving && !Director.OnAir) return;
+            if (!Director.OnAir) return;
             if (Tower != null && Tower.Hidden || DebugMenu.Bare) return;
             k = Screen.height / 1080f;
             offset = (Screen.width / k - 1920f) / 2f;
@@ -179,16 +127,6 @@ namespace TarmacGauntlet.Raceday
             Rect area = Tower != null ? Tower.Area : Rect.zero;
             tower = area.width > 0f ? new Rect(area.x / k - offset, area.y / k, area.width / k, area.height / k) : Rect.zero;
 
-            if (driving)
-            {
-                // Above the dial, and left of the pit panel while it is open.
-                float bottom = 1080f - DriveHud.Clearance - Spacing;
-                float right = PitPanel.Showing ? Screen.width / k - offset - PitPanel.LeftFromRight - Spacing : float.MaxValue;
-                Rect fight = ownBack >= 0 && Live(ownFront) && Live(ownBack) ? Battle(ownFront, ownBack, bottom, right) : Rect.zero;
-                PitService stop = Cars[Player].Service;
-                if (stop != null) PitTimer(Player, stop, fight, bottom, right);
-                return;
-            }
 
             int s = Director.Subject;
             if (s < 0 || Cars[s] == null) return;
