@@ -18,6 +18,7 @@ sill (0.13 up). Side intake z -0.28 to -0.84, y 0.31 to 0.76. Bonnet z 1.35 to 2
 -0.62 for |x| under 0.37.
 """
 import math
+import re
 import sys
 from pathlib import Path
 
@@ -42,6 +43,9 @@ CHERRY = "#d0103a"
 LEAF = "#2f8a3c"
 AUBERGINE = "#5a2580"
 AUB_HI = "#8a4fb8"
+AMBER = "#f2a531"
+AMBER_DK = "#c27a12"
+FOAM = "#fffaf0"
 
 # ---------------------------------------------------------------- marks, in unit coordinates
 LIPS = ('<path d="M-1,0 C-0.7,-0.35 -0.35,-0.55 -0.12,-0.42 Q0,-0.3 0.12,-0.42 C0.35,-0.55 0.7,-0.35 1,0 '
@@ -74,16 +78,50 @@ def eggplant():
             f'stroke-linecap="round"/>')
 
 
+def beer():
+    """A beer mug: amber glass, a foam head spilling over, a handle on the right."""
+    return (f'<path d="M0.42,-0.25 h0.22 a0.18,0.18 0 0 1 0.18,0.18 v0.36 a0.18,0.18 0 0 1 -0.18,0.18 h-0.22" fill="none" '
+            f'stroke="{AMBER_DK}" stroke-width="0.12"/>'
+            f'<rect x="-0.5" y="-0.45" width="0.95" height="1.2" rx="0.1" fill="{AMBER}"/>'
+            f'<path d="M-0.25,-0.2 v0.75 M0.0,-0.2 v0.75 M0.22,-0.2 v0.75" stroke="{AMBER_DK}" stroke-width="0.06" '
+            f'stroke-linecap="round"/>'
+            f'<path d="M-0.58,-0.4 a0.2,0.2 0 0 1 0.12,-0.36 a0.25,0.25 0 0 1 0.45,-0.08 a0.25,0.25 0 0 1 0.45,0.04 '
+            f'a0.2,0.2 0 0 1 0.1,0.4 v0.12 a0.1,0.1 0 0 1 -0.2,0 a0.1,0.1 0 0 0 -0.2,0 v0.08 a0.1,0.1 0 0 1 -0.2,0 '
+            f'v-0.1 a0.1,0.1 0 0 0 -0.2,0 a0.1,0.1 0 0 1 -0.2,0 Z" fill="{FOAM}"/>')
+
+
+def outlined(svg, width=0.09):
+    """Art with a white outline round its silhouette, width in the art's own units."""
+    return f'<g filter="url(#wo{round(width * 1000)})">{svg}</g>'
+
+
 def logo(script=CREAM, edge=PLUM, lip=LIP, hi=LIP_HI):
     """The team logo: a big lipstick print with the name written across its lower lip.
     Unit: the lips are 2.6 wide; the whole mark is about 2.6 wide and 1.5 tall."""
-    return (f'<g transform="translate(0 -0.22) scale(1.3)">{lips(lip, hi)}</g>'
+    return (f'<g transform="translate(0 -0.22) scale(1.3)" filter="url(#wo70)">{lips(lip, hi)}</g>'
             f'<text x="0" y="0.42" font-family="Pacifico" font-size="0.62" text-anchor="middle" dominant-baseline="central" '
             f'fill="{script}" stroke="{edge}" stroke-width="0.07" paint-order="stroke" stroke-linejoin="round">Sip Vanessa</text>')
 
 
+_filters = {}
+
+
+def white_outline(lv, view, width):
+    """Defines the white-outline filter for this width on a view, once."""
+    key = (id(lv), view, width)
+    if key not in _filters:
+        _filters[key] = True
+        lv.raw(view, f'<defs><filter id="wo{width}" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB">'
+                     f'<feMorphology in="SourceAlpha" operator="dilate" radius="{width / 1000}" result="d"/>'
+                     f'<feFlood flood-color="#ffffff"/><feComposite in2="d" operator="in" result="o"/>'
+                     f'<feMerge><feMergeNode in="o"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>')
+
+
 def put(lv, view, p, size, svg, rotate=0, flip=False):
-    """Unit-coordinate art, size metres per unit, centred on p (car metres)."""
+    """Unit-coordinate art, size metres per unit, centred on p (car metres). Art that asks for a
+    white outline (filter wo<n>) gets the filter defined on that view."""
+    for w in set(re.findall(r"url\(#wo(\d+)\)", svg)):
+        white_outline(lv, view, int(w))
     u, v = lv.uv(view, p)
     sx = -size if flip else size
     lv.raw(view, f'<g transform="translate({u:.4f} {v:.4f}) rotate({rotate}) scale({sx:.4f} {size:.4f})">{svg}</g>')
@@ -121,28 +159,32 @@ def happy_hour():
         return 0.56
     top = scallop_edge(2.5, -2.25, foam_y, 0.035, 0.125)
     lv.side_poly(top + [(-2.25, -0.2), (2.5, -0.2)], CREAM)
-    lv.side_text("CRAFT BEER &amp; BAR FOOD", 0.55, 0.205, 0.075, PLUM, spacing=0.12, font="Bebas")
+    lv.side_text("CRAFT BEER &amp; BAR FOOD", 0.2, 0.205, 0.075, PLUM, spacing=0.12, font="Bebas")
 
-    side_put(lv, 0.16, 0.55, 0.21, logo())
-    lv.side_number(0.84, 0.47, 0.26, 0.2, PLUM)
-    side_put(lv, 0.84, 0.47, 0.155, f'<circle r="1" fill="{CREAM}"/>')
-    # The wink: a cherry pair and an eggplant, up on the rear haunch above the arch.
-    side_put(lv, -1.0, 0.80, 0.1, cherries())
-    side_put(lv, -1.38, 0.80, 0.1, eggplant(), rotate=28)
+    side_put(lv, 0.14, 0.54, 0.21, logo())
+    lv.side_number(0.84, 0.54, 0.26, 0.2, PLUM)
+    side_put(lv, 0.84, 0.54, 0.155, f'<circle r="1" fill="{CREAM}"/>')
+    # The wink: a cherry pair, an eggplant and a beer, in a row on the rear haunch above the arch.
+    side_put(lv, -1.0, 0.78, 0.085, outlined(cherries()))
+    side_put(lv, -1.3, 0.78, 0.085, outlined(eggplant()), rotate=28)
+    side_put(lv, -1.6, 0.76, 0.08, outlined(beer()))
+    side_put(lv, 1.98, 0.42, 0.075, outlined(beer()))
 
     # Top: the logo on the bonnet, read from the nose; the number on the roof.
-    put(lv, "top", (0, 0, 1.86), 0.24, logo(), rotate=-90)
+    put(lv, "top", (0, 0, 1.70), 0.21, logo(), rotate=-90)
     lv.number("top", (0, 0, 0.04), 0.42, 0.3, PLUM, rotate=-90)
     put(lv, "top", (0, 0, 0.04), 0.33, '<circle r="1" fill="#fff3e2"/>')
-    put(lv, "top", (0.62, 0, -1.0), 0.16, cherries(), rotate=-90)
-    put(lv, "top", (-0.62, 0, -1.0), 0.16, eggplant(), rotate=-90)
+    put(lv, "top", (0.62, 0, -0.95), 0.15, outlined(cherries()), rotate=-90)
+    put(lv, "top", (-0.62, 0, -0.95), 0.15, outlined(eggplant()), rotate=-90)
+    for x in (0.62, -0.62):
+        put(lv, "top", (x, 0, -1.4), 0.14, outlined(beer()), rotate=-90)
 
     # Ends: the foam runs round the lower corners; a kiss on the nose, the slogan on the tail.
     for view in ("front", "rear"):
         lv.poly(view, [(-1.2, -0.1, 0), (1.2, -0.1, 0), (1.2, 0.30, 0), (-1.2, 0.30, 0)], CREAM)
-    put(lv, "front", (0.0, 0.62, 0), 0.07, lips())
-    lv.text("rear", "CRAFT BEER &amp; BAR FOOD", (0, 0.6, 0), 0.06, CREAM, spacing=0.12, font="Bebas")
-    put(lv, "rear", (-0.62, 0.42, 0), 0.08, lips(), rotate=-12)
+    put(lv, "front", (0.0, 0.62, 0), 0.07, outlined(lips(), 0.12))
+    lv.text("rear", "CRAFT BEER &amp; BAR FOOD", (0, 0.585, 0), 0.085, CREAM, spacing=0.1, font="Bebas")
+    put(lv, "rear", (-0.62, 0.42, 0), 0.08, outlined(lips(), 0.12), rotate=-12)
     return lv
 
 
