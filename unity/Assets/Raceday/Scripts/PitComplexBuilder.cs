@@ -157,9 +157,9 @@ namespace TarmacGauntlet.Raceday
             Offices(pc.OfficeFrom, pc.OfficeTo);
             for (int g = 0; g < pc.Garages; g++) FitOut(g);
 
-            Emit("Pit building", concrete, m?.Concrete, true);
-            Emit("Pit building glass", glass, m?.Glass, true);
-            Emit("Pit building steel", steel, m?.Steel, true);
+            Emit("Pit building", concrete, m?.Concrete, true, true);
+            Emit("Pit building glass", glass, m?.Glass, true, true);
+            Emit("Pit building steel", steel, m?.Steel, true, true);
             Emit("Garage team colours", team, m?.Palette, false);
             Emit("Garage floor paint", paintFloor, m?.Palette, false);
             Emit("Garage mats", mats, m?.Rubber, false);
@@ -489,10 +489,11 @@ namespace TarmacGauntlet.Raceday
 
         private static float Dot(Vector3 a, Vector3 b) => a.x * b.x + a.y * b.y + a.z * b.z;
 
-        private void Emit(string name, MeshKit kit, Material material, bool shadows)
+        /// <param name="solid">Cars hit it: the building, not the garages' fit-out, where the cars and crews stand.</param>
+        private void Emit(string name, MeshKit kit, Material material, bool shadows, bool solid = false)
         {
             foreach (MeshKit chunk in kit.Indexed().Chunks(ChunkSize))
-                if (!chunk.IsEmpty) parts.Add(new CircuitPart(name, chunk, material, false, shadows));
+                if (!chunk.IsEmpty) parts.Add(new CircuitPart(name, chunk, material, solid, shadows));
         }
     }
 }

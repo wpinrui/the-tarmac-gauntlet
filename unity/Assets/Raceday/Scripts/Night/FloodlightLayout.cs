@@ -124,7 +124,7 @@ namespace TarmacGauntlet.Raceday
         public List<CircuitPart> Build(Material steelMaterial, Material lensMaterial)
         {
             var parts = new List<CircuitPart>();
-            foreach (MeshKit chunk in steel.Chunks(150f)) parts.Add(new CircuitPart("Floodlight steel", chunk, steelMaterial, false, true));
+            foreach (MeshKit chunk in steel.Chunks(150f)) parts.Add(new CircuitPart("Floodlight steel", chunk, steelMaterial, true, true));
             foreach (MeshKit chunk in lenses.Chunks(150f)) parts.Add(new CircuitPart("Floodlight lenses", chunk, lensMaterial, false, false));
             return parts;
         }

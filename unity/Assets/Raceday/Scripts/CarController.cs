@@ -642,6 +642,10 @@ namespace TarmacGauntlet.Raceday
                 into = speed;
                 where = contact.point;
             }
+            // Invulnerability for the car you drive: what it ignores does no damage, and with Full a hard barrier hit
+            // doesn't stop it dead. The bodies still bounce off each other.
+            Invulnerability invulnerable = AiDriving ? Invulnerability.Off : DriveSettings.Invulnerability;
+            if (invulnerable == Invulnerability.Full || (car && invulnerable == Invulnerability.Cars)) return;
             float along = transform.InverseTransformPoint(where).z;
             Hit?.Invoke(into, (float)TarmacGauntlet.Simulation.CarDamage.FrontShare(along, Spec != null ? Spec.HalfWheelbase * 1.5f : 2.25f));
             if (Crashed || !barrier || into < HardHit) return;

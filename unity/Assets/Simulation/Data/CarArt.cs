@@ -62,6 +62,7 @@ namespace TarmacGauntlet.Simulation
             { "Vespro Corse", "Assets/Art/Liveries/VesproCorse" },
             { "Team Tora Racing", "Assets/Art/Liveries/TeamToraRacing" },
             { "Tora GT Works", "Assets/Art/Liveries/ToraGTWorks" },
+            { "Cóndor Racing", "Assets/Art/Liveries/CondorRacing" },
         };
 
         /// <summary>The team's livery folder, or null for a team with no livery yet.</summary>

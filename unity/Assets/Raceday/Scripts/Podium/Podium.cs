@@ -108,7 +108,9 @@ namespace TarmacGauntlet.Raceday
                 if (kit.IsEmpty) continue;
                 var part = new GameObject(name);
                 part.transform.SetParent(transform, false);
-                part.AddComponent<MeshFilter>().sharedMesh = kit.ToMesh(name);
+                Mesh mesh = kit.ToMesh(name);
+                part.AddComponent<MeshFilter>().sharedMesh = mesh;
+                Barriers.FromMesh(part, mesh);
                 var r = part.AddComponent<MeshRenderer>();
                 r.sharedMaterial = byName[name];
                 r.shadowCastingMode = name == "Podium glass" || name == "Podium lamps" ? ShadowCastingMode.Off : ShadowCastingMode.On;
