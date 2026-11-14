@@ -44,9 +44,9 @@ namespace TarmacGauntlet.Raceday
         private int lockedOnboard;
 
         /// <summary>A fight is two cars of a class this close, s.</summary>
-        private const float BattleGap = 0.5f;
+        public const float BattleGap = 0.5f;
         /// <summary>A fight for a class lead counts from this far apart, s.</summary>
-        private const float LeadBattleGap = 1f;
+        public const float LeadBattleGap = 1f;
         /// <summary>The front of a class is its top this many cars: their offs and fights matter most.</summary>
         private const int Front = 3;
         /// <summary>A car slower than this off the track has stopped there, m/s.</summary>

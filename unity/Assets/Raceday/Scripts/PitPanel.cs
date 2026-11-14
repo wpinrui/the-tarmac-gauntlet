@@ -25,6 +25,11 @@ namespace TarmacGauntlet.Raceday
 
         public bool Open { get; private set; }
 
+        /// <summary>True while the panel was drawn last frame, for the broadcast graphics to keep clear of it.</summary>
+        public static bool Showing { get; private set; }
+        /// <summary>The panel's left edge, px on the layout from the right edge of the screen.</summary>
+        public const float LeftFromRight = Right + Width;
+
         private static readonly Color Panel = new Color(12f / 255f, 14f / 255f, 18f / 255f, 0.72f);
         private static readonly Color Red = RaceTower.Hex(0xd8262b);
         private static readonly Color Cap = new Color(1f, 1f, 1f, 0.55f);
@@ -76,9 +81,12 @@ namespace TarmacGauntlet.Raceday
 
         private void DrawGui()
         {
-            if (!Open || !Usable || Event.current.type != EventType.Repaint) return;
+            if (Event.current.type != EventType.Repaint) return;
+            Showing = false;
+            if (!Open || !Usable) return;
             // Hidden over the broadcast, and under live timing, which has the same plan.
             if (DebugMenu.Clean || Hud != null && (Hud.Hidden || !Hud.enabled)) return;
+            Showing = true;
             float k = Screen.height / 1080f;
             Style(k);
 
@@ -196,6 +204,7 @@ namespace TarmacGauntlet.Raceday
 
         private void OnDestroy()
         {
+            Showing = false;
             if (fuel != null) Destroy(fuel);
             if (tyre != null) Destroy(tyre);
             if (helmet != null) Destroy(helmet);
