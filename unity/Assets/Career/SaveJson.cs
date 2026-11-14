@@ -13,7 +13,7 @@ namespace TarmacGauntlet.Career
     public static class SaveJson
     {
         /// <summary>The save format written today. Raise it when the format changes and teach <see cref="Migrate"/> the old one.</summary>
-        public const int Version = 1;
+        public const int Version = 2;
 
         private static readonly JsonSerializerSettings Settings = new JsonSerializerSettings
         {
@@ -53,9 +53,63 @@ namespace TarmacGauntlet.Career
                 ? game
                 : game with { Teams = RaceNumbers.Assign(game.Teams, RaceNumbers.WinnerOf(game.RaceHistory, game.CurrentYear - 1)) };
 
-        /// <summary>Brings an older save up to <see cref="Version"/> in place. Version 1 is the first, so nothing to do yet.</summary>
+        /// <summary>Brings an older save up to <see cref="Version"/> in place.</summary>
         private static void Migrate(JObject root, int version)
         {
+            if (version < 2) DropCutModels(root);
+        }
+
+        /// <summary>
+        /// Format 2 cut the Kaiser Sceptre, Tora Zero and Liberty Fortress. Each one's stand-in keeps its brand and class.
+        /// </summary>
+        private static readonly System.Collections.Generic.Dictionary<string, string> CutModels = new System.Collections.Generic.Dictionary<string, string>
+        {
+            { "e-09", "e-07" },
+            { "c-18", "c-20" },
+            { "a-26", "a-28" },
+        };
+
+        /// <summary>
+        /// Takes the cut models out of an older save. An AI team that ran one moves to its car from today's roster,
+        /// and so do its cars and its past results. Any other car on a cut model becomes its stand-in.
+        /// Market listings for a cut model are dropped.
+        /// </summary>
+        private static void DropCutModels(JObject root)
+        {
+            var teamModel = new System.Collections.Generic.Dictionary<string, string>();
+            foreach (JObject team in (root["Teams"] as JArray)?.OfType<JObject>() ?? Enumerable.Empty<JObject>())
+            {
+                string? modelId = team["ModelId"]?.Value<string>();
+                if (modelId == null || !CutModels.TryGetValue(modelId, out string? standIn)) continue;
+                string name = team["Name"]?.Value<string>() ?? "";
+                string replacement = AiTeamRoster.All.FirstOrDefault(e => e.Name == name)?.ModelId ?? standIn;
+                if (CutModels.ContainsKey(replacement)) replacement = standIn;
+                team["ModelId"] = replacement;
+                string? id = team["Id"]?.Value<string>();
+                if (id != null) teamModel[id] = replacement;
+                foreach (JObject car in (team["Cars"] as JArray)?.OfType<JObject>() ?? Enumerable.Empty<JObject>())
+                    if (CutModels.ContainsKey(car["ModelId"]?.Value<string>() ?? "")) car["ModelId"] = replacement;
+            }
+
+            if (root["CarModels"] is JArray models)
+                foreach (JToken m in models.Where(m => CutModels.ContainsKey(m["Id"]?.Value<string>() ?? "")).ToList()) m.Remove();
+            if (root["CarMarket"] is JObject market)
+                foreach (JProperty list in market.Properties().ToList())
+                    foreach (JToken listing in list.Value.SelectTokens("..ModelId").Where(t => CutModels.ContainsKey(t.Value<string>() ?? "")).ToList())
+                        ListingOf(listing)?.Remove();
+
+            foreach (JToken modelId in root.SelectTokens("..ModelId").Where(t => CutModels.ContainsKey(t.Value<string>() ?? "")).ToList())
+            {
+                string? teamId = modelId.Parent?.Parent?["TeamId"]?.Value<string>();
+                modelId.Replace(teamId != null && teamModel.TryGetValue(teamId, out string? own) ? own : CutModels[modelId.Value<string>()!]);
+            }
+        }
+
+        /// <summary>The listing a ModelId belongs to, when that listing sits in an array.</summary>
+        private static JToken? ListingOf(JToken modelId)
+        {
+            JToken? listing = modelId.Parent?.Parent;
+            return listing?.Parent is JArray ? listing : null;
         }
 
         /// <summary>Teams are player or AI; the JSON names which with a "Kind" field.</summary>

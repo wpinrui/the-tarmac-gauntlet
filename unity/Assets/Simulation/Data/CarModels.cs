@@ -99,7 +99,6 @@ namespace TarmacGauntlet.Simulation
             // --- Class E ---
             new RawCar("e-07", "Liberty Fantasy", CarClass.E, 20_000, new double[] { 24, 26, 82, 78, 32, 86, 88, 42 }, new RawPot(power: 34, fuelEfficiency: 86, handling: 36, tyreDurability: 84, comfort: 46)),
             new RawCar("e-08", "Seorak Hwaeum", CarClass.E, 22_500, new double[] { 22, 24, 86, 82, 62, 94, 88, 50 }, new RawPot(power: 32, fuelEfficiency: 90, handling: 34, tyreDurability: 86, comfort: 74)),
-            new RawCar("e-09", "Liberty Fortress", CarClass.E, 25_000, new double[] { 26, 26, 76, 74, 50, 82, 86, 53 }, new RawPot(power: 36, fuelEfficiency: 80, handling: 38, tyreDurability: 80, comfort: 62)),
             new RawCar("e-10", "Kaiser Oboe", CarClass.E, 27_500, new double[] { 24, 28, 78, 76, 56, 84, 86, 55 }, new RawPot(power: 34, fuelEfficiency: 82, handling: 40, tyreDurability: 82, comfort: 68)),
             new RawCar("e-11", "Liberty Mantle", CarClass.E, 30_000, new double[] { 22, 24, 74, 78, 72, 96, 84, 60 }, new RawPot(power: 32, fuelEfficiency: 78, handling: 34, tyreDurability: 82, comfort: 80)),
 
@@ -112,7 +111,6 @@ namespace TarmacGauntlet.Simulation
             // --- Class C ---
             new RawCar("c-16", "Archer Crescendo", CarClass.C, 190_000, new double[] { 56, 58, 62, 64, 78, 82, 68, 59 }, new RawPot(power: 68, fuelEfficiency: 66, handling: 70, tyreDurability: 70, comfort: 86)),
             new RawCar("c-17", "Kaiser Elevate", CarClass.C, 212_500, new double[] { 58, 58, 58, 62, 82, 78, 66, 73 }, new RawPot(power: 70, fuelEfficiency: 64, handling: 70, tyreDurability: 68, comfort: 90)),
-            new RawCar("c-18", "Tora Zero", CarClass.C, 235_000, new double[] { 62, 66, 44, 48, 34, 74, 56, 65 }, new RawPot(power: 74, fuelEfficiency: 50, handling: 78, tyreDurability: 56, comfort: 46)),
             new RawCar("c-19", "Kaiser Klassik", CarClass.C, 257_500, new double[] { 64, 68, 38, 44, 38, 76, 44, 64 }, new RawPot(power: 76, fuelEfficiency: 44, handling: 78, tyreDurability: 52, comfort: 50)),
             new RawCar("c-20", "Tora Giga", CarClass.C, 280_000, new double[] { 66, 64, 32, 38, 55, 62, 40, 74 }, new RawPot(power: 78, fuelEfficiency: 38, handling: 76, tyreDurability: 46, comfort: 65)),
 
@@ -124,7 +122,6 @@ namespace TarmacGauntlet.Simulation
             new RawCar("b-25", "Liberty Bounty", CarClass.B, 950_000, new double[] { 84, 86, 26, 30, 18, 50, 24, 65 }, new RawPot(power: 90, fuelEfficiency: 32, handling: 92, tyreDurability: 36)),
 
             // --- Class A ---
-            new RawCar("a-26", "Kaiser Sceptre", CarClass.A, 2_500_000, new double[] { 90, 92, 30, 28, 16, 42, 22, 70 }, new RawPot(comfort: 24)),
             new RawCar("a-27", "Archer Hypernova", CarClass.A, 2_625_000, new double[] { 92, 92, 22, 22, 10, 36, 20, 72 }, new RawPot(comfort: 18)),
             new RawCar("a-28", "Kaiser K24 Dynamo", CarClass.A, 2_750_000, new double[] { 92, 96, 34, 30, 8, 40, 14, 68 }, new RawPot(comfort: 16)),
             new RawCar("a-29", "Seorak Cheonma CX-24Si", CarClass.A, 2_875_000, new double[] { 94, 98, 36, 32, 8, 44, 12, 68 }, new RawPot(comfort: 16)),
@@ -135,7 +132,7 @@ namespace TarmacGauntlet.Simulation
         };
 
         /// <summary>
-        /// Full car model catalogue: 31 models across 7 classes (F, E, D, C, B, A, F1).
+        /// Full car model catalogue: 28 models across 7 classes (F, E, D, C, B, A, F1).
         /// All numeric stats are from car_roster.md.
         /// </summary>
         public static readonly IReadOnlyList<CarModel> All = Raw.Select(BuildModel).ToArray();

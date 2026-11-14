@@ -186,6 +186,30 @@ namespace TarmacGauntlet.Career.Tests
         }
 
         [Test]
+        public void AFormat1SaveLosesTheCutModels()
+        {
+            var root = Newtonsoft.Json.Linq.JObject.Parse(SaveJson.Serialize(RichGame()));
+            root["Meta"]!["Version"] = 1;
+            var kaiser = root["Teams"]!.Single(t => (string?)t["Name"] == "Kaiser Motorsport");
+            kaiser["ModelId"] = "a-26";
+            foreach (var car in kaiser["Cars"]!) car["ModelId"] = "a-26";
+            root["Teams"]![0]!["Cars"]![0]!["ModelId"] = "c-18";
+            var sceptre = root["CarModels"]!.Single(m => (string?)m["Id"] == "a-28").DeepClone();
+            sceptre["Id"] = "a-26";
+            ((Newtonsoft.Json.Linq.JArray)root["CarModels"]!).Add(sceptre);
+            ((Newtonsoft.Json.Linq.JArray)root["CarMarket"]!["NewListings"]!).Add(new Newtonsoft.Json.Linq.JObject { ["ModelId"] = "e-09", ["Price"] = 25_000 });
+
+            GameState back = SaveJson.Deserialize(root.ToString());
+
+            var team = back.Teams.OfType<AITeam>().Single(t => t.Name == "Kaiser Motorsport");
+            Assert.That(team.ModelId, Is.EqualTo("a-28"));
+            Assert.That(team.Cars.Select(c => c.ModelId), Is.All.EqualTo("a-28"));
+            Assert.That(back.Teams[0].Cars[0].ModelId, Is.EqualTo("c-20"));
+            Assert.That(back.CarModels.Select(m => m.Id), Has.None.AnyOf("a-26", "c-18", "e-09"));
+            Assert.That(back.CarMarket.NewListings.Select(l => l.ModelId), Has.None.EqualTo("e-09"));
+        }
+
+        [Test]
         public void ANewCareerIsSavedAndContinued()
         {
             Assert.That(GameSession.HasSave, Is.False);

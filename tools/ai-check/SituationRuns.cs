@@ -48,7 +48,7 @@ static partial class Check
         if (only == "speeds")
         {
             // Each model's racing speed along the back straight, km/h, to place the set-ups by.
-            foreach (string m in new[] { "a-29", "a-28", "b-25", "b-24", "b-23", "b-22", "b-21", "c-19", "c-18", "d-15", "e-11", "f-01", "f-05" })
+            foreach (string m in new[] { "a-29", "a-28", "b-25", "b-24", "b-23", "b-22", "b-21", "c-19", "d-15", "e-11", "f-01", "f-05" })
             {
                 var p = new SpeedProfile(LineFor(m), CarSpec.For(m), AiPilot.LimitFor(90f));
                 Console.WriteLine($"{m} " + string.Join(" ", new[] { 2960f, 3200f, 3500f, 3700f, 3800f, 3850f, 3900f, 3950f, 3990f }.Select(d => $"{d:0}:{p.Speed[circuit.IndexOf(d)] * 3.6f:0}")) + $"  lap {p.LapTime:0.0}");
