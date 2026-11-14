@@ -15,6 +15,7 @@ Cars carry no number plates.
 Race cars get no street-legal lighting: no indicators, side repeaters or reversing lamps.
 
 ## 1. Start
+Every brief states the car's class.
 Each car has one locked real-car reference, listed in `car_roster.md`.
 Never offer an alternative reference.
 Every request to Ivan names the real car the model is based on.
