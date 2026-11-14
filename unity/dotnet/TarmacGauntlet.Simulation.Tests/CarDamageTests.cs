@@ -50,9 +50,9 @@ namespace TarmacGauntlet.Simulation.Tests
             Assert.That(CarDamage.Grip(100), Is.EqualTo(CarDamage.MinGrip));
             Assert.That(CarDamage.Drag(0), Is.EqualTo(1));
             Assert.That(CarDamage.Drag(20), Is.EqualTo(1 + 20 * CarDamage.DragPerPoint).Within(1e-12));
-            // A heavy hit (30 m/s) costs a lap several per cent; a light one (8 m/s) about one.
-            Assert.That(CarDamage.LapSlowdown(CarDamage.FromImpact(30)), Is.InRange(0.07, 0.11));
-            Assert.That(CarDamage.LapSlowdown(CarDamage.FromImpact(8)), Is.InRange(0.005, 0.02));
+            // A heavy hit (30 m/s) costs a lap about a fifth; a light one (8 m/s) a few per cent.
+            Assert.That(CarDamage.LapSlowdown(CarDamage.FromImpact(30)), Is.InRange(0.15, 0.22));
+            Assert.That(CarDamage.LapSlowdown(CarDamage.FromImpact(8)), Is.InRange(0.01, 0.04));
         }
 
         [Test]
@@ -153,6 +153,7 @@ namespace TarmacGauntlet.Simulation.Tests
         {
             Assert.That(CarDamage.RepairSeconds(0), Is.EqualTo(0));
             Assert.That(CarDamage.RepairSeconds(5), Is.EqualTo(5 * RaceMinute).Within(1e-9));
+            Assert.That(CarDamage.RepairSeconds(10), Is.EqualTo(15 * RaceMinute).Within(1e-9));
             Assert.That(CarDamage.RepairSeconds(CarDamage.FromImpact(30)), Is.EqualTo(60 * RaceMinute).Within(1e-9));
             Assert.That(CarDamage.RepairSeconds(CarDamage.RetireDamage), Is.EqualTo(180 * RaceMinute).Within(1e-9));
             Assert.That(CarDamage.RepairSeconds(60), Is.GreaterThan(180 * RaceMinute));

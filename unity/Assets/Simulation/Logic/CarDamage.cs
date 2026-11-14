@@ -23,18 +23,18 @@ namespace TarmacGauntlet.Simulation
         public const double TotalImpact = 30;
         /// <summary>Damage on the car at which it is out of the race: hits that each leave it running add up to a wreck.</summary>
         public const double RetireDamage = 35;
-        /// <summary>Share of its grip a car loses for each point of damage spread evenly: 15 damage, a heavy hit, costs 17%.</summary>
-        public const double GripLossPerPoint = 0.01125;
+        /// <summary>Share of its grip a car loses for each point of damage spread evenly: 15 damage, a heavy hit, costs 34%: a damaged car limps.</summary>
+        public const double GripLossPerPoint = 0.0225;
         /// <summary>Grip an axle keeps however damaged: a wreck still crawls back to its box.</summary>
         public const double MinGrip = 0.3;
-        /// <summary>Drag added for each point of damage, as a share of the car's own: 15 damage adds 22.5%.</summary>
-        public const double DragPerPoint = 0.015;
+        /// <summary>Drag added for each point of damage, as a share of the car's own: 15 damage adds 45%.</summary>
+        public const double DragPerPoint = 0.03;
         /// <summary>Condition a point of damage still on the car at the flag takes off: one for one.</summary>
         public const double ConditionPerPoint = 1;
         /// <summary>
         /// Crew seconds to repair damage down from each of these points to none, before the crew's size and the
         /// Engineer skill scale it: a race runs at 10 times the clock (1 race hour is 360 s), so a knock of 5 is 5
-        /// race minutes, a heavy hit of 15 (one just short of totalling the car) is a race hour, and damage at the
+        /// race minutes, 10 is 15 race minutes, a heavy hit of 15 (one just short of totalling the car) is a race hour, and damage at the
         /// retirement limit (<see cref="RetireDamage"/>) is 3 race hours. Between the points it grows in a straight line, and past the last at
         /// the last slope.
         /// </summary>
@@ -42,6 +42,7 @@ namespace TarmacGauntlet.Simulation
         {
             (0, 0),
             (5, 30),
+            (10, 90),
             (15, 360),
             (RetireDamage, 1080),
         };
