@@ -96,7 +96,7 @@ def wordmark(lv, z, y, h):
 
 
 def logo():
-    """Logo 5: an acacia roundel at sunset in a gold ring, SOUTHGATE MOTORSPORT under it."""
+    """Logo 5: an acacia roundel at sunset in a gold ring, SOUTHGATE over MOTORSPORT under it."""
     def tree(x, base, h):
         limbs = "".join(f'<line x1="{x + h * 0.04}" y1="{base - h * 0.55}" x2="{x + dx * h}" y2="{base + dy * h}" stroke-width="{h * 0.035}"/>'
                         for dx, dy in ((-0.42, -0.86), (0.38, -0.88), (0.1, -0.9)))
@@ -104,20 +104,22 @@ def logo():
                 f'{limbs}<ellipse cx="{x}" cy="{base - h * 0.93}" rx="{h * 0.72}" ry="{h * 0.1}" stroke="none"/>'
                 f'<ellipse cx="{x + h * 0.25}" cy="{base - h}" rx="{h * 0.4}" ry="{h * 0.07}" stroke="none"/></g>')
 
-    return ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="-40 0 280 200">'
+    return ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 212">'
             '<clipPath id="sg-ring"><circle cx="100" cy="82" r="72"/></clipPath>'
             f'<circle cx="100" cy="82" r="72" fill="{DUSK}"/><g clip-path="url(#sg-ring)">'
             f'<circle cx="100" cy="108" r="44" fill="{GOLD_D}"/><rect x="20" y="108" width="160" height="60" fill="{BLACK}"/>'
             f'{tree(80, 108, 58)}{tree(136, 108, 36)}</g>'
             f'<circle cx="100" cy="82" r="72" fill="none" stroke="{GOLD}" stroke-width="3.5"/>'
             f'<rect x="28" y="106.5" width="144" height="3" fill="{GOLD}"/>'
-            f'<text x="100" y="182" text-anchor="middle" dominant-baseline="central" font-family="Cinzel" font-size="16" '
-            f'letter-spacing="1.5" fill="{GOLD_L}">SOUTHGATE MOTORSPORT</text></svg>')
+            f'<text x="100" y="176" text-anchor="middle" dominant-baseline="central" font-family="Cinzel" font-size="22" '
+            f'letter-spacing="2" fill="{GOLD_L}">SOUTHGATE</text>'
+            f'<text x="100" y="200" text-anchor="middle" dominant-baseline="central" font-family="Barlow" font-size="13" '
+            f'letter-spacing="6" fill="{GOLD}">MOTORSPORT</text></svg>')
 
 
 def common(lv):
     """What both takes share: the gold pinstripe under the windows, the sill line, the horizon
-    across the front and rear, the number on the bonnet, the logo on the roof."""
+    across the front and rear, the logo on the roof."""
     line(lv, NOSE, 0.868, TAIL, 0.990, 0.010, GOLD_L)
     line(lv, NOSE, 0.30, TAIL, 0.30, 0.012, GOLD)
     lv.band_x(-1.1, 1.1, GOLD, views=("front",), y=(0.493, 0.507))
@@ -127,7 +129,6 @@ def common(lv):
     for s in (1, -1):
         lv.poly("top", [(s * 0.46, 0, -1.38), (s * 0.48, 0, -1.38), (s * 0.48, 0, 0.22), (s * 0.46, 0, 0.22)], GOLD)
     lv.mark("top", LOGOS / "logo.svg", (0, 0, -0.58), 0.78, rotate=-90)
-    lv.number("top", (0, 0, 1.6), 0.46, 0.26, GOLD_L, rotate=-90)
 
 
 def dusk_option(views):
@@ -156,6 +157,99 @@ def badge_option(views):
     return lv
 
 
+# --- bonnet centrepieces -------------------------------------------------------------------
+# Drawn upright for someone at the nose: a is across the car (+ the car's left), b up the art,
+# which runs from the bonnet's front edge (z 2.0) back towards the windscreen.
+B0 = 2.0
+RED = "#b5121b"
+GREEN = "#006b3f"
+BONE = "#f4f1e8"
+BEAD_B = "#1f5fbf"
+BEAD_O = "#e2701e"
+
+
+def bpoly(lv, pts, fill):
+    lv.poly("top", [(a, 0, B0 - b) for a, b in pts], fill)
+
+
+def bcircle(cx, cy, r, a0=0.0, a1=2 * math.pi, n=48):
+    return [(cx + r * math.cos(a0 + (a1 - a0) * k / n), cy + r * math.sin(a0 + (a1 - a0) * k / n)) for k in range(n + 1)]
+
+
+def bonnet_sunset(lv):
+    """The setting sun on a horizon across the bonnet, rays round it, acacias in black against it."""
+    base, r = 0.12, 0.30
+    for i in range(15):
+        a = math.pi * (i + 0.5) / 15
+        w = 0.03
+        bpoly(lv, [(math.cos(a - w) * 0.36, base + math.sin(a - w) * 0.36), (math.cos(a - w * 0.6) * 0.5, base + math.sin(a - w * 0.6) * 0.5),
+                   (math.cos(a + w * 0.6) * 0.5, base + math.sin(a + w * 0.6) * 0.5), (math.cos(a + w) * 0.36, base + math.sin(a + w) * 0.36)], GOLD_D)
+    bpoly(lv, bcircle(0, base, r, 0, math.pi), GOLD_L)
+    bpoly(lv, [(-0.58, base - 0.008), (0.58, base - 0.008), (0.58, base + 0.008), (-0.58, base + 0.008)], GOLD)
+    for a, h in ((-0.1, 0.24), (0.16, 0.15)):
+        for part in acacia(a, base, h):
+            bpoly(lv, part, BLACK)
+
+
+def bonnet_shield(lv):
+    """The Maasai shield and crossed spears from the Kenyan flag, in gold, red and black."""
+    cy, h = 0.44, 0.7
+    w = h * 0.56
+    for sgn in (-1, 1):
+        ang = sgn * 0.5
+        dx, dy = math.sin(ang) * h * 0.72, math.cos(ang) * h * 0.72
+        n = h * 0.0125
+        ox, oy = math.cos(ang) * n, -math.sin(ang) * n
+        bpoly(lv, [(-dx + ox, cy - dy + oy), (dx + ox, cy + dy + oy), (dx - ox, cy + dy - oy), (-dx - ox, cy - dy - oy)], GOLD)
+        tip = (dx, cy + dy)
+        blade = [(0, h * 0.2), (h * 0.045, h * 0.06), (0, -h * 0.02), (-h * 0.045, h * 0.06)]
+        ca, sa = math.cos(-ang), math.sin(-ang)
+        bpoly(lv, [(tip[0] + x * ca - y * sa, tip[1] + x * sa + y * ca) for x, y in blade], GOLD)
+    bpoly(lv, [(w / 2 * 1.08 * math.cos(t * math.pi / 24), cy + h / 2 * 1.04 * math.sin(t * math.pi / 24)) for t in range(48)], GOLD)
+    bpoly(lv, [(w / 2 * math.cos(t * math.pi / 24), cy + h / 2 * math.sin(t * math.pi / 24)) for t in range(48)], RED)
+    lens = [(w * 0.13 * math.sin(math.pi * k / 24), cy + h / 2 * math.cos(math.pi * k / 24)) for k in range(25)]
+    bpoly(lv, lens + [(-a, b) for a, b in reversed(lens)], BLACK)
+    for ax, rx, ry in ((0, 0.05, 0.16), (-0.33, 0.04, 0.2), (0.33, 0.04, 0.2)):
+        bpoly(lv, [(ax * w + w * rx * math.cos(t * math.pi / 12), cy + h * ry * math.sin(t * math.pi / 12)) for t in range(24)], BONE)
+
+
+BEADS = [RED, BONE, GOLD_L, GREEN, BONE, BEAD_B, BEAD_O, BONE]
+
+
+def bonnet_beads(lv):
+    """A Maasai bead collar laid over the bonnet, fanning out from the front edge, gold edged."""
+    s, r0, rows = 0.036, 0.2, 7
+    for r in range(rows):
+        rad = r0 + r * s
+        n = round(math.pi * rad / s)
+        for i in range(n + 1):
+            a = math.pi * i / n
+            bpoly(lv, bcircle(math.cos(a) * rad, 0.02 + math.sin(a) * rad, s * 0.42, n=12), BEADS[(i // 3 + r) % len(BEADS)])
+    for rad in (r0 - s * 0.6, r0 + (rows - 0.4) * s):
+        outer, inner = bcircle(0, 0.02, rad + 0.006, 0, math.pi), bcircle(0, 0.02, rad - 0.006, 0, math.pi)
+        bpoly(lv, outer + list(reversed(inner)), GOLD)
+
+
+def bonnet_logo(lv):
+    """Logo 5, big, centred on the bonnet."""
+    lv.mark("top", LOGOS / "logo.svg", (0, 0, B0 - 0.42), 0.74, rotate=-90)
+
+
+def bonnet_peak(lv):
+    """Mount Kenya: gold peaks with snow on them, the sun rising behind, on the horizon line."""
+    base = 0.1
+    bpoly(lv, bcircle(0.12, base + 0.36, 0.2), GOLD_L)
+    peak = [(-0.56, base), (-0.22, base + 0.38), (-0.12, base + 0.3), (0.0, base + 0.52), (0.14, base + 0.36), (0.22, base + 0.42), (0.56, base)]
+    bpoly(lv, peak, GOLD)
+    for (px, py), (lx, ly), (rx, ry) in (((0.0, 0.52), (-0.12, 0.3), (0.14, 0.36)), ((-0.22, 0.38), (-0.56, 0), (-0.12, 0.3)), ((0.22, 0.42), (0.14, 0.36), (0.56, 0))):
+        k = 0.3
+        bpoly(lv, [(px, base + py), (px + (rx - px) * k, base + py + (ry - py) * k), (px + (rx - px) * k * 0.5, base + py + (ry - py) * k * 0.6),
+                   (px, base + py - 0.05), (px + (lx - px) * k * 0.5, base + py + (ly - py) * k * 0.6), (px + (lx - px) * k, base + py + (ly - py) * k)], BONE)
+    bpoly(lv, [(-0.58, base - 0.008), (0.58, base - 0.008), (0.58, base + 0.008), (-0.58, base + 0.008)], GOLD)
+
+
+BONNETS = {"sunset": bonnet_sunset, "shield": bonnet_shield, "beads": bonnet_beads, "logo": bonnet_logo, "peak": bonnet_peak}
+
 OPTIONS = {"dusk": dusk_option, "badge": badge_option}
 
 if __name__ == "__main__":
@@ -164,3 +258,8 @@ if __name__ == "__main__":
     views = HERE / "out" / "views" / "views.json"
     for name, make in OPTIONS.items():
         make(views).write(HERE / "out" / name)
+    # The Dusk take with each bonnet centrepiece, for Ivan to pick from.
+    for name, draw in BONNETS.items():
+        lv = dusk_option(views)
+        draw(lv)
+        lv.write(HERE / "out" / f"dusk-{name}")
