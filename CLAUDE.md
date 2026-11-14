@@ -4,6 +4,12 @@
 - Never edit `docs/car-modelling.md` without Ivan's explicit permission in this thread. Propose the change in chat and wait for his yes.
 - All 3D car modelling work follows `docs/car-modelling.md`. Read it in full before starting, and follow every step in order. No shortcuts or other methods.
 
+## Workflows
+- When a task has a written workflow, that workflow is the only method. Read it in full and follow every step in order. The livery workflow is https://claude.ai/artifact/W5q7r67SdELNmkjpPhrQc1, and car modelling is `docs/car-modelling.md`.
+- Never add steps, sources or references the workflow does not name. Never use an earlier brief, thread, PR or another team's work as a pattern.
+- A brief gives only the task's facts and a link to the workflow. It adds no method of its own.
+- A new rule from Ivan goes into the workflow itself the same turn, not only into briefs.
+
 ## Questions are not instructions
 - When Ivan asks a question, answer it and keep working. A question never means stop, undo or change course.
 - Never stop, cancel or kill running work (a bake, a build, a render, a long script) unless Ivan's own words say to stop that work.
