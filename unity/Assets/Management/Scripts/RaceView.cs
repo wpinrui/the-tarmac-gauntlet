@@ -13,7 +13,8 @@ namespace TarmacGauntlet.Management
     /// <summary>
     /// One race as the race summary and the race history both show it: the results overall, by class and as class
     /// podiums, the player's finish, the position chart with its legend, and the stints, stops and issues. A race just
-    /// run (<paramref name="live"/>) also has stop times, fuel, best laps and the laps issues were fixed on.
+    /// run (<paramref name="live"/>) also has stop times, fuel, best laps and the laps issues were fixed on. A car that
+    /// retired has what put it out as its last issue, by name ("Gearbox seizure"), as the race history has it.
     /// </summary>
     internal sealed class RaceView
     {
@@ -35,6 +36,8 @@ namespace TarmacGauntlet.Management
         private readonly Views views;
         private readonly Dictionary<string, Color> colours = new Dictionary<string, Color>();
         private readonly Dictionary<string, string> names = new Dictionary<string, string>();
+        /// <summary>The player's issues, and what put the car out if it retired.</summary>
+        private readonly IReadOnlyList<IssueRecord> issues;
 
         internal RaceView(RaceSummary race, bool live, Views views)
         {
@@ -46,6 +49,16 @@ namespace TarmacGauntlet.Management
                 names[s.DriverId] = s.DriverName;
                 if (!colours.ContainsKey(s.DriverId)) colours[s.DriverId] = DriverColours[colours.Count % DriverColours.Length];
             }
+            issues = race.Issues;
+            // The race history already lists the retirement among the issues (RaceReplay); a race just run doesn't.
+            if (live && race.Player is ClassifiedCar me && me.Retired)
+                issues = race.Issues.Append(new IssueRecord
+                {
+                    Lap = me.Laps,
+                    TemplateId = me.FailureId ?? (me.RetirementReason ?? FailureType.Mechanical).ToString(),
+                    DriverId = race.Stints.Count > 0 ? race.Stints[race.Stints.Count - 1].DriverId : "",
+                    FixedLap = null,
+                }).ToArray();
         }
 
         private bool IsMe(ClassifiedCar r) => r.CarId == race.Player?.CarId;
@@ -252,7 +265,7 @@ namespace TarmacGauntlet.Management
             }
 
             tabs.Clear();
-            foreach ((string view, string name, int count) in new[] { ("stints", "STINTS", race.Stints.Count), ("stops", "STOPS", race.PitStops.Count), ("issues", "ISSUES", race.Issues.Count) })
+            foreach ((string view, string name, int count) in new[] { ("stints", "STINTS", race.Stints.Count), ("stops", "STOPS", race.PitStops.Count), ("issues", "ISSUES", issues.Count) })
                 tabs.Add(CountTab(name, count, views.Log == view, () => Show(view)));
 
             head.Clear();
@@ -319,7 +332,7 @@ namespace TarmacGauntlet.Management
                     head.Add(Head("LAP", "c-at"));
                     head.Add(Head("ISSUE", "fill"));
                     head.Add(Head(live ? "FIXED" : "", "c-fixed"));
-                    foreach (IssueRecord i in race.Issues)
+                    foreach (IssueRecord i in issues)
                     {
                         VisualElement row = Row();
                         row.Add(Cell(Num(i.Lap), "c-at"));

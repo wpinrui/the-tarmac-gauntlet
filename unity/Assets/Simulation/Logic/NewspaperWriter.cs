@@ -196,7 +196,7 @@ namespace TarmacGauntlet.Simulation
                 {
                     FailureType.Crash => $"their {model} went off on lap {c.Laps}",
                     FailureType.Withdrawn => $"they withdrew their {model} on lap {c.Laps}",
-                    _ => $"their {model} broke down on lap {c.Laps}",
+                    _ => $"their {model} broke down with {Cause(c)} on lap {c.Laps}",
                 };
                 var paragraphs = new List<string>
                 {
@@ -269,7 +269,7 @@ namespace TarmacGauntlet.Simulation
                 string cls = ClassName(c.CarClass), model = ModelName(c.ModelId);
                 var paragraphs = new List<string> { $"{Introduce(c)} arrived as the top team in class {cls} on prestige." };
                 if (c.Retired)
-                    paragraphs.Add($"Their {model} lasted {c.Laps} laps before {Cause(c.RetirementReason)} ended it.");
+                    paragraphs.Add($"Their {model} lasted {c.Laps} laps before {Cause(c)} ended it.");
                 else
                 {
                     ClassifiedCar? classWinner = summary.Classification.FirstOrDefault(x => x.CarClass == c.CarClass && !x.Retired);
@@ -357,7 +357,7 @@ namespace TarmacGauntlet.Simulation
                 string cls = ClassName(p.CarClass), model = ModelName(p.ModelId);
                 int grid = GridPosition(p.CarId);
                 int? lastYear = LastYearPosition();
-                string reason = Cause(p.RetirementReason);
+                string reason = Cause(p);
 
                 if (coverage == PlayerCoverage.Footnote)
                 {
@@ -520,13 +520,24 @@ namespace TarmacGauntlet.Simulation
 
         public static string ClassName(CarClass cls) => cls.ToString();
 
-        /// <summary>What ended a retired car's race, as "... ended it" reads it.</summary>
-        private static string Cause(FailureType? reason) => reason switch
+        /// <summary>What ended a retired car's race, as "... ended it" reads it: what broke, by name, for a failure.</summary>
+        private static string Cause(ClassifiedCar c) => c.RetirementReason switch
         {
             FailureType.Crash => "a crash",
             FailureType.Withdrawn => "the team's call",
-            _ => "a mechanical failure",
+            _ => IssueTemplates.Find(c.FailureId) is IssueTemplate broke ? Failure(broke) : "a mechanical failure",
         };
+
+        /// <summary>A failure as a sentence names it: "a gearbox seizure", "an injector failure", "engine overheating".</summary>
+        public static string Failure(IssueTemplate broke)
+        {
+            string what = broke.Description.ToLowerInvariant();
+            if (Uncounted.Contains(broke.Id)) return what;
+            return ("aeiou".IndexOf(what[0]) >= 0 ? "an " : "a ") + what;
+        }
+
+        /// <summary>Failures that read without "a": damage, wear and overheating.</summary>
+        private static readonly HashSet<string> Uncounted = new HashSet<string> { "engine-overheating", "differential-wear", "wheel-bearing-damage" };
 
         public static string Ordinal(int n)
         {

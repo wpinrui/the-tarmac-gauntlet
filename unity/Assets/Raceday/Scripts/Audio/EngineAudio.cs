@@ -36,11 +36,25 @@ namespace TarmacGauntlet.Raceday
         private volatile bool playing;
         /// <summary>Switched off: the race is over and the car parked, so it makes no sound.</summary>
         private bool off;
+        /// <summary>When the engine died, in game seconds, or negative while it runs.</summary>
+        private float diedAt = -1f;
+
+        /// <summary>How long a dying engine takes to fall silent, s.</summary>
+        public const float DieTime = 1.6f;
 
         /// <summary>Switches every car's engine off, for good: the race is over and the cars are parked.</summary>
         public static void SwitchOffAll()
         {
             foreach (EngineAudio e in all) e.off = true;
+        }
+
+        /// <summary>
+        /// The engine gives out: the throttle is gone, the revs sag and the note fades to nothing over
+        /// <see cref="DieTime"/>, then the car makes no sound.
+        /// </summary>
+        public void Die()
+        {
+            if (diedAt < 0f) diedAt = Time.time;
         }
 
         public void Setup(string modelId, int seed)
@@ -83,7 +97,13 @@ namespace TarmacGauntlet.Raceday
             if (synth == null) return;
             if (rankedFrame != Time.frameCount) Rank();
             if (!playing) return;
-            gain.Target = Mix.Gain(SoundGroup.Engines);
+            float alive = 1f;
+            if (diedAt >= 0f)
+            {
+                alive = Mathf.Clamp01(1f - (Time.time - diedAt) / DieTime);
+                if (alive <= 0f) off = true;
+            }
+            gain.Target = Mix.Gain(SoundGroup.Engines) * alive * alive;
 
             CarSpec spec = car.Spec;
             int gear = Mathf.Max(car.Gear, 1);
@@ -93,8 +113,10 @@ namespace TarmacGauntlet.Raceday
             // The engine's share of the car's redline from the wheels and gear, as the physics works it out.
             // It works the same while the car glides with no physics.
             float fraction = Mathf.Abs(car.Speed) / spec.WheelRadius * spec.Gears[gear - 1] / spec.Redline;
-            float throttle = car.Crashed ? 0f : car.Throttle;
+            float throttle = car.Crashed || diedAt >= 0f ? 0f : car.Throttle;
             float rpm = fraction * Sound.RedlineRpm;
+            // Dying, the revs sag away from the wheels' as the clutch goes.
+            if (diedAt >= 0f) rpm *= Mathf.Lerp(0.55f, 1f, alive);
             // Pulling away, the clutch slips and the revs rise ahead of the wheels.
             if (gear == 1) rpm = Mathf.Max(rpm, Mathf.Lerp(Sound.IdleRpm, 0.45f * Sound.RedlineRpm, throttle));
 

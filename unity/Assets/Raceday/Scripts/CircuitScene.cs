@@ -334,7 +334,16 @@ namespace TarmacGauntlet.Raceday
             director.Cars = racing;
             director.Drivers = drivers;
             director.Tower = tower;
+            director.Effects = effects;
             if (resumed) director.Resume(resume);
+            // What broke, at the top of the screen, while a car that broke down sits on the verge.
+            FailureBanner failures = new GameObject("Failure banner").AddComponent<FailureBanner>();
+            failures.Director = director;
+            failures.Cameras = views;
+            failures.Cars = cars;
+            failures.Teams = teams;
+            failures.Colours = tower.Colours;
+            failures.Player = player;
             RaceWeekend.Snapshot = Save;
             // The crowd, PA, rain, thunder, countryside and wind round the race.
             RaceAmbience ambience = new GameObject("Ambience").AddComponent<RaceAmbience>();
