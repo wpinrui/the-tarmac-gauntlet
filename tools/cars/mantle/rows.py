@@ -251,13 +251,13 @@ TAIL_AXIS = (86.0, 18.0)  # the corner's axis in plan (top render: Y, half width
 # The dark band low across the bumper's back and the rain light in its middle.
 BAND_R = [(0.0, -9.4), (29.0, -9.4), (28.0, -7.8), (25.8, -6.2), (19.5, -5.2), (0.0, -5.0)]
 RAIN = (3.5, -8.6, -6.0)                          # rain light: half width, bottom, top
-# The boot lid's outline on the tail (rear render): across above the bumper, round the plate's
-# recess and up the lamps' inner edges to the deck's edge.
-LID = [(0.0, 4.8), (14.5, 4.8), (16.5, 6.0), (17.0, 8.5), (15.0, 11.0), (12.2, 13.6), (13.0, 15.0), (15.5, 16.2),
-       (18.5, 17.4), (20.5, 18.4)]
+# The boot lid's outline on the tail (rear render): across above the bumper, then straight up at
+# the rear glass's width to the deck's edge, cutting through the tail lamps.
+LID = [(0.0, 4.8), (23.4, 4.8), (24.9, 6.3), (24.9, 18.4)]
+LID_W = 24.9
 # Its front edge runs across the deck just behind the rear glass, traced from above (top render:
-# Y, half width) from the side's top corner in to the middle.
-LID_TOP = [(89.0, 20.6), (82.5, 20.4), (81.2, 19.0), (83.2, 15.0), (85.2, 8.0), (86.0, 0.0)]
+# Y, half width) from the side's top corner forward at the same width, then in to the middle.
+LID_TOP = [(88.0, 24.9), (79.4, 24.9), (78.6, 24.0), (80.2, 20.0), (82.2, 15.0), (85.2, 8.0), (86.0, 0.0)]
 GATE_Z, GATE_LOW = 14.6, 9.6                      # the lid between the lamps (the badge), and low in its recess
 
 # ---------------------------------------------------------------- other parts
@@ -303,12 +303,13 @@ data = {
     "band_r": end(BAND_R),
     "rain": [H(RAIN[0]), Z(RAIN[1]), Z(RAIN[2])],
     "lid": end(LID),
+    "lid_w": H(LID_W),
     "lid_top": plan(LID_TOP),
     "gate_z": Z(GATE_Z),
     "gate_low": Z(GATE_LOW),
     "mirror": {"x_back": X(MIRROR["y1"]), "x_front": X(MIRROR["y0"]), "y_in": H(MIRROR["w0"]),
                "y_out": H(MIRROR["w1"]), "z0": Z(MIRROR["z0"]), "z1": Z(MIRROR["z1"])},
-    "picks": {"frontbadge": 1, "rearbadge": 1, "name": 1},   # placeholders until Ivan picks in the viewer
+    "picks": {"frontbadge": 1, "rearbadge": 1, "name": 1},   # Ivan's picks, 2026-11-14
 }
 # belt line z(x) in build space, sampled for parts to interpolate
 _ys = np.linspace(-42.0, 58.0, 48)

@@ -204,9 +204,9 @@ TAIL_R = 0.25
 
 
 def taillamps(ref, cutters, out):
-    """Each tail lamp is the traced sweep from the boot lid's edge round onto the side. Our own
-    interior: the tail lamp a thin ring just inside the whole outline, the brake lamp one long
-    bar through its middle."""
+    """Each tail lamp is the traced sweep from the boot lid round onto the side, split where the
+    lid's side runs through it. Our own interior: the tail lamp a thin ring just inside the whole
+    outline, the brake lamp one long bar through its middle."""
     shp = soft(wrap_outline(ref, R["tail_axis"], -1, TAIL_R, R["tail"], R["tail_side"], R["tail_top"], rear_fr()),
                0.008)
     b = shp.bounds
@@ -215,6 +215,13 @@ def taillamps(ref, cutters, out):
     zc = (b[1] + b[3]) / 2
     bar = soft(inner.buffer(-0.022).intersection(box(b[0] - 1, zc - 0.014, b[2] + 1, zc + 0.014)), 0.004)
     bar = biggest(bar)
+    # the boot lid's side runs straight through each lamp: split the lamp's glass and lights there
+    xa, ya = R["tail_axis"]
+    p, _n = blend.cast(ref, rear_fr(), R["lid_w"], (b[1] + b[3]) / 2)
+    a = np.arctan2(p[1] - ya, -(p[0] - xa)) * TAIL_R
+    gap = box(a - 0.004, -5, a + 0.004, 5)
+    ring, bar = ring.difference(gap), bar.difference(gap)
+    glass = shp.buffer(-0.002).difference(gap)
     for sgn, side in ((1, "l"), (-1, "r")):
         fr = wrap_fr(R["tail_axis"], sgn, -1, TAIL_R)
         cutters += blend.lay(ref, f"cut_tail_{side}", shp, fr, -0.035, 0.006, "housing", LAMP_STEP, along_ray=True)
@@ -222,7 +229,7 @@ def taillamps(ref, cutters, out):
                          along_ray=True)
         out += blend.lay(ref, f"lamp_tail_{side}", ring, fr, -0.029, -0.025, "lamp_tail", LAMP_STEP, along_ray=True)
         out += blend.lay(ref, f"lamp_brake_{side}", bar, fr, -0.029, -0.025, "lamp_brake", LAMP_STEP, along_ray=True)
-        out += blend.lay(ref, f"tail_glass_{side}", shp.buffer(-0.002), fr, -0.0055, -0.0025, "tail_glass", LAMP_STEP,
+        out += blend.lay(ref, f"tail_glass_{side}", glass, fr, -0.0055, -0.0025, "tail_glass", LAMP_STEP,
                          along_ray=True)
 
 
@@ -504,14 +511,15 @@ def _sweep(ob, sgn):
 
 
 def _pod(name, y0, y1, z0, z1, x0, x1, sgn, mat="body"):
-    """A mirror housing: a soft rounded face at the back, its rings easing in towards the front on
-    an ellipse, so the front is one smooth nose leaning outboard."""
+    """A mirror housing: a straight run from its flat back, then its rings easing in on a quarter
+    ellipse, so the front is one smooth nose leaning outboard."""
     face = soft(box(y0, z0, y1, z1), min(MIRROR_R, 0.45 * (z1 - z0)))
     ring = body.even(np.array(face.exterior.coords)[:-1], 96)
     cy, cz = y0 + 0.55 * (y1 - y0), (z0 + z1) / 2
     rings = []
-    for t in np.concatenate([[0.0, 0.004], np.linspace(0.1, 1.0, 14)]):
-        k = max(np.sqrt(max(1 - t ** 2.2, 0.0)), 0.2)
+    for t in np.concatenate([[0.0, 0.004, 0.2, 0.4], np.linspace(0.46, 1.0, 12)]):
+        u = max(t - 0.4, 0.0) / 0.6
+        k = max(np.sqrt(max(1 - u * u, 0.0)), 0.25)
         rr = np.column_stack([cy + (ring[:, 0] - cy) * k, cz + (ring[:, 1] - cz) * k])
         rings.append(np.column_stack([np.full(96, x0 + (x1 - x0) * t), rr[:, 0] * sgn, rr[:, 1]]))
     v, f = geom.close_rings(rings)
@@ -521,21 +529,21 @@ def _pod(name, y0, y1, z0, z1, x0, x1, sgn, mat="body"):
 
 
 def mirrors():
-    """A painted housing out from the black sail under the A-pillar on a short black arm, its
-    glass in a recess in the housing's back."""
+    """A painted housing out from the black sail under the A-pillar on a short black arm that runs
+    into its underside, its glass filling a shallow recess in the housing's flat back."""
     m = R["mirror"]
     xb, xf = m["x_back"], m["x_front"]
     y0, y1, z0, z1 = m["y_in"] + 0.03, m["y_out"], m["z0"] + 0.02, m["z1"]
-    xa = xb + 0.55 * (xf - xb)
-    zb = belt(xa)
-    root = body.y_at(xa, zb + 0.03) - 0.03
+    xa = xb + 0.5 * (xf - xb)
+    za0, za1 = z0 + 0.010, z0 + 0.040            # the arm's bottom and top, inside the housing's lower half
+    root = body.y_at(xa, (za0 + za1) / 2) - 0.03
     obs = []
     for sgn, side in ((1, "l"), (-1, "r")):
         house = _pod(f"mirror_{side}", y0, y1, z0, z1, xb, xf, sgn, "body")
         cut = _rounded_bar(f"cut_mirror_{side}", y0 + 0.008, y1 - 0.008, z0 + 0.008, z1 - 0.008, xb - 0.03, xb + 0.006,
                            MIRROR_R - 0.008, sgn)
         blend.boolean(house, cut, "DIFFERENCE")
-        arm = _rounded_bar(f"mirror_arm_{side}", root, y0 + 0.03, zb + 0.010, zb + 0.040, xa - 0.04, xa + 0.02, 0.010,
+        arm = _rounded_bar(f"mirror_arm_{side}", root, y0 + 0.04, za0, za1, xa - 0.035, xa + 0.025, 0.010,
                            sgn, "trim")
         glass = _rounded_bar(f"mirror_glass_{side}", y0 + 0.0095, y1 - 0.0095, z0 + 0.0095, z1 - 0.0095, xb + 0.0015,
                              xb + 0.0045, MIRROR_R - 0.0095, sgn, "mirror_glass")
@@ -788,8 +796,8 @@ def options(ref):
     # front doors behind their front edge
     nb = nm.bounds
     wn = (nb[2] - nb[0]) * cap
-    xs = R["lid"][2][0] - 0.03 - wn / 2
-    zn = R["lid"][2][1] + 0.025
+    xs = R["lid_w"] - 0.05 - wn / 2
+    zn = R["lid"][0][1] + 0.05
     add("name", 1, _flat(ref, nm, cap, rear_fr(), xs, zn, up, "nm", 0.0012, NAME_T, "chrome"))
     add("name", 2, _flat(ref, nm, cap, rear_fr(), -xs, zn, up, "nm", 0.0012, NAME_T, "chrome"))
     q = []
