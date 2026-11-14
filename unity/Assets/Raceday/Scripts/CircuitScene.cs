@@ -498,6 +498,10 @@ namespace TarmacGauntlet.Raceday
                 AutopilotHint hint = new GameObject("Autopilot hint").AddComponent<AutopilotHint>();
                 hint.Stages = new[] { intro, outro };
                 hint.Showing = () => ai.enabled && YourStint && !day.Cars[playerIndex].Flagged;
+                RacingLineAssist assist = new GameObject("Racing line").AddComponent<RacingLineAssist>();
+                assist.Car = cars[player];
+                assist.Line = line;
+                assist.Showing = () => !ai.enabled && !racing[player].InPitLane;
             }
             Lap("race");
             built = true;
