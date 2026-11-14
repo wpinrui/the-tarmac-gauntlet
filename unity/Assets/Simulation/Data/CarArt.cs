@@ -18,6 +18,7 @@ namespace TarmacGauntlet.Simulation
             { "f-04", "Assets/Art/Vehicles/KaiserFirefly/KaiserFirefly.obj" },
             { "f-06", "Assets/Art/Vehicles/NusaFox/NusaFox.obj" },
             { "e-07", "Assets/Art/Vehicles/LibertyFantasy/LibertyFantasy.obj" },
+            { "e-08", "Assets/Art/Vehicles/SeorakHwaeum/SeorakHwaeum.obj" },
             { "d-12", "Assets/Art/Vehicles/SeorakHoeori/SeorakHoeori.obj" },
             { "c-20", "Assets/Art/Vehicles/ToraGiga/ToraGiga.obj" },
             { "b-22", "Assets/Art/Vehicles/ArcherTachyon/ArcherTachyon.obj" },
