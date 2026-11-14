@@ -387,6 +387,13 @@ namespace TarmacGauntlet.Raceday
             graphics.Circuit = circuit;
             graphics.Player = player;
             graphics.Tower = tower;
+            if (player >= 0)
+            {
+                PlayerPip pip = new GameObject("Picture in picture").AddComponent<PlayerPip>();
+                pip.Director = tv;
+                pip.Car = racing[player];
+                pip.Tower = tower;
+            }
             DriverCard card = views.gameObject.AddComponent<DriverCard>();
             card.Views = views;
             card.Cars = cars;
