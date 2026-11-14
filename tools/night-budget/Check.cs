@@ -10,7 +10,7 @@
 //   clear of the gantry no mast stands within 30 m of the start gantry's feet, and nothing sits in the start light box
 //   within the lights   wherever the camera is on the lap, every floodlight that reaches the track under it is one of
 //                       the nearest FloodlightRig turns on, and with the most headlamps the lights on fit URP's 256
-// Then the budget (Sweep.cs).
+// Then the budget (Sweep.cs), and a car swept round the lap against what its paint mirrors (CarSweep.cs).
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -51,6 +51,7 @@ static class Check
         ClearOfGantry(placed, lit);
         WithinLights(circuit, floods);
         Sweep.Run(root, circuit, pc, stands, floods);
+        CarSweep.Run(root, circuit, pc, pitParts, lit);
         if (args.Length > 1) Scene.Write(args[1], circuit, stands, floods, track.Concat(standParts).Concat(pitParts).Concat(furniture).Concat(lit).ToList());
         return failed ? 1 : 0;
     }

@@ -12,8 +12,11 @@ namespace TarmacGauntlet.Raceday
     /// and drawing everything round it, the other cars too: the car's own body is hidden while its probe draws. Those probes
     /// take turns, a few faces a frame, nearest car first. A probe moved to another car is left out until it is drawn
     /// again, so the car shows the shared probe meanwhile, never an old view. All the probes are HDR, so the floodlights'
-    /// and the pit's lenses stay bright in the paint at night. Sets <c>_TarmacCarGlint</c> from the night's lights for the
-    /// paint (CarPaint.hlsl). Without <see cref="GraphicsOptions.CarReflections"/> the cars reflect the sky alone.
+    /// and the pit's lenses stay bright in the paint at night. At night, from High up, the car nearest the camera has its
+    /// probe drawn whole every frame instead of taking turns: the floodlights slide smoothly over its paint, where a probe
+    /// drawn a face a frame stepped them along every second or so. The others take turns with one face fewer to pay for it.
+    /// Sets <c>_TarmacCarGlint</c> from the night's lights for the paint (CarPaint.hlsl). Without
+    /// <see cref="GraphicsOptions.CarReflections"/> the cars reflect the sky alone.
     /// Sits on the race camera beside <see cref="RaceCameras"/>.
     /// </summary>
     [RequireComponent(typeof(RaceCameras))]
@@ -26,13 +29,16 @@ namespace TarmacGauntlet.Raceday
             public readonly int Shared;
             /// <summary>How many cars get their own probe, its face in pixels, and how many of them draw a face each frame.</summary>
             public readonly int Near, NearSize, Busy;
+            /// <summary>At night the nearest car's probe is drawn whole every frame.</summary>
+            public readonly bool Live;
 
-            public Tier(int shared, int near = 0, int nearSize = 0, int busy = 0)
+            public Tier(int shared, int near = 0, int nearSize = 0, int busy = 0, bool live = false)
             {
                 Shared = shared;
                 Near = near;
                 NearSize = nearSize;
                 Busy = busy;
+                Live = live;
             }
         }
 
@@ -40,8 +46,8 @@ namespace TarmacGauntlet.Raceday
         {
             new Tier(64),
             new Tier(128),
-            new Tier(128, 3, 512, 2),
-            new Tier(256, 5, 512, 3),
+            new Tier(128, 3, 512, 2, true),
+            new Tier(256, 5, 512, 3, true),
         };
 
         /// <summary>How far round the watched car the shared probe reaches, and how far it sees, m.</summary>
@@ -184,7 +190,18 @@ namespace TarmacGauntlet.Raceday
             DrawShared();
             if (nears.Count == 0) return;
             Pick();
-            DrawNear(Tiers[Mathf.Clamp(level, 0, Tiers.Length - 1)].Busy);
+            Tier tier = Tiers[Mathf.Clamp(level, 0, Tiers.Length - 1)];
+            Near live = tier.Live && NightBudget.On(sky != null ? sky.Lights : 0f) > 0f ? Live() : null;
+            DrawNear(live != null ? tier.Busy - 1 : tier.Busy, live);
+        }
+
+        /// <summary>The probe on the car nearest the camera, if it has one.</summary>
+        private Near Live()
+        {
+            if (picked.Count == 0) return null;
+            foreach (Near n in nears)
+                if (n.Car == picked[0]) return n;
+            return null;
         }
 
         /// <summary>The paint's night boost, from how far the circuit's lights are on.</summary>
@@ -285,8 +302,11 @@ namespace TarmacGauntlet.Raceday
             return new Bounds(car.TransformPoint(CarBuilder.BoxCentre), extent * 2f);
         }
 
-        /// <summary>Starts drawing the probes that are due, nearest car first, then the longest waiting, up to the budget.</summary>
-        private void DrawNear(int budget)
+        /// <summary>
+        /// Draws the live probe whole, then starts drawing the other probes that are due, nearest car first, then the
+        /// longest waiting, up to the budget.
+        /// </summary>
+        private void DrawNear(int budget, Near live)
         {
             int busy = 0;
             foreach (Near n in nears)
@@ -300,26 +320,32 @@ namespace TarmacGauntlet.Raceday
                     }
                     n.Rendering = -1;
                 }
-                else busy++;
+                else if (n != live) busy++;
             }
+            if (live != null && live.Rendering < 0) Draw(live, ReflectionProbeTimeSlicingMode.NoTimeSlicing);
             while (busy < budget)
             {
                 Near next = null;
                 foreach (CarController car in picked)
                 {
                     foreach (Near n in nears)
-                        if (n.Car == car && n.Rendering < 0 && (next == null || Due(n, next))) next = n;
+                        if (n != live && n.Car == car && n.Rendering < 0 && (next == null || Due(n, next))) next = n;
                     if (next != null && !next.Ready) break;
                 }
                 if (next == null) return;
-                next.Probe.transform.position = Capture(next.Car);
-                next.Probe.center = BodyBounds(next.Car.transform).center - next.Probe.transform.position;
-                next.Probe.timeSlicingMode = ReflectionProbeTimeSlicingMode.IndividualFaces;
-                next.Started = Time.frameCount;
-                next.Drawing = next.Car;
-                next.Rendering = next.Probe.RenderProbe();
+                Draw(next, ReflectionProbeTimeSlicingMode.IndividualFaces);
                 busy++;
             }
+        }
+
+        private static void Draw(Near n, ReflectionProbeTimeSlicingMode slicing)
+        {
+            n.Probe.transform.position = Capture(n.Car);
+            n.Probe.center = BodyBounds(n.Car.transform).center - n.Probe.transform.position;
+            n.Probe.timeSlicingMode = slicing;
+            n.Started = Time.frameCount;
+            n.Drawing = n.Car;
+            n.Rendering = n.Probe.RenderProbe();
         }
 
         /// <summary>True if a should be drawn before b: one not yet drawn at its car first, then the one waiting longest.</summary>

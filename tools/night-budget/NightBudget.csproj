@@ -10,7 +10,7 @@
     <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)../../out/night-budget/obj/</BaseIntermediateOutputPath>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Check.cs;Sweep.cs;Scene.cs;Stubs.cs" />
+    <Compile Include="Check.cs;Sweep.cs;CarSweep.cs;Scene.cs;Stubs.cs" />
     <Compile Include="../circuit/geometry-check/UnityStubs.cs" />
     <Compile Include="../furniture-check/Stubs.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/Circuit.cs" />
