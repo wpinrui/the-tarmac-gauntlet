@@ -136,7 +136,7 @@ static partial class Check
         // As the game's scene: quickest first, the player's car (the quickest) at the back.
         if (QuickestFirst) { order.Reverse(); order.Add(order[0]); order.RemoveAt(0); }
         var entries = order.Take(cars).Select(m => (m, 1f)).ToList();
-        var s = new Session(circuit, line, entries, rolling: true, LineFor, int.TryParse(Environment.GetEnvironmentVariable("START_SEED"), out int startSeed) ? startSeed : 11, garages: garages) { SlowPlayer = slowPlayer };
+        var s = new Session(circuit, line, entries, rolling: true, LineFor, int.TryParse(Environment.GetEnvironmentVariable("START_SEED"), out int startSeed) ? startSeed : 11, garages: garages, slowPlayer: slowPlayer, swapGarage: slowPlayer);
         if (glide) Watch(s, s.Cars[s.Cars.Count - 1]);
         var watch = System.Diagnostics.Stopwatch.StartNew();
         float worstSlip = 0f;
@@ -199,11 +199,29 @@ static partial class Check
         }
         if (slowPlayer >= 0)
         {
-            garageNote += $"slot {slowPlayer} out of its garage at {s.Launched[slowPlayer]:0} s and down the lane at {Session.SlowSpeed * 3.6f:0} km/h, out {Session.Clock(Math.Max(s.OutAtTime[slowPlayer], 0f))}, slot {slowPlayer + 1} out {Session.Clock(Math.Max(s.OutAtTime[slowPlayer + 1], 0f))}; ";
+            // The same field from the same garages with every car on the timetable: the cars ahead of the player in the
+            // grid should get out no later than they do here.
+            var plain = new Session(circuit, line, entries, rolling: true, LineFor, startSeed, garages: true, swapGarage: slowPlayer);
+            if (glide) Watch(plain, plain.Cars[plain.Cars.Count - 1]);
+            while (!plain.GaragesDone && plain.Time < 12f * 60f)
+                plain.Step();
+            float aheadOut = slowPlayer > 0 ? s.OutAtTime.Take(slowPlayer).Max() : 0f;
+            float plainOut = slowPlayer > 0 ? plain.OutAtTime.Take(slowPlayer).Max() : 0f;
+            float worstLate = 0f;
+            int lateCar = -1;
+            for (int i = 0; i < slowPlayer; i++)
+            {
+                float late = (s.OutAtTime[i] < 0f ? float.PositiveInfinity : s.OutAtTime[i]) - plain.OutAtTime[i];
+                if (late > worstLate) { worstLate = late; lateCar = i; }
+            }
+            garageNote += $"slot {slowPlayer} out of its garage at {s.Launched[slowPlayer]:0} s and down the lane at {Session.SlowSpeed * 3.6f:0} km/h, out {Session.Clock(Math.Max(s.OutAtTime[slowPlayer], 0f))}, every car ahead of it in the grid out by {Session.Clock(Math.Max(aheadOut, 0f))} (by {Session.Clock(Math.Max(plainOut, 0f))} with it on the timetable, worst {worstLate:0.0} s later), {s.PassThroughs} passes through it; ";
             // The formation lap cuts the field into place once the drive out is over (FinalFormation), so only the
             // drive out counts: no contacts while any car is still on its way out.
             problems.Clear();
             if (!s.GaragesDone) problems.Add("the field never all got out of the garages");
+            // Only the cars behind a player wait for them: every car ahead of them in the grid gets out as soon as it would
+            // with the player on the timetable.
+            if (worstLate > 3f) problems.Add($"{s.Name(s.Cars[lateCar])}, ahead of the player in the grid, got out {worstLate:0.0} s later than with the player on the timetable");
             var during = s.Contacts.Where(c => c.Time < s.GaragesDoneAt).ToList();
             if (during.Count > 0) problems.Add($"{during.Count} contacts on the way out, first {Describe(during[0])}");
             garageNote += $"{during.Count} contacts on the way out; ";

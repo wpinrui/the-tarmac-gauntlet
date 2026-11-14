@@ -98,9 +98,10 @@ sealed class Session
     /// <c>rolling</c> it starts behind the pace car, out of the garages with <c>garages</c>;
     /// otherwise it races from the grid at once.
     /// </summary>
-    public Session(Circuit circuit, RacingLine minimum, IList<(string Model, float Fuel)> entries, bool rolling, Func<string, RacingLine> lineFor, int seed = 11, bool garages = false)
+    public Session(Circuit circuit, RacingLine minimum, IList<(string Model, float Fuel)> entries, bool rolling, Func<string, RacingLine> lineFor, int seed = 11, bool garages = false, int slowPlayer = -1, int swapGarage = -1)
     {
         this.circuit = circuit;
+        SlowPlayer = slowPlayer;
         pits = new PitLane(circuit);
         var rng = new System.Random(seed);
         for (int i = 0; i < entries.Count; i++)
@@ -114,7 +115,10 @@ sealed class Session
             float smoothness = 30f + 60f * (float)rng.NextDouble();
             var supplies = Consumables.For(spec, new SpeedProfile(minimum, spec, AiPilot.LimitFor(pace)), smoothness);
             supplies.Fuel = supplies.Capacity * entries[i].Fuel;
-            int garage = garages ? GarageStart.GarageFor(i, pits.Garages) : i % pits.Garages;
+            // swapGarage, the slow player's slot, swaps garages with the pole car: the one nearest the pit exit, the
+            // worst place for the cars ahead of them in the grid, who all have to pass them.
+            int g = swapGarage > 0 && i == swapGarage ? 0 : swapGarage > 0 && i == 0 ? swapGarage : i;
+            int garage = garages ? GarageStart.GarageFor(g, pits.Garages) : i % pits.Garages;
             var pilot = new AiPilot(line, spec, pace, consistency, safety, i + 1);
             var car = new SessionCar
             {
@@ -159,9 +163,16 @@ sealed class Session
     public int[] Leaving;
     public float[] Launched, Joined, OutAtTime;
     public float GaragesDoneAt = -1f;
-    /// <summary>A slot driven as a player might: out of its garage late and down the pit lane at a crawl, or -1.</summary>
-    public int SlowPlayer = -1;
-    public const float SlowSpeed = 8f, SlowLeaves = 20f;
+    /// <summary>
+    /// A slot driven as a player might: out of its garage when it likes, not on the timetable, and down the pit lane at
+    /// a crawl, or -1. The cars ahead of it in the grid pass through it (RaceStart.Passes); the cars behind queue.
+    /// </summary>
+    public readonly int SlowPlayer = -1;
+    public const float SlowSpeed = 8f, SlowLeaves = 2f;
+    /// <summary>Times a car ahead of the slow player in the grid passed through it on the way out.</summary>
+    public int PassThroughs;
+    readonly HashSet<(int, int)> passing = new HashSet<(int, int)>();
+    bool Passes(int slot, int j) => j == SlowPlayer && j > slot;
     public float[] Along;
     float paceAlong;
     int[] progress;
@@ -223,8 +234,8 @@ sealed class Session
         AiRacer r = s.Racer;
         if (Leaving[i] == 0)
         {
-            bool late = i == SlowPlayer && Time < SlowLeaves;
-            if (late || !Garages.Launch(i) || !Garages.JoinClear(i, Along, Leaving.Select(l => l == 2).ToArray())) { brake = 1f; s.Car.Hold = true; return true; }
+            bool wait = i == SlowPlayer ? Time < SlowLeaves : !Garages.Launch(i) || !Garages.JoinClear(i, Along, Leaving.Select(l => l == 2).ToArray(), j => Passes(i, j));
+            if (wait) { brake = 1f; s.Car.Hold = true; return true; }
             Leaving[i] = 1;
             Launched[i] = Time;
             s.Car.Hold = false;
@@ -258,7 +269,7 @@ sealed class Session
         bool Close(float at, Vector3 p) { float g = Garages.Between(Along[i], at); return g > 0f && g < 80f && Garages.InWay(i, myK, p, Along[i]); }
         float follow = Close(paceAlong, PaceCar.Position) ? Garages.Behind(Along[i], s.Car.Speed, s.Car.Spec, paceAlong, PaceCar.Speed, PaceCar.Spec) : float.PositiveInfinity;
         for (int j = 0; j < Cars.Count; j++)
-            if (j != i && Leaving[j] == 2 && Close(Along[j], Cars[j].Car.Position)) follow = Math.Min(follow, Garages.Behind(Along[i], s.Car.Speed, s.Car.Spec, Along[j], Cars[j].Car.Speed, Cars[j].Car.Spec));
+            if (j != i && Leaving[j] == 2 && !Passes(i, j) && Close(Along[j], Cars[j].Car.Position)) follow = Math.Min(follow, Garages.Behind(Along[i], s.Car.Speed, s.Car.Spec, Along[j], Cars[j].Car.Speed, Cars[j].Car.Spec));
         r.FormationCap = i == SlowPlayer ? Math.Min(SlowSpeed, follow) : Garages.Cap(i, Along[i], follow);
         if (OutAtTime[i] < 0f && Garages.Out(Along[i])) OutAtTime[i] = Time;
         if (trace == s.Id && (int)(Time / Dt) % TraceEvery == 0)
@@ -636,7 +647,14 @@ sealed class Session
                 float nx = 0f, nz = 0f, depth = 0f;
                 bool hit = dx * dx + dz * dz < 30f && Race.Overlap(a, b, out nx, out nz, out depth);
                 var key = (i, j);
-                if (!hit) { touching.Remove(key); continue; }
+                if (!hit) { touching.Remove(key); passing.Remove(key); continue; }
+                // RaceStart.PassPlayers: a car ahead of the player, or the pace car, passes through them on the way out, and stays a
+                // ghost to them until the two are apart.
+                if ((i == Cars.Count || j == Cars.Count ? (i == SlowPlayer || j == SlowPlayer) : Passes(i, j) || Passes(j, i)) && (!GaragesDone || passing.Contains(key)))
+                {
+                    if (passing.Add(key)) PassThroughs++;
+                    continue;
+                }
                 if (bodies[i].Name.Contains("(ghost)") || bodies[j].Name.Contains("(ghost)"))
                 {
                     touching.Add(key);

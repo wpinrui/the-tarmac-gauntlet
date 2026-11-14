@@ -82,14 +82,14 @@ from the garages: after the grid show, the pit exit stage sends the whole field 
 (`GarageStart.cs`). Each car has a slot in a line that moves down the pit lane at a steady headway, the pace car
 two slots ahead, and leaves its garage just in time to meet its slot, so the garage order does not matter.
 A car that would cut into a car already on its way waits for it. A player who drives out slowly holds up
-everyone behind, who queue. Hold Enter to skip the stage; the formation lap then puts the field in place.
+only the cars behind them in the grid, who queue. The cars ahead of them, and the pace car, pass through them. Hold Enter to skip the stage; the formation lap then puts the field in place.
 Every car starts on a full tank. Grid races from the grid at once.
 
 The field is the season's 99 AI teams, by the class of their roster entry, and the player's. The timing
 tower in the top left (`RaceTower.cs`, order in `Standings.cs`) counts down the 24 hour race clock, which runs
 at 10:1 from the green or the first car out of the pit lane. It shows every class leader, the four cars either
 side of the player, and the fastest class in the rows left. Gaps are in fake laps, a tenth of the lap: the leader
-shows the fake laps it has completed and the rest +N behind it. `run.sh tower` checks the order.
+shows the fake laps it has completed and the rest +N behind it. `run.sh garageslow [slot]` does it with a slow player who leaves at once from the garage nearest the exit, last in the grid and then in slot 40: the cars ahead of them pass through them and get out as soon as they would without them, and nobody touches.sh tower` checks the order.
 
 AI driver (`AiDriver` on the car): Pace, Consistency and Safety (0 to 100) can be changed in the
 inspector during Play. Pace sets how much of the car's grip and braking it uses (86% at 0, 98% at 100),
@@ -190,12 +190,12 @@ After changing the AI or the car physics, run `bash tools/ai-check/run.sh` (need
 checks the line goes outside, apex, outside and that tuning shortens the lap, then drives the AI in a
 flat stand-in for `CarController` and checks that every car model laps without
 leaving the track and within 5% of its predicted time, that Pace, Consistency and Safety do what they
-say, and that overcooked corners cost time. `run.sh glide` checks gliding: every model's gliding lap
+say, and that overcooked corners cost time. `run.sh garageslow [slot]` does it with a slow player who leaves at once from the garage nearest the exit, last in the grid and then in slot 40: the cars ahead of them pass through them and get out as soon as they would without them, and nobody touches.sh glide` checks gliding: every model's gliding lap
 is within 1.5% of its driven one, a gliding mistake costs about what a driven one does, cars switch
 between gliding and physics without leaving the track or touching, 100 gliding cars at 16x keep their
-pace, and gliding cars still pit and start rolling with the pack. `run.sh garagestart` sends 100 cars out
+pace, and gliding cars still pit and start rolling with the pack. `run.sh garageslow [slot]` does it with a slow player who leaves at once from the garage nearest the exit, last in the grid and then in slot 40: the cars ahead of them pass through them and get out as soon as they would without them, and nobody touches.sh garagestart` sends 100 cars out
 of their garages into formation behind the pace car (`GARAGE_GLIDE=1` with the far cars gliding), and
-`run.sh garageslow` does it with a slow player in slot 40, checking the cars behind queue without touching. `StandInCar.cs` copies `CarController`'s formulas, so keep
+`run.sh garageslow [slot]` does it with a slow player who leaves at once from the garage nearest the exit, last in the grid and then in slot 40: the cars ahead of them pass through them and get out as soon as they would without them, and nobody touches.sh garageslow` does it with a slow player in slot 40, checking the cars behind queue without touching. `StandInCar.cs` copies `CarController`'s formulas, so keep
 it in step when those change.
 
 Driving: left and right arrows steer, up accelerates, down brakes (hold it at a standstill to
@@ -216,7 +216,7 @@ or gliding, laps about 13% slower, wears its tyres less and makes more mistakes.
 and loses its sun and shadows (`WeatherSky.cs`), the track darkens and shines, rain falls round the camera and the dozen
 cars nearest it throw spray. `weatherSeed` on `CircuitScene` replays one race's weather; 0 rolls a new one.
 `bash tools/weather-check/run.sh` rolls 4,000 races and checks how often it rains, when, how fast the track dries and what
-the grip does (`--races 40` draws a strip per race, `--table SEED` one race hour by hour). `run.sh wet` in the AI check
+the grip does (`--races 40` draws a strip per race, `--table SEED` one race hour by hour). `run.sh garageslow [slot]` does it with a slow player who leaves at once from the garage nearest the exit, last in the grid and then in slot 40: the cars ahead of them pass through them and get out as soon as they would without them, and nobody touches.sh wet` in the AI check
 drives every class on a wet track.
 
 Engine sound is synthesised live, with no recordings (`Raceday/Scripts/Audio/`). Each class has a
@@ -224,7 +224,7 @@ package in `EngineSounds.Tier` and each car is that package with a few values ch
 `EngineSynth` fires an exhaust pulse per cylinder down a pipe, then adds the intake, valvetrain, gear whine,
 turbo and hybrid motor. `EngineAudio` on each car feeds it the revs, throttle and road speed, and only the 10
 cars nearest the listener within 350 m play. To hear a change outside Unity, `bash tools/engine-audio/run.sh`
-(or `run.sh d-14 b` for one car or class) writes a WAV per car to `out/engine-audio/`.
+(or `run.sh garageslow [slot]` does it with a slow player who leaves at once from the garage nearest the exit, last in the grid and then in slot 40: the cars ahead of them pass through them and get out as soon as they would without them, and nobody touches.sh d-14 b` for one car or class) writes a WAV per car to `out/engine-audio/`.
 
 Free camera: move the mouse to look, `W` `A` `S` `D` move along the ground, `Q` and `E` go down and up,
 `Shift` is 5x faster and the scroll wheel changes speed. Click to capture the mouse, `Esc` frees it.
