@@ -1,5 +1,5 @@
 """Team Tora Racing on the Tora Giga: cubist facets in shades of orange, bold black streaks,
-the Tora badge in white and the 虎 seal. Two candidates, Shatter and Folded.
+the Tora badge outlined in white and the 虎 seal. Two candidates, Shatter and Folded.
 
 Run: python3 design.py   (after views.js has drawn out/views)
 """
@@ -13,11 +13,12 @@ sys.path.insert(0, str(HERE.parent / "common"))
 from livery import Livery  # noqa: E402
 
 VIEWS = HERE / "out" / "views" / "views.json"
-BADGE = HERE / "marks" / "tora-badge-white.svg"
+BADGE = HERE / "marks" / "tora-badge-outline.svg"
 SEAL = HERE / "marks" / "seal.svg"
 
 SHADES = ["#ffb04a", "#f8913a", "#ee6a1f", "#e05a1a", "#c94b14", "#a83c10"]
 BLACK = "#16130f"
+SHADE = "rgba(22,19,15,0.5)"  # side streaks darken the facets under them
 WHITE = "#f6f3ee"
 BASE = "#ee6a1f"
 
@@ -72,15 +73,13 @@ def rect(c0, c1, w, h):
 
 
 def door_number(lv, z, y, w, h):
-    """A white panel with the race number in black, on both sides."""
-    side(lv, rect(z, y, w, h), WHITE)
-    lv.side_number(z, y, w * 0.88, h * 0.74, BLACK)
+    """The race number in black outlined in white (the livery's own digits), on both sides."""
+    lv.side_number(z, y, w, h, BLACK, edge=WHITE)
 
 
 def roof_number(lv, z):
     # Reads from in front of the car: the panel's width runs across the car.
-    top(lv, rect(0, z, 0.72, 0.46), WHITE)
-    lv.number("top", (0, 0, z), 0.64, 0.34, BLACK, rotate=-90)
+    lv.number("top", (0, 0, z), 0.64, 0.34, BLACK, rotate=-90, edge=WHITE)
 
 
 def badge_top(lv, z, h):
@@ -103,13 +102,13 @@ def shatter():
     nose = lambda z, _: 0.5 - z / 5  # light at the nose, dark at the tail
     fill_views(lv, 0.3, 0.0, nose, nose, 11)
     for s in (streak(-2.45, 1.0, 1.7, 0.74, 0.2), streak(-2.45, 0.5, 0.5, 0.36, 0.15), streak(2.45, 0.86, 0.7, 0.8, 0.1)):
-        side(lv, s, BLACK)
+        side(lv, s, SHADE)
     for x in (-0.72, 0.72):
         top(lv, streak(x, -2.45, x * 0.9, 0.3, 0.18), BLACK)
     for x in (-0.9, 0.9):
         end(lv, "front", streak(x, 1.0, x * 0.25, 0.78, 0.14), BLACK)
     end(lv, "rear", streak(-1.05, 0.92, 1.05, 0.76, 0.16), BLACK)
-    door_number(lv, 0.0, 0.58, 0.72, 0.46)
+    door_number(lv, 0.0, 0.58, 0.66, 0.36)
     roof_number(lv, -0.4)
     badge_top(lv, 1.5, 0.72)
     lv.side_mark(SEAL, -0.87, 0.6, 0.3)
@@ -120,13 +119,13 @@ def folded():
     lv = Livery(VIEWS, BASE)
     fill_views(lv, 0.55, 0.6, lambda z, y: 0.5 + 0.4 * math.sin(z * 1.6 + y * 2), lambda z, x: 0.5 + 0.4 * math.sin(z * 1.6 + x * 2), 71)
     for s in (streak(2.3, 0.8, -2.2, 0.98, 0.22), streak(-2.45, 0.42, -0.6, 0.33, 0.14)):
-        side(lv, s, BLACK)
+        side(lv, s, SHADE)
     for x in (-0.45, 0.45):
         top(lv, streak(x, 2.3, x * 1.65, -1.2, 0.22), BLACK)
     for x in (-0.15, 0.15):
         end(lv, "front", streak(x * 5, 0.62, x * 2, 0.9, 0.2), BLACK)
     lv.side_mark(BADGE, 0.0, 0.55, 0.46)
-    door_number(lv, -0.86, 0.66, 0.36, 0.26)
+    door_number(lv, -0.86, 0.66, 0.34, 0.22)
     roof_number(lv, -0.4)
     badge_top(lv, 1.45, 0.7)
     lv.mark("top", SEAL, (0, 0, -2.05), 0.28, rotate=-90)
