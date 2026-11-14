@@ -46,6 +46,11 @@ namespace TarmacGauntlet.Simulation
         /// Each chance is compounded over it, so the risk follows time on track, not laps counted.
         /// </summary>
         public double Exposure { get; init; } = 1;
+        /// <summary>
+        /// False skips the race-ending failure roll: the driven race rolls it on its own through the lap
+        /// (<see cref="RiskRolls.RollFailure"/>), so a failure can strike anywhere on track, not only at the line.
+        /// </summary>
+        public bool RollFailure { get; init; } = true;
     }
 
     public sealed record LapRiskResult
@@ -57,6 +62,8 @@ namespace TarmacGauntlet.Simulation
         /// If non-null, the car should be retired; NewIssues will be empty.
         /// </summary>
         public FailureType? Failure { get; init; }
+        /// <summary>For a mechanical failure, the id of what broke (<see cref="IssueTemplates.MechanicalFailures"/>); else null.</summary>
+        public string? FailureId { get; init; }
     }
 
     /// <summary>Port of simulation/riskRolls.ts.</summary>
@@ -90,7 +97,7 @@ namespace TarmacGauntlet.Simulation
 
         // --- Failure probability modifiers ---
         /// <summary>Base chance of a race-ending failure per lap under ideal conditions.</summary>
-        private const double BaseFailureProb = 0.003;
+        private const double BaseFailureProb = 0.0049;
 
         /// <summary>
         /// At 0% condition this factor is added on top of 1.0, quintupling the failure probability.
@@ -202,14 +209,11 @@ namespace TarmacGauntlet.Simulation
             var random = ctx.Random ?? DefaultRandom.Next;
 
             // 1. Check for terminal failure first.
-            double failureProb = FailureEffectiveProbability(
-                ctx.Condition,
-                ctx.CarAge,
-                ctx.Reliability,
-                ctx.DriverSafety,
-                ctx.InstructionMode);
-            if (random() < Over(failureProb, ctx.Exposure))
-                return new LapRiskResult { NewIssues = Array.Empty<ActiveIssue>(), Failure = FailureType.Mechanical };
+            if (ctx.RollFailure)
+            {
+                LapRiskResult failure = RollFailure(ctx);
+                if (failure.Failure.HasValue) return failure;
+            }
 
             // 2. Two-step issue roll: does something break?
             double issueProb = IssueEffectiveProbability(ctx.Condition, ctx.Reliability, ctx.InstructionMode);
@@ -227,5 +231,26 @@ namespace TarmacGauntlet.Simulation
 
             return new LapRiskResult { NewIssues = newIssues, Failure = null };
         }
+
+        /// <summary>
+        /// The race-ending mechanical failure roll alone, over <see cref="LapRiskContext.Exposure"/> laps' worth of
+        /// driving, with what broke picked at random (<see cref="PickFailure"/>). No failure gives an empty result.
+        /// </summary>
+        public static LapRiskResult RollFailure(LapRiskContext ctx)
+        {
+            var random = ctx.Random ?? DefaultRandom.Next;
+            double failureProb = FailureEffectiveProbability(
+                ctx.Condition,
+                ctx.CarAge,
+                ctx.Reliability,
+                ctx.DriverSafety,
+                ctx.InstructionMode);
+            if (random() >= Over(failureProb, ctx.Exposure)) return new LapRiskResult();
+            return new LapRiskResult { Failure = FailureType.Mechanical, FailureId = PickFailure(random) };
+        }
+
+        /// <summary>What broke in a race-ending mechanical failure: a weighted draw over <see cref="IssueTemplates.MechanicalFailures"/>.</summary>
+        public static string PickFailure(Func<double> random) =>
+            WeightedPick(IssueTemplates.MechanicalFailures, Array.Empty<ActiveIssue>(), random)!.Id;
     }
 }

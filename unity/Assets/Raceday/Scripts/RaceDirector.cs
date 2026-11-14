@@ -10,7 +10,8 @@ namespace TarmacGauntlet.Raceday
     /// (<see cref="Consumables.Stint"/>), and logs the lap, which ages the car and may give it an issue or retire it: issues cut the car's
     /// power, grip, fuel efficiency and tyre life until a stop fixes them. Hits on barriers and other cars damage it, and a
     /// big enough hit totals it (<see cref="CarDamage"/>); a car far from the camera, with no physics, takes its hits by chance.
-    /// A car out of the race stops, and a moment later is in its garage (<see cref="Retire"/>). After a stop's driver change, the new driver drives at their own pace.
+    /// A car out of the race stops: one that broke down pulls off onto the verge, smoking, its engine dead (<see cref="Breakdown"/>).
+    /// It sits there for <see cref="WreckWait"/>, then is in its garage (<see cref="Retire"/>). After a stop's driver change, the new driver drives at their own pace.
     /// The driver at the wheel tires lap by lap (<see cref="CarRaceLog.Fatigue"/>), which slows the car until a stop puts in someone fresh. When the
     /// race clock runs out the leader takes the chequered flag the next time it crosses the line, and every car
     /// after it as each crosses the line (<see cref="RaceDay.CompleteLap"/>). Past the flag a car drives a
@@ -23,13 +24,13 @@ namespace TarmacGauntlet.Raceday
     public sealed class RaceDirector : MonoBehaviour
     {
         /// <summary>The race is called this long after the time runs out, s, for cars that never come round.</summary>
-        public const float FlagWait = 400f;
+        public const float FlagWait = RaceEnd.FlagWait;
         /// <summary>How long the cooldown laps may take once <see cref="FlagWait"/> is up, s, for cars that never park.</summary>
         public const float CooldownWait = 700f;
         /// <summary>Share of its racing speed a car drives its cooldown lap at.</summary>
         public const float CooldownSpeed = 0.6f;
-        /// <summary>Seconds a car out of the race stays where it stopped before it is taken back to its garage.</summary>
-        public const float WreckWait = 5f;
+        /// <summary>Seconds a car out of the race sits where it stopped before it is taken back to its garage.</summary>
+        public const float WreckWait = 20f;
         /// <summary>How far across the pit lane the summary's camera stands from the player's box, m.</summary>
         public const float SummaryDistance = 11f;
 
@@ -38,6 +39,14 @@ namespace TarmacGauntlet.Raceday
         public RaceCar[] Cars;
         public AiDriver[] Drivers;
         public RaceTower Tower;
+        /// <summary>Smoke for a car that breaks down, or null.</summary>
+        public CarEffects Effects;
+
+        /// <summary>
+        /// A car's engine or running gear gave out on track, at any point in the lap: its index, and what broke. Raised
+        /// as the car is taken out of the race, before it stops.
+        /// </summary>
+        public event Action<int, IssueTemplate> MechanicalFailure;
 
         public bool Finished { get; private set; }
         /// <summary>True once the race is under way: from the green.</summary>
@@ -60,6 +69,16 @@ namespace TarmacGauntlet.Raceday
         private float timeUpAt = -1f;
         private RaceSave resume;
         private readonly System.Random hitRoll = new System.Random();
+        /// <summary>True for a car out of the race and still out on the track, not yet back in its garage.</summary>
+        private bool[] outOnTrack;
+
+        /// <summary>
+        /// What broke on car <paramref name="i"/>, from the moment it broke down until it is back in its garage, or null:
+        /// for a car still racing, one out for any other reason, and one already in its garage.
+        /// </summary>
+        public IssueTemplate BrokenDown(int i) =>
+            outOnTrack != null && i >= 0 && i < outOnTrack.Length && outOnTrack[i] && Day.Cars[i].RetirementReason == FailureType.Mechanical
+                ? Day.Cars[i].Failure : null;
 
         /// <summary>Carries on a saved race: its clocks pick up where the save left them.</summary>
         public void Resume(RaceSave save) => resume = save;
@@ -92,21 +111,8 @@ namespace TarmacGauntlet.Raceday
             if (RaceWeekend.CanSkipToEnd) FinishNow();
         }
 
-        /// <summary>
-        /// True once the time is up and the player's race is over: their car has taken the flag or is out.
-        /// With no car of the player's in the race, once the first car has taken the flag.
-        /// </summary>
-        private bool PlayerDone()
-        {
-            if (timeUpAt < 0f) return false;
-            bool any = false;
-            foreach (CarRaceLog log in Day.Cars)
-            {
-                if (log.Car.Player) return log.Flagged || log.Retired;
-                any |= log.Flagged;
-            }
-            return any;
-        }
+        /// <summary>True once the time is up and the player's race is over (<see cref="RaceEnd.PlayerDone"/>).</summary>
+        private bool PlayerDone() => RaceEnd.PlayerDone(Day, SinceTimeUp);
 
         /// <summary>A car past the flag: its cooldown lap, slow and off the line, then into its box (<see cref="Consumables.RaceOver"/>).</summary>
         private void TakeFlag(int i)
@@ -125,6 +131,7 @@ namespace TarmacGauntlet.Raceday
             driverShown = new int[Cars.Length];
             crossed = new float[Cars.Length];
             pitLap = new bool[Cars.Length];
+            outOnTrack = new bool[Cars.Length];
             for (int i = 0; i < Cars.Length; i++)
             {
                 controllers[i] = Cars[i].GetComponent<CarController>();
@@ -195,6 +202,13 @@ namespace TarmacGauntlet.Raceday
                         continue;
                     }
                 }
+                // A race-ending failure can strike anywhere on the lap: it is rolled for every second on track.
+                if (!Cars[i].InPitLane && Day.Drive(i, Tower.RaceTime, Time.deltaTime, supplies.Mode))
+                {
+                    if (log.Failure != null) MechanicalFailure?.Invoke(i, log.Failure);
+                    Retire(i);
+                    continue;
+                }
                 // A car far from the camera runs with no physics, so it can't hit anything: it takes its hits by chance.
                 if (controllers[i].Asleep && !Cars[i].InPitLane && CarDamage.RollHit(Time.deltaTime, hitRoll.NextDouble) is double impact)
                 {
@@ -214,21 +228,8 @@ namespace TarmacGauntlet.Raceday
             if (AllParked() || (timeUpAt >= 0f && Time.time - timeUpAt > FlagWait + CooldownWait)) Finish();
         }
 
-        /// <summary>
-        /// True once every car still in the race has taken the flag, or been given up on after <see cref="FlagWait"/>:
-        /// the results stand, whatever is left of the cooldown laps.
-        /// </summary>
-        public bool FieldFlagged
-        {
-            get
-            {
-                if (Day == null || timeUpAt < 0f) return false;
-                if (Time.time - timeUpAt > FlagWait) return true;
-                foreach (CarRaceLog log in Day.Cars)
-                    if (!log.Retired && !log.Flagged) return false;
-                return true;
-            }
-        }
+        /// <summary>True once every car still in the race has taken the flag, or been given up on (<see cref="RaceEnd.FieldFlagged"/>).</summary>
+        public bool FieldFlagged => RaceEnd.FieldFlagged(Day, SinceTimeUp);
 
         /// <summary>True once every car still in the race has taken the flag and parked in its box.</summary>
         private bool AllParked()
@@ -269,21 +270,42 @@ namespace TarmacGauntlet.Raceday
         }
 
         /// <summary>
-        /// Car i is out and can't drive on, whatever put it out. Nobody drives it: it stops where it is, stays in the
-        /// other cars' traffic so they drive round it, and after <see cref="WreckWait"/> it is back in its garage.
+        /// Car i is out and can't drive on, whatever put it out, and nobody drives it. One that broke down smokes, its
+        /// engine dies, and it coasts off onto the verge and stops there (<see cref="Breakdown"/>); any other stops where it
+        /// is. It stays in the other cars' traffic so they drive round it, and once it has sat there for
+        /// <see cref="WreckWait"/> it is back in its garage.
         /// </summary>
         private void Retire(int i)
         {
             CarController car = controllers[i];
-            Drivers[i].enabled = false;
-            car.Hold = true;
+            int from = Drivers[i].Pilot != null ? Drivers[i].Pilot.Index : 0;
+            Drivers[i].enabled = false;   // a car gliding far from the camera is back in its physics
             car.InputEnabled = false;
-            StartCoroutine(ToGarage(i));
+            outOnTrack[i] = !Cars[i].InPitLane;
+            Breakdown pullOff = null;
+            if (Day.Cars[i].RetirementReason == FailureType.Mechanical && outOnTrack[i] && Drivers[i].Line != null)
+            {
+                pullOff = car.gameObject.AddComponent<Breakdown>();
+                pullOff.Line = Drivers[i].Line;
+                pullOff.From = from;
+                if (car.TryGetComponent(out EngineAudio engine)) engine.Die();
+                if (Effects != null) Effects.BrokeDown(i, true);
+            }
+            else car.Hold = true;
+            StartCoroutine(ToGarage(i, pullOff));
         }
 
-        private System.Collections.IEnumerator ToGarage(int i)
+        private System.Collections.IEnumerator ToGarage(int i, Breakdown pullOff)
         {
+            if (pullOff != null)
+            {
+                float giveUp = Time.time + Breakdown.GiveUp + 1f;
+                while (pullOff != null && !pullOff.Stopped && Time.time < giveUp) yield return null;
+            }
             yield return new WaitForSeconds(WreckWait);
+            if (pullOff != null) Destroy(pullOff);
+            if (Effects != null) Effects.BrokeDown(i, false);
+            outOnTrack[i] = false;
             ParkInGarage(Cars[i]);
         }
 

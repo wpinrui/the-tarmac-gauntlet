@@ -66,11 +66,11 @@ namespace TarmacGauntlet.Management
                     p.Shadow.style.display = shown ? DisplayStyle.Flex : DisplayStyle.None;
                     Rect r = g.layout;
                     FitShadow(p, r);
-                    // box-shadow: 0 24px 60px: the shadow reaches 40px past the pane, offset 24px down.
-                    p.Shadow.style.left = r.x - 40;
-                    p.Shadow.style.top = r.y - 16;
-                    p.Shadow.style.width = r.width + 80;
-                    p.Shadow.style.height = r.height + 80;
+                    // box-shadow: 0 0 12px: centred on the pane, reaching ShadowReach px past every side.
+                    p.Shadow.style.left = r.x - ShadowReach;
+                    p.Shadow.style.top = r.y - ShadowReach;
+                    p.Shadow.style.width = r.width + 2 * ShadowReach;
+                    p.Shadow.style.height = r.height + 2 * ShadowReach;
                 }
                 if (!shown) continue;
 
@@ -118,7 +118,7 @@ namespace TarmacGauntlet.Management
         }
 
         /// <summary>How far the shadow reaches past the pane, and over how much of that it fades in, px.</summary>
-        private const int ShadowReach = 40, ShadowSoft = 32;
+        private const int ShadowReach = 12, ShadowSoft = 10;
 
         /// <summary>Gives the pane's shadow the corners the pane has: a round button casts a round shadow.</summary>
         private void FitShadow(Pane p, Rect r)

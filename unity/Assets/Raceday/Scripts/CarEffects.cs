@@ -8,12 +8,13 @@ using UnityEngine.Rendering;
 namespace TarmacGauntlet.Raceday
 {
     /// <summary>
-    /// The cars' heat and friction: smoke off locked and spinning tyres, sparks where a car bottoms out at speed, haze
+    /// The cars' heat and friction: smoke pouring out of a car that has broken down (<see cref="BrokeDown"/>), smoke off locked and spinning tyres, sparks where a car bottoms out at speed, haze
     /// behind the exhausts and brake discs glowing after a hard stop. It also sets how strongly the far tarmac shimmers in
     /// the heat (<see cref="HeatHazeFeature"/>) from the sun, the cloud and the wet. Cheap by design: smoke, sparks and haze
     /// are one particle system each, fed only by the cars nearest the camera, with a cap on cars and particles for each
     /// quality level; the discs' heat is a sum a car, and a car's glowing discs are four small quads drawn only while hot.
-    /// Each part follows its graphics option and draws nothing with it off. None of it is drawn into a reflection probe:
+    /// Each part follows its graphics option and draws nothing with it off, except a broken-down car's smoke, which always
+    /// shows: it tells you a car is out. None of it is drawn into a reflection probe:
     /// a car's probe sits in its body, and the sparks under it or its own glowing discs filled the probe and whited out
     /// the whole car's paint (CarReflections).
     /// </summary>
@@ -41,11 +42,22 @@ namespace TarmacGauntlet.Raceday
         private const float SparkSpeed = 12f, SparkRate = 260f;
         /// <summary>Haze puffs a second from one car at full throttle.</summary>
         private const float HazeRate = 22f;
+        /// <summary>Most puffs in the air from broken-down cars, at any quality level; puffs a second from one at a standstill and at speed.</summary>
+        private const int FailureMost = 500;
+        private const float FailureRate = 14f, FailureFastRate = 34f;
+        /// <summary>Broken-down cars further from the camera than this throw nothing, m.</summary>
+        private const float FailureRange = 400f;
+        /// <summary>Seconds a broken-down car smokes hardest for, before it settles to a steady trail.</summary>
+        private const float FailureBurst = 4f;
         /// <summary>Discs glow from inside the rim at this share of the wheel's radius, and sit this far in from its centre, m.</summary>
         private const float DiscRadius = 0.62f, DiscInset = 0.05f;
 
-        private ParticleSystem smoke, sparks, haze;
-        private Material smokeMaterial, sparkMaterial, hazeMaterial, discMaterial;
+        private ParticleSystem smoke, sparks, haze, failureSmoke;
+        private Material smokeMaterial, sparkMaterial, hazeMaterial, discMaterial, failureMaterial;
+        /// <summary>The broken-down cars still smoking, with when each broke down, game seconds, and its puffs owed.</summary>
+        private readonly Dictionary<int, float> brokeAt = new Dictionary<int, float>();
+        private readonly Dictionary<int, float> failureOwed = new Dictionary<int, float>();
+        private readonly List<int> broken = new List<int>();
         private Mesh discMesh;
         private int level = -1;
         private float picked = -1f, levelRead = -1f;
@@ -62,6 +74,8 @@ namespace TarmacGauntlet.Raceday
         /// <summary>What this hid from the reflection probe drawing now, to show again after it.</summary>
         private readonly List<Renderer> hidden = new List<Renderer>();
 
+        private static readonly int TintId = Shader.PropertyToID("_Tint");
+        private static readonly Color FailureTint = new Color(0.42f, 0.42f, 0.44f, 1f);
         private static readonly int GlowId = Shader.PropertyToID("_Glow"), SoftId = Shader.PropertyToID("_EffectsSoft"),
             DarkId = Shader.PropertyToID("_EffectsDark");
 
@@ -79,11 +93,15 @@ namespace TarmacGauntlet.Raceday
             sparkMaterial = new Material(Resources.Load<Shader>("Effects/Sparks")) { name = "Sparks" };
             hazeMaterial = new Material(Resources.Load<Shader>("Effects/Haze")) { name = "Exhaust haze" };
             discMaterial = new Material(Resources.Load<Shader>("Effects/BrakeGlow")) { name = "Brake glow" };
+            // Oil and coolant burning: darker and denser than tyre smoke.
+            failureMaterial = new Material(smokeMaterial) { name = "Failure smoke" };
+            failureMaterial.SetColor(TintId, FailureTint);
             discMesh = Quad();
             block = new MaterialPropertyBlock();
             smoke = MakeSmoke();
             sparks = MakeSparks();
             haze = MakeHaze();
+            failureSmoke = MakeFailureSmoke();
             ReadLevel();
             foreach (GraphicsOption o in new[] { GraphicsOptions.TyreSmoke, GraphicsOptions.Sparks, GraphicsOptions.ExhaustHaze, GraphicsOptions.BrakeGlow })
                 o.Changed += OnOption;
@@ -98,6 +116,7 @@ namespace TarmacGauntlet.Raceday
             Hide(smoke != null ? smoke.GetComponent<Renderer>() : null);
             Hide(sparks != null ? sparks.GetComponent<Renderer>() : null);
             Hide(haze != null ? haze.GetComponent<Renderer>() : null);
+            Hide(failureSmoke != null ? failureSmoke.GetComponent<Renderer>() : null);
             if (discs == null) return;
             foreach (Discs d in discs)
                 if (d != null && d.Shown)
@@ -135,6 +154,7 @@ namespace TarmacGauntlet.Raceday
             Destroy(sparkMaterial);
             Destroy(hazeMaterial);
             Destroy(discMaterial);
+            Destroy(failureMaterial);
             Destroy(discMesh);
         }
 
@@ -203,6 +223,7 @@ namespace TarmacGauntlet.Raceday
 
             Glow(dt);
             if (dt <= 1e-5f) return;
+            if (brokeAt.Count > 0 && cam != null) Failures(cam.transform.position, dt);
             // Water on the track takes the heat out of a sliding tyre: little smoke in the wet.
             float dryness = 1f - 0.85f * weather.Wet;
             bool smoking = GraphicsOptions.TyreSmoke.On && smoke.main.maxParticles > 0;
@@ -245,6 +266,65 @@ namespace TarmacGauntlet.Raceday
             {
                 if (i < smokeCars) nearSmoke.Add(byDistance[i].Item2);
                 if (i < hazeCars && byDistance[i].Item1 < HazeRange * HazeRange) nearHaze.Add(byDistance[i].Item2);
+            }
+        }
+
+        // ---- Broken-down cars ----------------------------------------------------------------
+
+        /// <summary>
+        /// Car c has broken down: smoke pours from its engine bay, hardest at first, until <paramref name="smoking"/> is
+        /// false, as it is taken back to its garage.
+        /// </summary>
+        public void BrokeDown(int c, bool smoking)
+        {
+            if (smoking)
+            {
+                brokeAt[c] = Time.time;
+                failureOwed[c] = 0f;
+            }
+            else
+            {
+                brokeAt.Remove(c);
+                failureOwed.Remove(c);
+            }
+        }
+
+        private void Failures(Vector3 camera, float dt)
+        {
+            broken.Clear();
+            broken.AddRange(brokeAt.Keys);
+            foreach (int c in broken)
+            {
+                CarController car = c < Cars.Length ? Cars[c] : null;
+                if (car == null || !car.isActiveAndEnabled || car.Spec == null) continue;
+                Transform body = car.transform;
+                if ((body.position - camera).sqrMagnitude > FailureRange * FailureRange)
+                {
+                    failureOwed[c] = 0f;
+                    continue;
+                }
+                float age = Time.time - brokeAt[c];
+                float burst = 1f + 1.5f * Mathf.Clamp01(1f - age / FailureBurst);
+                float rate = Mathf.Lerp(FailureRate, FailureFastRate, Mathf.Clamp01(car.Speed / 30f)) * burst;
+                float owed = failureOwed[c] + rate * dt;
+                // From under the back of the car, where the engine, gearbox and exhaust are.
+                Vector3 at = body.TransformPoint(new Vector3(0f, 0.45f, -(car.Spec.HalfWheelbase + 0.4f)));
+                Vector3 velocity = car.Velocity;
+                for (; owed >= 1f; owed -= 1f)
+                {
+                    var p = new ParticleSystem.EmitParams
+                    {
+                        position = at + new Vector3(UnityEngine.Random.Range(-0.5f, 0.5f), UnityEngine.Random.Range(-0.15f, 0.2f), UnityEngine.Random.Range(-0.4f, 0.4f)),
+                        velocity = velocity * UnityEngine.Random.Range(0.3f, 0.5f) + body.up * UnityEngine.Random.Range(0.8f, 1.8f)
+                            + body.right * UnityEngine.Random.Range(-0.6f, 0.6f),
+                        startSize = UnityEngine.Random.Range(0.7f, 1.2f) * (0.8f + 0.2f * burst),
+                        startLifetime = UnityEngine.Random.Range(3f, 4.5f),
+                        rotation = UnityEngine.Random.Range(0f, 360f),
+                        startColor = Color.white,
+                    };
+                    failureSmoke.Emit(p, 1);
+                }
+                failureOwed[c] = owed;
             }
         }
 
@@ -476,9 +556,11 @@ namespace TarmacGauntlet.Raceday
         /// Smoke: puffs that billow out to several times their size, slow in the air, rise and drift apart, and thin away
         /// over a few seconds, so a long lockup leaves a cloud hanging over the track.
         /// </summary>
-        private ParticleSystem MakeSmoke()
+        private ParticleSystem MakeSmoke() => MakeSmokeLike("Tyre smoke", smokeMaterial);
+
+        private ParticleSystem MakeSmokeLike(string name, Material material)
         {
-            ParticleSystem ps = MakeSystem("Tyre smoke", smokeMaterial);
+            ParticleSystem ps = MakeSystem(name, material);
             ParticleSystem.LimitVelocityOverLifetimeModule drag = ps.limitVelocityOverLifetime;
             drag.enabled = true;
             drag.limit = 1000f;
@@ -510,6 +592,15 @@ namespace TarmacGauntlet.Raceday
             });
             renderer.maxParticleSize = 0.8f;
             renderer.sortMode = ParticleSystemSortMode.Distance;
+            return ps;
+        }
+
+        /// <summary>A broken-down car's smoke: tyre smoke's billowing puffs, darker, rising higher and hanging longer.</summary>
+        private ParticleSystem MakeFailureSmoke()
+        {
+            ParticleSystem ps = MakeSmokeLike("Failure smoke", failureMaterial);
+            ParticleSystem.MainModule main = ps.main;
+            main.maxParticles = FailureMost;
             return ps;
         }
 

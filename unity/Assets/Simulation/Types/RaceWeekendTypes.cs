@@ -81,6 +81,8 @@ namespace TarmacGauntlet.Simulation
         public int Laps { get; init; }
         public bool Retired { get; init; }
         public FailureType? RetirementReason { get; init; }
+        /// <summary>For a mechanical failure, the id of what broke (<see cref="IssueTemplates.Find"/>); else null.</summary>
+        public string? FailureId { get; init; }
         public double? BestLap { get; init; }
         public double PrizeMoney { get; init; }
     }

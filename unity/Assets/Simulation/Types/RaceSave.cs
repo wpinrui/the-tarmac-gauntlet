@@ -74,6 +74,8 @@ namespace TarmacGauntlet.Simulation
         public int SpareParts { get; init; }
         public bool Retired { get; init; }
         public FailureType? RetirementReason { get; init; }
+        /// <summary>For a mechanical failure, the id of what broke.</summary>
+        public string? FailureId { get; init; }
         public double LastLineTime { get; init; }
         public bool Flagged { get; init; }
         public double FuelAdded { get; init; }

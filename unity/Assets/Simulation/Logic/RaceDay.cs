@@ -49,6 +49,10 @@ namespace TarmacGauntlet.Simulation
         public int SpareParts { get; private set; }
         public bool Retired { get; private set; }
         public FailureType? RetirementReason { get; private set; }
+        /// <summary>For a car out with a mechanical failure, the id of what broke (<see cref="IssueTemplates.MechanicalFailures"/>); else null.</summary>
+        public string? FailureId { get; private set; }
+        /// <summary>For a car out with a mechanical failure, what broke: its <see cref="IssueTemplate.Description"/> names it. Else null.</summary>
+        public IssueTemplate? Failure => IssueTemplates.Find(FailureId);
         /// <summary>Race seconds when the car last crossed the line. Retiring doesn't move it: the car is classified on the laps it completed, when it completed them.</summary>
         public double LastLineTime { get; private set; }
         /// <summary>True once the car has crossed the line after the race time ran out.</summary>
@@ -117,8 +121,8 @@ namespace TarmacGauntlet.Simulation
         public CarStats Stats => EffectiveStats.CalculateEffectiveStats(Car.Car with { Condition = Condition }, Car.Model);
 
         /// <summary>
-        /// A lap completed at <paramref name="raceTime"/>: ages the car, then rolls for issues and a
-        /// race-ending failure. Returns the issues it picked up; check <see cref="Retired"/> after.
+        /// A lap completed at <paramref name="raceTime"/>: ages the car, then rolls for issues. Returns the issues it
+        /// picked up. A race-ending failure is rolled through the lap instead (<see cref="Drive"/>).
         /// </summary>
         public IReadOnlyList<ActiveIssue> CompleteLap(double raceTime, double lapSeconds, InstructionMode mode, bool timeUp, Func<double> random)
         {
@@ -150,15 +154,11 @@ namespace TarmacGauntlet.Simulation
                 IssueTemplates = IssueTemplates.MechanicalIssues,
                 Random = random,
                 Exposure = exposure,
+                RollFailure = false,
             });
             Condition = Degradation.UpdateCarCondition(Condition, Car.Car.Age, Car.EngineerSkill, mode, exposure);
             double fatiguePerLap = Degradation.UpdateDriverFatigue(0, stats.Comfort, Driver.Stats.Stamina, mode);
             Fatigue = Math.Min(100, Fatigue + fatiguePerLap * exposure);
-            if (risk.Failure.HasValue)
-            {
-                Retire(raceTime, risk.Failure.Value);
-                return Array.Empty<ActiveIssue>();
-            }
             foreach (ActiveIssue issue in risk.NewIssues)
             {
                 active.Add(issue);
@@ -167,18 +167,47 @@ namespace TarmacGauntlet.Simulation
             return risk.NewIssues;
         }
 
-        /// <summary>Takes the car out of the race, as at a race-ending failure.</summary>
-        public void Retire(double raceTime, FailureType reason)
+        /// <summary>
+        /// <paramref name="seconds"/> more of driving on track: rolls for a race-ending mechanical failure over them,
+        /// so a failure can strike anywhere on the lap. Returns true if the car failed: it is out, and
+        /// <see cref="Failure"/> names what broke.
+        /// </summary>
+        public bool Drive(double raceTime, double seconds, InstructionMode mode, Func<double> random)
+        {
+            if (Retired || Flagged || seconds <= 0) return false;
+            LapRiskResult risk = RiskRolls.RollFailure(new LapRiskContext
+            {
+                CurrentLap = Laps + 1,
+                Condition = Condition,
+                CarAge = Car.Car.Age,
+                Reliability = Debuffed(Stats).Reliability,
+                DriverSafety = Driver.Stats.Safety,
+                InstructionMode = mode,
+                Random = random,
+                Exposure = seconds / MathsLapSeconds,
+            });
+            if (!risk.Failure.HasValue) return false;
+            Retire(raceTime, risk.Failure.Value, risk.FailureId);
+            return true;
+        }
+
+        /// <summary>
+        /// Takes the car out of the race. For a mechanical failure, <paramref name="failureId"/> names what broke; with
+        /// none given one is picked at random.
+        /// </summary>
+        public void Retire(double raceTime, FailureType reason, string? failureId = null)
         {
             if (Retired) return;
             Retired = true;
             RetirementReason = reason;
+            if (reason == FailureType.Mechanical) FailureId = failureId ?? RiskRolls.PickFailure(DefaultRandom.Next);
             CloseStint();
         }
 
         /// <summary>
-        /// The car hit a barrier or another car at <paramref name="impact"/> m/s into it. Adds the damage, and a hit
-        /// hard enough totals the car and takes it out of the race. Returns true if it did.
+        /// The car hit a barrier or another car at <paramref name="impact"/> m/s into it. Adds the damage. A hit hard
+        /// enough totals the car and takes it out of the race, and so does damage piling up to
+        /// <see cref="CarDamage.RetireDamage"/>. Returns true if the car is out.
         /// </summary>
         public bool Hit(double raceTime, double impact, double front = 0.5)
         {
@@ -186,7 +215,12 @@ namespace TarmacGauntlet.Simulation
             double added = Math.Min(100 - Damage, CarDamage.FromImpact(impact));
             if (added > 0) DamageFront = (DamageFront * Damage + Math.Max(0, Math.Min(1, front)) * added) / (Damage + added);
             Damage += added;
-            if (!CarDamage.Totals(impact)) return false;
+            if (!CarDamage.Totals(impact))
+            {
+                if (!CarDamage.Retires(Damage)) return false;
+                Retire(raceTime, FailureType.Crash);
+                return true;
+            }
             Damage = 100;
             Totalled = true;
             Retire(raceTime, FailureType.Crash);
@@ -333,6 +367,7 @@ namespace TarmacGauntlet.Simulation
             SpareParts = SpareParts,
             Retired = Retired,
             RetirementReason = RetirementReason,
+            FailureId = FailureId,
             LastLineTime = LastLineTime,
             Flagged = Flagged,
             FuelAdded = FuelAdded,
@@ -361,6 +396,7 @@ namespace TarmacGauntlet.Simulation
             SpareParts = s.SpareParts;
             Retired = s.Retired;
             RetirementReason = s.RetirementReason;
+            FailureId = s.FailureId;
             LastLineTime = s.LastLineTime;
             Flagged = s.Flagged;
             FuelAdded = s.FuelAdded;
@@ -443,6 +479,13 @@ namespace TarmacGauntlet.Simulation
             if (leader && car.Laps > positions.Count) RecordPositions();
             return found;
         }
+
+        /// <summary>
+        /// Car <paramref name="index"/> drove <paramref name="seconds"/> more on track: rolls for a race-ending
+        /// mechanical failure over them (<see cref="CarRaceLog.Drive"/>). Returns true if the car failed.
+        /// </summary>
+        public bool Drive(int index, double raceTime, double seconds, InstructionMode mode) =>
+            Cars[index].Drive(raceTime, seconds, mode, random);
 
         /// <summary>True once the leader has taken the chequered flag: every car crossing the line from now on takes it too.</summary>
         public bool FlagOut => Cars.Any(c => c.Flagged);

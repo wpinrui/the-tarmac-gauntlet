@@ -264,7 +264,7 @@ namespace TarmacGauntlet.Simulation
                     {
                         Lap = c.Laps,
                         Type = RaceEventType.Retirement,
-                        Text = $"{car} retired — {c.RetirementReason.ToString()!.ToLowerInvariant()}",
+                        Text = $"{car} retired — {(c.Failure?.Description ?? c.RetirementReason.ToString()!).ToLowerInvariant()}",
                         CarId = car,
                         TeamId = team,
                     });
@@ -302,6 +302,7 @@ namespace TarmacGauntlet.Simulation
                     Laps = c.Laps,
                     Retired = c.Retired,
                     RetirementReason = c.RetirementReason,
+                    FailureId = c.FailureId,
                     BestLap = c.BestLap,
                     PrizeMoney = history.Results[i].PrizeMoney,
                 };
