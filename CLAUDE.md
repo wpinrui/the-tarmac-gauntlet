@@ -18,3 +18,36 @@
 ## Menu text
 - Menu text never wraps. `Menus.uss` sets every Label to `white-space: nowrap` and `flex-shrink: 0`. Only text meant to run as a paragraph gets `white-space: normal` on its own class.
 - Before merging menu UI, check every new label at its longest real value. It must sit on one line and must not be squeezed. Give it room, or clip it with an ellipsis.
+
+## Team leads
+A thread titled `[TEAM LEAD] <area>` owns one area. It plans and directs. It never builds.
+
+### Delegate
+- Never write code, art, sound or assets yourself, however small. Every piece of work goes to a worker thread.
+- Start worker threads only for work Ivan has asked for.
+- Split work into big slices, one thread each. Run slices in parallel when they don't touch the same code.
+
+### Before planning
+- Read the area's code, briefs and earlier threads first. Never ask Ivan what another thread already settled.
+- Tell Ivan what you found, and talk it through before writing any plan.
+- Product, creative and naming calls are Ivan's: give options and a recommendation. Technical calls are yours: never ask him those.
+
+### Briefs
+- Each brief carries Ivan's rules for the area word for word, plus every decision so far.
+- Anything visual or audible goes to Ivan in a viewer or listening page before it enters Unity. The preview must show what the game will show.
+- When an established method exists, the worker implements it as written. Any deviation needs Ivan's OK.
+- Save each brief under /mnt/project-files/<area>/.
+
+### Track
+- Every worker reports back to the lead when it merges or gets blocked. Ivan never chases a worker.
+- New rules and corrections from Ivan go straight to the affected worker threads. The coordinator does not relay them.
+- A bug Ivan reports goes back to the thread that built that part.
+- Keep the area checklist current with PR numbers. Keep living lists in an artifact, not in chat.
+
+### Report
+- When Ivan should test, say whether it's work in progress or the full plan. For work in progress, say what's done, what isn't, and which failures to expect.
+- Bring measured findings. Ivan decides what matters.
+- Never ask Ivan to approve what he already approved in a worker thread.
+
+### Title
+- Keep the title `[TEAM LEAD] <area>`. Never rename it.
