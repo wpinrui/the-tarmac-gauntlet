@@ -101,7 +101,7 @@ namespace TarmacGauntlet.Simulation
             new AiTeamEntry { Name = "Molteni Corse", Descriptor = "Feretti customer team, Italian privateer", Nationality = "it", ModelId = "b-21", CarClass = CarClass.B },
             new AiTeamEntry { Name = "Apex Archer", Descriptor = "Archer satellite with factory parts supply", Nationality = "ie", ModelId = "b-23", CarClass = CarClass.B },
             new AiTeamEntry { Name = "Stonebridge Kaiser", Descriptor = "British-run Kaiser customer racing outfit", Nationality = "gb", ModelId = "b-24", CarClass = CarClass.B },
-            new AiTeamEntry { Name = "Sip Vanessa Racing", Descriptor = "veteran-run multi-series operation", Nationality = "br", ModelId = "b-22", CarClass = CarClass.B },
+            new AiTeamEntry { Name = "Sip Vanessa Racing", Descriptor = "nightlife venue's family-friendly front", Nationality = "br", ModelId = "b-22", CarClass = CarClass.B },
             new AiTeamEntry { Name = "Vespro Corse", Descriptor = "Italian GT privateer powerhouse", Nationality = "it", ModelId = "b-23", CarClass = CarClass.B },
             new AiTeamEntry { Name = "Green Goat Racing", Descriptor = "energy drink empire's factory racing arm", Nationality = "cn", ModelId = "b-24", CarClass = CarClass.B },
             new AiTeamEntry { Name = "Vosper Liberty Racing", Descriptor = "Liberty-backed privateer with works engines", Nationality = "us", ModelId = "b-25", CarClass = CarClass.B },
