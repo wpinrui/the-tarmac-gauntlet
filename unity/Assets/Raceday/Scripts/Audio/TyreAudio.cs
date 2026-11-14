@@ -27,6 +27,8 @@ namespace TarmacGauntlet.Raceday
         private AudioSource source;
         private TyreSynth synth;
         private float[] mono = new float[4096];
+        /// <summary>The tyres' gain, on the samples: the source itself stays at <see cref="SynthGain.Carrier"/>.</summary>
+        private readonly SynthGain gain = new SynthGain();
         private volatile bool playing;
 
         public static TyreAudio Fit(CarController car, int seed)
@@ -56,6 +58,7 @@ namespace TarmacGauntlet.Raceday
             s.minDistance = 5f;
             s.maxDistance = Range;
             s.priority = 96;   // below the engines when Unity runs short of voices
+            s.volume = SynthGain.Carrier;
             t.source = s;
             return t;
         }
@@ -73,7 +76,7 @@ namespace TarmacGauntlet.Raceday
             if (synth == null) return;
             if (rankedFrame != Time.frameCount) Rank();
             if (!playing) return;
-            source.volume = Mix.Gain(SoundGroup.Tyres);
+            gain.Target = Mix.Gain(SoundGroup.Tyres);
 
             float slide = 0f;
             int kerb = 0, gravel = 0, grass = 0, grounded = 0;
@@ -125,6 +128,7 @@ namespace TarmacGauntlet.Raceday
             int frames = data.Length / channels;
             if (mono.Length < frames) mono = new float[frames];
             synth.Render(mono, frames);
+            gain.Apply(mono, frames);
             for (int i = 0, k = 0; i < frames; i++)
                 for (int c = 0; c < channels; c++, k++)
                     data[k] *= mono[i];

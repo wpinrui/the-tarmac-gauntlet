@@ -9,8 +9,9 @@
     <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)../../out/mix-check/obj/</BaseIntermediateOutputPath>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Check.cs;Render.cs" />
+    <Compile Include="Check.cs;Render.cs;SynthGains.cs" />
     <Compile Include="../../unity/Assets/Audio/Scripts/Mix.cs" />
+    <Compile Include="../../unity/Assets/Audio/Scripts/SynthGain.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/RaceVoices.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/SfxVoices.cs" />
     <Compile Include="../../unity/Assets/Raceday/Scripts/Audio/AmbienceMix.cs" />
