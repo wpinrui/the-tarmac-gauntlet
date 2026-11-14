@@ -135,16 +135,17 @@ namespace TarmacGauntlet.Raceday
             Emit("Stand seats", seats, m?.Seats, true);
             Emit("Stand roofs", roof, m?.Roof, true);
             Emit("Stand banks", bank, m?.Bank, true);
-            Emit("Crowd", crowd, m?.Crowd, false);
+            Emit("Crowd", crowd, m?.Crowd, false, false);
             Emit("Catch fence", mesh, m?.FenceMesh, false);
             Emit("Catch fence posts", posts, m?.FencePosts, false);
             return parts;
         }
 
-        private void Emit(string name, MeshKit kit, Material material, bool shadows)
+        /// <param name="solid">Cars hit it: everything but the crowd, who stand inside what cars hit first.</param>
+        private void Emit(string name, MeshKit kit, Material material, bool shadows, bool solid = true)
         {
             if (kit.IsEmpty) return;
-            foreach (MeshKit chunk in kit.Chunks(150f)) parts.Add(new CircuitPart(name, chunk, material, false, shadows));
+            foreach (MeshKit chunk in kit.Chunks(150f)) parts.Add(new CircuitPart(name, chunk, material, solid, shadows));
         }
 
         // ---------------------------------------------------------------- placing a stand
