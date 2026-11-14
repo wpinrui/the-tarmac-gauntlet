@@ -3,7 +3,7 @@
 // at the line, and a stop every stint where the crew repair what is worth repairing. Each year the race is settled
 // into the career and the career moves on a year, so the field ages and wears as it does in a real game.
 // Reports how much of the field finishes and why the rest retire, and fails outside the plan's numbers
-// (/mnt/project-files/mechanical-failure/plan.md): about 65% finish, retirements split about evenly between
+// (/mnt/project-files/mechanical-failure/plan.md, finish rate moved to 70% by Ivan): about 70% finish, retirements split about evenly between
 // mechanical failures and crashes, and worn, old cars and Push well below the average.
 using System;
 using System.Collections.Generic;
@@ -93,7 +93,7 @@ static class Check
         Console.WriteLine($"all on Push  {push}");
         Console.WriteLine();
 
-        Expect(Math.Abs(all.Finish - 0.65) <= 0.04, "about 65% of the field finishes", all.Finish.ToString("P1"));
+        Expect(Math.Abs(all.Finish - 0.70) <= 0.04, "about 70% of the field finishes", all.Finish.ToString("P1"));
         double mechShare = all.Out == 0 ? 0 : (double)all.Mechanical / all.Out;
         Expect(mechShare >= 0.4 && mechShare <= 0.6, "retirements split about evenly", $"{mechShare:P0} mechanical, {1 - mechShare:P0} crash");
         Expect(worn.Cars == 0 || worn.Finish < all.Finish - 0.05, "worn and old cars finish well below the average", worn.Finish.ToString("P1"));
