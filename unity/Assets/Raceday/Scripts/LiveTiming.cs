@@ -10,7 +10,7 @@ namespace TarmacGauntlet.Raceday
     /// the car over. Once your car is out of the race it opens and closes on T at any time, until the race ends: once the time is up and your race is over it shuts, for the cooldown lap and the podiums. The race runs at the speed picked on the buttons left of the way back, 1x to 16x,
     /// or stepped through them with F,
     /// and back at 1x once the page closes. The scene behind the page is not drawn. Left: every car in race order, filtered by class, your row in white, a chequered flag by each car that has finished. Right: your car's
-    /// onboard and the track map, or above 2x the map alone across both, as a second view of the scene costs too much there, then your car's driver, fuel, tyres, condition and the driver's fatigue,
+    /// onboard and the track map, or above 2x the map alone across both, as a second view of the scene costs too much there, then your car's driver, fuel, tyres, condition and the driver's fatigue, its active issues by name, each in its colour (<see cref="FailureBanner.IssueColour"/>),
     /// fuel and tyres with the laps they last on the engine map in use (the one that runs out first in amber), the engine map, and
     /// the next stop: laps of fuel, tyres, repairs, next driver and Pit now (<see cref="PitOrders"/>), the same plan
     /// as the pit panel's (<see cref="PitPanel"/>). Left alone the car still pits and the crew choose (<see cref="StopPlanner"/>).
@@ -379,6 +379,7 @@ namespace TarmacGauntlet.Raceday
                 Bar(x, ref y, w, "TYRES", 1f - s.Wear, Laps(tyreLaps), tyreLaps < fuelLaps);
                 Bar(x, ref y, w, "CONDITION", (float)Log.Condition / 100f, Mathf.RoundToInt((float)Log.Condition) + "%", false);
                 Bar(x, ref y, w, "FATIGUE", (float)Log.Fatigue / 100f, Mathf.RoundToInt((float)Log.Fatigue) + "%", false);
+                Issues(x, y, w, panel.yMax - 24f * k - 52f * k - 16f * k);
             }
 
             float bw = (w - 16f * k) / 3f;
@@ -395,6 +396,31 @@ namespace TarmacGauntlet.Raceday
                     Label(b, m.ToString().ToUpperInvariant(), small, on ? Ink : colour, TextAnchor.MiddleCenter);
                 }
                 if (Click(b)) s.Map = m;
+            }
+        }
+
+        /// <summary>
+        /// The car's active issues, one a line from y down to <paramref name="bottom"/>, under an ISSUES label. Past the room,
+        /// the last line counts the rest.
+        /// </summary>
+        private void Issues(float x, float y, float w, float bottom)
+        {
+            IReadOnlyList<ActiveIssue> active = Log.ActiveIssues;
+            if (active.Count == 0) return;
+            Label(new Rect(x, y, w, 26f * k), "ISSUES", small, Dim, TextAnchor.MiddleLeft);
+            y += 32f * k;
+            float line = 28f * k;
+            int room = Mathf.Max(1, Mathf.FloorToInt((bottom - y) / line));
+            for (int i = 0; i < active.Count; i++)
+            {
+                if (i == room - 1 && active.Count > room)
+                {
+                    Label(new Rect(x, y, w, line), "+" + (active.Count - i), text, Dim, TextAnchor.MiddleLeft);
+                    return;
+                }
+                IssueTemplate t = IssueTemplates.Find(active[i].TemplateId);
+                Label(new Rect(x, y, w, line), t != null ? t.Description : active[i].TemplateId, text, FailureBanner.IssueColour(t), TextAnchor.MiddleLeft);
+                y += line;
             }
         }
 
